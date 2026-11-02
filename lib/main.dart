@@ -4,10 +4,16 @@ import 'package:window_manager/window_manager.dart';
 import 'app_info.dart';
 import 'app_scope.dart';
 import 'app_state.dart';
+import 'installer/installer_app.dart';
+import 'installer/installer_core.dart';
 import 'shell.dart';
 import 'theme.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
+  // 安装包外壳与系统「应用」列表会以安装 / 卸载模式启动；这时不读写启动器的用户数据
+  final installer = installerModeFromArgs(args);
+  if (installer != null) return runInstaller(installer, args);
+
   WidgetsFlutterBinding.ensureInitialized();
   final state = await AppState.create();
   final window = WindowManager.instance.getCurrent()!;

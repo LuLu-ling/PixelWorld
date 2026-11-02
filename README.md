@@ -31,6 +31,14 @@ flutter build windows --release --no-tree-shake-icons
 
 发布构建需要加 `--no-tree-shake-icons`：当前 Flutter 版本裁剪图标字体时会漏掉部分图标。
 
+打包 Windows 安装程序与便携版（输出到 `dist/`）：
+
+```bash
+dart run tool/build_installer.dart
+```
+
+安装程序只为当前用户安装，不需要管理员权限；外壳用系统自带的 .NET Framework 编译器编译。推送 `v*` 标签时，GitHub Actions 会自动打包并上传到草稿 Release。
+
 ## 许可证
 
 PCL.PW 自身的代码以 [Apache-2.0](LICENSE) 协议开源。PCL 的相关规则见 [PCL-GUIDE.md](PCL-GUIDE.md)。

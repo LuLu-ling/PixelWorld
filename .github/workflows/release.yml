@@ -1,0 +1,30 @@
+# 推送 v* 标签时打包 Windows 版并上传到对应的 GitHub Release（草稿）
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build
+        run: |
+          flutter pub get
+          dart run tool/build_installer.dart
+      - name: Upload
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "PCL.PW $GITHUB_REF_NAME" --notes "第三方基于 PCL 二次创作的测试版本，详见 README。"
+          gh release upload "$GITHUB_REF_NAME" dist/*-setup.exe dist/*-portable.zip --clobber

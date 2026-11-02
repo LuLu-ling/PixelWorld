@@ -1,0 +1,161 @@
+import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
+
+import 'app_info.dart';
+import 'pages/download_page.dart';
+import 'pages/home_page.dart';
+import 'pages/settings_page.dart';
+import 'pages/tools_page.dart';
+import 'widgets/window_buttons.dart';
+
+enum MainPage { home, download, settings, tools }
+
+const _nav = [
+  (page: MainPage.home, icon: Icons.rocket_launch_outlined, active: Icons.rocket_launch, label: '启动'),
+  (page: MainPage.download, icon: Icons.download_outlined, active: Icons.download, label: '下载'),
+  (page: MainPage.settings, icon: Icons.settings_outlined, active: Icons.settings, label: '设置'),
+  (page: MainPage.tools, icon: Icons.construction_outlined, active: Icons.construction, label: '工具'),
+];
+
+/// 主窗口：标题栏里放主导航（与 PCL 相同的布局），下面是当前页面。
+class Shell extends StatefulWidget {
+  const Shell({super.key});
+
+  @override
+  State<Shell> createState() => _ShellState();
+}
+
+class _ShellState extends State<Shell> {
+  MainPage _page = MainPage.home;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        children: [
+          _TitleBar(page: _page, onSelect: (p) => setState(() => _page = p)),
+          Expanded(
+            child: IndexedStack(
+              index: _page.index,
+              children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TitleBar extends StatelessWidget {
+  const _TitleBar({required this.page, required this.onSelect});
+
+  final MainPage page;
+  final ValueChanged<MainPage> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      height: 56,
+      child: Stack(
+        children: [
+          // 空白处可拖动窗口，双击最大化
+          const Positioned.fill(child: DragToMoveArea(child: SizedBox.expand())),
+          Positioned(
+            left: 20,
+            top: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: Row(
+                children: [
+                  const PixelLogo(size: 18),
+                  const SizedBox(width: 10),
+                  Text(AppInfo.name, style: theme.textTheme.titleMedium),
+                ],
+              ),
+            ),
+          ),
+          Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final item in _nav)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: _NavPill(
+                      icon: page == item.page ? item.active : item.icon,
+                      label: item.label,
+                      selected: page == item.page,
+                      onTap: () => onSelect(item.page),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Positioned(right: 0, top: 0, child: WindowButtons()),
+        ],
+      ),
+    );
+  }
+}
+
+/// 与 MD3 导航项相同的药丸形指示器
+class _NavPill extends StatelessWidget {
+  const _NavPill({required this.icon, required this.label, required this.selected, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fg = selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant;
+    return Material(
+      color: selected ? scheme.secondaryContainer : Colors.transparent,
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: fg),
+              const SizedBox(width: 8),
+              Text(label, style: Theme.of(context).textTheme.labelLarge?.copyWith(color: fg)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 像素风格的四格小方块 logo，颜色全部取自主题蓝
+class PixelLogo extends StatelessWidget {
+  const PixelLogo({super.key, required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Theme.of(context).colorScheme;
+    final half = size / 2;
+    Widget cell(Color c) => SizedBox(width: half, height: half, child: ColoredBox(color: c));
+    return SizedBox.square(
+      dimension: size,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(size * 0.28),
+        child: Column(
+          children: [
+            Row(children: [cell(s.primary), cell(s.tertiary)]),
+            Row(children: [cell(s.secondary), cell(s.primaryContainer)]),
+          ],
+        ),
+      ),
+    );
+  }
+}

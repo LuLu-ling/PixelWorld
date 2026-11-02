@@ -3,9 +3,31 @@ import 'package:flutter/material.dart';
 import '../app_scope.dart';
 import '../core/install.dart';
 import '../core/loaders.dart';
+import '../core/modrinth.dart';
 import '../widgets/side_nav.dart';
+import 'resources.dart';
 
-enum _Section { minecraft, fabric, quilt, legacyfabric, liteloader, mods, modpacks, resourcePacks, shaders }
+enum _Section {
+  minecraft,
+  fabric,
+  quilt,
+  legacyfabric,
+  liteloader,
+  mods,
+  modpacks,
+  resourcePacks,
+  shaders,
+  datapacks,
+  favorites,
+}
+
+const _resources = {
+  _Section.mods: ResourceType.mod,
+  _Section.modpacks: ResourceType.modpack,
+  _Section.resourcePacks: ResourceType.resourcepack,
+  _Section.shaders: ResourceType.shader,
+  _Section.datapacks: ResourceType.datapack,
+};
 
 const _presets = {
   _Section.fabric: LoaderKind.fabric,
@@ -33,26 +55,30 @@ class _DownloadPageState extends State<DownloadPage> {
       SideNavItem(_Section.liteloader, 'LiteLoader', Icons.light_mode_outlined),
     ]),
     SideNavGroup('社区资源', [
-      SideNavItem(_Section.mods, '模组', Icons.extension_outlined, trailing: '迁移中'),
-      SideNavItem(_Section.modpacks, '整合包', Icons.inventory_2_outlined, trailing: '迁移中'),
-      SideNavItem(_Section.resourcePacks, '资源包', Icons.layers_outlined, trailing: '迁移中'),
-      SideNavItem(_Section.shaders, '光影包', Icons.wb_sunny_outlined, trailing: '迁移中'),
+      SideNavItem(_Section.mods, '模组', Icons.extension_outlined),
+      SideNavItem(_Section.modpacks, '整合包', Icons.inventory_2_outlined),
+      SideNavItem(_Section.resourcePacks, '资源包', Icons.layers_outlined),
+      SideNavItem(_Section.shaders, '光影包', Icons.wb_sunny_outlined),
+      SideNavItem(_Section.datapacks, '数据包', Icons.data_object),
     ]),
+    SideNavGroup(null, [SideNavItem(_Section.favorites, '收藏夹', Icons.favorite_border)]),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final label = _groups.expand((g) => g.items).firstWhere((i) => i.value == _section).label;
     final preset = _presets[_section];
+    final resource = _resources[_section];
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SideNav(groups: _groups, value: _section, onChanged: (s) => setState(() => _section = s)),
         Expanded(
           child: ContentPanel(
-            child: _section == _Section.minecraft || preset != null
-                ? _MinecraftList(key: ValueKey(_section), preset: preset)
-                : MigratingPlaceholder(title: label),
+            child: switch (_section) {
+              _Section.favorites => const FavoritesList(),
+              _ when resource != null => ResourceBrowser(key: ValueKey(_section), type: resource),
+              _ => _MinecraftList(key: ValueKey(_section), preset: preset),
+            },
           ),
         ),
       ],

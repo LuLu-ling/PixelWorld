@@ -95,8 +95,13 @@ class HomePage extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => ShellNav.of(context).open(SubPage.log),
-                        child: const Text('游戏日志'),
+                        onPressed: version == null
+                            ? null
+                            : () {
+                                AppScope.read(context).instanceId = version.id;
+                                ShellNav.of(context).open(SubPage.instance);
+                              },
+                        child: const Text('版本设置'),
                       ),
                     ),
                   ],
@@ -163,6 +168,15 @@ class HomePage extends StatelessWidget {
                     ),
                     onTap: () => ShellNav.of(context).open(SubPage.versions),
                     trailing: const Icon(Icons.chevron_right),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => ShellNav.of(context).open(SubPage.log),
+                    icon: const Icon(Icons.article_outlined),
+                    label: Text(state.gameState == GameState.running ? '游戏运行中 · 查看日志' : '游戏日志'),
                   ),
                 ),
               ],

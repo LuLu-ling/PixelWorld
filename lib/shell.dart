@@ -5,6 +5,7 @@ import 'app_info.dart';
 import 'app_scope.dart';
 import 'pages/download_page.dart';
 import 'pages/home_page.dart';
+import 'pages/instance_page.dart';
 import 'pages/log_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/tools_page.dart';
@@ -14,9 +15,9 @@ import 'widgets/window_buttons.dart';
 enum MainPage { home, download, settings, tools }
 
 /// 从主页面进入的子页面：标题栏显示返回按钮和标题，代替主导航
-enum SubPage { versions, log }
+enum SubPage { versions, log, instance }
 
-const _subTitles = {SubPage.versions: '版本选择', SubPage.log: '游戏日志'};
+const _subTitles = {SubPage.versions: '版本选择', SubPage.log: '游戏日志', SubPage.instance: '版本设置'};
 
 const _nav = [
   (page: MainPage.home, icon: Icons.rocket_launch_outlined, active: Icons.rocket_launch, label: '启动'),
@@ -62,7 +63,7 @@ class _ShellState extends State<Shell> {
               children: [
                 _TitleBar(
                   page: _page,
-                  subTitle: _subTitles[_sub],
+                  subTitle: _sub == SubPage.instance ? '版本设置 - ${AppScope.of(context).instanceId}' : _subTitles[_sub],
                   onSelect: (p) => setState(() => _page = p),
                   onBack: () => setState(() => _sub = null),
                 ),
@@ -70,6 +71,7 @@ class _ShellState extends State<Shell> {
                   child: switch (_sub) {
                     SubPage.versions => const VersionsPage(),
                     SubPage.log => const LogPage(),
+                    SubPage.instance => const InstancePage(),
                     null => IndexedStack(
                       index: _page.index,
                       children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage()],

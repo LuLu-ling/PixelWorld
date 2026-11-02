@@ -149,7 +149,20 @@ class VersionsPage extends StatelessWidget {
                             leading: Icon(versionIcon(v), color: scheme.primary),
                             title: Text(v.id),
                             subtitle: Text(describeVersion(v)),
-                            trailing: v.id == state.config.selectedVersion ? const Icon(Icons.check) : null,
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (v.id == state.config.selectedVersion) const Icon(Icons.check),
+                                IconButton(
+                                  tooltip: '版本设置',
+                                  icon: const Icon(Icons.settings_outlined),
+                                  onPressed: () {
+                                    state.instanceId = v.id;
+                                    ShellNav.of(context).open(SubPage.instance);
+                                  },
+                                ),
+                              ],
+                            ),
                             onTap: () async {
                               await state.selectVersion(v.id);
                               if (context.mounted) ShellNav.of(context).back();

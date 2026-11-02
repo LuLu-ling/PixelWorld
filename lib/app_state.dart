@@ -10,6 +10,7 @@ import 'core/cat_ini.dart';
 import 'core/config.dart';
 import 'core/download.dart';
 import 'core/install.dart';
+import 'core/instance_files.dart';
 import 'core/instance.dart';
 import 'core/instance_config.dart';
 import 'core/java.dart';
@@ -17,6 +18,7 @@ import 'core/launch.dart';
 import 'core/loaders.dart';
 import 'core/memory.dart';
 import 'core/microsoft.dart';
+import 'core/modrinth.dart';
 import 'core/paths.dart';
 import 'core/precheck.dart';
 import 'core/task.dart';
@@ -57,6 +59,12 @@ class AppState extends ChangeNotifier {
 
   /// 正在进行的安装任务
   final installs = <TaskProgress>[];
+
+  /// 资源收藏夹
+  List<ResourceHit> favorites = Favorites.load();
+
+  /// 版本设置页正在查看的版本
+  String instanceId = '';
 
   /// 最近的游戏日志（最多保留 5000 行）
   final log = ValueNotifier<List<String>>(const []);
@@ -125,6 +133,56 @@ class AppState extends ChangeNotifier {
     final acc = await accounts.upsert(await login.run(onCode));
     await config.update({'selectedAccount': acc.id, 'hintBuy': true});
     return acc;
+  }
+
+  bool isFavorite(String id) => favorites.any((f) => f.id == id);
+
+  Future<void> toggleFavorite(ResourceHit hit) async {
+    favorites = isFavorite(hit.id) ? favorites.where((f) => f.id != hit.id).toList() : [hit, ...favorites];
+    notifyListeners();
+    await Favorites.save(favorites);
+  }
+
+  InstanceInfo? instance(String id) => versions.where((v) => v.id == id).firstOrNull;
+
+  /// 版本的实际运行目录（考虑版本隔离）；persist 时把首次决定的隔离结果写入实例配置
+  Future<String> gameDirOf(InstanceInfo info, {bool persist = false}) =>
+      gameDirFor(paths, info, config.isolationMode, persist: persist);
+
+  /// 把 Modrinth 资源安装到指定版本
+  Future<InstallResult> installResource(
+    ResourceVersion version,
+    ResourceType type,
+    InstanceInfo instance, {
+    String? world,
+  }) async {
+    final t = TaskProgress('安装 ${version.fileName}');
+    installs.add(t);
+    notifyListeners();
+    try {
+      // 安装资源时确定版本隔离，与启动时一致
+      final dir = await gameDirOf(instance, persist: true);
+      return await Modrinth.install(
+        version: version,
+        type: type,
+        instance: instance,
+        gameDir: dir,
+        world: world,
+        dl: downloader,
+        task: t,
+      );
+    } finally {
+      installs.remove(t);
+      notifyListeners();
+    }
+  }
+
+  /// 删除版本文件夹（移到回收站）
+  Future<void> deleteVersion(String id) async {
+    if (id.isEmpty || id.contains('..') || RegExp(r'[\\/]').hasMatch(id)) throw Exception('非法版本号');
+    await moveToTrash(paths.versionDir(id));
+    if (config.selectedVersion == id) await config.update({'selectedVersion': ''});
+    await refreshVersions();
   }
 
   /// 安装原版或加载器，完成后选中新版本

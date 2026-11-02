@@ -110,7 +110,7 @@ JavaPref _parseJava(Object? v) {
   }
 }
 
-String _serializeJava(JavaPref j) => switch (j) {
+String serializeJava(JavaPref j) => switch (j) {
   JavaGlobal() => '使用全局设置',
   JavaAuto() => jsonEncode({'kind': 'auto'}),
   JavaRelative(:final path) => jsonEncode({'kind': 'relative', 'RelativePath': path}),
@@ -170,4 +170,4 @@ Future<void> writeInstanceRaw(String versionDir, Map<String, Object> patch) asyn
 }
 
 Future<void> writeInstanceJava(String versionDir, JavaPref java) =>
-    writeInstanceRaw(versionDir, {'VersionArgumentJavaSelect': _serializeJava(java)});
+    writeInstanceRaw(versionDir, {'VersionArgumentJavaSelect': serializeJava(java)});

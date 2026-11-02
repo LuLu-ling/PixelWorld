@@ -14,7 +14,9 @@ import 'core/instance.dart';
 import 'core/instance_config.dart';
 import 'core/java.dart';
 import 'core/launch.dart';
+import 'core/loaders.dart';
 import 'core/memory.dart';
+import 'core/microsoft.dart';
 import 'core/paths.dart';
 import 'core/precheck.dart';
 import 'core/task.dart';
@@ -52,6 +54,9 @@ class AppState extends ChangeNotifier {
   TaskProgress? task;
   Process? _game;
   int? lastExitCode;
+
+  /// 正在进行的安装任务
+  final installs = <TaskProgress>[];
 
   /// 最近的游戏日志（最多保留 5000 行）
   final log = ValueNotifier<List<String>>(const []);
@@ -115,6 +120,37 @@ class AppState extends ChangeNotifier {
 
   Future<void> selectAccount(String id) => config.update({'selectedAccount': id});
 
+  /// 微软登录。登录过一次正版账号后，不再进行正版购买劝导
+  Future<Account> loginMicrosoft(MicrosoftLogin login, void Function(DeviceCode) onCode) async {
+    final acc = await accounts.upsert(await login.run(onCode));
+    await config.update({'selectedAccount': acc.id, 'hintBuy': true});
+    return acc;
+  }
+
+  /// 安装原版或加载器，完成后选中新版本
+  Future<String> installVersion(
+    String gameVersion, {
+    LoaderKind? loader,
+    String loaderVersion = '',
+    String? name,
+  }) async {
+    final t = TaskProgress('安装 ${name ?? defaultVersionName(loader, gameVersion, loaderVersion)}');
+    installs.add(t);
+    notifyListeners();
+    try {
+      final g = paths;
+      final id = loader == null
+          ? await installVanilla(g, gameVersion, downloader, t, name: name)
+          : await installLoader(g, loader, gameVersion, loaderVersion, downloader, t, name: name);
+      await refreshVersions();
+      await selectVersion(id);
+      return id;
+    } finally {
+      installs.remove(t);
+      notifyListeners();
+    }
+  }
+
   void _log(List<String> lines) {
     final next = [...log.value, ...lines];
     log.value = next.length > 5000 ? next.sublist(next.length - 5000) : next;
@@ -133,7 +169,7 @@ class AppState extends ChangeNotifier {
     if (gameState != GameState.idle) throw Exception('游戏已在运行');
     final id = config.selectedVersion;
     if (id.isEmpty) throw Exception('请先选择一个游戏版本');
-    final acc = selectedAccount;
+    var acc = selectedAccount;
     if (acc == null) throw Exception('请先添加一个账户');
 
     // ---- 正版购买劝导与赞助劝导 ----
@@ -159,6 +195,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       final dl = downloader;
+      if (acc.type == AccountType.microsoft) {
+        t.setStage('验证账户');
+        final refreshed = await refreshIfNeeded(acc, cfg.msClientId);
+        if (!identical(refreshed, acc)) acc = await accounts.upsert(refreshed);
+      }
       t.setStage('分析版本');
       final info = await analyzeInstance(g, id);
       final inst = readInstanceSettings(g.versionDir(id));

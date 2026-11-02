@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import 'paths.dart';
+import 'secure.dart';
 
 enum AccountType { offline, microsoft }
 
@@ -29,6 +31,16 @@ class Account {
 
   /// 毫秒时间戳
   final int? expiresAt;
+
+  Account copyWithId(String newId) => Account(
+    id: newId,
+    type: type,
+    name: name,
+    uuid: uuid,
+    accessToken: accessToken,
+    refreshToken: refreshToken,
+    expiresAt: expiresAt,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -66,30 +78,53 @@ String offlineUuid(String name) {
   return h.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 }
 
-/// 账户列表，保存在应用数据目录的 accounts.json。
-/// 目前只有离线账户；微软账户的令牌在迁移微软登录时改为加密保存。
+/// 账户列表，加密保存在应用数据目录的 accounts.dat（见 [SecureData]）
 class AccountStore {
   AccountStore._(this.accounts);
 
   final List<Account> accounts;
 
-  static File get _file => File(p.join(Paths.appData, 'accounts.json'));
+  static File get _file => File(p.join(Paths.appData, 'accounts.dat'));
+
+  /// 早期版本明文保存的账户文件，读取后迁移到 accounts.dat
+  static File get _legacyFile => File(p.join(Paths.appData, 'accounts.json'));
+
+  static List<Account> _parse(String text) =>
+      (jsonDecode(text) as List).whereType<Map<String, dynamic>>().map(Account.fromJson).toList();
 
   static AccountStore load() {
     try {
       if (_file.existsSync()) {
-        final list = jsonDecode(_file.readAsStringSync()) as List;
-        return AccountStore._(list.whereType<Map<String, dynamic>>().map(Account.fromJson).toList());
+        return AccountStore._(_parse(utf8.decode(SecureData.unprotect(_file.readAsBytesSync()))));
+      }
+      if (_legacyFile.existsSync()) {
+        final store = AccountStore._(_parse(_legacyFile.readAsStringSync()));
+        store._save().then((_) => _legacyFile.delete()).catchError((_) => _legacyFile);
+        return store;
       }
     } catch (_) {
-      // 文件损坏时从空列表开始
+      // 文件损坏或无法解密时从空列表开始
     }
     return AccountStore._([]);
   }
 
   Future<void> _save() async {
     await _file.parent.create(recursive: true);
-    await _file.writeAsString(jsonEncode([for (final a in accounts) a.toJson()]));
+    final text = jsonEncode([for (final a in accounts) a.toJson()]);
+    await _file.writeAsBytes(SecureData.protect(Uint8List.fromList(utf8.encode(text))));
+  }
+
+  /// 添加或更新账户（同类型同 UUID 视为同一账户）
+  Future<Account> upsert(Account acc) async {
+    final i = accounts.indexWhere((a) => a.type == acc.type && a.uuid == acc.uuid);
+    if (i >= 0) {
+      acc = acc.copyWithId(accounts[i].id);
+      accounts[i] = acc;
+    } else {
+      accounts.add(acc);
+    }
+    await _save();
+    return acc;
   }
 
   static final _namePattern = RegExp(r'^[A-Za-z0-9_]{3,16}$');

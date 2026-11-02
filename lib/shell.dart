@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_info.dart';
+import 'app_scope.dart';
 import 'pages/download_page.dart';
 import 'pages/home_page.dart';
 import 'pages/log_page.dart';
@@ -55,24 +56,29 @@ class _ShellState extends State<Shell> {
       open: (s) => setState(() => _sub = s),
       back: () => setState(() => _sub = null),
       child: Scaffold(
-        body: Column(
+        body: Stack(
           children: [
-            _TitleBar(
-              page: _page,
-              subTitle: _subTitles[_sub],
-              onSelect: (p) => setState(() => _page = p),
-              onBack: () => setState(() => _sub = null),
-            ),
-            Expanded(
-              child: switch (_sub) {
-                SubPage.versions => const VersionsPage(),
-                SubPage.log => const LogPage(),
-                null => IndexedStack(
-                  index: _page.index,
-                  children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage()],
+            Column(
+              children: [
+                _TitleBar(
+                  page: _page,
+                  subTitle: _subTitles[_sub],
+                  onSelect: (p) => setState(() => _page = p),
+                  onBack: () => setState(() => _sub = null),
                 ),
-              },
+                Expanded(
+                  child: switch (_sub) {
+                    SubPage.versions => const VersionsPage(),
+                    SubPage.log => const LogPage(),
+                    null => IndexedStack(
+                      index: _page.index,
+                      children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage()],
+                    ),
+                  },
+                ),
+              ],
             ),
+            const Positioned(right: 20, bottom: 20, child: _InstallProgress()),
           ],
         ),
       ),
@@ -202,6 +208,56 @@ class PixelLogo extends StatelessWidget {
           children: [
             Row(children: [cell(s.primary), cell(s.tertiary)]),
             Row(children: [cell(s.secondary), cell(s.primaryContainer)]),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 右下角的安装进度
+class _InstallProgress extends StatelessWidget {
+  const _InstallProgress();
+
+  @override
+  Widget build(BuildContext context) {
+    final installs = AppScope.of(context).installs;
+    if (installs.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Material(
+      elevation: 3,
+      color: theme.colorScheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 320,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final t in installs)
+              ListenableBuilder(
+                listenable: t,
+                builder: (context, _) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(t.title, style: theme.textTheme.titleSmall, overflow: TextOverflow.ellipsis),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(t.stage, style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis),
+                          ),
+                          if (t.total > 0) Text('${t.done} / ${t.total}', style: theme.textTheme.labelSmall),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      LinearProgressIndicator(value: t.fraction, borderRadius: BorderRadius.circular(4)),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),

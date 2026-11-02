@@ -26,8 +26,10 @@ PCL.PW 是一个跨平台的 Minecraft 启动器，页面布局参考 PCL，视�
 ```bash
 flutter pub get
 flutter run -d windows
-flutter build windows --release
+flutter build windows --release --no-tree-shake-icons
 ```
+
+发布构建需要加 `--no-tree-shake-icons`：当前 Flutter 版本裁剪图标字体时会漏掉部分图标。
 
 ## 许可证
 

@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'download.dart';
 import 'paths.dart';
 import 'task.dart';
+import 'instance.dart';
 import 'version.dart';
 
 /// 补全版本运行所需的文件（客户端、依赖库、日志配置、资源），启动前调用。
@@ -95,4 +96,92 @@ Future<VersionJson> ensureVersionFiles(
     }
   }
   return v;
+}
+
+// ---------- 远程版本列表 ----------
+
+const _manifestUrl = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';
+
+class RemoteVersion {
+  RemoteVersion({
+    required this.id,
+    required this.type,
+    required this.url,
+    required this.releaseTime,
+    required this.fool,
+  });
+
+  final String id;
+
+  /// release / snapshot / old_beta / old_alpha
+  final String type;
+  final String url;
+  final String releaseTime;
+
+  /// 愚人节版本
+  final bool fool;
+}
+
+({DateTime at, List<RemoteVersion> list, String latestRelease, String latestSnapshot})? _manifestCache;
+
+Future<({List<RemoteVersion> list, String latestRelease, String latestSnapshot})> remoteVersions(Downloader dl) async {
+  final c = _manifestCache;
+  if (c != null && DateTime.now().difference(c.at) < const Duration(minutes: 10)) {
+    return (list: c.list, latestRelease: c.latestRelease, latestSnapshot: c.latestSnapshot);
+  }
+  final data = await dl.fetchJson(_manifestUrl) as Map<String, dynamic>;
+  final list = [
+    for (final v in (data['versions'] as List).cast<Map<String, dynamic>>())
+      RemoteVersion(
+        id: '${v['id']}',
+        type: '${v['type']}',
+        url: '${v['url']}',
+        releaseTime: '${v['releaseTime']}',
+        fool: isAprilFools('${v['id']}', '${v['releaseTime']}'),
+      ),
+  ];
+  final latest = data['latest'] as Map<String, dynamic>;
+  _manifestCache = (
+    at: DateTime.now(),
+    list: list,
+    latestRelease: '${latest['release']}',
+    latestSnapshot: '${latest['snapshot']}',
+  );
+  return (list: list, latestRelease: '${latest['release']}', latestSnapshot: '${latest['snapshot']}');
+}
+
+// ---------- 安装 ----------
+
+/// 版本名称用作文件夹名，排除非法字符
+String checkVersionName(GamePaths g, String name) {
+  final n = name.trim();
+  if (n.isEmpty || n.length > 64 || RegExp(r'[\/:*?"<>|]').hasMatch(n) || n == '.' || n == '..') {
+    throw Exception(r'版本名称不能为空，且不能包含 \ / : * ? " < > |');
+  }
+  if (Directory(g.versionDir(n)).existsSync()) throw Exception('已存在名为 $n 的版本');
+  return n;
+}
+
+/// 写入版本 JSON（可改名）并补全文件，返回最终版本名
+Future<String> saveVersionJson(GamePaths g, VersionJson json, Downloader dl, TaskProgress task, {String? name}) async {
+  final id = name != null ? checkVersionName(g, name) : json.id;
+  json.id = id;
+  await Directory(g.versionDir(id)).create(recursive: true);
+  await File(g.versionJson(id)).writeAsString(const JsonEncoder.withIndent('  ').convert(json.raw));
+  // 新安装的版本还没有决定隔离，map_to_resources 的旧版资源放在版本文件夹下
+  await ensureVersionFiles(g, id, dl, task, resourcesDir: () => p.join(g.versionDir(id), 'resources'));
+  return id;
+}
+
+Future<String> installVanilla(GamePaths g, String id, Downloader dl, TaskProgress task, {String? name}) async {
+  task.setStage('获取版本信息');
+  final entry = (await remoteVersions(dl)).list.where((v) => v.id == id).firstOrNull;
+  if (entry == null) throw Exception('找不到版本 $id');
+  final json = VersionJson(await dl.fetchJson(entry.url) as Map<String, dynamic>);
+  return saveVersionJson(g, json, dl, task, name: name != null && name != id ? name : null);
+}
+
+/// 确保加载器依赖的原版已安装（以原版版本号命名）
+Future<void> ensureVanilla(GamePaths g, String gameVersion, Downloader dl, TaskProgress task) async {
+  if (!File(g.versionJson(gameVersion)).existsSync()) await installVanilla(g, gameVersion, dl, task);
 }

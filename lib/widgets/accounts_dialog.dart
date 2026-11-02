@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
 import '../core/accounts.dart';
+import 'microsoft_login_dialog.dart';
 
 /// 账户管理：切换、添加离线账户、移除
 Future<void> showAccountsDialog(BuildContext context) =>
@@ -92,8 +93,24 @@ class _AccountsDialogState extends State<_AccountsDialog> {
                 ),
               ],
             ),
+            const SizedBox(height: 20),
+            Text('正版账户', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
-            Text('微软登录正在迁移中。', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                onPressed: () => showMicrosoftLogin(context),
+                icon: const Icon(Icons.login),
+                label: const Text('微软登录'),
+              ),
+            ),
+            if (state.config.msClientId.trim().isEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                '微软登录需要先在「设置 - 其他」中填写 Azure 应用 Client ID。',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ],
           ],
         ),
       ),

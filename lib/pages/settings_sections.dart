@@ -520,6 +520,19 @@ class MiscSection extends StatelessWidget {
             ),
           ],
         ),
+        SettingsGroup(
+          title: '正版登录',
+          children: [
+            _TextRow(
+              icon: Icons.key_outlined,
+              title: 'Azure 应用 Client ID',
+              subtitle: '微软登录需要在 Azure 注册一个「个人 Microsoft 账户」类型的公共客户端应用，并开启“允许公共客户端流”',
+              value: cfg.msClientId,
+              wide: true,
+              onSaved: (v) => cfg.update({'msClientId': v.trim()}),
+            ),
+          ],
+        ),
       ],
     );
   }

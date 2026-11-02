@@ -4,11 +4,18 @@ import 'package:window_manager/window_manager.dart';
 import 'app_info.dart';
 import 'pages/download_page.dart';
 import 'pages/home_page.dart';
+import 'pages/log_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/tools_page.dart';
+import 'pages/versions_page.dart';
 import 'widgets/window_buttons.dart';
 
 enum MainPage { home, download, settings, tools }
+
+/// 从主页面进入的子页面：标题栏显示返回按钮和标题，代替主导航
+enum SubPage { versions, log }
+
+const _subTitles = {SubPage.versions: '版本选择', SubPage.log: '游戏日志'};
 
 const _nav = [
   (page: MainPage.home, icon: Icons.rocket_launch_outlined, active: Icons.rocket_launch, label: '启动'),
@@ -16,6 +23,19 @@ const _nav = [
   (page: MainPage.settings, icon: Icons.settings_outlined, active: Icons.settings, label: '设置'),
   (page: MainPage.tools, icon: Icons.construction_outlined, active: Icons.construction, label: '工具'),
 ];
+
+/// 页面切换，供各页面打开子页面或返回
+class ShellNav extends InheritedWidget {
+  const ShellNav({super.key, required this.open, required this.back, required super.child});
+
+  final void Function(SubPage) open;
+  final VoidCallback back;
+
+  static ShellNav of(BuildContext context) => context.getInheritedWidgetOfExactType<ShellNav>()!;
+
+  @override
+  bool updateShouldNotify(ShellNav old) => false;
+}
 
 /// 主窗口：标题栏里放主导航（与 PCL 相同的布局），下面是当前页面。
 class Shell extends StatefulWidget {
@@ -27,30 +47,46 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   MainPage _page = MainPage.home;
+  SubPage? _sub;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          _TitleBar(page: _page, onSelect: (p) => setState(() => _page = p)),
-          Expanded(
-            child: IndexedStack(
-              index: _page.index,
-              children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage()],
+    return ShellNav(
+      open: (s) => setState(() => _sub = s),
+      back: () => setState(() => _sub = null),
+      child: Scaffold(
+        body: Column(
+          children: [
+            _TitleBar(
+              page: _page,
+              subTitle: _subTitles[_sub],
+              onSelect: (p) => setState(() => _page = p),
+              onBack: () => setState(() => _sub = null),
             ),
-          ),
-        ],
+            Expanded(
+              child: switch (_sub) {
+                SubPage.versions => const VersionsPage(),
+                SubPage.log => const LogPage(),
+                null => IndexedStack(
+                  index: _page.index,
+                  children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage()],
+                ),
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _TitleBar extends StatelessWidget {
-  const _TitleBar({required this.page, required this.onSelect});
+  const _TitleBar({required this.page, required this.subTitle, required this.onSelect, required this.onBack});
 
   final MainPage page;
+  final String? subTitle;
   final ValueChanged<MainPage> onSelect;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -62,36 +98,45 @@ class _TitleBar extends StatelessWidget {
           // 空白处可拖动窗口，双击最大化
           const Positioned.fill(child: DragToMoveArea(child: SizedBox.expand())),
           Positioned(
-            left: 20,
+            left: subTitle == null ? 20 : 8,
             top: 0,
             bottom: 0,
-            child: IgnorePointer(
+            child: subTitle == null
+                ? IgnorePointer(
+                    child: Row(
+                      children: [
+                        const PixelLogo(size: 18),
+                        const SizedBox(width: 10),
+                        Text(AppInfo.name, style: theme.textTheme.titleMedium),
+                      ],
+                    ),
+                  )
+                : Row(
+                    children: [
+                      IconButton(tooltip: '返回', onPressed: onBack, icon: const Icon(Icons.arrow_back)),
+                      const SizedBox(width: 4),
+                      Text(subTitle!, style: theme.textTheme.titleMedium),
+                    ],
+                  ),
+          ),
+          if (subTitle == null)
+            Center(
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const PixelLogo(size: 18),
-                  const SizedBox(width: 10),
-                  Text(AppInfo.name, style: theme.textTheme.titleMedium),
+                  for (final item in _nav)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: _NavPill(
+                        icon: page == item.page ? item.active : item.icon,
+                        label: item.label,
+                        selected: page == item.page,
+                        onTap: () => onSelect(item.page),
+                      ),
+                    ),
                 ],
               ),
             ),
-          ),
-          Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final item in _nav)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: _NavPill(
-                      icon: page == item.page ? item.active : item.icon,
-                      label: item.label,
-                      selected: page == item.page,
-                      onTap: () => onSelect(item.page),
-                    ),
-                  ),
-              ],
-            ),
-          ),
           const Positioned(right: 0, top: 0, child: WindowButtons()),
         ],
       ),
@@ -144,7 +189,11 @@ class PixelLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = Theme.of(context).colorScheme;
     final half = size / 2;
-    Widget cell(Color c) => SizedBox(width: half, height: half, child: ColoredBox(color: c));
+    Widget cell(Color c) => SizedBox(
+      width: half,
+      height: half,
+      child: ColoredBox(color: c),
+    );
     return SizedBox.square(
       dimension: size,
       child: ClipRRect(

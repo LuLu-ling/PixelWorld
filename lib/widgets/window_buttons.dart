@@ -53,15 +53,20 @@ class _WindowButtonsState extends State<WindowButtons> {
               onTap: () => _maximized ? _window.unmaximize() : _window.maximize(),
             ),
           ),
-        _Button(
-            height: widget.height, glyph: _Glyph.close, tooltip: '关闭', onTap: () => _window.close(), danger: true),
+        _Button(height: widget.height, glyph: _Glyph.close, tooltip: '关闭', onTap: () => _window.close(), danger: true),
       ],
     );
   }
 }
 
 class _Button extends StatefulWidget {
-  const _Button({required this.height, required this.glyph, required this.tooltip, required this.onTap, this.danger = false});
+  const _Button({
+    required this.height,
+    required this.glyph,
+    required this.tooltip,
+    required this.onTap,
+    this.danger = false,
+  });
 
   final double height;
   final _Glyph glyph;
@@ -83,8 +88,8 @@ class _ButtonState extends State<_Button> {
     final bg = !_hover
         ? Colors.transparent
         : widget.danger
-            ? const Color(0xFFC42B1C)
-            : scheme.onSurface.withValues(alpha: 0.08);
+        ? const Color(0xFFC42B1C)
+        : scheme.onSurface.withValues(alpha: 0.08);
     final fg = _hover && widget.danger ? Colors.white : scheme.onSurfaceVariant;
     return Tooltip(
       message: widget.tooltip,

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_info.dart';
-import '../main.dart';
+import '../app_scope.dart';
+import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
+import 'settings_sections.dart';
 
 enum _Section { launch, java, manage, appearance, misc, about }
 
@@ -40,49 +42,15 @@ class _SettingsPageState extends State<SettingsPage> {
         Expanded(
           child: ContentPanel(
             child: switch (_section) {
+              _Section.launch => const LaunchSection(),
+              _Section.java => const JavaSection(),
+              _Section.misc => const MiscSection(),
               _Section.appearance => const _AppearanceSection(),
               _Section.about => const _AboutSection(),
               _ => MigratingPlaceholder(title: label),
             },
           ),
         ),
-      ],
-    );
-  }
-}
-
-/// 设置项分组：标题 + 圆角卡片
-class _Group extends StatelessWidget {
-  const _Group({required this.title, required this.children});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 4, 12),
-          child: Text(title, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-        ),
-        Card.filled(
-          color: theme.colorScheme.surfaceContainerLow,
-          margin: EdgeInsets.zero,
-          clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Column(
-            children: [
-              for (var i = 0; i < children.length; i++) ...[
-                if (i > 0) const Divider(height: 1),
-                children[i],
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
       ],
     );
   }
@@ -96,26 +64,26 @@ class _AppearanceSection extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(28),
       children: [
-        _Group(title: '个性化', children: [
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            leading: const Icon(Icons.dark_mode_outlined),
-            title: const Text('颜色模式'),
-            subtitle: const Text('主题色固定为 PCL 主题蓝'),
-            trailing: ValueListenableBuilder(
-              valueListenable: themeMode,
-              builder: (context, mode, _) => SegmentedButton<ThemeMode>(
+        SettingsGroup(
+          title: '个性化',
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              leading: const Icon(Icons.dark_mode_outlined),
+              title: const Text('颜色模式'),
+              subtitle: const Text('主题色固定为 PCL 主题蓝'),
+              trailing: SegmentedButton<String>(
                 segments: const [
-                  ButtonSegment(value: ThemeMode.system, label: Text('跟随系统'), icon: Icon(Icons.brightness_auto)),
-                  ButtonSegment(value: ThemeMode.light, label: Text('浅色'), icon: Icon(Icons.light_mode_outlined)),
-                  ButtonSegment(value: ThemeMode.dark, label: Text('深色'), icon: Icon(Icons.dark_mode_outlined)),
+                  ButtonSegment(value: 'system', label: Text('跟随系统'), icon: Icon(Icons.brightness_auto)),
+                  ButtonSegment(value: 'light', label: Text('浅色'), icon: Icon(Icons.light_mode_outlined)),
+                  ButtonSegment(value: 'dark', label: Text('深色'), icon: Icon(Icons.dark_mode_outlined)),
                 ],
-                selected: {mode},
-                onSelectionChanged: (s) => themeMode.value = s.first,
+                selected: {AppScope.of(context).config.themeMode},
+                onSelectionChanged: (s) => AppScope.read(context).config.update({'themeMode': s.first}),
               ),
             ),
-          ),
-        ]),
+          ],
+        ),
       ],
     );
   }
@@ -132,49 +100,65 @@ class _AboutSection extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     ListTile link(IconData icon, String title, String subtitle, String url, {String action = '查看'}) => ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-          leading: Icon(icon),
-          title: Text(title),
-          subtitle: Text(subtitle),
-          trailing: TextButton(onPressed: () => _open(url), child: Text(action)),
-        );
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      trailing: TextButton(onPressed: () => _open(url), child: Text(action)),
+    );
     return ListView(
       padding: const EdgeInsets.all(28),
       children: [
-        _Group(title: '关于', children: [
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            leading: CircleAvatar(
-              backgroundColor: scheme.primaryContainer,
-              foregroundColor: scheme.onPrimaryContainer,
-              child: const Icon(Icons.favorite),
+        SettingsGroup(
+          title: '关于',
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              leading: CircleAvatar(
+                backgroundColor: scheme.primaryContainer,
+                foregroundColor: scheme.onPrimaryContainer,
+                child: const Icon(Icons.favorite),
+              ),
+              title: const Text(AppInfo.pclAuthor),
+              subtitle: const Text('Plain Craft Launcher（PCL）的作者。PCL.PW 基于 PCL 二次创作'),
+              trailing: FilledButton.icon(
+                onPressed: () => _open(AppInfo.pclSponsorUrl),
+                icon: const Icon(Icons.volunteer_activism_outlined),
+                label: const Text('赞助作者'),
+              ),
             ),
-            title: const Text(AppInfo.pclAuthor),
-            subtitle: const Text('Plain Craft Launcher（PCL）的作者。PCL.PW 基于 PCL 二次创作'),
-            trailing: FilledButton.icon(
-              onPressed: () => _open(AppInfo.pclSponsorUrl),
-              icon: const Icon(Icons.volunteer_activism_outlined),
-              label: const Text('赞助作者'),
-            ),
-          ),
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            leading: const Icon(Icons.info_outline),
-            title: Text('${AppInfo.fullName} ${AppInfo.version}'),
-            subtitle: const Text('本软件是第三方基于 PCL 独立进行二次创作的产物，'
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              leading: const Icon(Icons.info_outline),
+              title: Text('${AppInfo.fullName} ${AppInfo.version}'),
+              subtitle: const Text(
+                '本软件是第三方基于 PCL 独立进行二次创作的产物，'
                 '由第三方开发和维护，与 PCL 及其作者无关，也不代表 PCL 官方。'
-                '请勿就本软件的问题打扰 PCL 作者。'),
-          ),
-          link(Icons.code, '源代码', 'PCL.PW 以 Apache-2.0 协议开源', AppInfo.repoUrl, action: '打开'),
-          link(Icons.gavel_outlined, 'PCL 存储库合理使用指南', '本项目遵循的命名、署名与使用规则，随源代码一同发布',
-              '${AppInfo.repoUrl}/blob/main/PCL-GUIDE.md'),
-        ]),
-        _Group(title: '致谢', children: [
-          link(Icons.groups_outlined, 'PCL Community', 'PCL 社区版（PCL-CE）的开发者们，本软件与 PCL-CE 的数据兼容',
-              AppInfo.pclCeRepoUrl),
-          link(Icons.flutter_dash, 'Flutter', '跨平台界面框架', 'https://flutter.dev'),
-          link(Icons.palette_outlined, 'Material Design 3', '界面设计语言与配色算法', 'https://m3.material.io'),
-        ]),
+                '请勿就本软件的问题打扰 PCL 作者。',
+              ),
+            ),
+            link(Icons.code, '源代码', 'PCL.PW 以 Apache-2.0 协议开源', AppInfo.repoUrl, action: '打开'),
+            link(
+              Icons.gavel_outlined,
+              'PCL 存储库合理使用指南',
+              '本项目遵循的命名、署名与使用规则，随源代码一同发布',
+              '${AppInfo.repoUrl}/blob/main/PCL-GUIDE.md',
+            ),
+          ],
+        ),
+        SettingsGroup(
+          title: '致谢',
+          children: [
+            link(
+              Icons.groups_outlined,
+              'PCL Community',
+              'PCL 社区版（PCL-CE）的开发者们，本软件与 PCL-CE 的数据兼容',
+              AppInfo.pclCeRepoUrl,
+            ),
+            link(Icons.flutter_dash, 'Flutter', '跨平台界面框架', 'https://flutter.dev'),
+            link(Icons.palette_outlined, 'Material Design 3', '界面设计语言与配色算法', 'https://m3.material.io'),
+          ],
+        ),
         Text(
           'Minecraft 是 Mojang Studios 的商标。本软件不是官方 Minecraft 产品，未经 Mojang 或 Microsoft 批准，也与其无关。',
           style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),

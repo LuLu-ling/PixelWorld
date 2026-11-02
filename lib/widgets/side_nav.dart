@@ -53,19 +53,26 @@ class SideNav<T> extends StatelessWidget {
                       child: Row(
                         children: [
                           const SizedBox(width: 16),
-                          Icon(item.icon,
-                              size: 22,
-                              color: item.value == value ? scheme.onSecondaryContainer : scheme.onSurfaceVariant),
+                          Icon(
+                            item.icon,
+                            size: 22,
+                            color: item.value == value ? scheme.onSecondaryContainer : scheme.onSurfaceVariant,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(item.label,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                    color: item.value == value ? scheme.onSecondaryContainer : scheme.onSurface)),
+                            child: Text(
+                              item.label,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: item.value == value ? scheme.onSecondaryContainer : scheme.onSurface,
+                              ),
+                            ),
                           ),
                           if (item.trailing != null)
-                            Text(item.trailing!,
-                                style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                            Text(
+                              item.trailing!,
+                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
                           const SizedBox(width: 16),
                         ],
                       ),

@@ -31,7 +31,9 @@ class _DownloadPageState extends State<DownloadPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SideNav(groups: _groups, value: _section, onChanged: (s) => setState(() => _section = s)),
-        Expanded(child: ContentPanel(child: MigratingPlaceholder(title: label))),
+        Expanded(
+          child: ContentPanel(child: MigratingPlaceholder(title: label)),
+        ),
       ],
     );
   }

@@ -1,0 +1,216 @@
+import 'dart:convert';
+import 'dart:ffi' show Abi;
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
+
+import 'paths.dart';
+
+/// Mojang 版本 JSON。字段较多且各加载器写法不一，直接包装 Map 读取。
+class VersionJson {
+  VersionJson(this.raw);
+
+  final Map<String, dynamic> raw;
+
+  String get id => raw['id'] as String;
+  set id(String v) => raw['id'] = v;
+  String? get type => raw['type'] as String?;
+  String? get releaseTime => raw['releaseTime'] as String?;
+  String? get inheritsFrom => raw['inheritsFrom'] as String?;
+  String? get jar => raw['jar'] as String?;
+  String get mainClass => (raw['mainClass'] as String?) ?? '';
+  String? get minecraftArguments => raw['minecraftArguments'] as String?;
+  Map<String, dynamic>? get arguments => raw['arguments'] as Map<String, dynamic>?;
+  List<dynamic>? get gameArguments => arguments?['game'] as List<dynamic>?;
+  List<dynamic>? get jvmArguments => arguments?['jvm'] as List<dynamic>?;
+  Map<String, dynamic>? get assetIndex => raw['assetIndex'] as Map<String, dynamic>?;
+  String? get assets => raw['assets'] as String?;
+  Map<String, dynamic>? get clientDownload => (raw['downloads'] as Map?)?['client'] as Map<String, dynamic>?;
+  List<Map<String, dynamic>> get libraries =>
+      ((raw['libraries'] as List?) ?? const []).whereType<Map<String, dynamic>>().toList();
+  int? get javaMajor => ((raw['javaVersion'] as Map?)?['majorVersion'] as num?)?.toInt();
+  String? get javaComponent => (raw['javaVersion'] as Map?)?['component'] as String?;
+  Map<String, dynamic>? get loggingClient => (raw['logging'] as Map?)?['client'] as Map<String, dynamic>?;
+
+  /// 原版版本号（部分加载器写在 clientVersion）
+  String? get clientVersion => raw['clientVersion'] as String?;
+}
+
+// ---------- 规则判断 ----------
+
+String get osName => Platform.isWindows ? 'windows' : (Platform.isMacOS ? 'osx' : 'linux');
+
+bool get _isArm64 =>
+    Abi.current() == Abi.windowsArm64 || Abi.current() == Abi.macosArm64 || Abi.current() == Abi.linuxArm64;
+bool get _isX86 => Abi.current() == Abi.windowsIA32 || Abi.current() == Abi.linuxIA32;
+
+bool rulesAllow(List<dynamic>? rules, [Map<String, bool> features = const {}]) {
+  if (rules == null || rules.isEmpty) return true;
+  var result = false;
+  for (final rule in rules.whereType<Map<String, dynamic>>()) {
+    var match = true;
+    final os = rule['os'] as Map<String, dynamic>?;
+    if (os != null) {
+      if (os['name'] != null && os['name'] != osName) match = false;
+      if (os['arch'] == 'x86' && !_isX86) match = false;
+      if (os['arch'] == 'arm64' && !_isArm64) match = false;
+    }
+    final f = rule['features'] as Map<String, dynamic>?;
+    if (f != null) {
+      for (final e in f.entries) {
+        if ((features[e.key] ?? false) != e.value) match = false;
+      }
+    }
+    if (match) result = rule['action'] == 'allow';
+  }
+  return result;
+}
+
+// ---------- Maven 坐标 ----------
+
+/// group:artifact:version[:classifier][@ext] -> 相对路径
+String mavenPath(String name) {
+  var ext = 'jar';
+  var coord = name;
+  final at = coord.indexOf('@');
+  if (at >= 0) {
+    ext = coord.substring(at + 1);
+    coord = coord.substring(0, at);
+  }
+  final parts = coord.split(':');
+  final group = parts[0], artifact = parts[1], version = parts[2];
+  final classifier = parts.length > 3 ? parts[3] : null;
+  final file = '$artifact-$version${classifier != null ? '-$classifier' : ''}.$ext';
+  return [...group.split('.'), artifact, version, file].join('/');
+}
+
+/// 用于去重的键：group:artifact[:classifier]，忽略版本
+String _libKey(String name) {
+  final parts = name.split('@').first.split(':');
+  return [parts[0], if (parts.length > 1) parts[1], if (parts.length > 3) parts[3]].join(':');
+}
+
+// ---------- 读取 & 合并继承 ----------
+
+Future<VersionJson> readVersionJson(GamePaths g, String id) async {
+  final f = File(g.versionJson(id));
+  if (!f.existsSync()) throw Exception('版本 $id 未安装');
+  return VersionJson(jsonDecode(await f.readAsString()) as Map<String, dynamic>);
+}
+
+/// 解析 inheritsFrom（Fabric 等加载器），返回完整版本 JSON
+Future<VersionJson> resolveVersion(GamePaths g, String id, [int depth = 0]) async {
+  final self = await readVersionJson(g, id);
+  final parentId = self.inheritsFrom;
+  if (parentId == null || depth > 8) return self;
+  final parent = await resolveVersion(g, parentId, depth + 1);
+
+  // 子版本库优先，同一构件只保留一份
+  final seen = <String>{};
+  final libraries = <Map<String, dynamic>>[];
+  for (final lib in [...self.libraries, ...parent.libraries]) {
+    if (seen.add(_libKey('${lib['name']}'))) libraries.add(lib);
+  }
+
+  final merged = <String, dynamic>{...parent.raw, ...self.raw};
+  merged['jar'] = self.jar ?? parent.jar ?? parent.id;
+  merged['mainClass'] = self.raw['mainClass'] ?? parent.raw['mainClass'];
+  merged['libraries'] = libraries;
+  if (self.arguments != null || parent.arguments != null) {
+    merged['arguments'] = {
+      'game': [...?parent.gameArguments, ...?self.gameArguments],
+      'jvm': [...?parent.jvmArguments, ...?self.jvmArguments],
+    };
+  }
+  for (final k in ['minecraftArguments', 'assetIndex', 'assets', 'downloads', 'javaVersion', 'logging']) {
+    merged[k] = self.raw[k] ?? parent.raw[k];
+  }
+  return VersionJson(merged);
+}
+
+// ---------- 库文件解析 ----------
+
+class ResolvedLibrary {
+  ResolvedLibrary({
+    required this.name,
+    required this.path,
+    required this.url,
+    this.sha1,
+    this.size,
+    required this.native,
+    required this.classpath,
+    required this.exclude,
+  });
+
+  final String name;
+  final String path;
+  final String url;
+  final String? sha1;
+  final int? size;
+
+  /// 需要解压到 natives 目录
+  final bool native;
+
+  /// 是否加入 classpath
+  final bool classpath;
+  final List<String> exclude;
+}
+
+const _defaultLibBase = 'https://libraries.minecraft.net/';
+
+List<ResolvedLibrary> resolveLibraries(GamePaths g, VersionJson v) {
+  final out = <ResolvedLibrary>[];
+  final archBits = _isX86 ? '32' : '64';
+  for (final lib in v.libraries) {
+    if (!rulesAllow(lib['rules'] as List?)) continue;
+    final name = '${lib['name']}';
+    final exclude = (((lib['extract'] as Map?)?['exclude'] as List?) ?? const []).map((e) => '$e').toList();
+    final downloads = lib['downloads'] as Map<String, dynamic>?;
+    final natives = lib['natives'] as Map<String, dynamic>?;
+    final libUrl = lib['url'] as String?;
+
+    // 旧格式 natives：通过 classifier 下载
+    final classifier = (natives?[osName] as String?)?.replaceAll(r'${arch}', archBits);
+    if (classifier != null) {
+      final a = (downloads?['classifiers'] as Map?)?[classifier] as Map<String, dynamic>?;
+      final rel = (a?['path'] as String?) ?? mavenPath('$name:$classifier');
+      out.add(
+        ResolvedLibrary(
+          name: name,
+          path: p.join(g.libraries, rel),
+          url: (a?['url'] as String?) ?? '${libUrl ?? _defaultLibBase}$rel',
+          sha1: a?['sha1'] as String?,
+          size: (a?['size'] as num?)?.toInt(),
+          native: true,
+          classpath: false,
+          exclude: exclude,
+        ),
+      );
+    }
+
+    final a = downloads?['artifact'] as Map<String, dynamic>?;
+    // 只有 natives、没有 downloads 信息的旧格式库（如 lwjgl-platform）不存在主 jar
+    final nativesOnly = natives != null && downloads == null;
+    if (a != null || (downloads == null && !nativesOnly)) {
+      final rel = (a?['path'] as String?) ?? mavenPath(name);
+      var base = libUrl ?? _defaultLibBase;
+      if (!base.endsWith('/')) base = '$base/';
+      // 部分加载器的库需要本地生成，没有下载地址
+      if (a != null && (a['url'] as String? ?? '').isEmpty) continue;
+      out.add(
+        ResolvedLibrary(
+          name: name,
+          path: p.join(g.libraries, rel),
+          url: (a?['url'] as String?) ?? base + rel,
+          sha1: (a?['sha1'] ?? lib['sha1']) as String?,
+          size: ((a?['size'] ?? lib['size']) as num?)?.toInt(),
+          // 新格式（1.19+）natives 直接放在 classpath 中，同时也解压一份
+          native: RegExp(r':natives-').hasMatch(name),
+          classpath: true,
+          exclude: exclude,
+        ),
+      );
+    }
+  }
+  return out;
+}

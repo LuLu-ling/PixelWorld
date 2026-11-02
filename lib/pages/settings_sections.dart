@@ -5,6 +5,7 @@ import '../app_scope.dart';
 import '../core/config.dart';
 import '../core/java.dart';
 import '../core/memory.dart';
+import '../widgets/pcl_import_dialog.dart';
 import '../widgets/settings_group.dart';
 
 // ---------- 通用设置行 ----------
@@ -492,6 +493,18 @@ class MiscSection extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(28),
       children: [
+        SettingsGroup(
+          title: 'PCL-CE',
+          children: [
+            ListTile(
+              contentPadding: _rowPadding,
+              leading: const Icon(Icons.move_down),
+              title: const Text('从 PCL-CE 导入'),
+              subtitle: const Text('导入启动设置、游戏文件夹与账户；版本独立设置两者直接共用'),
+              trailing: FilledButton.tonal(onPressed: () => showPclImport(context), child: const Text('导入')),
+            ),
+          ],
+        ),
         SettingsGroup(
           title: '下载',
           children: [

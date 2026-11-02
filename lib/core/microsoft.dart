@@ -164,6 +164,11 @@ class LoginCancelled implements Exception {
 Future<Account> refreshIfNeeded(Account acc, String clientId) async {
   final expiresAt = acc.expiresAt ?? 0;
   if (acc.type != AccountType.microsoft || expiresAt > DateTime.now().millisecondsSinceEpoch + 5 * 60000) return acc;
+  // 从 PCL-CE 导入的令牌无法用本启动器的 Client ID 刷新
+  if (acc.importedFromPcl) {
+    if (acc.expiresAt == null) return acc;
+    throw Exception('账户 ${acc.name} 的登录已过期（导入自 PCL-CE），请使用微软登录重新添加');
+  }
   if (clientId.trim().isEmpty || acc.refreshToken == null) throw Exception('微软账户已过期，请重新登录');
   final (_, t) = await _request(
     'POST',

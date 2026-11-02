@@ -20,6 +20,7 @@ class Account {
     required this.accessToken,
     this.refreshToken,
     this.expiresAt,
+    this.importedFromPcl = false,
   });
 
   final String id;
@@ -32,6 +33,9 @@ class Account {
   /// 毫秒时间戳
   final int? expiresAt;
 
+  /// 从 PCL-CE 导入的微软账户：刷新令牌属于 PCL-CE 的应用，过期后需要重新登录
+  final bool importedFromPcl;
+
   Account copyWithId(String newId) => Account(
     id: newId,
     type: type,
@@ -40,6 +44,7 @@ class Account {
     accessToken: accessToken,
     refreshToken: refreshToken,
     expiresAt: expiresAt,
+    importedFromPcl: importedFromPcl,
   );
 
   Map<String, dynamic> toJson() => {
@@ -50,6 +55,7 @@ class Account {
     'accessToken': accessToken,
     if (refreshToken != null) 'refreshToken': refreshToken,
     if (expiresAt != null) 'expiresAt': expiresAt,
+    if (importedFromPcl) 'importedFrom': 'pcl',
   };
 
   static Account fromJson(Map<String, dynamic> j) => Account(
@@ -60,6 +66,7 @@ class Account {
     accessToken: '${j['accessToken']}',
     refreshToken: j['refreshToken'] as String?,
     expiresAt: (j['expiresAt'] as num?)?.toInt(),
+    importedFromPcl: j['importedFrom'] == 'pcl',
   );
 }
 
@@ -117,6 +124,21 @@ class AccountStore {
   /// 添加或更新账户（同类型同 UUID 视为同一账户）
   Future<Account> upsert(Account acc) async {
     final i = accounts.indexWhere((a) => a.type == acc.type && a.uuid == acc.uuid);
+    if (i >= 0) {
+      acc = acc.copyWithId(accounts[i].id);
+      accounts[i] = acc;
+    } else {
+      accounts.add(acc);
+    }
+    await _save();
+    return acc;
+  }
+
+  /// 导入（PCL-CE）：离线账户按名称匹配，避免 UUID 生成方式不同导致重复；微软账户按 UUID 匹配
+  Future<Account> importAccount(Account acc) async {
+    final i = accounts.indexWhere(
+      (a) => a.type == acc.type && (acc.type == AccountType.offline ? a.name == acc.name : a.uuid == acc.uuid),
+    );
     if (i >= 0) {
       acc = acc.copyWithId(accounts[i].id);
       accounts[i] = acc;

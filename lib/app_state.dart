@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:window_manager/window_manager.dart';
 
 import 'app_info.dart';
 import 'core/accounts.dart';
@@ -324,6 +325,7 @@ class AppState extends ChangeNotifier {
       await config.update({'launchCount': count});
       await setPriority(proc.pid, cfg.processPriority);
 
+      _afterLaunched(cfg.afterLaunch);
       if (detached) {
         gameState = GameState.idle;
       } else {
@@ -340,6 +342,7 @@ class AppState extends ChangeNotifier {
             lastExitCode = code;
             gameState = GameState.idle;
             notifyListeners();
+            _afterExited(config.afterLaunch);
           }),
         );
       }
@@ -351,6 +354,34 @@ class AppState extends ChangeNotifier {
     } finally {
       task = null;
       notifyListeners();
+    }
+  }
+
+  // ---------- 启动器可见性，与 PCL-CE 的 LauncherVisibility 一致 ----------
+
+  Window? get _window => WindowManager.instance.getCurrent();
+
+  void _afterLaunched(String after) {
+    switch (after) {
+      case 'exit':
+        // 游戏以独立进程启动，启动器直接退出
+        exit(0);
+      case 'minimizeAndReopen':
+        _window?.minimize();
+      case 'hideAndExit' || 'hideAndReopen':
+        _window?.hide();
+    }
+  }
+
+  void _afterExited(String after) {
+    switch (after) {
+      case 'hideAndExit':
+        exit(0);
+      case 'hideAndReopen' || 'minimizeAndReopen':
+        _window
+          ?..show()
+          ..restore()
+          ..focus();
     }
   }
 

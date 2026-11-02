@@ -284,6 +284,7 @@ class Modrinth {
     final files = [version];
     final missing = <String>[];
     if (type == ResourceType.mod) {
+      task.beginStep('解析前置');
       final loaders = modrinthLoaders(instance.loader);
       final seen = {version.projectId};
       final queue = [...version.requires];
@@ -318,6 +319,7 @@ class Modrinth {
       items.add(DownloadItem(url: v.fileUrl, path: p.join(dir, v.fileName), sha1: v.fileSha1, size: v.fileSize));
       installed.add(v.fileName);
     }
+    task.beginStep('下载文件');
     task.setStage('下载文件');
     await dl.downloadAll(items, task.progress);
     return InstallResult(installed, skipped, missing);

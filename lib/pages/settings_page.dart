@@ -84,6 +84,27 @@ class _AppearanceSection extends StatelessWidget {
             ),
           ],
         ),
+        SettingsGroup(
+          title: '首页',
+          children: [
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              secondary: const Icon(Icons.info_outline),
+              title: const Text('显示使用提示'),
+              subtitle: const Text('正在使用的版本与免费声明'),
+              value: AppScope.of(context).config.homeHints,
+              onChanged: (v) => AppScope.read(context).config.update({'homeHints': v}),
+            ),
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              secondary: const Icon(Icons.newspaper_outlined),
+              title: const Text('显示 Minecraft 版本动态'),
+              subtitle: const Text('最新的正式版与快照，简介来自中文 Minecraft Wiki'),
+              value: AppScope.of(context).config.homeNews,
+              onChanged: (v) => AppScope.read(context).config.update({'homeNews': v}),
+            ),
+          ],
+        ),
       ],
     );
   }

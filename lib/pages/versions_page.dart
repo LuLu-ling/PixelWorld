@@ -146,7 +146,7 @@ class VersionsPage extends StatelessWidget {
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            leading: Icon(versionIcon(v), color: scheme.primary),
+                            leading: versionIcon(v, color: scheme.primary),
                             title: Text(v.id),
                             subtitle: Text(describeVersion(v)),
                             trailing: Row(

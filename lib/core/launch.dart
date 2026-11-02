@@ -127,7 +127,7 @@ List<String> buildArgs(LaunchContext ctx) {
     for (final l in libs)
       if (l != optifine) l.path,
   }.toList();
-  cp.add(g.versionJar(v.jar ?? v.id));
+  cp.add(g.versionJar(v.launchJar));
   if (optifine != null) cp.insert((cp.length - 2).clamp(0, cp.length), optifine.path);
   for (final head in inst.classpathHead.split(';').reversed) {
     if (head.trim().isNotEmpty) cp.insert(0, head.trim());

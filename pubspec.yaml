@@ -47,6 +47,7 @@ dependencies:
   ffi: ^2.2.0
   file_selector: ^1.1.0
   cryptography: ^2.9.0
+  flutter_svg: ^2.3.2
 
 dev_dependencies:
   flutter_test:

@@ -58,8 +58,36 @@ class AppState extends ChangeNotifier {
   Process? _game;
   int? lastExitCode;
 
-  /// 正在进行的安装任务
-  final installs = <TaskProgress>[];
+  /// 所有任务（安装、下载、启动），新的在前；完成的任务保留到手动清除
+  final tasks = <TaskProgress>[];
+
+  List<TaskProgress> get runningTasks => tasks.where((t) => t.state == TaskState.running).toList();
+
+  /// 登记并执行一个任务，结束时记录成功或失败
+  Future<T> track<T>(TaskProgress t, Future<T> Function() body) async {
+    tasks.insert(0, t);
+    notifyListeners();
+    try {
+      final r = await body();
+      t.complete();
+      return r;
+    } catch (e) {
+      t.fail(e);
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  void clearFinishedTasks() {
+    tasks.removeWhere((t) => t.state != TaskState.running);
+    notifyListeners();
+  }
+
+  void removeTask(TaskProgress t) {
+    tasks.remove(t);
+    notifyListeners();
+  }
 
   /// 资源收藏夹
   List<ResourceHit> favorites = Favorites.load();
@@ -157,13 +185,15 @@ class AppState extends ChangeNotifier {
     InstanceInfo instance, {
     String? world,
   }) async {
-    final t = TaskProgress('安装 ${version.fileName}');
-    installs.add(t);
-    notifyListeners();
-    try {
+    final t = TaskProgress(
+      '安装 ${version.fileName}',
+      steps: [if (type == ResourceType.mod) '解析前置', '下载文件'],
+      retry: () => installResource(version, type, instance, world: world).catchError((_) => InstallResult([], [], [])),
+    );
+    return track(t, () async {
       // 安装资源时确定版本隔离，与启动时一致
       final dir = await gameDirOf(instance, persist: true);
-      return await Modrinth.install(
+      final r = await Modrinth.install(
         version: version,
         type: type,
         instance: instance,
@@ -172,10 +202,12 @@ class AppState extends ChangeNotifier {
         dl: downloader,
         task: t,
       );
-    } finally {
-      installs.remove(t);
-      notifyListeners();
-    }
+      t.output(
+        '已安装 ${r.installed.length} 个文件，跳过 ${r.skipped.length} 个已存在的文件'
+        '${r.missing.isEmpty ? '' : '，找不到兼容的前置：${r.missing.join('、')}'}',
+      );
+      return r;
+    });
   }
 
   /// 删除版本文件夹（移到回收站）
@@ -193,21 +225,31 @@ class AppState extends ChangeNotifier {
     String loaderVersion = '',
     String? name,
   }) async {
-    final t = TaskProgress('安装 ${name ?? defaultVersionName(loader, gameVersion, loaderVersion)}');
-    installs.add(t);
-    notifyListeners();
-    try {
+    // 计划的步骤：原版没装过时先下载、安装原版，再下载、安装加载器
+    final vanillaMissing = !File(paths.versionJson(gameVersion)).existsSync();
+    final component = loader == null ? null : loaderComponent(loader, gameVersion, loaderVersion);
+    final t = TaskProgress(
+      '安装 ${name ?? defaultVersionName(loader, gameVersion, loaderVersion)}',
+      steps: [
+        if (loader == null || vanillaMissing) ...[
+          downloadStep('Minecraft $gameVersion'),
+          installStep('Minecraft $gameVersion'),
+        ],
+        if (component != null) ...[downloadStep(component), installStep(component)],
+      ],
+      retry: () =>
+          installVersion(gameVersion, loader: loader, loaderVersion: loaderVersion, name: name).catchError((_) => ''),
+    );
+    return track(t, () async {
       final g = paths;
       final id = loader == null
           ? await installVanilla(g, gameVersion, downloader, t, name: name)
           : await installLoader(g, loader, gameVersion, loaderVersion, downloader, t, name: name);
       await refreshVersions();
       await selectVersion(id);
+      t.output('已安装为 $id');
       return id;
-    } finally {
-      installs.remove(t);
-      notifyListeners();
-    }
+    });
   }
 
   void _log(List<String> lines) {
@@ -247,8 +289,9 @@ class AppState extends ChangeNotifier {
 
     final g = paths;
     final cfg = config;
-    final t = TaskProgress('启动 $id');
+    final t = TaskProgress('启动 $id', steps: const ['检查文件', '准备启动', '启动游戏']);
     task = t;
+    tasks.insert(0, t);
     gameState = GameState.preparing;
     log.value = const [];
     notifyListeners();
@@ -266,9 +309,11 @@ class AppState extends ChangeNotifier {
       final gameDir = await gameDirFor(g, info, cfg.isolationMode, persist: true);
       await Directory(gameDir).create(recursive: true);
 
+      t.beginStep('检查文件');
       final v = await ensureVersionFiles(g, id, dl, t, resourcesDir: () => p.join(gameDir, 'resources'));
       final java = await ensureJava(v, inst.java, cfg.javaPath, dl, t);
 
+      t.beginStep('准备启动');
       t.setStage('解压本地库');
       final nativesDir = nativesDirFor(g, id);
       await extractNatives(g, v, nativesDir);
@@ -311,6 +356,7 @@ class AppState extends ChangeNotifier {
       await runPreLaunch(cfg.preLaunchCommand, cfg.preLaunchWait, g.root, _launcherLog);
       await runPreLaunch(inst.preLaunchCommand, inst.preLaunchWait, g.root, _launcherLog);
 
+      t.beginStep('启动游戏');
       t.setStage('启动游戏');
       _launcherLog('Java: ${java.path}（Java ${java.major}，${java.is64 ? 64 : 32} 位）');
       _launcherLog(
@@ -346,8 +392,10 @@ class AppState extends ChangeNotifier {
           }),
         );
       }
+      t.complete();
       return true;
     } catch (e) {
+      t.fail(e);
       if (_game == null) gameState = GameState.idle;
       _launcherLog('启动失败：$e');
       rethrow;

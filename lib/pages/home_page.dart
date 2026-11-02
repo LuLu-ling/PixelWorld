@@ -10,6 +10,7 @@ import '../widgets/accounts_dialog.dart';
 import '../widgets/launch_dialogs.dart';
 import '../widgets/loader_label.dart';
 import '../widgets/side_nav.dart';
+import 'home_feed.dart';
 
 /// 启动页：左侧账户与启动按钮，右侧欢迎卡片和当前版本（PCL 的布局）
 class HomePage extends StatelessWidget {
@@ -120,7 +121,9 @@ class HomePage extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 36),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(28),
-                    gradient: LinearGradient(colors: [scheme.primaryContainer, scheme.tertiary]),
+                    gradient: LinearGradient(
+                      colors: [scheme.primaryContainer, Color.lerp(scheme.primaryContainer, Colors.black, 0.28)!],
+                    ),
                   ),
                   alignment: Alignment.centerLeft,
                   child: Column(
@@ -158,12 +161,16 @@ class HomePage extends StatelessWidget {
                         color: scheme.primaryContainer,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(version == null ? Icons.add : versionIcon(version), color: scheme.onPrimaryContainer),
+                      child: Center(
+                        child: version == null
+                            ? Icon(Icons.add, color: scheme.onPrimaryContainer)
+                            : versionIcon(version, color: scheme.onPrimaryContainer),
+                      ),
                     ),
                     title: Text(version == null ? '当前版本' : version.id),
                     subtitle: Text(
                       version == null
-                          ? (state.versions.isEmpty ? '当前文件夹中还没有版本，下载功能正在迁移' : '请选择一个版本')
+                          ? (state.versions.isEmpty ? '当前文件夹中还没有版本，可以到「下载」页安装' : '请选择一个版本')
                           : describeVersion(version),
                     ),
                     onTap: () => ShellNav.of(context).open(SubPage.versions),
@@ -179,6 +186,8 @@ class HomePage extends StatelessWidget {
                     label: Text(state.gameState == GameState.running ? '游戏运行中 · 查看日志' : '游戏日志'),
                   ),
                 ),
+                if (state.config.homeHints) ...[const SizedBox(height: 8), const HomeHints()],
+                if (state.config.homeNews) ...[const SizedBox(height: 16), const VersionNewsFeed()],
               ],
             ),
           ),

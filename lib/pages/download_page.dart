@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
 import '../core/install.dart';
+import '../core/instance.dart';
 import '../core/loaders.dart';
 import '../core/modrinth.dart';
+import '../widgets/loader_icon.dart';
 import '../widgets/side_nav.dart';
 import 'resources.dart';
 
 enum _Section {
   minecraft,
+  forge,
+  neoforge,
   fabric,
   quilt,
   legacyfabric,
@@ -30,6 +34,8 @@ const _resources = {
 };
 
 const _presets = {
+  _Section.forge: LoaderKind.forge,
+  _Section.neoforge: LoaderKind.neoforge,
   _Section.fabric: LoaderKind.fabric,
   _Section.quilt: LoaderKind.quilt,
   _Section.legacyfabric: LoaderKind.legacyfabric,
@@ -47,12 +53,16 @@ class _DownloadPageState extends State<DownloadPage> {
   _Section _section = _Section.minecraft;
 
   static const _groups = [
-    SideNavGroup(null, [SideNavItem(_Section.minecraft, 'Minecraft', Icons.view_in_ar_outlined)]),
+    SideNavGroup(null, [
+      SideNavItem(_Section.minecraft, 'Minecraft', Icons.view_in_ar_outlined, loader: Loader.vanilla),
+    ]),
     SideNavGroup('加载器', [
-      SideNavItem(_Section.fabric, 'Fabric', Icons.extension_outlined),
-      SideNavItem(_Section.quilt, 'Quilt', Icons.grid_view_outlined),
-      SideNavItem(_Section.legacyfabric, 'Legacy Fabric', Icons.history_outlined),
-      SideNavItem(_Section.liteloader, 'LiteLoader', Icons.light_mode_outlined),
+      SideNavItem(_Section.forge, 'Forge', Icons.extension_outlined, loader: Loader.forge),
+      SideNavItem(_Section.neoforge, 'NeoForge', Icons.extension_outlined, loader: Loader.neoforge),
+      SideNavItem(_Section.fabric, 'Fabric', Icons.extension_outlined, loader: Loader.fabric),
+      SideNavItem(_Section.quilt, 'Quilt', Icons.grid_view_outlined, loader: Loader.quilt),
+      SideNavItem(_Section.legacyfabric, 'Legacy Fabric', Icons.history_outlined, loader: Loader.legacyfabric),
+      SideNavItem(_Section.liteloader, 'LiteLoader', Icons.light_mode_outlined, loader: Loader.liteloader),
     ]),
     SideNavGroup('社区资源', [
       SideNavItem(_Section.mods, '模组', Icons.extension_outlined),
@@ -267,6 +277,8 @@ class InstallDialog extends StatefulWidget {
 class _InstallDialogState extends State<InstallDialog> {
   static const _descriptions = {
     null: '纯净的 Minecraft',
+    LoaderKind.forge: '历史最久、模组最多的加载器',
+    LoaderKind.neoforge: '从 Forge 分出的社区版，1.20.1 起可用',
     LoaderKind.fabric: '轻量、更新快的模组加载器',
     LoaderKind.quilt: '兼容大部分 Fabric 模组',
     LoaderKind.legacyfabric: '为 1.13.2 及更早版本移植的 Fabric',
@@ -370,7 +382,7 @@ class _InstallDialogState extends State<InstallDialog> {
                     child: ListTile(
                       dense: true,
                       enabled: _loading(k) || _available(k),
-                      leading: Icon(k == null ? Icons.view_in_ar_outlined : Icons.extension_outlined),
+                      leading: LoaderIcon(k == null ? Loader.vanilla : Loader.values.byName(k.name)),
                       title: Text(k?.label ?? '原版'),
                       subtitle: Text(!_loading(k) && !_available(k) ? '该版本不可用' : _descriptions[k]!),
                       trailing: _loading(k)
@@ -395,7 +407,7 @@ class _InstallDialogState extends State<InstallDialog> {
                   menuHeight: 300,
                   dropdownMenuEntries: [
                     for (final l in current.take(40))
-                      DropdownMenuEntry(value: l.version, label: l.stable ? l.version : '${l.version}（测试版）'),
+                      DropdownMenuEntry(value: l.version, label: l.stable ? l.label : '${l.label}（测试版）'),
                   ],
                   onSelected: (v) => setState(() => _loaderVersion = v ?? _loaderVersion),
                 ),

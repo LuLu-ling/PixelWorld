@@ -1,4 +1,5 @@
 import 'download.dart';
+import 'forge.dart';
 import 'install.dart';
 import 'paths.dart';
 import 'task.dart';
@@ -6,6 +7,9 @@ import 'version.dart';
 
 /// 可以在原版之上直接安装的加载器
 enum LoaderKind {
+  // 顺序即安装对话框中的顺序
+  forge('Forge', ''),
+  neoforge('NeoForge', ''),
   fabric('Fabric', 'https://meta.fabricmc.net/v2'),
   quilt('Quilt', 'https://meta.quiltmc.org/v3'),
   legacyfabric('Legacy Fabric', 'https://meta.legacyfabric.net/v2'),
@@ -20,10 +24,14 @@ enum LoaderKind {
 }
 
 class LoaderVersion {
-  LoaderVersion(this.version, {required this.stable});
+  LoaderVersion(this.version, {required this.stable, String? label}) : label = label ?? version;
 
+  /// 安装时使用的完整版本号
   final String version;
   final bool stable;
+
+  /// 列表中显示的版本号（Forge 的完整版本号带有游戏版本前缀）
+  final String label;
 }
 
 // ---------- LiteLoader ----------
@@ -74,6 +82,7 @@ Future<String> _installLiteLoader(
   await ensureVanilla(g, gameVersion, dl, task);
   final parent = await readVersionJson(g, gameVersion);
   if (parent.minecraftArguments == null) throw Exception('LiteLoader 只支持 1.12.2 及更早的版本');
+  task.beginStep(downloadStep(loaderComponent(LoaderKind.liteloader, gameVersion, version)));
 
   final liteName = 'com.mumfrey:liteloader:${build['version']}';
   final json = VersionJson({
@@ -105,6 +114,7 @@ Future<String> _installLiteLoader(
         },
     ],
   });
+  task.beginStep(installStep(loaderComponent(LoaderKind.liteloader, gameVersion, version)));
   task.setStage('安装 LiteLoader');
   return saveVersionJson(g, json, dl, task, name: name);
 }
@@ -112,6 +122,8 @@ Future<String> _installLiteLoader(
 // ---------- 对外接口 ----------
 
 Future<List<LoaderVersion>> loaderVersions(Downloader dl, LoaderKind kind, String gameVersion) async {
+  if (kind == LoaderKind.forge) return forgeVersions(dl, gameVersion).catchError((_) => <LoaderVersion>[]);
+  if (kind == LoaderKind.neoforge) return neoForgeVersions(dl, gameVersion).catchError((_) => <LoaderVersion>[]);
   if (kind == LoaderKind.liteloader) {
     return [
       for (final b in (await _liteLoaderBuilds(dl, gameVersion)).reversed)
@@ -145,18 +157,32 @@ Future<String> installLoader(
   String? name,
 }) async {
   if (kind == LoaderKind.liteloader) return _installLiteLoader(g, gameVersion, loaderVersion, dl, task, name: name);
+  if (kind == LoaderKind.forge || kind == LoaderKind.neoforge) {
+    return installForgeLike(g, kind, gameVersion, loaderVersion, dl, task, name: name);
+  }
   await ensureVanilla(g, gameVersion, dl, task);
+  task.beginStep(downloadStep(loaderComponent(kind, gameVersion, loaderVersion)));
   task.setStage('获取 ${kind.label} 配置');
   final profile = await dl.fetchJson(
     '${kind.meta}/versions/loader/${Uri.encodeComponent(gameVersion)}/${Uri.encodeComponent(loaderVersion)}/profile/json',
   );
-  return saveVersionJson(g, VersionJson(profile as Map<String, dynamic>), dl, task, name: name);
+  final id = await saveVersionJson(g, VersionJson(profile as Map<String, dynamic>), dl, task, name: name);
+  task.beginStep(installStep(loaderComponent(kind, gameVersion, loaderVersion)));
+  return id;
 }
+
+/// 任务步骤中显示的组件名，例如「Forge 47.4.28」
+String loaderComponent(LoaderKind kind, String gameVersion, String loaderVersion) =>
+    '${kind.label} ${loaderVersion.startsWith('$gameVersion-') ? loaderVersion.substring(gameVersion.length + 1) : loaderVersion}';
 
 /// 默认的版本名称，与各加载器官方安装器一致
 String defaultVersionName(LoaderKind? kind, String gameVersion, String loaderVersion) => switch (kind) {
   null => gameVersion,
   LoaderKind.liteloader => '$gameVersion-LiteLoader',
   LoaderKind.quilt => 'quilt-loader-$loaderVersion-$gameVersion',
+  // 由官方安装器决定，这里只用于提示
+  LoaderKind.forge => '$gameVersion-forge-${loaderVersion.replaceFirst('$gameVersion-', '')}',
+  LoaderKind.neoforge when loaderVersion.startsWith('1.20.1-') => '1.20.1-neoforge-${loaderVersion.substring(7)}',
+  LoaderKind.neoforge => 'neoforge-$loaderVersion',
   _ => 'fabric-loader-$loaderVersion-$gameVersion',
 };

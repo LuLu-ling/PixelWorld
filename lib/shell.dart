@@ -3,11 +3,14 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app_info.dart';
 import 'app_scope.dart';
+import 'core/task.dart';
+import 'widgets/task_steps.dart';
 import 'pages/download_page.dart';
 import 'pages/home_page.dart';
 import 'pages/instance_page.dart';
 import 'pages/log_page.dart';
 import 'pages/settings_page.dart';
+import 'pages/tasks_page.dart';
 import 'pages/tools_page.dart';
 import 'pages/versions_page.dart';
 import 'widgets/window_buttons.dart';
@@ -15,9 +18,9 @@ import 'widgets/window_buttons.dart';
 enum MainPage { home, download, settings, tools }
 
 /// 从主页面进入的子页面：标题栏显示返回按钮和标题，代替主导航
-enum SubPage { versions, log, instance }
+enum SubPage { versions, log, instance, tasks }
 
-const _subTitles = {SubPage.versions: '版本选择', SubPage.log: '游戏日志', SubPage.instance: '版本设置'};
+const _subTitles = {SubPage.versions: '版本选择', SubPage.log: '游戏日志', SubPage.instance: '版本设置', SubPage.tasks: '任务'};
 
 const _nav = [
   (page: MainPage.home, icon: Icons.rocket_launch_outlined, active: Icons.rocket_launch, label: '启动'),
@@ -72,6 +75,7 @@ class _ShellState extends State<Shell> {
                     SubPage.versions => const VersionsPage(),
                     SubPage.log => const LogPage(),
                     SubPage.instance => const InstancePage(),
+                    SubPage.tasks => const TasksPage(),
                     null => IndexedStack(
                       index: _page.index,
                       children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage()],
@@ -145,6 +149,8 @@ class _TitleBar extends StatelessWidget {
                 ],
               ),
             ),
+          // 窗口按钮左侧：任务入口
+          const Positioned(right: 46 * 3 + 4, top: 4, child: _TasksButton()),
           const Positioned(right: 0, top: 0, child: WindowButtons()),
         ],
       ),
@@ -217,50 +223,86 @@ class PixelLogo extends StatelessWidget {
   }
 }
 
-/// 右下角的安装进度
+/// 标题栏的任务入口；有任务进行时显示进度环
+class _TasksButton extends StatelessWidget {
+  const _TasksButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context);
+    final running = state.runningTasks;
+    final failed = state.tasks.any((t) => t.state == TaskState.failed);
+    final scheme = Theme.of(context).colorScheme;
+    return IconButton(
+      tooltip: running.isEmpty ? '任务' : '${running.length} 个任务进行中',
+      onPressed: () => ShellNav.of(context).open(SubPage.tasks),
+      icon: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (running.isNotEmpty)
+            const SizedBox.square(dimension: 28, child: CircularProgressIndicator(strokeWidth: 2)),
+          Icon(Icons.download_outlined, size: 20, color: failed ? scheme.error : null),
+        ],
+      ),
+    );
+  }
+}
+
+/// 右下角的任务进度，点击进入任务页查看详情
 class _InstallProgress extends StatelessWidget {
   const _InstallProgress();
 
   @override
   Widget build(BuildContext context) {
-    final installs = AppScope.of(context).installs;
-    if (installs.isEmpty) return const SizedBox.shrink();
+    final running = AppScope.of(context).runningTasks;
+    if (running.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
     return Material(
       elevation: 3,
       color: theme.colorScheme.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 320,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final t in installs)
-              ListenableBuilder(
-                listenable: t,
-                builder: (context, _) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(t.title, style: theme.textTheme.titleSmall, overflow: TextOverflow.ellipsis),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(t.stage, style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis),
-                          ),
-                          if (t.total > 0) Text('${t.done} / ${t.total}', style: theme.textTheme.labelSmall),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      LinearProgressIndicator(value: t.fraction, borderRadius: BorderRadius.circular(4)),
-                    ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => ShellNav.of(context).open(SubPage.tasks),
+        child: Container(
+          width: 340,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final t in running.take(3))
+                ListenableBuilder(
+                  listenable: t,
+                  builder: (context, _) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(t.title, style: theme.textTheme.titleSmall, overflow: TextOverflow.ellipsis),
+                        if (t.steps.isNotEmpty) ...[const SizedBox(height: 4), TaskSteps(task: t, dense: true)],
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(t.stage, style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis),
+                            ),
+                            if (t.total > 0) Text('${t.done} / ${t.total}', style: theme.textTheme.labelSmall),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        LinearProgressIndicator(value: t.fraction, borderRadius: BorderRadius.circular(4)),
+                      ],
+                    ),
                   ),
                 ),
+              const SizedBox(height: 4),
+              Text(
+                running.length > 3 ? '还有 ${running.length - 3} 个任务 · 点击查看详情' : '点击查看详情',
+                style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );

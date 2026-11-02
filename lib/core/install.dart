@@ -27,7 +27,7 @@ Future<VersionJson> ensureVersionFiles(
     items.add(
       DownloadItem(
         url: '${client['url']}',
-        path: g.versionJar(v.jar ?? v.id),
+        path: g.versionJar(v.rootJar),
         sha1: client['sha1'] as String?,
         size: (client['size'] as num?)?.toInt(),
       ),
@@ -54,6 +54,16 @@ Future<VersionJson> ensureVersionFiles(
 
   task.setStage('下载游戏本体与依赖库');
   await dl.downloadAll(items, task.progress);
+
+  // 继承的版本使用自己文件夹里的游戏 jar 副本
+  if (v.launchJar != v.rootJar) {
+    final own = File(g.versionJar(v.launchJar));
+    final root = File(g.versionJar(v.rootJar));
+    if (root.existsSync() && (!own.existsSync() || own.lengthSync() != root.lengthSync())) {
+      await own.parent.create(recursive: true);
+      await root.copy(own.path);
+    }
+  }
 
   // 资源文件
   final ai = v.assetIndex;
@@ -173,12 +183,19 @@ Future<String> saveVersionJson(GamePaths g, VersionJson json, Downloader dl, Tas
   return id;
 }
 
+/// 任务步骤名称：每个组件分为下载与安装两步
+String downloadStep(String component) => '下载 $component';
+String installStep(String component) => '安装 $component';
+
 Future<String> installVanilla(GamePaths g, String id, Downloader dl, TaskProgress task, {String? name}) async {
+  task.beginStep(downloadStep('Minecraft $id'));
   task.setStage('获取版本信息');
   final entry = (await remoteVersions(dl)).list.where((v) => v.id == id).firstOrNull;
   if (entry == null) throw Exception('找不到版本 $id');
   final json = VersionJson(await dl.fetchJson(entry.url) as Map<String, dynamic>);
-  return saveVersionJson(g, json, dl, task, name: name != null && name != id ? name : null);
+  final result = await saveVersionJson(g, json, dl, task, name: name != null && name != id ? name : null);
+  task.beginStep(installStep('Minecraft $id'));
+  return result;
 }
 
 /// 确保加载器依赖的原版已安装（以原版版本号命名）

@@ -18,6 +18,8 @@ const _mirrors = [
   ('https://libraries.minecraft.net', '$_bmclapi/maven'),
   ('https://maven.fabricmc.net', '$_bmclapi/maven'),
   ('https://meta.fabricmc.net', '$_bmclapi/fabric-meta'),
+  ('https://maven.minecraftforge.net', '$_bmclapi/maven'),
+  ('https://maven.neoforged.net/releases', '$_bmclapi/maven'),
 ];
 
 class DownloadItem {
@@ -77,6 +79,8 @@ class Downloader {
   }
 
   Future<dynamic> fetchJson(String url) async => jsonDecode(utf8.decode(await _get(url)));
+
+  Future<String> fetchText(String url) async => utf8.decode(await _get(url));
 
   /// 文件已存在且大小匹配即视为完整（全量校验 sha1 太慢）
   static Future<bool> isComplete(DownloadItem item) async {

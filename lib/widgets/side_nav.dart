@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../core/instance.dart';
+import 'loader_icon.dart';
+
 class SideNavItem<T> {
-  const SideNavItem(this.value, this.label, this.icon, {this.trailing});
+  const SideNavItem(this.value, this.label, this.icon, {this.trailing, this.loader});
 
   final T value;
   final String label;
   final IconData icon;
   final String? trailing;
+
+  /// 设置时显示加载器图标，代替 [icon]
+  final Loader? loader;
 }
 
 class SideNavGroup<T> {
@@ -53,11 +59,18 @@ class SideNav<T> extends StatelessWidget {
                       child: Row(
                         children: [
                           const SizedBox(width: 16),
-                          Icon(
-                            item.icon,
-                            size: 22,
-                            color: item.value == value ? scheme.onSecondaryContainer : scheme.onSurfaceVariant,
-                          ),
+                          if (item.loader != null)
+                            LoaderIcon(
+                              item.loader!,
+                              size: 22,
+                              color: item.value == value ? scheme.onSecondaryContainer : scheme.onSurfaceVariant,
+                            )
+                          else
+                            Icon(
+                              item.icon,
+                              size: 22,
+                              color: item.value == value ? scheme.onSecondaryContainer : scheme.onSurfaceVariant,
+                            ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(

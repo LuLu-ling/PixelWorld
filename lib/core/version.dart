@@ -17,7 +17,16 @@ class VersionJson {
   String? get type => raw['type'] as String?;
   String? get releaseTime => raw['releaseTime'] as String?;
   String? get inheritsFrom => raw['inheritsFrom'] as String?;
+
+  /// 显式指定的游戏 jar（LiteLoader 等直接使用原版的 jar）
   String? get jar => raw['jar'] as String?;
+
+  /// 继承链最底层（原版）的版本号，客户端 jar 从这里下载
+  String get rootJar => (raw['_rootJar'] as String?) ?? jar ?? id;
+
+  /// 启动时使用的游戏 jar。继承的版本没有指定 jar 时用自己文件夹里的副本（与官方启动器一致）：
+  /// Forge 1.17+ 按版本名在模块系统中排除游戏 jar，直接用原版的 jar 会导致包冲突
+  String get launchJar => jar ?? id;
   String get mainClass => (raw['mainClass'] as String?) ?? '';
   String? get minecraftArguments => raw['minecraftArguments'] as String?;
   Map<String, dynamic>? get arguments => raw['arguments'] as Map<String, dynamic>?;
@@ -113,7 +122,8 @@ Future<VersionJson> resolveVersion(GamePaths g, String id, [int depth = 0]) asyn
   }
 
   final merged = <String, dynamic>{...parent.raw, ...self.raw};
-  merged['jar'] = self.jar ?? parent.jar ?? parent.id;
+  merged['jar'] = self.jar ?? parent.jar;
+  merged['_rootJar'] = parent.rootJar;
   merged['mainClass'] = self.raw['mainClass'] ?? parent.raw['mainClass'];
   merged['libraries'] = libraries;
   if (self.arguments != null || parent.arguments != null) {

@@ -67,6 +67,9 @@ class LauncherConfig extends ChangeNotifier {
     'launchCount': 0,
     // 登录过一次正版账号后不再进行正版购买劝导（与 PCL 的 HintBuy 对应）
     'hintBuy': false,
+    // 首页的使用提示与 Minecraft 版本动态
+    'homeHints': true,
+    'homeNews': true,
   };
 
   static File get _file => File(p.join(Paths.appData, 'config.json'));
@@ -127,4 +130,6 @@ class LauncherConfig extends ChangeNotifier {
   String get afterLaunch => _get('afterLaunch');
   int get launchCount => (_data['launchCount'] as num).toInt();
   bool get hintBuy => _get('hintBuy');
+  bool get homeHints => _get('homeHints');
+  bool get homeNews => _get('homeNews');
 }

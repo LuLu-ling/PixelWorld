@@ -137,6 +137,17 @@ Future<String> renameVersion(GamePaths g, String from, String to) async {
   return name;
 }
 
+/// 复制版本（JSON 与 jar），原版本保留
+Future<String> copyVersion(GamePaths g, String from, String to) async {
+  final name = checkVersionName(g, to);
+  await Directory(g.versionDir(name)).create(recursive: true);
+  final v = VersionJson(jsonDecode(await File(g.versionJson(from)).readAsString()) as Map<String, dynamic>)..id = name;
+  await File(g.versionJson(name)).writeAsString(const JsonEncoder.withIndent('  ').convert(v.raw));
+  final jar = File(g.versionJar(from));
+  if (jar.existsSync()) await jar.copy(g.versionJar(name));
+  return name;
+}
+
 Future<String> installForgeLike(
   GamePaths g,
   LoaderKind kind,
@@ -162,25 +173,43 @@ Future<String> installForgeLike(
 
     task.beginStep(installStep(component));
     final String id;
+    // 安装器将生成的版本名；这个版本已存在时安装器会覆盖它，改名时要复制而不是移走原版本
+    String? expectedId;
+    var preexisting = false;
     if (profile['versionInfo'] is Map) {
       id = await _installLegacy(g, zip, profile, dl, task, label);
     } else {
       // 安装器自带的版本 JSON 要求更新的 Java 时（例如 Cleanroom 需要 Java 21），按它的要求选择
       final inner = zip.findFile('version.json');
-      final innerJava = inner == null
-          ? null
-          : (jsonDecode(utf8.decode(inner.content)) as Map<String, dynamic>)['javaVersion'] as Map<String, dynamic>?;
+      final innerJson = inner == null ? null : jsonDecode(utf8.decode(inner.content)) as Map<String, dynamic>;
+      final innerJava = innerJson?['javaVersion'] as Map<String, dynamic>?;
+      expectedId = innerJson?['id'] as String?;
+      preexisting = expectedId != null && File(g.versionJson(expectedId)).existsSync();
       // Cleanroom 的新版安装器有自己的命令行格式
       final args = kind == LoaderKind.cleanroom
           ? ['client', '--version', version, '-d', g.root, '--no-gui', '-y']
           : ['--installClient', g.root];
-      id = await _runInstaller(g, gameVersion, installer.path, dl, task, label, javaVersion: innerJava, args: args);
+      id = await _runInstaller(
+        g,
+        gameVersion,
+        installer.path,
+        dl,
+        task,
+        label,
+        javaVersion: innerJava,
+        args: args,
+        expectedId: expectedId,
+      );
     }
     // NeoForge 1.20.1 的安装器生成的版本名形如 1.20.1-forge-47.1.106，容易与 Forge 混淆
     final wanted =
         name ??
         (kind == LoaderKind.neoforge && id.contains('-forge-') ? id.replaceFirst('-forge-', '-neoforge-') : null);
-    final finalId = wanted == null || wanted == id ? id : await renameVersion(g, id, wanted);
+    final finalId = wanted == null || wanted == id
+        ? id
+        : preexisting
+        ? await copyVersion(g, id, wanted)
+        : await renameVersion(g, id, wanted);
     // 独立的版本 JSON（例如 Cleanroom）没有记录原版版本号，补上 clientVersion（HMCL 也使用这个字段）
     final jsonFile = File(g.versionJson(finalId));
     final raw = jsonDecode(await jsonFile.readAsString()) as Map<String, dynamic>;
@@ -206,6 +235,7 @@ Future<String> _runInstaller(
   String label, {
   Map<String, dynamic>? javaVersion,
   List<String> args = const [],
+  String? expectedId,
 }) async {
   await ensureLauncherProfiles(g.root);
   // 安装器的处理器需要与该版本相同或更新的 Java
@@ -240,8 +270,10 @@ Future<String> _runInstaller(
     throw Exception('$label 安装器运行失败（退出代码 $code）\n$tail');
   }
   final added = _versionIds(g).difference(before);
-  if (added.isEmpty) throw Exception('$label 安装器没有生成新的版本，可能已经安装过同一个版本');
-  return added.first;
+  if (added.isNotEmpty) return added.first;
+  // 已安装过同一个版本时，安装器覆盖原有的版本，不会新增文件夹
+  if (expectedId != null && File(g.versionJson(expectedId)).existsSync()) return expectedId;
+  throw Exception('$label 安装器没有生成新的版本');
 }
 
 /// 老版安装器：install_profile.json 中包含 versionInfo（版本 JSON）与 install（主 jar 位置）

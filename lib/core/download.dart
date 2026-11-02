@@ -55,6 +55,9 @@ class Downloader {
     final candidates = [mirror(url), if (mirror(url) != url) url]; // 镜像失败时回退到官方源
     Object? lastErr;
     for (final target in candidates) {
+      // BMCLAPI 会重定向到随机的社区节点，个别节点的证书链不完整（不发送中间证书），
+      // 系统浏览器能自动补全而 Dart 不能；重新请求会分到另一个节点，所以握手失败时多试几次
+      var handshakeRetries = 6;
       for (var i = 0; i < retries; i++) {
         try {
           final req = await _client.getUrl(Uri.parse(target));
@@ -69,6 +72,12 @@ class Downloader {
           await res.drain<void>();
           lastErr = HttpException('HTTP ${res.statusCode} $target');
           if (res.statusCode == 404) break;
+        } on HandshakeException catch (e) {
+          lastErr = e;
+          if (handshakeRetries-- > 0) {
+            i--;
+            continue;
+          }
         } catch (e) {
           lastErr = e;
         }

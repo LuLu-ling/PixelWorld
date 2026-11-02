@@ -10,6 +10,7 @@ import 'core/accounts.dart';
 import 'core/cat_ini.dart';
 import 'core/config.dart';
 import 'core/download.dart';
+import 'core/extra_loaders.dart';
 import 'core/install.dart';
 import 'core/instance_files.dart';
 import 'core/instance.dart';
@@ -210,6 +211,21 @@ class AppState extends ChangeNotifier {
     });
   }
 
+  /// 给已安装的版本添加 OptiFine（作为模组）
+  Future<void> addOptiFineMod(InstanceInfo instance, String version) {
+    final t = TaskProgress(
+      '为 ${instance.id} 添加 OptiFine',
+      steps: [
+        downloadStep(loaderComponent(LoaderKind.optifine, instance.gameVersion, version)),
+        installStep(loaderComponent(LoaderKind.optifine, instance.gameVersion, version)),
+      ],
+    );
+    return track(t, () async {
+      final dir = await gameDirOf(instance, persist: true);
+      await installOptiFineAsMod(dir, instance.gameVersion, version, downloader, t);
+    });
+  }
+
   /// 删除版本文件夹（移到回收站）
   Future<void> deleteVersion(String id) async {
     if (id.isEmpty || id.contains('..') || RegExp(r'[\\/]').hasMatch(id)) throw Exception('非法版本号');
@@ -224,6 +240,9 @@ class AppState extends ChangeNotifier {
     LoaderKind? loader,
     String loaderVersion = '',
     String? name,
+
+    /// 同时安装的 OptiFine 版本；有加载器时作为模组放进 mods
+    String? optifine,
   }) async {
     // 计划的步骤：原版没装过时先下载、安装原版，再下载、安装加载器
     final vanillaMissing = !File(paths.versionJson(gameVersion)).existsSync();
@@ -236,15 +255,29 @@ class AppState extends ChangeNotifier {
           installStep('Minecraft $gameVersion'),
         ],
         if (component != null) ...[downloadStep(component), installStep(component)],
+        if (optifine != null) ...[
+          downloadStep(loaderComponent(LoaderKind.optifine, gameVersion, optifine)),
+          installStep(loaderComponent(LoaderKind.optifine, gameVersion, optifine)),
+        ],
       ],
-      retry: () =>
-          installVersion(gameVersion, loader: loader, loaderVersion: loaderVersion, name: name).catchError((_) => ''),
+      retry: () => installVersion(
+        gameVersion,
+        loader: loader,
+        loaderVersion: loaderVersion,
+        name: name,
+        optifine: optifine,
+      ).catchError((_) => ''),
     );
     return track(t, () async {
       final g = paths;
       final id = loader == null
           ? await installVanilla(g, gameVersion, downloader, t, name: name)
           : await installLoader(g, loader, gameVersion, loaderVersion, downloader, t, name: name);
+      if (optifine != null) {
+        // 安装资源时确定版本隔离，与启动时一致
+        final dir = await gameDirOf(await analyzeInstance(g, id), persist: true);
+        await installOptiFineAsMod(dir, gameVersion, optifine, downloader, t);
+      }
       await refreshVersions();
       await selectVersion(id);
       t.output('已安装为 $id');

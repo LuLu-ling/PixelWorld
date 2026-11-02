@@ -11,8 +11,12 @@ import '../core/instance_files.dart';
 import '../core/java.dart';
 import '../core/memory.dart';
 import '../shell.dart';
+import '../core/extra_loaders.dart';
+import '../core/loaders.dart';
 import '../widgets/format.dart';
+import '../widgets/loader_icon.dart';
 import '../widgets/loader_label.dart';
+import '../widgets/optifine_compat.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
 
@@ -582,6 +586,18 @@ class _FilesState extends State<_Files> {
                     onChanged: (v) => setState(() => _query = v),
                   ),
                 ),
+              if (isMods && canAddOptiFine(widget.info.loader))
+                TextButton.icon(
+                  onPressed: () async {
+                    await showDialog<void>(
+                      context: context,
+                      builder: (_) => _AddOptiFineDialog(info: widget.info),
+                    );
+                    _refresh();
+                  },
+                  icon: const LoaderIcon(Loader.optifine, size: 18),
+                  label: const Text('添加 OptiFine'),
+                ),
               IconButton(tooltip: '刷新', onPressed: _refresh, icon: const Icon(Icons.refresh)),
               TextButton.icon(
                 onPressed: () => openInFileManager(_dir),
@@ -708,6 +724,103 @@ class _Servers extends StatelessWidget {
               subtitle: Text(s.address),
             ),
           ),
+      ],
+    );
+  }
+}
+
+/// 给已安装的版本添加 OptiFine：作为模组放进 mods（参照 PCL）
+class _AddOptiFineDialog extends StatefulWidget {
+  const _AddOptiFineDialog({required this.info});
+
+  final InstanceInfo info;
+
+  @override
+  State<_AddOptiFineDialog> createState() => _AddOptiFineDialogState();
+}
+
+class _AddOptiFineDialogState extends State<_AddOptiFineDialog> {
+  late final Future<List<LoaderVersion>> _future = optiFineVersions(
+    AppScope.read(context).downloader,
+    widget.info.gameVersion,
+  ).then((all) => optiFineFor(widget.info.loader, all));
+  String? _version;
+  bool _running = false;
+  String? _error;
+
+  Future<void> _add() async {
+    setState(() {
+      _running = true;
+      _error = null;
+    });
+    try {
+      await AppScope.read(context).addOptiFineMod(widget.info, _version!);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) setState(() => _error = errorText(e));
+    } finally {
+      if (mounted) setState(() => _running = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AlertDialog(
+      icon: const LoaderIcon(Loader.optifine, size: 28),
+      title: const Text('添加 OptiFine'),
+      content: SizedBox(
+        width: 460,
+        child: FutureBuilder(
+          future: _future,
+          builder: (context, snap) {
+            if (snap.hasError) return Text('获取 OptiFine 版本失败：${errorText(snap.error!)}');
+            if (!snap.hasData) return const LinearProgressIndicator();
+            final list = snap.data!;
+            if (list.isEmpty) {
+              return Text(
+                widget.info.loader == Loader.forge
+                    ? '没有与 Forge 兼容的 OptiFine（${widget.info.gameVersion}）'
+                    : '${widget.info.gameVersion} 没有可用的 OptiFine',
+              );
+            }
+            _version ??= (list.where((v) => v.stable).firstOrNull ?? list.first).version;
+            final selected = list.where((v) => v.version == _version).firstOrNull;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DropdownMenu<String>(
+                  expandedInsets: EdgeInsets.zero,
+                  label: const Text('OptiFine 版本'),
+                  initialSelection: _version,
+                  menuHeight: 300,
+                  dropdownMenuEntries: [
+                    for (final l in list.take(40))
+                      DropdownMenuEntry(
+                        value: l.version,
+                        label:
+                            '${l.label}${l.stable ? '' : '（预览版）'}'
+                            '${widget.info.loader == Loader.forge && (l.requiredForge?.isNotEmpty ?? false) ? ' · 需要 Forge ${l.requiredForge}' : ''}',
+                      ),
+                  ],
+                  onSelected: (v) => setState(() => _version = v),
+                ),
+                const SizedBox(height: 12),
+                Text(optiFineNote(widget.info.loader, selected), style: TextStyle(color: scheme.onSurfaceVariant)),
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(_error!, style: TextStyle(color: scheme.error)),
+                ],
+                if (_running) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
+              ],
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: _running ? null : () => Navigator.pop(context), child: const Text('取消')),
+        FilledButton(onPressed: _running || _version == null ? null : _add, child: const Text('添加')),
       ],
     );
   }

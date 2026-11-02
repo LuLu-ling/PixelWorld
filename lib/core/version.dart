@@ -211,7 +211,7 @@ List<ResolvedLibrary> resolveLibraries(GamePaths g, VersionJson v) {
           name: name,
           path: p.join(g.libraries, rel),
           // 下载地址为空的库由安装器在本地生成，只加入 classpath、不下载（与官方启动器一致）
-        url: (a?['url'] as String?) ?? base + rel,
+          url: (a?['url'] as String?) ?? base + rel,
           sha1: (a?['sha1'] ?? lib['sha1']) as String?,
           size: ((a?['size'] ?? lib['size']) as num?)?.toInt(),
           // 新格式（1.19+）natives 直接放在 classpath 中，同时也解压一份

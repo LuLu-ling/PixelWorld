@@ -6,6 +6,7 @@ import '../core/instance.dart';
 import '../core/loaders.dart';
 import '../core/modrinth.dart';
 import '../widgets/loader_icon.dart';
+import '../widgets/optifine_compat.dart';
 import '../widgets/side_nav.dart';
 import 'resources.dart';
 
@@ -289,7 +290,6 @@ class _InstallDialogState extends State<InstallDialog> {
     LoaderKind.forge: '历史最久、模组最多的加载器',
     LoaderKind.neoforge: '从 Forge 分出的社区版，1.20.1 起可用',
     LoaderKind.cleanroom: '基于 Forge 的 1.12.2 现代化分支，需要 Java 21',
-    LoaderKind.optifine: '高清修复、光影与性能优化',
     LoaderKind.labymod: '自带大量功能的整合客户端（LabyMod 4）',
     LoaderKind.fabric: '轻量、更新快的模组加载器',
     LoaderKind.quilt: '兼容大部分 Fabric 模组',
@@ -297,17 +297,27 @@ class _InstallDialogState extends State<InstallDialog> {
     LoaderKind.liteloader: '1.12.2 及更早版本的轻量加载器',
   };
 
+  /// 主加载器；null 为原版。OptiFine 不在其中，作为附加项单独勾选
   LoaderKind? _choice;
 
   /// 各加载器的可用版本；还在加载的加载器不在其中
   final _lists = <LoaderKind, List<LoaderVersion>>{};
   String _loaderVersion = '';
+  bool _optifine = false;
+  String _optifineVersion = '';
   final _name = TextEditingController();
+
+  static final _mainOptions = <LoaderKind?>[null, ...LoaderKind.values.where((k) => k != LoaderKind.optifine)];
 
   @override
   void initState() {
     super.initState();
-    _choice = widget.preset;
+    // 从 OptiFine 入口进入时：原版 + OptiFine
+    if (widget.preset == LoaderKind.optifine) {
+      _optifine = true;
+    } else {
+      _choice = widget.preset;
+    }
     _load();
   }
 
@@ -330,6 +340,7 @@ class _InstallDialogState extends State<InstallDialog> {
             if (list.isEmpty) _choice = null;
             _pickDefault();
           }
+          if (k == LoaderKind.optifine) _pickOptiFine();
         });
       });
     }
@@ -342,21 +353,60 @@ class _InstallDialogState extends State<InstallDialog> {
   void _pickDefault() {
     final list = _choice == null ? const <LoaderVersion>[] : (_lists[_choice] ?? const <LoaderVersion>[]);
     _loaderVersion = (list.where((l) => l.stable).firstOrNull ?? list.firstOrNull)?.version ?? '';
+    _pickOptiFine();
+  }
+
+  /// 可与当前主加载器搭配的 OptiFine 版本
+  List<LoaderVersion> get _optifineList =>
+      optiFineFor(loaderOfKind(_choice), _lists[LoaderKind.optifine] ?? const <LoaderVersion>[]);
+
+  bool get _canOptiFine => canAddOptiFine(loaderOfKind(_choice)) && _optifineList.isNotEmpty;
+
+  void _pickOptiFine() {
+    final list = _optifineList;
+    if (list.any((v) => v.version == _optifineVersion)) return;
+    _optifineVersion = (list.where((l) => l.stable).firstOrNull ?? list.firstOrNull)?.version ?? '';
+  }
+
+  /// 选择 OptiFine 时，把 Forge 切换到 OptiFine 要求的版本（较新的 Forge 可能与 OptiFine 不兼容）
+  void _matchForge() {
+    if (_choice != LoaderKind.forge || !_optifine) return;
+    final req = _optifineList.where((v) => v.version == _optifineVersion).firstOrNull?.requiredForge;
+    if (req == null || req.isEmpty) return;
+    final wanted = '${widget.version.id}-$req';
+    if ((_lists[LoaderKind.forge] ?? const <LoaderVersion>[]).any((v) => v.version == wanted)) {
+      _loaderVersion = wanted;
+    }
+  }
+
+  bool _forgeMismatch(LoaderVersion? of) {
+    final req = of?.requiredForge;
+    if (_choice != LoaderKind.forge || !_optifine || req == null || req.isEmpty) return false;
+    return _loaderVersion != '${widget.version.id}-$req';
   }
 
   void _install() {
     final state = AppScope.read(context);
     final messenger = ScaffoldMessenger.of(context);
     final name = _name.text.trim();
-    final loader = _choice;
+    final withOptiFine = _optifine && _canOptiFine && _optifineVersion.isNotEmpty;
     Navigator.pop(context);
-    state
-        .installVersion(
-          widget.version.id,
-          loader: loader,
-          loaderVersion: _loaderVersion,
-          name: name.isEmpty ? null : name,
-        )
+    // 只选 OptiFine 时安装为独立版本；有主加载器时 OptiFine 作为模组
+    final future = _choice == null && withOptiFine
+        ? state.installVersion(
+            widget.version.id,
+            loader: LoaderKind.optifine,
+            loaderVersion: _optifineVersion,
+            name: name.isEmpty ? null : name,
+          )
+        : state.installVersion(
+            widget.version.id,
+            loader: _choice,
+            loaderVersion: _loaderVersion,
+            name: name.isEmpty ? null : name,
+            optifine: withOptiFine ? _optifineVersion : null,
+          );
+    future
         .then(
           (id) => messenger.showSnackBar(
             SnackBar(content: Text('$id 安装完成'), behavior: SnackBarBehavior.floating, width: 420),
@@ -369,12 +419,18 @@ class _InstallDialogState extends State<InstallDialog> {
         );
   }
 
+  String get _defaultName => _choice == null && _optifine && _canOptiFine
+      ? defaultVersionName(LoaderKind.optifine, widget.version.id, _optifineVersion)
+      : defaultVersionName(_choice, widget.version.id, _loaderVersion);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final options = <LoaderKind?>[null, ...LoaderKind.values];
     final current = _choice == null ? const <LoaderVersion>[] : (_lists[_choice] ?? const <LoaderVersion>[]);
+    final ofList = _optifineList;
+    final ofSelected = ofList.where((v) => v.version == _optifineVersion).firstOrNull;
+    final ofLoading = _loading(LoaderKind.optifine);
     return AlertDialog(
       title: Text('安装 Minecraft ${widget.version.id}'),
       content: SizedBox(
@@ -384,7 +440,7 @@ class _InstallDialogState extends State<InstallDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final k in options)
+              for (final k in _mainOptions)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Material(
@@ -394,7 +450,7 @@ class _InstallDialogState extends State<InstallDialog> {
                     child: ListTile(
                       dense: true,
                       enabled: _loading(k) || _available(k),
-                      leading: LoaderIcon(k == null ? Loader.vanilla : Loader.values.byName(k.name)),
+                      leading: LoaderIcon(loaderOfKind(k)),
                       title: Text(k?.label ?? '原版'),
                       subtitle: Text(!_loading(k) && !_available(k) ? '该版本不可用' : _descriptions[k]!),
                       trailing: _loading(k)
@@ -412,9 +468,10 @@ class _InstallDialogState extends State<InstallDialog> {
               const SizedBox(height: 10),
               if (_choice != null && current.isNotEmpty) ...[
                 DropdownMenu<String>(
-                  key: ValueKey(_choice),
+                  // 选择 OptiFine 后 Forge 版本可能被自动切换，需要重建下拉框
+                  key: ValueKey('$_choice-$_loaderVersion'),
                   expandedInsets: EdgeInsets.zero,
-                  label: const Text('加载器版本'),
+                  label: Text('${_choice!.label} 版本'),
                   initialSelection: _loaderVersion,
                   menuHeight: 300,
                   dropdownMenuEntries: [
@@ -423,13 +480,67 @@ class _InstallDialogState extends State<InstallDialog> {
                   ],
                   onSelected: (v) => setState(() => _loaderVersion = v ?? _loaderVersion),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
               ],
+              // OptiFine 附加项
+              Material(
+                color: _optifine && _canOptiFine ? scheme.secondaryContainer : scheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+                clipBehavior: Clip.antiAlias,
+                child: CheckboxListTile(
+                  dense: true,
+                  secondary: const LoaderIcon(Loader.optifine),
+                  title: const Text('同时安装 OptiFine'),
+                  subtitle: Text(
+                    ofLoading
+                        ? '正在获取 OptiFine 版本…'
+                        : !canAddOptiFine(loaderOfKind(_choice))
+                        ? '${_choice?.label} 不支持与 OptiFine 一起安装'
+                        : ofList.isEmpty
+                        ? (_choice == LoaderKind.forge ? '没有与 Forge 兼容的 OptiFine' : '该版本没有 OptiFine')
+                        : [
+                            optiFineNote(loaderOfKind(_choice), ofSelected),
+                            if (_forgeMismatch(ofSelected)) '当前选择的 Forge 与 OptiFine 要求的版本不同，较新的 Forge 可能与它不兼容',
+                          ].join('\n'),
+                  ),
+                  value: _optifine && _canOptiFine,
+                  onChanged: _canOptiFine
+                      ? (v) => setState(() {
+                          _optifine = v ?? false;
+                          _matchForge();
+                        })
+                      : null,
+                ),
+              ),
+              if (_optifine && _canOptiFine) ...[
+                const SizedBox(height: 10),
+                DropdownMenu<String>(
+                  key: ValueKey('optifine-$_choice'),
+                  expandedInsets: EdgeInsets.zero,
+                  label: const Text('OptiFine 版本'),
+                  initialSelection: _optifineVersion,
+                  menuHeight: 300,
+                  dropdownMenuEntries: [
+                    for (final l in ofList.take(40))
+                      DropdownMenuEntry(
+                        value: l.version,
+                        label:
+                            '${l.label}${l.stable ? '' : '（预览版）'}'
+                            '${_choice == LoaderKind.forge && (l.requiredForge?.isNotEmpty ?? false) ? ' · 需要 Forge ${l.requiredForge}' : ''}',
+                      ),
+                  ],
+                  onSelected: (v) => setState(() {
+                    _optifineVersion = v ?? _optifineVersion;
+                    _matchForge();
+                  }),
+                ),
+              ],
+              const SizedBox(height: 14),
               TextField(
                 controller: _name,
                 decoration: InputDecoration(
                   labelText: '版本名称（可选）',
-                  hintText: defaultVersionName(_choice, widget.version.id, _loaderVersion),
+                  hintText: _defaultName,
                   helperText: '留空则使用默认名称',
                   border: const OutlineInputBorder(),
                 ),

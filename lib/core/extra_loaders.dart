@@ -32,8 +32,43 @@ Future<List<LoaderVersion>> optiFineVersions(Downloader dl, String gameVersion) 
           '${v['type']}_${v['patch']}',
           stable: !'${v['patch']}'.startsWith('pre'),
           label: '${'${v['type']}'.replaceAll('_', ' ')} ${v['patch']}',
+          // 形如「Forge 47.1.0」「Forge #2851」或「Forge N/A」（与 Forge 不兼容）
+          requiredForge: '${v['forge'] ?? ''}'.contains('N/A')
+              ? null
+              : '${v['forge'] ?? ''}'.replaceAll('Forge', '').replaceAll('#', '').trim(),
+          fileName: v['filename'] as String?,
         ),
   ];
+}
+
+/// 作为模组安装：把 OptiFine 的 jar 原样放进版本运行目录的 mods（与 PCL 相同，由 Forge 等加载器加载）
+Future<void> installOptiFineAsMod(
+  String gameDir,
+  String gameVersion,
+  String version,
+  Downloader dl,
+  TaskProgress task,
+) async {
+  final component = loaderComponent(LoaderKind.optifine, gameVersion, version);
+  task.beginStep(downloadStep(component));
+  final cut = version.lastIndexOf('_');
+  final entry = (await optiFineVersions(dl, gameVersion)).where((v) => v.version == version).firstOrNull;
+  final fileName = entry?.fileName ?? 'OptiFine_${gameVersion}_$version.jar';
+  task.setStage('下载 OptiFine');
+  final tmp = File(p.join(Directory.systemTemp.path, 'pclpw-$fileName'));
+  await dl.downloadFile(
+    DownloadItem(
+      url: '$_bmclapi/optifine/$gameVersion/${version.substring(0, cut)}/${version.substring(cut + 1)}',
+      path: tmp.path,
+    ),
+  );
+  task.beginStep(installStep(component));
+  task.setStage('放入 mods 文件夹');
+  final target = File(p.join(gameDir, 'mods', fileName));
+  await target.parent.create(recursive: true);
+  await tmp.copy(target.path);
+  await tmp.delete();
+  task.output('已放入 ${target.path}');
 }
 
 Future<String> installOptiFine(

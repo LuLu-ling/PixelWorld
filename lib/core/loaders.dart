@@ -28,7 +28,8 @@ enum LoaderKind {
 }
 
 class LoaderVersion {
-  LoaderVersion(this.version, {required this.stable, String? label}) : label = label ?? version;
+  LoaderVersion(this.version, {required this.stable, String? label, this.requiredForge = '', this.fileName})
+    : label = label ?? version;
 
   /// 安装时使用的完整版本号
   final String version;
@@ -36,6 +37,12 @@ class LoaderVersion {
 
   /// 列表中显示的版本号（Forge 的完整版本号带有游戏版本前缀）
   final String label;
+
+  /// OptiFine 需要的 Forge 版本：空字符串为不限，null 为与 Forge 不兼容
+  final String? requiredForge;
+
+  /// OptiFine 的原始文件名，作为模组放进 mods 时使用
+  final String? fileName;
 }
 
 // ---------- LiteLoader ----------

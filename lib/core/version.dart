@@ -42,7 +42,8 @@ class VersionJson {
   Map<String, dynamic>? get loggingClient => (raw['logging'] as Map?)?['client'] as Map<String, dynamic>?;
 
   /// 原版版本号（部分加载器写在 clientVersion）
-  String? get clientVersion => raw['clientVersion'] as String?;
+  /// LabyMod 的版本 JSON 是完整的独立版本，原版版本号写在 _minecraftVersion
+  String? get clientVersion => (raw['clientVersion'] ?? raw['_minecraftVersion']) as String?;
 }
 
 // ---------- 规则判断 ----------
@@ -205,13 +206,12 @@ List<ResolvedLibrary> resolveLibraries(GamePaths g, VersionJson v) {
       final rel = (a?['path'] as String?) ?? mavenPath(name);
       var base = libUrl ?? _defaultLibBase;
       if (!base.endsWith('/')) base = '$base/';
-      // 部分加载器的库需要本地生成，没有下载地址
-      if (a != null && (a['url'] as String? ?? '').isEmpty) continue;
       out.add(
         ResolvedLibrary(
           name: name,
           path: p.join(g.libraries, rel),
-          url: (a?['url'] as String?) ?? base + rel,
+          // 下载地址为空的库由安装器在本地生成，只加入 classpath、不下载（与官方启动器一致）
+        url: (a?['url'] as String?) ?? base + rel,
           sha1: (a?['sha1'] ?? lib['sha1']) as String?,
           size: ((a?['size'] ?? lib['size']) as num?)?.toInt(),
           // 新格式（1.19+）natives 直接放在 classpath 中，同时也解压一份

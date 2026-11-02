@@ -1,4 +1,5 @@
 import 'download.dart';
+import 'extra_loaders.dart';
 import 'forge.dart';
 import 'install.dart';
 import 'paths.dart';
@@ -13,7 +14,10 @@ enum LoaderKind {
   fabric('Fabric', 'https://meta.fabricmc.net/v2'),
   quilt('Quilt', 'https://meta.quiltmc.org/v3'),
   legacyfabric('Legacy Fabric', 'https://meta.legacyfabric.net/v2'),
-  liteloader('LiteLoader', '');
+  liteloader('LiteLoader', ''),
+  cleanroom('Cleanroom', ''),
+  optifine('OptiFine', ''),
+  labymod('LabyMod', '');
 
   const LoaderKind(this.label, this.meta);
 
@@ -123,6 +127,9 @@ Future<String> _installLiteLoader(
 
 Future<List<LoaderVersion>> loaderVersions(Downloader dl, LoaderKind kind, String gameVersion) async {
   if (kind == LoaderKind.forge) return forgeVersions(dl, gameVersion).catchError((_) => <LoaderVersion>[]);
+  if (kind == LoaderKind.optifine) return optiFineVersions(dl, gameVersion).catchError((_) => <LoaderVersion>[]);
+  if (kind == LoaderKind.cleanroom) return cleanroomVersions(dl, gameVersion).catchError((_) => <LoaderVersion>[]);
+  if (kind == LoaderKind.labymod) return labyModVersions(dl, gameVersion).catchError((_) => <LoaderVersion>[]);
   if (kind == LoaderKind.neoforge) return neoForgeVersions(dl, gameVersion).catchError((_) => <LoaderVersion>[]);
   if (kind == LoaderKind.liteloader) {
     return [
@@ -157,7 +164,9 @@ Future<String> installLoader(
   String? name,
 }) async {
   if (kind == LoaderKind.liteloader) return _installLiteLoader(g, gameVersion, loaderVersion, dl, task, name: name);
-  if (kind == LoaderKind.forge || kind == LoaderKind.neoforge) {
+  if (kind == LoaderKind.optifine) return installOptiFine(g, gameVersion, loaderVersion, dl, task, name: name);
+  if (kind == LoaderKind.labymod) return installLabyMod(g, gameVersion, loaderVersion, dl, task, name: name);
+  if (kind == LoaderKind.forge || kind == LoaderKind.neoforge || kind == LoaderKind.cleanroom) {
     return installForgeLike(g, kind, gameVersion, loaderVersion, dl, task, name: name);
   }
   await ensureVanilla(g, gameVersion, dl, task);
@@ -172,8 +181,13 @@ Future<String> installLoader(
 }
 
 /// 任务步骤中显示的组件名，例如「Forge 47.4.28」
-String loaderComponent(LoaderKind kind, String gameVersion, String loaderVersion) =>
-    '${kind.label} ${loaderVersion.startsWith('$gameVersion-') ? loaderVersion.substring(gameVersion.length + 1) : loaderVersion}';
+String loaderComponent(LoaderKind kind, String gameVersion, String loaderVersion) => switch (kind) {
+  // LabyMod 的版本形如 production:<commit>:48.3
+  LoaderKind.labymod => 'LabyMod 4.${loaderVersion.split(':').last}',
+  LoaderKind.optifine => 'OptiFine ${loaderVersion.replaceAll('_', ' ')}',
+  _ =>
+    '${kind.label} ${loaderVersion.startsWith('$gameVersion-') ? loaderVersion.substring(gameVersion.length + 1) : loaderVersion}',
+};
 
 /// 默认的版本名称，与各加载器官方安装器一致
 String defaultVersionName(LoaderKind? kind, String gameVersion, String loaderVersion) => switch (kind) {
@@ -184,5 +198,8 @@ String defaultVersionName(LoaderKind? kind, String gameVersion, String loaderVer
   LoaderKind.forge => '$gameVersion-forge-${loaderVersion.replaceFirst('$gameVersion-', '')}',
   LoaderKind.neoforge when loaderVersion.startsWith('1.20.1-') => '1.20.1-neoforge-${loaderVersion.substring(7)}',
   LoaderKind.neoforge => 'neoforge-$loaderVersion',
+  LoaderKind.cleanroom => '$gameVersion-cleanroom-$loaderVersion',
+  LoaderKind.optifine => '$gameVersion-OptiFine_$loaderVersion',
+  LoaderKind.labymod => '$gameVersion-LabyMod-4.${loaderVersion.split(':').last}',
   _ => 'fabric-loader-$loaderVersion-$gameVersion',
 };

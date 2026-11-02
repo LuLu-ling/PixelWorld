@@ -59,6 +59,10 @@ List<Loader> _detectAddons(VersionJson v) {
   final libs = v.libraries.map((l) => '${l['name']}'.toLowerCase()).toList();
   bool has(String prefix) => libs.any((n) => n.startsWith(prefix));
   final out = <Loader>[];
+  // LabyMod 的依赖库里也有 net.neoforged 等，先判断它，避免被识别成 NeoForge
+  if (has('net.labymod:labymod') || main.toLowerCase().contains('labymod')) {
+    return [Loader.labymod, if (has('optifine:optifine')) Loader.optifine];
+  }
   if (has('com.cleanroommc:cleanroom')) {
     out.add(Loader.cleanroom);
   } else if (has('net.neoforged')) {
@@ -75,7 +79,6 @@ List<Loader> _detectAddons(VersionJson v) {
   }
   if (has('com.mumfrey:liteloader')) out.add(Loader.liteloader);
   if (has('optifine:optifine')) out.add(Loader.optifine);
-  if (main.toLowerCase().contains('labymod') || has('net.labymod')) out.add(Loader.labymod);
   return out;
 }
 

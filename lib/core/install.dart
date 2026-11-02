@@ -35,8 +35,17 @@ Future<VersionJson> ensureVersionFiles(
   }
 
   // 依赖库
+  final missingLocal = <String>[];
   for (final lib in resolveLibraries(g, v)) {
+    if (lib.url.isEmpty) {
+      // 由安装器在本地生成的库没有下载地址
+      if (!File(lib.path).existsSync()) missingLocal.add(lib.name);
+      continue;
+    }
     items.add(DownloadItem(url: lib.url, path: lib.path, sha1: lib.sha1, size: lib.size));
+  }
+  if (missingLocal.isNotEmpty) {
+    throw Exception('缺少由安装器生成的文件：${missingLocal.take(3).join('、')}，请重新安装这个版本');
   }
 
   // 日志配置（修复 Log4Shell）

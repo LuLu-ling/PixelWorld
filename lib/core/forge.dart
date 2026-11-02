@@ -5,6 +5,7 @@ import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 
 import 'download.dart';
+import 'extra_loaders.dart';
 import 'install.dart';
 import 'instance_config.dart';
 import 'java.dart';
@@ -83,6 +84,7 @@ Future<List<LoaderVersion>> neoForgeVersions(Downloader dl, String gameVersion) 
 }
 
 String _installerUrl(LoaderKind kind, String version) => switch (kind) {
+  LoaderKind.cleanroom => cleanroomInstallerUrl(version),
   LoaderKind.neoforge when version.startsWith('1.20.1-') => '$_neoMaven/forge/$version/forge-$version-installer.jar',
   LoaderKind.neoforge => '$_neoMaven/neoforge/$version/neoforge-$version-installer.jar',
   _ => '$_forgeMaven/$version/forge-$version-installer.jar',
@@ -163,13 +165,29 @@ Future<String> installForgeLike(
     if (profile['versionInfo'] is Map) {
       id = await _installLegacy(g, zip, profile, dl, task, label);
     } else {
-      id = await _runInstaller(g, gameVersion, installer.path, dl, task, label);
+      // 安装器自带的版本 JSON 要求更新的 Java 时（例如 Cleanroom 需要 Java 21），按它的要求选择
+      final inner = zip.findFile('version.json');
+      final innerJava = inner == null
+          ? null
+          : (jsonDecode(utf8.decode(inner.content)) as Map<String, dynamic>)['javaVersion'] as Map<String, dynamic>?;
+      // Cleanroom 的新版安装器有自己的命令行格式
+      final args = kind == LoaderKind.cleanroom
+          ? ['client', '--version', version, '-d', g.root, '--no-gui', '-y']
+          : ['--installClient', g.root];
+      id = await _runInstaller(g, gameVersion, installer.path, dl, task, label, javaVersion: innerJava, args: args);
     }
     // NeoForge 1.20.1 的安装器生成的版本名形如 1.20.1-forge-47.1.106，容易与 Forge 混淆
     final wanted =
         name ??
         (kind == LoaderKind.neoforge && id.contains('-forge-') ? id.replaceFirst('-forge-', '-neoforge-') : null);
     final finalId = wanted == null || wanted == id ? id : await renameVersion(g, id, wanted);
+    // 独立的版本 JSON（例如 Cleanroom）没有记录原版版本号，补上 clientVersion（HMCL 也使用这个字段）
+    final jsonFile = File(g.versionJson(finalId));
+    final raw = jsonDecode(await jsonFile.readAsString()) as Map<String, dynamic>;
+    if (raw['inheritsFrom'] == null && raw['clientVersion'] == null) {
+      raw['clientVersion'] = gameVersion;
+      await jsonFile.writeAsString(const JsonEncoder.withIndent('  ').convert(raw));
+    }
     // 补全安装器没有下载的文件（例如资源文件）
     await ensureVersionFiles(g, finalId, dl, task, resourcesDir: () => p.join(g.versionDir(finalId), 'resources'));
     return finalId;
@@ -185,16 +203,25 @@ Future<String> _runInstaller(
   String installer,
   Downloader dl,
   TaskProgress task,
-  String label,
-) async {
+  String label, {
+  Map<String, dynamic>? javaVersion,
+  List<String> args = const [],
+}) async {
   await ensureLauncherProfiles(g.root);
   // 安装器的处理器需要与该版本相同或更新的 Java
   final vanilla = await resolveVersion(g, gameVersion);
-  final java = await ensureJava(vanilla, const JavaAuto(), '', dl, task);
+  final needed = (javaVersion?['majorVersion'] as num?)?.toInt() ?? 0;
+  final java = await ensureJava(
+    needed > (vanilla.javaMajor ?? 8) ? VersionJson({'id': gameVersion, 'javaVersion': javaVersion}) : vanilla,
+    const JavaAuto(),
+    '',
+    dl,
+    task,
+  );
 
   task.setStage('运行 $label 安装器（下载依赖并处理文件，可能需要几分钟）');
   final before = _versionIds(g);
-  final proc = await Process.start(java.path, ['-jar', installer, '--installClient', g.root], workingDirectory: g.root);
+  final proc = await Process.start(java.path, ['-jar', installer, ...args], workingDirectory: g.root);
   final log = StringBuffer();
   final lines = proc.stdout.transform(const Utf8Decoder(allowMalformed: true)).transform(const LineSplitter()).listen((
     l,

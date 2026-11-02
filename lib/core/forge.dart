@@ -264,6 +264,9 @@ Future<String> _runInstaller(
     task.output(l);
   });
   final code = await proc.exitCode;
+  // 安装器会在工作目录留下与安装器同名的 .log
+  final installerLog = File(p.join(g.root, '${p.basename(installer)}.log'));
+  if (installerLog.existsSync()) await installerLog.delete().catchError((_) => installerLog);
   await lines.cancel();
   if (code != 0) {
     final tail = log.toString().trim().split('\n').reversed.take(6).toList().reversed.join('\n');

@@ -328,6 +328,27 @@ class _ChatViewState extends State<_ChatView> {
     widget.chats.retry(s, ai);
   }
 
+  /// 这条回答是否为一轮对话的最后一条（之后是用户的下一条消息，或对话已结束）
+  static bool _turnEnd(List<ChatMessage> messages, int i, bool busy) {
+    for (var j = i + 1; j < messages.length; j++) {
+      if (messages[j].isUser) return true;
+      if (!messages[j].isTool) return false;
+    }
+    return !busy;
+  }
+
+  /// 第 i 条回答所在的一轮中的所有回答
+  static List<ChatMessage> _turnOf(List<ChatMessage> messages, int i) {
+    var start = i;
+    while (start > 0 && !messages[start - 1].isUser) {
+      start--;
+    }
+    return [
+      for (final m in messages.sublist(start, i + 1))
+        if (m.role == 'assistant') m,
+    ];
+  }
+
   /// Enter 发送，Shift + Enter 换行；输入法正在输入时不处理
   KeyEventResult _onKey(FocusNode node, KeyEvent e) {
     if (e is! KeyDownEvent || e.logicalKey != LogicalKeyboardKey.enter) return KeyEventResult.ignored;
@@ -391,6 +412,7 @@ class _ChatViewState extends State<_ChatView> {
                                   : null,
                             ),
                           for (final c in messages[i].toolCalls) _ToolCard(chats: widget.chats, session: s!, call: c),
+                          if (_turnEnd(messages, i, busy)) _TurnStats(messages: _turnOf(messages, i)),
                         ],
                       if (busy && streaming != null)
                         streaming.isEmpty
@@ -783,6 +805,42 @@ class _ToolCardState extends State<_ToolCard> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// 一轮回答的详细信息：完成时间、用量与生成用时（多次请求时合计）
+class _TurnStats extends StatelessWidget {
+  const _TurnStats({required this.messages});
+
+  final List<ChatMessage> messages;
+
+  static String _n(int v) => v.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final last = messages.last;
+    final t = last.time;
+    final withUsage = messages.where((m) => m.inputTokens != null || m.outputTokens != null).toList();
+    final input = withUsage.fold<int>(0, (a, m) => a + (m.inputTokens ?? 0));
+    final output = withUsage.fold<int>(0, (a, m) => a + (m.outputTokens ?? 0));
+    final ms = messages.fold<int>(0, (a, m) => a + (m.ms ?? 0));
+    final parts = [
+      '${t.month}/${t.day} ${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}',
+      if (withUsage.isNotEmpty) '输入 ${_n(input)} · 输出 ${_n(output)} tokens',
+      if (ms > 0) '用时 ${(ms / 1000).toStringAsFixed(1)} 秒',
+      if (messages.length > 1) '${messages.length} 次请求',
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 8),
+      child: Tooltip(
+        message: '用量由 AI 服务返回，多次请求（例如调用工具）时为合计；用时不包括等待你确认的时间',
+        child: Text(
+          parts.join('  ·  '),
+          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
       ),
     );
   }

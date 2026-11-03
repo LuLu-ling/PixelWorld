@@ -26,6 +26,9 @@ class ChatMessage {
     this.status,
     this.title,
     this.details = const [],
+    this.inputTokens,
+    this.outputTokens,
+    this.ms,
   }) : time = time ?? DateTime.now();
 
   /// user、assistant 或 tool（工具结果，显示在对应的工具卡片里）
@@ -47,6 +50,11 @@ class ChatMessage {
   final ToolStatus? status;
   final String? title;
   final List<String> details;
+
+  /// assistant：这次请求的用量与生成用时（毫秒）
+  final int? inputTokens;
+  final int? outputTokens;
+  final int? ms;
 
   bool get isUser => role == 'user';
   bool get isTool => role == 'tool';
@@ -72,6 +80,9 @@ class ChatMessage {
     'status': ?status?.name,
     'title': ?title,
     if (details.isNotEmpty) 'details': details,
+    'inputTokens': ?inputTokens,
+    'outputTokens': ?outputTokens,
+    'ms': ?ms,
   };
 
   static ChatMessage fromJson(Map<String, dynamic> j) => ChatMessage(
@@ -87,6 +98,9 @@ class ChatMessage {
     status: ToolStatus.values.asNameMap()[j['status']],
     title: j['title'] as String?,
     details: (j['details'] as List? ?? const []).map((e) => '$e').toList(),
+    inputTokens: (j['inputTokens'] as num?)?.toInt(),
+    outputTokens: (j['outputTokens'] as num?)?.toInt(),
+    ms: (j['ms'] as num?)?.toInt(),
   );
 }
 
@@ -276,6 +290,7 @@ class ChatStore extends ChangeNotifier {
         _streaming[s.id] = '';
         notifyListeners();
         AiTurnEnd? end;
+        final watch = Stopwatch()..start();
         await for (final e in aiStream(ai, assistantSystemPrompt, _history(s), tools: tools)) {
           if (stopped()) return;
           switch (e) {
@@ -295,7 +310,18 @@ class ChatStore extends ChangeNotifier {
         final calls = m.blocks != null
             ? m.toolCalls
             : [for (final c in m.toolCalls) used.add(c.id) ? c : AiToolCall('call_${newId()}', c.name, c.args)];
-        s.messages.add(ChatMessage('assistant', m.content, toolCalls: calls, blocks: m.blocks, reasoning: m.reasoning));
+        s.messages.add(
+          ChatMessage(
+            'assistant',
+            m.content,
+            toolCalls: calls,
+            blocks: m.blocks,
+            reasoning: m.reasoning,
+            inputTokens: end.inputTokens,
+            outputTokens: end.outputTokens,
+            ms: watch.elapsedMilliseconds,
+          ),
+        );
         s.updated = DateTime.now();
         unawaited(_save(s));
         notifyListeners();

@@ -139,9 +139,13 @@ class AiText extends AiEvent {
 
 /// 一轮回答结束：完整的文字、工具调用与需要传回的内容
 class AiTurnEnd extends AiEvent {
-  AiTurnEnd(this.message, this.stopReason);
+  AiTurnEnd(this.message, this.stopReason, {this.inputTokens, this.outputTokens});
   final AiMessage message;
   final String? stopReason;
+
+  /// 用量（接口没有返回时为 null）
+  final int? inputTokens;
+  final int? outputTokens;
 }
 
 class AiException implements Exception {
@@ -291,6 +295,8 @@ Stream<AiEvent> aiStream(
       : {
           'model': s.model,
           'stream': true,
+          // 流式回答默认不返回用量，需要单独要求
+          'stream_options': {'include_usage': true},
           'messages': _openAiMessages(system, messages),
           if (tools.isNotEmpty)
             'tools': [
@@ -328,6 +334,9 @@ Stream<AiEvent> aiStream(
     // OpenAI：按序号累积工具调用
     final calls = <int, ({StringBuffer id, StringBuffer name, StringBuffer args})>{};
     final reasoning = StringBuffer();
+    int? inputTokens;
+    int? outputTokens;
+    int? toInt(Object? v) => (v as num?)?.toInt();
 
     await for (final line in res.transform(utf8.decoder).transform(const LineSplitter())) {
       if (!line.startsWith('data:')) continue;
@@ -343,6 +352,16 @@ Stream<AiEvent> aiStream(
       if (anthropic) {
         final index = (ev['index'] as num?)?.toInt() ?? 0;
         switch (ev['type']) {
+          case 'message_start':
+            // 输入用量包括缓存读写的部分
+            final u = (ev['message'] as Map?)?['usage'] as Map?;
+            if (u != null) {
+              inputTokens =
+                  (toInt(u['input_tokens']) ?? 0) +
+                  (toInt(u['cache_creation_input_tokens']) ?? 0) +
+                  (toInt(u['cache_read_input_tokens']) ?? 0);
+              outputTokens = toInt(u['output_tokens']);
+            }
           case 'content_block_start':
             final block = Map<String, dynamic>.from(ev['content_block'] as Map? ?? {'type': 'text', 'text': ''});
             if (block['type'] == 'tool_use') {
@@ -377,6 +396,8 @@ Stream<AiEvent> aiStream(
             }
           case 'message_delta':
             stop = (ev['delta'] as Map?)?['stop_reason'] as String? ?? stop;
+            // message_delta 中的输出用量是累计值
+            outputTokens = toInt((ev['usage'] as Map?)?['output_tokens']) ?? outputTokens;
         }
       } else {
         final choice = (ev['choices'] as List?)?.firstOrNull as Map?;
@@ -397,6 +418,12 @@ Stream<AiEvent> aiStream(
           if (fn?['arguments'] != null) acc.args.write(fn!['arguments']);
         }
         stop = choice?['finish_reason'] as String? ?? stop;
+        // include_usage 时最后一段带有整次请求的用量
+        final u = ev['usage'] as Map?;
+        if (u != null) {
+          inputTokens = toInt(u['prompt_tokens']) ?? inputTokens;
+          outputTokens = toInt(u['completion_tokens']) ?? outputTokens;
+        }
       }
     }
 
@@ -436,6 +463,8 @@ Stream<AiEvent> aiStream(
         reasoning: reasoning.isEmpty ? null : reasoning.toString(),
       ),
       stop,
+      inputTokens: inputTokens,
+      outputTokens: outputTokens,
     );
   } on SocketException catch (e) {
     throw AiException('无法连接 ${s.host}：${e.message}');

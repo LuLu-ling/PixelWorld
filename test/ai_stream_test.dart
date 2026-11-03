@@ -67,6 +67,10 @@ void main() {
             },
           ],
         }),
+        jsonEncode({
+          'choices': <dynamic>[],
+          'usage': {'prompt_tokens': 120, 'completion_tokens': 30},
+        }),
         '[DONE]',
       ],
     );
@@ -83,6 +87,8 @@ void main() {
     expect(end.message.toolCalls.single.name, 'list_mods');
     expect(end.message.toolCalls.single.args, {'version': '1.20.1'});
     expect(end.stopReason, 'tool_calls');
+    expect((end.inputTokens, end.outputTokens), (120, 30));
+    expect((requests.single['stream_options'] as Map)['include_usage'], isTrue);
     expect(((requests.single['tools'] as List).single as Map)['type'], 'function');
 
     // 工具结果的格式
@@ -100,6 +106,12 @@ void main() {
     final (server, requests) = await _server(
       (_) => [
         for (final e in [
+          {
+            'type': 'message_start',
+            'message': {
+              'usage': {'input_tokens': 50, 'cache_read_input_tokens': 200, 'output_tokens': 1},
+            },
+          },
           {
             'type': 'content_block_start',
             'index': 0,
@@ -141,6 +153,7 @@ void main() {
           {
             'type': 'message_delta',
             'delta': {'stop_reason': 'tool_use'},
+            'usage': {'output_tokens': 42},
           },
         ])
           jsonEncode(e),
@@ -156,6 +169,7 @@ void main() {
     final events = await aiStream(s, 'sys', const [AiMessage('user', 'hi')], tools: const [_tool]).toList();
     final end = events.whereType<AiTurnEnd>().single;
     expect(end.message.toolCalls.single.args, {'version': '1.20.1'});
+    expect((end.inputTokens, end.outputTokens), (250, 42));
     expect(end.message.blocks!.first, {'type': 'thinking', 'thinking': '', 'signature': 'sig'});
     expect(((requests.single['tools'] as List).single as Map)['input_schema'], isNotNull);
 

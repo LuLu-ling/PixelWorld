@@ -338,8 +338,16 @@ class AppState extends ChangeNotifier {
 
   void killGame() {
     lastRun?.killed = true;
-    _game?.kill();
+    // 安卓上游戏在独立进程中运行，没有 Process 对象
+    if (isDesktop) {
+      _game?.kill();
+    } else {
+      unawaited(AndroidRuntime.stop());
+    }
   }
+
+  /// 安卓：切回正在运行的游戏
+  Future<void> resumeGame() => AndroidRuntime.resume();
 
   /// 启动当前选择的版本。返回 false 表示用户在劝导中取消了启动。
   Future<bool> launch(

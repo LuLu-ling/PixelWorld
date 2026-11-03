@@ -55,6 +55,12 @@ abstract final class AndroidRuntime {
     }
   }
 
+  /// 回到正在运行的游戏界面
+  static Future<void> resume() => _channel.invokeMethod('resume');
+
+  /// 结束游戏进程
+  static Future<void> stop() => _channel.invokeMethod('stop');
+
   static Future<bool> isRunning() async => await _channel.invokeMethod<bool>('isRunning') ?? false;
 
   /// 游戏异常退出时记录的退出代码，读取后清除

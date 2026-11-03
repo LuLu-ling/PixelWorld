@@ -79,6 +79,19 @@ class MainActivity : FlutterActivity() {
                     startActivity(intent)
                     result.success(null)
                 }
+                // 回到正在运行的游戏（游戏界面是单独的任务）
+                "resume" -> {
+                    startActivity(Intent(this, GameActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    result.success(null)
+                }
+                // 结束游戏进程（与启动器同一个用户，可以直接结束）
+                "stop" -> {
+                    val am = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
+                    am.runningAppProcesses?.filter { it.processName == "$packageName:game" }?.forEach {
+                        android.os.Process.killProcess(it.pid)
+                    }
+                    result.success(null)
+                }
                 "isRunning" -> {
                     val am = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
                     result.success(am.runningAppProcesses?.any { it.processName == "$packageName:game" } == true)

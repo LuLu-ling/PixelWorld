@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app_scope.dart';
 import '../app_state.dart';
 import '../core/accounts.dart';
+import '../platform.dart';
 import '../shell.dart';
 import '../widgets/accounts_dialog.dart';
 import '../widgets/launch_dialogs.dart';
@@ -254,6 +255,39 @@ class _LaunchButton extends StatelessWidget {
     }
 
     final running = state.gameState == GameState.running;
+    // 手机上游戏切到后台后，主按钮回到游戏，旁边单独放结束按钮
+    if (running && !isDesktop) {
+      return SizedBox(
+        height: 72,
+        child: Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: state.resumeGame,
+                style: FilledButton.styleFrom(shape: shape, minimumSize: const Size.fromHeight(72)),
+                icon: const Icon(Icons.sports_esports),
+                label: const Text('返回游戏', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Tooltip(
+              message: '结束游戏',
+              child: FilledButton(
+                onPressed: state.killGame,
+                style: FilledButton.styleFrom(
+                  shape: shape,
+                  minimumSize: const Size(72, 72),
+                  padding: EdgeInsets.zero,
+                  backgroundColor: theme.colorScheme.error,
+                  foregroundColor: theme.colorScheme.onError,
+                ),
+                child: const Icon(Icons.stop),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return SizedBox(
       width: double.infinity,
       height: 72,

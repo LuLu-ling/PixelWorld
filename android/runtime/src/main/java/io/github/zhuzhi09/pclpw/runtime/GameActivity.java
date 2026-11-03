@@ -117,6 +117,13 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         // The decor view exists only after setContentView
         hideSystemBars();
         CallbackBridge.addGrabListener(this);
+        // Back gesture = Esc (pause menu / close screen) instead of leaving the game.
+        // Android 13+ delivers back through this callback, not as a key event.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                    () -> CallbackBridge.sendKeyPress(LwjglGlfwKeycode.GLFW_KEY_ESCAPE));
+        }
     }
 
     /** Java exceptions in this process go to the game log, so the launcher can show them */
@@ -169,10 +176,18 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        CallbackBridge.physicalWidth = width;
-        CallbackBridge.physicalHeight = height;
-        int w = Math.max(1, Math.round(width * scale)), h = Math.max(1, Math.round(height * scale));
-        holder.setFixedSize(w, h);
+        // The view keeps the screen size; the surface buffer is scaled by setFixedSize, which
+        // calls back here with the scaled size. Use the view size, or the scale would be applied again.
+        int viewW = surface.getWidth() > 0 ? surface.getWidth() : width;
+        int viewH = surface.getHeight() > 0 ? surface.getHeight() : height;
+        CallbackBridge.physicalWidth = viewW;
+        CallbackBridge.physicalHeight = viewH;
+        int w = Math.max(1, Math.round(viewW * scale)), h = Math.max(1, Math.round(viewH * scale));
+        if (width != w || height != h) {
+            // Wait for the callback with the target size
+            holder.setFixedSize(w, h);
+            return;
+        }
         CallbackBridge.windowWidth = w;
         CallbackBridge.windowHeight = h;
         JREUtils.setupBridgeWindow(holder.getSurface());
@@ -378,6 +393,13 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         char ch = (char) event.getUnicodeChar();
         CallbackBridge.sendKeycode(glfw, textInput.hasFocus() ? 0 : ch, 0, CallbackBridge.getCurrentMods(), down);
         return true;
+    }
+
+    @SuppressWarnings("deprecation")
+    @Override
+    public void onBackPressed() {
+        // Android 12 and older
+        CallbackBridge.sendKeyPress(LwjglGlfwKeycode.GLFW_KEY_ESCAPE);
     }
 
     /** Invisible text field for the soft keyboard, forwarding typed characters */

@@ -160,6 +160,22 @@ Java_net_kdt_pojavlaunch_Logger_setLogListener(JNIEnv *env, __attribute((unused)
 }
 
 
+// PCL.PW: Amethyst also hooks exit() with bytehook to learn the exit code. Without it the code is
+// unknown here, so report 0; crashes are still found through crash reports and the game log.
+static _Atomic bool exit_tripped = false;
+
+static void custom_atexit() {
+    if (exit_tripped) return;
+    exit_tripped = true;
+    // Leave through Android before the JVM tears down threads and mutexes, which can abort
+    nominal_exit(0, false);
+}
+
+JNIEXPORT void JNICALL
+Java_net_kdt_pojavlaunch_utils_JREUtils_initializeHooks(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jclass clazz) {
+    atexit(custom_atexit);
+}
+
 JNIEXPORT void JNICALL
 Java_net_kdt_pojavlaunch_utils_JREUtils_setupExitMethod(JNIEnv *env, jclass clazz,
                                                         jobject context) {

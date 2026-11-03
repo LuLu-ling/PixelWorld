@@ -15,6 +15,8 @@ public final class JREUtils {
     public static native void setupBridgeWindow(Object surface);
     public static native void releaseBridgeWindow();
     public static native void setupExitMethod(Context context);
+    /** Registers the atexit handler that leaves through Android when the game exits */
+    public static native void initializeHooks();
 
     static {
         System.loadLibrary("pojavexec");

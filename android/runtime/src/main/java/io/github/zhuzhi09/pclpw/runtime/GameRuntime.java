@@ -233,7 +233,10 @@ public final class GameRuntime {
 
         loadJavaLibraries(jreHome, jvmDir, nativeDir);
         JREUtils.setupExitMethod(app);
+        sLogFile = logFile;
         JREUtils.chdir(gameDir.getAbsolutePath());
+        // Registered last so it runs before the exit handlers of the JVM libraries
+        JREUtils.initializeHooks();
         int code = VMLauncher.launchJVM(argv.toArray(new String[0]));
         Logger.appendToLog("Java exit code: " + code);
         return code;
@@ -279,11 +282,32 @@ public final class GameRuntime {
         return new File(context.getFilesDir(), "game_exit.txt");
     }
 
+    private static File sLogFile;
+
     public static void recordExit(Context context, int code, boolean isSignal) {
+        // The JVM can abort while tearing down after a normal quit ("Stopping!" is Minecraft's
+        // last line on a normal shutdown); that is not a crash
+        if (isSignal && stoppedNormally()) return;
         try {
             writeText(exitFile(context), code + (isSignal ? " signal" : ""));
         } catch (IOException e) {
             Log.e(TAG, "Cannot record exit code", e);
+        }
+    }
+
+    private static boolean stoppedNormally() {
+        File f = sLogFile;
+        if (f == null || !f.exists()) return false;
+        try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(f, "r")) {
+            long len = raf.length();
+            int n = (int) Math.min(len, 16 * 1024);
+            byte[] tail = new byte[n];
+            raf.seek(len - n);
+            raf.readFully(tail);
+            String text = new String(tail, StandardCharsets.UTF_8);
+            return text.contains("Stopping!") && !text.contains("Game crashed!");
+        } catch (IOException e) {
+            return false;
         }
     }
 

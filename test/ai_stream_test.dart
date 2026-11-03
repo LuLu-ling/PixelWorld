@@ -174,4 +174,40 @@ void main() {
       {'type': 'tool_result', 'tool_use_id': 'tu_2', 'content': '拒绝', 'is_error': true},
     ]);
   });
+
+  test('获取模型列表：新的在前，去掉非对话模型', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    final auth = <String?>[];
+    server.listen((req) async {
+      auth.add(req.headers.value('authorization') ?? req.headers.value('x-api-key'));
+      req.response.headers.contentType = ContentType.json;
+      req.response.write(
+        jsonEncode(
+          req.uri.path == '/v1/models'
+              ? {
+                  'data': [
+                    {'id': 'old-chat', 'created': 1},
+                    {'id': 'text-embedding-x', 'created': 9},
+                    {'id': 'new-chat', 'created': 5},
+                  ],
+                }
+              : {'error': 'x'},
+        ),
+      );
+      await req.response.close();
+    });
+    final base = 'http://127.0.0.1:${server.port}/v1';
+    expect(await aiListModels(AiSettings(provider: AiProvider.openai, baseUrl: base, model: '', apiKey: 'k1')), [
+      'new-chat',
+      'old-chat',
+    ]);
+    expect(auth.last, 'Bearer k1');
+    // Anthropic：保持接口返回的顺序（已是新的在前），使用 x-api-key
+    expect(await aiListModels(AiSettings(provider: AiProvider.anthropic, baseUrl: base, model: '', apiKey: 'k2')), [
+      'old-chat',
+      'new-chat',
+    ]);
+    expect(auth.last, 'k2');
+  });
 }

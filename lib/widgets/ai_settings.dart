@@ -86,6 +86,35 @@ class AiSettingsFormState extends State<AiSettingsForm> {
     }
   }
 
+  bool _loadingModels = false;
+
+  /// 从接口获取模型列表并选择
+  Future<void> _pickModel() async {
+    setState(() => _loadingModels = true);
+    List<String> models;
+    try {
+      models = await aiListModels(_current);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _ok = false;
+          _result = errorText(e);
+        });
+        toast(context, errorText(e));
+      }
+      return;
+    } finally {
+      if (mounted) setState(() => _loadingModels = false);
+    }
+    if (!mounted) return;
+    if (models.isEmpty) return toast(context, '接口没有返回可用的模型');
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (context) => _ModelPicker(models: models, current: _model.text.trim()),
+    );
+    if (picked != null) setState(() => _model.text = picked);
+  }
+
   bool get testing => _testing;
 
   /// 测试连接的结果；对话框中显示在按钮旁
@@ -119,7 +148,8 @@ class AiSettingsFormState extends State<AiSettingsForm> {
                 onPressed: () => setState(() {
                   _provider = preset.provider;
                   _url.text = preset.url;
-                  if (preset.model.isNotEmpty) _model.text = preset.model;
+                  // 没有推荐模型的服务清空模型，避免沿用其他服务的模型名
+                  _model.text = preset.model;
                 }),
               ),
           ],
@@ -144,11 +174,6 @@ class AiSettingsFormState extends State<AiSettingsForm> {
         ),
         const SizedBox(height: 12),
         TextField(
-          controller: _model,
-          decoration: const InputDecoration(labelText: '模型', hintText: '模型名称见服务商的文档', border: OutlineInputBorder()),
-        ),
-        const SizedBox(height: 12),
-        TextField(
           controller: _key,
           obscureText: !_showKey,
           decoration: InputDecoration(
@@ -160,6 +185,21 @@ class AiSettingsFormState extends State<AiSettingsForm> {
               icon: Icon(_showKey ? Icons.visibility_off_outlined : Icons.visibility_outlined),
               onPressed: () => setState(() => _showKey = !_showKey),
             ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _model,
+          decoration: InputDecoration(
+            labelText: '模型',
+            hintText: '点右侧按钮从接口获取可用的模型',
+            border: const OutlineInputBorder(),
+            suffixIcon: _loadingModels
+                ? const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                : IconButton(tooltip: '获取模型列表', icon: const Icon(Icons.list_alt), onPressed: _pickModel),
           ),
         ),
         const SizedBox(height: 8),
@@ -234,4 +274,61 @@ Future<void> showAiSettingsDialog(BuildContext context) {
       ),
     ),
   );
+}
+
+/// 模型选择：可以输入筛选
+class _ModelPicker extends StatefulWidget {
+  const _ModelPicker({required this.models, required this.current});
+
+  final List<String> models;
+  final String current;
+
+  @override
+  State<_ModelPicker> createState() => _ModelPickerState();
+}
+
+class _ModelPickerState extends State<_ModelPicker> {
+  String _filter = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final list = widget.models.where((m) => m.toLowerCase().contains(_filter.toLowerCase())).toList();
+    return AlertDialog(
+      title: Text('选择模型（${widget.models.length} 个）'),
+      content: SizedBox(
+        width: 480,
+        height: 420,
+        child: Column(
+          children: [
+            TextField(
+              autofocus: true,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: '筛选',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              onChanged: (v) => setState(() => _filter = v.trim()),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: list.isEmpty
+                  ? const Center(child: Text('没有匹配的模型'))
+                  : ListView.builder(
+                      itemCount: list.length,
+                      itemBuilder: (context, i) => ListTile(
+                        dense: true,
+                        title: Text(list[i]),
+                        selected: list[i] == widget.current,
+                        trailing: list[i] == widget.current ? const Icon(Icons.check) : null,
+                        onTap: () => Navigator.pop(context, list[i]),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消'))],
+    );
+  }
 }

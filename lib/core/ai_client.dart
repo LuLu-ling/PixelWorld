@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -11,16 +12,17 @@ import 'secure.dart';
 /// 接口格式：OpenAI 兼容（DeepSeek、通义千问、Kimi、OpenRouter、Ollama 等）或 Anthropic
 enum AiProvider { openai, anthropic }
 
-/// 常用服务的预设：只填写接口地址，部分附带推荐的模型
+/// 常用服务的预设：接口地址与推荐的模型（2026-11 按各家文档核对）。
+/// 模型更新很快，设置页可以从接口获取最新的模型列表
 const aiPresets = [
-  (label: 'DeepSeek', provider: AiProvider.openai, url: 'https://api.deepseek.com/v1', model: 'deepseek-chat'),
+  (label: 'DeepSeek', provider: AiProvider.openai, url: 'https://api.deepseek.com/v1', model: 'deepseek-flash'),
   (
     label: '通义千问',
     provider: AiProvider.openai,
     url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    model: 'qwen-plus',
+    model: 'qwen3.8-flash',
   ),
-  (label: 'Kimi', provider: AiProvider.openai, url: 'https://api.moonshot.cn/v1', model: ''),
+  (label: 'Kimi', provider: AiProvider.openai, url: 'https://api.moonshot.cn/v1', model: 'kimi-k3.1-pro'),
   (label: 'OpenRouter', provider: AiProvider.openai, url: 'https://openrouter.ai/api/v1', model: ''),
   (label: 'OpenAI', provider: AiProvider.openai, url: 'https://api.openai.com/v1', model: ''),
   (label: 'Claude', provider: AiProvider.anthropic, url: 'https://api.anthropic.com', model: 'claude-opus-5-5'),
@@ -149,6 +151,53 @@ class AiException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// 不是对话模型的名称特征（向量、语音、图像、审核等）
+final _nonChat = RegExp(
+  r'embed|whisper|tts|speech|audio|dall-e|image|moderation|rerank|transcribe|realtime|ocr',
+  caseSensitive: false,
+);
+
+/// 从接口获取可用的模型：OpenAI 兼容接口为 GET /models，Anthropic 为 GET /v1/models（新的在前）
+Future<List<String>> aiListModels(AiSettings s) async {
+  final base = s.baseUrl.trim().replaceFirst(RegExp(r'/+$'), '');
+  if (base.isEmpty) throw AiException('请先填写接口地址');
+  final anthropic = s.provider == AiProvider.anthropic;
+  final url = Uri.parse(anthropic ? '${base.endsWith('/v1') ? base : '$base/v1'}/models?limit=1000' : '$base/models');
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
+  try {
+    final req = await client.getUrl(url);
+    if (anthropic) {
+      req.headers.set('x-api-key', s.apiKey);
+      req.headers.set('anthropic-version', '2026-10-21');
+    } else if (s.apiKey.isNotEmpty) {
+      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer ${s.apiKey}');
+    }
+    final res = await req.close().timeout(const Duration(seconds: 20));
+    final body = await res.transform(utf8.decoder).join();
+    if (res.statusCode != 200) throw AiException('获取模型列表失败（HTTP ${res.statusCode}）：${_errorMessage(body)}');
+    final data = (jsonDecode(body) as Map)['data'] as List? ?? const [];
+    final models = data.whereType<Map>().where((m) => m['id'] != null).toList();
+    // OpenAI 兼容接口按创建时间从新到旧排列（有时间时）
+    if (!anthropic) {
+      models.sort((a, b) => ((b['created'] as num?) ?? 0).compareTo((a['created'] as num?) ?? 0));
+    }
+    return [
+      for (final m in models)
+        if (!_nonChat.hasMatch('${m['id']}')) '${m['id']}',
+    ];
+  } on SocketException catch (e) {
+    throw AiException('无法连接 ${s.host}：${e.message}');
+  } on HandshakeException {
+    throw AiException('与 ${s.host} 的安全连接失败');
+  } on FormatException {
+    throw AiException('接口返回的不是模型列表，请检查接口地址');
+  } on TimeoutException {
+    throw AiException('连接 ${s.host} 超时');
+  } finally {
+    client.close(force: true);
+  }
 }
 
 /// 只要文字的流式对话（用于测试连接）

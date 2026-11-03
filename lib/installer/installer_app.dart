@@ -6,7 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 
 import '../app_info.dart';
-import '../shell.dart' show PixelLogo;
+import '../shell.dart' show AppLogo;
 import '../theme.dart';
 import '../widgets/window_buttons.dart';
 import 'installer_core.dart';
@@ -157,7 +157,7 @@ class _InstallerPageState extends State<_InstallerPage> {
                   child: IgnorePointer(
                     child: Row(
                       children: [
-                        const PixelLogo(size: 16),
+                        const AppLogo(size: 16),
                         const SizedBox(width: 10),
                         Text(AppInfo.fullName, style: theme.textTheme.titleSmall),
                       ],

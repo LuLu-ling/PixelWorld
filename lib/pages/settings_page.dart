@@ -171,7 +171,11 @@ class _AboutSection extends StatelessWidget {
             ),
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              leading: const Icon(Icons.info_outline),
+              // 图标的立方体是白色，用带蓝底的版本，浅色背景上也看得清
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset('assets/icon/icon.png', width: 40, height: 40),
+              ),
               title: Text('${AppInfo.fullName} ${AppInfo.version}'),
               subtitle: const Text(
                 '本软件是第三方基于 PCL 独立进行二次创作的产物，'

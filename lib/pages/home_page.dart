@@ -127,24 +127,32 @@ class HomePage extends StatelessWidget {
                     ),
                   ),
                   alignment: Alignment.centerLeft,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        _greeting(acc?.name),
-                        style: theme.textTheme.titleSmall?.copyWith(color: scheme.onPrimaryContainer),
-                      ),
-                      Text(
-                        'PCL.PW',
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          color: scheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w600,
+                      const AppLogo(size: 96),
+                      const SizedBox(width: 24),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _greeting(acc?.name),
+                              style: theme.textTheme.titleSmall?.copyWith(color: scheme.onPrimaryContainer),
+                            ),
+                            Text(
+                              'PCL.PW',
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                color: scheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '第三方基于 PCL 二次创作的跨平台 Minecraft 启动器',
+                              style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onPrimaryContainer),
+                            ),
+                          ],
                         ),
-                      ),
-                      Text(
-                        '第三方基于 PCL 二次创作的跨平台 Minecraft 启动器',
-                        style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onPrimaryContainer),
                       ),
                     ],
                   ),

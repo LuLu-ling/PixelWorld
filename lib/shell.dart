@@ -168,7 +168,7 @@ class _TitleBar extends StatelessWidget {
                 ? IgnorePointer(
                     child: Row(
                       children: [
-                        const PixelLogo(size: 18),
+                        const AppLogo(size: 20),
                         const SizedBox(width: 10),
                         Text(AppInfo.name, style: theme.textTheme.titleMedium),
                       ],
@@ -247,32 +247,17 @@ class _NavPill extends StatelessWidget {
   }
 }
 
-/// 像素风格的四格小方块 logo，颜色全部取自主题蓝
-class PixelLogo extends StatelessWidget {
-  const PixelLogo({super.key, required this.size});
+/// 应用图标（蓝底版：立方体是白色的，浅色标题栏上需要蓝底）
+class AppLogo extends StatelessWidget {
+  const AppLogo({super.key, required this.size});
 
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    final s = Theme.of(context).colorScheme;
-    final half = size / 2;
-    Widget cell(Color c) => SizedBox(
-      width: half,
-      height: half,
-      child: ColoredBox(color: c),
-    );
-    return SizedBox.square(
-      dimension: size,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(size * 0.28),
-        child: Column(
-          children: [
-            Row(children: [cell(s.primary), cell(s.tertiary)]),
-            Row(children: [cell(s.secondary), cell(s.primaryContainer)]),
-          ],
-        ),
-      ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * 0.22),
+      child: Image.asset('assets/icon/icon.png', width: size, height: size, filterQuality: FilterQuality.medium),
     );
   }
 }

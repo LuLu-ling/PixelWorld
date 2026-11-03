@@ -170,6 +170,21 @@ class AiSettingsFormState extends State<AiSettingsForm> {
           value: cfg.aiConfirm,
           onChanged: (v) => cfg.update({'aiConfirm': v}),
         ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('允许 AI 操作游戏文件'),
+          subtitle: const Text('查看版本、模组与日志，安装或禁用模组，备份与删除文件；会修改文件的操作都需要你确认'),
+          value: cfg.aiTools,
+          onChanged: (v) => cfg.update({'aiTools': v}),
+        ),
+        if (cfg.aiTools)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('查看类操作也需要确认'),
+            subtitle: const Text('关闭时，AI 查看版本、模组、文件与日志不需要确认'),
+            value: cfg.aiConfirmRead,
+            onChanged: (v) => cfg.update({'aiConfirmRead': v}),
+          ),
         if (widget.showButtons) ...[
           const SizedBox(height: 8),
           Row(

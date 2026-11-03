@@ -75,6 +75,9 @@ class LauncherConfig extends ChangeNotifier {
     'aiBaseUrl': '',
     'aiModel': '',
     'aiConfirm': true,
+    // 允许 AI 执行启动器操作（修改操作都需要用户确认）；只读操作是否也需要确认
+    'aiTools': true,
+    'aiConfirmRead': false,
   };
 
   static File get _file => File(p.join(Paths.appData, 'config.json'));
@@ -141,4 +144,6 @@ class LauncherConfig extends ChangeNotifier {
   String get aiBaseUrl => _get('aiBaseUrl');
   String get aiModel => _get('aiModel');
   bool get aiConfirm => _get('aiConfirm');
+  bool get aiTools => _get('aiTools');
+  bool get aiConfirmRead => _get('aiConfirmRead');
 }

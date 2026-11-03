@@ -5,6 +5,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import '../app_scope.dart';
 import '../core/ai_chat.dart';
 import '../core/ai_client.dart';
+import '../core/ai_tools.dart';
 import '../core/ai_prompt.dart';
 import '../core/crash.dart';
 import '../shell.dart';
@@ -378,15 +379,21 @@ class _ChatViewState extends State<_ChatView> {
                     padding: const EdgeInsets.fromLTRB(28, 8, 28, 16),
                     children: [
                       for (var i = 0; i < messages.length; i++)
-                        messages[i].isUser
-                            ? _UserMessage(text: messages[i].content)
-                            : _AssistantMessage(
-                                text: messages[i].content,
-                                // 只有最后一条是回答时才能重新生成
-                                onRetry: i == messages.length - 1 && !busy ? _retry : null,
-                              ),
-                      if (busy)
-                        (streaming ?? '').isEmpty
+                        if (messages[i].isUser)
+                          _UserMessage(text: messages[i].content)
+                        else if (!messages[i].isTool) ...[
+                          if (messages[i].content.isNotEmpty)
+                            _AssistantMessage(
+                              text: messages[i].content,
+                              // 只有最后一条是文字回答时才能重新生成
+                              onRetry: i == messages.length - 1 && messages[i].toolCalls.isEmpty && !busy
+                                  ? _retry
+                                  : null,
+                            ),
+                          for (final c in messages[i].toolCalls) _ToolCard(chats: widget.chats, session: s!, call: c),
+                        ],
+                      if (busy && streaming != null)
+                        streaming.isEmpty
                             ? const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 12),
                                 child: Row(
@@ -397,7 +404,7 @@ class _ChatViewState extends State<_ChatView> {
                                   ],
                                 ),
                               )
-                            : _AssistantMessage(text: streaming!),
+                            : _AssistantMessage(text: streaming),
                       if (error != null)
                         Container(
                           margin: const EdgeInsets.only(top: 8),
@@ -451,8 +458,8 @@ class _ChatViewState extends State<_ChatView> {
                   padding: const EdgeInsets.only(bottom: 4),
                   child: busy
                       ? IconButton.filledTonal(
-                          tooltip: '停止',
-                          onPressed: () => widget.chats.stop(s),
+                          tooltip: widget.chats.isExecuting(s.id) ? '操作执行中，完成后才能停止' : '停止',
+                          onPressed: widget.chats.isExecuting(s.id) ? null : () => widget.chats.stop(s),
                           icon: const Icon(Icons.stop),
                         )
                       : ListenableBuilder(
@@ -630,6 +637,151 @@ class _AssistantMessage extends StatelessWidget {
                 ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 工具调用卡片：等待确认时显示详情与允许、拒绝按钮；完成后显示结果
+class _ToolCard extends StatefulWidget {
+  const _ToolCard({required this.chats, required this.session, required this.call});
+
+  final ChatStore chats;
+  final ChatSession session;
+  final AiToolCall call;
+
+  @override
+  State<_ToolCard> createState() => _ToolCardState();
+}
+
+class _ToolCardState extends State<_ToolCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final chats = widget.chats;
+    final pending = chats.pendingOf(widget.call.id);
+    final result = widget.session.resultOf(widget.call.id);
+    final def = chats.toolbox?.find(widget.call.name);
+    final kind = def?.kind ?? ToolKind.read;
+    final title = result?.title ?? pending?.plan?.title ?? def?.label ?? widget.call.name;
+    final details = result?.details ?? pending?.plan?.details ?? const <String>[];
+
+    // 等待确认：醒目的卡片
+    if (pending != null && pending.waiting) {
+      final danger = kind == ToolKind.danger;
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        constraints: const BoxConstraints(maxWidth: 640),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: danger ? scheme.error : scheme.primary, width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  danger ? Icons.warning_amber_rounded : Icons.build_circle_outlined,
+                  color: danger ? scheme.error : scheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: Text(title, style: theme.textTheme.titleSmall)),
+              ],
+            ),
+            if (details.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              for (final d in details)
+                Padding(
+                  padding: const EdgeInsets.only(left: 34, bottom: 2),
+                  child: Text(d, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                ),
+            ],
+            const SizedBox(height: 8),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              children: [
+                TextButton(
+                  onPressed: () => chats.decide(widget.session, widget.call.id, false),
+                  child: const Text('拒绝'),
+                ),
+                if (kind == ToolKind.write)
+                  OutlinedButton(
+                    onPressed: () => chats.decide(widget.session, widget.call.id, true, always: true),
+                    child: Text('本次对话中允许${def?.label ?? ''}'),
+                  ),
+                FilledButton(
+                  style: danger
+                      ? FilledButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError)
+                      : null,
+                  onPressed: () => chats.decide(widget.session, widget.call.id, true),
+                  child: const Text('允许'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 其他状态：一行摘要，可以展开查看结果
+    final (IconData icon, Color color, String state) = switch ((pending, result?.status)) {
+      (PendingTool(running: true), _) => (Icons.sync, scheme.primary, '正在执行'),
+      (PendingTool(), _) => (Icons.hourglass_empty, scheme.onSurfaceVariant, '正在准备'),
+      (_, ToolStatus.done) => (Icons.check_circle_outline, scheme.primary, ''),
+      (_, ToolStatus.denied) => (Icons.block, scheme.onSurfaceVariant, '已拒绝'),
+      (_, ToolStatus.error) => (Icons.error_outline, scheme.error, '失败'),
+      _ => (Icons.remove_circle_outline, scheme.onSurfaceVariant, '已取消'),
+    };
+    final busy = pending != null;
+    final canExpand = result != null && (result.content.isNotEmpty || details.isNotEmpty);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: canExpand ? () => setState(() => _expanded = !_expanded) : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (busy)
+                    const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  else
+                    Icon(icon, size: 18, color: color),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      state.isEmpty ? title : '$state：$title',
+                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ),
+                  if (canExpand)
+                    Icon(_expanded ? Icons.expand_less : Icons.expand_more, size: 18, color: scheme.onSurfaceVariant),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded && result != null)
+            Container(
+              margin: const EdgeInsets.only(left: 26, top: 4, bottom: 4),
+              constraints: const BoxConstraints(maxHeight: 320, maxWidth: 720),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8)),
+              child: SingleChildScrollView(
+                child: Text([...details, if (details.isNotEmpty) '', result.content].join('\n'), style: _mono),
+              ),
+            ),
         ],
       ),
     );

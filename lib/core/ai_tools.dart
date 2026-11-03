@@ -14,8 +14,10 @@ import 'instance_config.dart';
 import 'install.dart';
 import 'instance_files.dart';
 import 'loaders.dart';
+import 'memory.dart';
 import 'modrinth.dart';
 import 'paths.dart';
+import 'version.dart';
 
 /// 操作的类型：只读操作默认直接执行；其余都要用户允许
 enum ToolKind {
@@ -257,6 +259,313 @@ class AiToolbox {
           await state.selectVersion(v.id);
           return '已切换为 ${v.id}';
         }, details: ['${v.id}（${describeVersion(v)}）']);
+      },
+    ),
+    AiToolDef(
+      spec: AiTool(
+        'search_resources',
+        '在 Modrinth 搜索资源：模组、光影包、资源包、数据包或整合包。指定 version 时只列出与该版本兼容的结果。'
+            '推荐资源时可以按下载量（downloads）或关注数（follows）排序。',
+        _schema(
+          {
+            'type': {
+              'type': 'string',
+              'enum': [for (final t in ResourceType.values) t.tag],
+            },
+            'query': {'type': 'string', 'description': '关键词，可以为空（只按排序列出热门资源）'},
+            'version': {'type': 'string', 'description': '可选：已安装的版本名称，用于筛选兼容的结果'},
+            'sort': {
+              'type': 'string',
+              'enum': ['relevance', 'downloads', 'follows', 'newest', 'updated'],
+            },
+          },
+          ['type'],
+        ),
+      ),
+      kind: ToolKind.read,
+      label: '搜索资源',
+      prepare: (a) async {
+        final type = _resourceType(a['type']);
+        final v = '${a['version'] ?? ''}'.trim().isEmpty ? null : _version(a);
+        final q = '${a['query'] ?? ''}'.trim();
+        final sort = '${a['sort'] ?? 'relevance'}';
+        return ToolPlan(
+          '在 Modrinth 搜索${type.label}${q.isEmpty ? '' : '「$q」'}',
+          () => _searchResources(type, q, v, sort),
+        );
+      },
+    ),
+    AiToolDef(
+      spec: AiTool(
+        'get_project',
+        '查看 Modrinth 项目的详情：简介、分类、支持的游戏版本，以及与某个已安装版本兼容的最新版本和必需的前置。',
+        _schema(
+          {
+            'project': {'type': 'string', 'description': 'Modrinth 项目 ID 或 slug'},
+            'version': {'type': 'string', 'description': '可选：已安装的版本名称，用于查看兼容的版本'},
+          },
+          ['project'],
+        ),
+      ),
+      kind: ToolKind.read,
+      label: '查看项目详情',
+      prepare: (a) async {
+        final project = '${a['project'] ?? ''}'.trim();
+        if (project.isEmpty) throw ToolError('请提供项目 ID');
+        final v = '${a['version'] ?? ''}'.trim().isEmpty ? null : _version(a);
+        return ToolPlan('查看 Modrinth 项目 $project', () => _projectInfo(project, v));
+      },
+    ),
+    AiToolDef(
+      spec: AiTool(
+        'install_resource',
+        '从 Modrinth 安装光影包、资源包或数据包到一个版本（模组请用 install_mod）。数据包需要指定存档 world。'
+            '默认选择与该版本兼容的最新正式版。光影包需要 Iris 或 OptiFine 才能使用。',
+        _schema(
+          {
+            'version': _versionParam,
+            'project': {'type': 'string', 'description': 'Modrinth 项目 ID 或 slug'},
+            'type': {
+              'type': 'string',
+              'enum': ['shader', 'resourcepack', 'datapack'],
+            },
+            'mod_version_id': {'type': 'string', 'description': '可选：指定 Modrinth 的版本 ID'},
+            'world': {'type': 'string', 'description': '数据包要安装到的存档名称'},
+          },
+          ['version', 'project', 'type'],
+        ),
+      ),
+      kind: ToolKind.write,
+      label: '安装资源',
+      prepare: (a) async {
+        final v = _version(a);
+        final type = _resourceType(a['type']);
+        if (type == ResourceType.mod || type == ResourceType.modpack) throw ToolError('模组请用 install_mod；暂不支持安装整合包');
+        final dir = await _gameDir(v);
+        final world = '${a['world'] ?? ''}'.trim();
+        if (type == ResourceType.datapack && !worldsOf(dir).contains(world)) {
+          throw ToolError('请指定存档。${v.id} 的存档：${worldsOf(dir).isEmpty ? '无' : worldsOf(dir).join('、')}');
+        }
+        final rv = await _resolveResource(
+          v,
+          type,
+          '${a['project'] ?? ''}'.trim(),
+          '${a['mod_version_id'] ?? ''}'.trim(),
+        );
+        final note = type == ResourceType.shader ? _shaderSupport(v, dir) : null;
+        return ToolPlan(
+          '安装${type.label} ${rv.name}',
+          () async {
+            final r = await state.installResource(rv, type, v, world: type == ResourceType.datapack ? world : null);
+            return [
+              if (r.installed.isNotEmpty) '已安装：${r.installed.join('、')}',
+              if (r.skipped.isNotEmpty) '已存在，跳过：${r.skipped.join('、')}',
+              ?note,
+            ].join('；');
+          },
+          details: [
+            '版本：${v.id}',
+            '文件：${rv.fileName}（${_size(rv.fileSize)}），放进 ${type == ResourceType.datapack ? 'saves/$world/datapacks' : type.folder}',
+            '来源：Modrinth',
+            ?note,
+          ],
+        );
+      },
+    ),
+    AiToolDef(
+      spec: AiTool('list_javas', '列出启动器找到的 Java，以及全局设置使用的 Java。', _schema({})),
+      kind: ToolKind.read,
+      label: '查看 Java',
+      prepare: (_) async => ToolPlan('查看已安装的 Java', _listJavas),
+    ),
+    AiToolDef(
+      spec: AiTool('system_info', '查看系统信息：操作系统、内存、处理器与显卡（含驱动版本）。', _schema({})),
+      kind: ToolKind.read,
+      label: '查看系统信息',
+      prepare: (_) async => ToolPlan('查看系统信息', _systemInfo),
+    ),
+    AiToolDef(
+      spec: AiTool(
+        'set_version_java',
+        '设置某个版本使用的 Java。java 为 global（跟随全局设置）、auto（自动选择），或 list_javas 返回的 Java 路径。',
+        _schema(
+          {
+            'version': _versionParam,
+            'java': {'type': 'string'},
+          },
+          ['version', 'java'],
+        ),
+      ),
+      kind: ToolKind.write,
+      label: '设置版本的 Java',
+      prepare: (a) async {
+        final v = _version(a);
+        final arg = '${a['java'] ?? ''}'.trim();
+        final JavaPref pref;
+        String label;
+        if (arg == 'global') {
+          pref = const JavaGlobal();
+          label = '跟随全局设置';
+        } else if (arg == 'auto') {
+          pref = const JavaAuto();
+          label = '自动选择';
+        } else {
+          // 只能选择启动器找到的 Java，不能指定任意程序
+          final j = (await state.javas()).where((j) => p.equals(j.path, arg)).firstOrNull;
+          if (j == null) throw ToolError('不是启动器找到的 Java：$arg，请先用 list_javas 查看');
+          pref = JavaExist(j.path);
+          label = 'Java ${j.major}（${state.redactor().apply(j.path)}）';
+        }
+        final old = _javaLabel(readInstanceSettings(state.paths.versionDir(v.id)).java);
+        return ToolPlan('把 ${v.id} 的 Java 改为$label', () async {
+          await writeInstanceJava(state.paths.versionDir(v.id), pref);
+          return '已把 ${v.id} 的 Java 设为$label';
+        }, details: ['版本：${v.id}', '原来：$old', '改为：$label']);
+      },
+    ),
+    AiToolDef(
+      spec: AiTool(
+        'set_version_memory',
+        '设置某个版本的内存。mode 为 global（跟随全局设置）、auto（自动分配）或 custom（自定义，需要 max_gb）。',
+        _schema(
+          {
+            'version': _versionParam,
+            'mode': {
+              'type': 'string',
+              'enum': ['global', 'auto', 'custom'],
+            },
+            'max_gb': {'type': 'number', 'description': 'custom 时的最大内存（GB）'},
+          },
+          ['version', 'mode'],
+        ),
+      ),
+      kind: ToolKind.write,
+      label: '设置版本的内存',
+      prepare: (a) async {
+        final v = _version(a);
+        final mode = '${a['mode'] ?? ''}';
+        if (!const {'global', 'auto', 'custom'}.contains(mode)) throw ToolError('mode 只能是 global、auto 或 custom');
+        final mem = systemMemory();
+        var tick = 0;
+        if (mode == 'custom') {
+          final gb = (a['max_gb'] as num?)?.toDouble();
+          if (gb == null || gb < 0.5) throw ToolError('请提供 max_gb（至少 0.5）');
+          // 不超过系统总内存（与版本设置页的滑块范围一致）
+          if (gb > mem.total) throw ToolError('超过了系统总内存 ${mem.total.toStringAsFixed(1)} GB');
+          tick = 1;
+          while (tick < maxTickFor(mem.total) && ramFromTick(tick + 1) <= gb) {
+            tick++;
+          }
+        }
+        final s = readInstanceSettings(state.paths.versionDir(v.id));
+        final label = switch (mode) {
+          'custom' => '自定义 ${ramFromTick(tick).toStringAsFixed(1)} GB',
+          'auto' => '自动分配',
+          _ => '跟随全局设置',
+        };
+        return ToolPlan(
+          '把 ${v.id} 的内存改为$label',
+          () async {
+            await writeInstanceRaw(state.paths.versionDir(v.id), {
+              'VersionRamType': const {'auto': 0, 'custom': 1, 'global': 2}[mode]!,
+              if (mode == 'custom') 'VersionRamCustom': tick,
+            });
+            return '已把 ${v.id} 的内存设为$label';
+          },
+          details: [
+            '版本：${v.id}',
+            '原来：${_memoryLabel(s)}',
+            '改为：$label',
+            '系统内存：共 ${mem.total.toStringAsFixed(1)} GB，当前空闲 ${mem.free.toStringAsFixed(1)} GB',
+          ],
+        );
+      },
+    ),
+    AiToolDef(
+      spec: AiTool(
+        'read_config',
+        '读取一个版本的配置文件（config 文件夹中的文本文件，或 options.txt 等游戏选项文件）。',
+        _schema(
+          {
+            'version': _versionParam,
+            'path': {'type': 'string', 'description': '相对于版本运行目录的路径，例如 config/sodium-options.json'},
+          },
+          ['version', 'path'],
+        ),
+      ),
+      kind: ToolKind.read,
+      label: '读取配置文件',
+      prepare: (a) async {
+        final v = _version(a);
+        final (abs, rel) = await _configFile(v, a['path']);
+        return ToolPlan('读取 $rel', () async {
+          final text = await File(abs).readAsString();
+          return state.redactor().apply(
+            text.length > 30000 ? '${text.substring(0, 30000)}\n…（文件过长，只显示前 30000 个字符）' : text,
+          );
+        });
+      },
+    ),
+    AiToolDef(
+      spec: AiTool(
+        'edit_config',
+        '修改一个版本的配置文件：把文件中的一段原文替换为新内容，可以一次做多处替换。每段原文必须在文件中只出现一次。修改前会自动备份。',
+        _schema(
+          {
+            'version': _versionParam,
+            'path': {'type': 'string', 'description': '相对于版本运行目录的路径'},
+            'edits': {
+              'type': 'array',
+              'items': {
+                'type': 'object',
+                'properties': {
+                  'old': {'type': 'string', 'description': '文件中的原文（原样复制）'},
+                  'new': {'type': 'string', 'description': '替换后的内容'},
+                },
+                'required': ['old', 'new'],
+                'additionalProperties': false,
+              },
+            },
+          },
+          ['version', 'path', 'edits'],
+        ),
+      ),
+      kind: ToolKind.danger,
+      label: '修改配置文件',
+      prepare: (a) async {
+        final v = _version(a);
+        final (abs, rel) = await _configFile(v, a['path']);
+        final edits = [
+          for (final e in (a['edits'] is List ? a['edits'] as List : const []).whereType<Map>())
+            (old: '${e['old'] ?? ''}', now: '${e['new'] ?? ''}'),
+        ];
+        if (edits.isEmpty) throw ToolError('请提供要修改的内容');
+        var text = await File(abs).readAsString();
+        for (final e in edits) {
+          if (e.old.isEmpty) throw ToolError('原文不能为空');
+          final n = e.old.allMatches(text).length;
+          if (n != 1) throw ToolError(n == 0 ? '文件中找不到原文：${e.old}' : '原文在文件中出现了 $n 次，请提供更长、唯一的原文：${e.old}');
+          text = text.replaceFirst(e.old, e.now);
+        }
+        final result = text;
+        String clip(String s) => s.length > 200 ? '${s.substring(0, 200)}…' : s;
+        return ToolPlan(
+          '修改 $rel（${edits.length} 处）',
+          () async {
+            final dir = await _gameDir(v);
+            final zip = await _backup(v, dir, [rel], 'config');
+            await File(abs).writeAsString(result);
+            return '已修改 $rel，原文件已备份到 ${p.basename(zip)}';
+          },
+          details: [
+            '版本：${v.id}',
+            for (final e in edits) ...[
+              for (final l in clip(e.old).split('\n')) '- $l',
+              for (final l in clip(e.now).split('\n')) '+ $l',
+            ],
+            '修改前会备份原文件',
+          ],
+        );
       },
     ),
     AiToolDef(
@@ -582,6 +891,145 @@ class AiToolbox {
 
   static String errorMessage(Object e) => '$e'.replaceFirst(RegExp(r'^Exception: ?'), '');
 
+  // ---------- Modrinth 资源 ----------
+
+  static ResourceType _resourceType(Object? v) =>
+      ResourceType.values.where((t) => t.tag == '$v').firstOrNull ?? (throw ToolError('不支持的资源类型：$v'));
+
+  Future<String> _searchResources(ResourceType type, String q, InstanceInfo? v, String sort) async {
+    String? loader;
+    if (v != null && type == ResourceType.mod) {
+      final loaders = modrinthLoaders(v.loader);
+      if (loaders.isEmpty) throw ToolError('${v.id} 不能安装模组（没有模组加载器）');
+      loader = loaders.first;
+    }
+    final r = await Modrinth.search(type: type, query: q, gameVersion: v?.gameVersion, loader: loader, sort: sort);
+    if (r.hits.isEmpty) return '没有找到结果';
+    return [
+      if (v != null) '已筛选与 ${v.gameVersion}${loader == null ? '' : '（$loader）'} 兼容的结果，共 ${r.total} 个：',
+      for (final h in r.hits.take(12))
+        '- ${h.title}（项目 ID：${h.id}，下载 ${h.downloads} 次，关注 ${h.follows}，分类：${h.categories.take(5).join('/')}）：'
+            '${h.description.length > 120 ? '${h.description.substring(0, 120)}…' : h.description}',
+    ].join('\n');
+  }
+
+  Future<String> _projectInfo(String project, InstanceInfo? v) async {
+    final info = await Modrinth.project(project, ResourceType.mod);
+    final body = info.body.replaceAll(RegExp(r'!\[[^\]]*\]\([^)]*\)|<[^>]+>'), '').trim();
+    final lines = [
+      '${info.hit.title}（项目 ID：${info.hit.id}，作者 ${info.hit.author}，下载 ${info.hit.downloads} 次）',
+      '简介：${info.hit.description}',
+      '分类：${info.hit.categories.join('、')}',
+      '页面：${info.page}',
+      '支持的游戏版本（最新的 10 个）：${info.gameVersions.reversed.take(10).join('、')}',
+    ];
+    if (v != null) {
+      final loaders = modrinthLoaders(v.loader);
+      final list = await Modrinth.versions(project, gameVersion: v.gameVersion);
+      // 模组按加载器筛选；光影、资源包等不区分加载器
+      final compatible = list
+          .where((x) => loaders.isEmpty || x.loaders.any(loaders.contains) || !x.loaders.any(_modLoaderTags.contains))
+          .toList();
+      lines.add(
+        compatible.isEmpty
+            ? '没有与 ${v.id}（${v.gameVersion}）兼容的版本'
+            : '与 ${v.id} 兼容的版本：${[for (final x in compatible.take(3)) '${x.versionNumber}（${x.type}，版本 ID ${x.id}${x.requires.isEmpty ? '' : '，有必需的前置'}）'].join('；')}',
+      );
+    }
+    lines.add('说明（节选）：${body.length > 1500 ? '${body.substring(0, 1500)}…' : body}');
+    return lines.join('\n');
+  }
+
+  static const _modLoaderTags = {'fabric', 'forge', 'neoforge', 'quilt', 'legacy-fabric', 'liteloader'};
+
+  Future<ResourceVersion> _resolveResource(InstanceInfo v, ResourceType type, String project, String wanted) async {
+    if (project.isEmpty) throw ToolError('请提供 Modrinth 项目 ID');
+    final list = await Modrinth.versions(project, gameVersion: v.gameVersion);
+    final pick = wanted.isNotEmpty
+        ? list.where((x) => x.id == wanted).firstOrNull
+        : list.where((x) => x.type == 'release').firstOrNull ?? list.firstOrNull;
+    if (pick == null) throw ToolError('$project 没有适用于 ${v.gameVersion} 的版本');
+    return pick;
+  }
+
+  /// 光影包需要 Iris 或 OptiFine
+  String? _shaderSupport(InstanceInfo v, String dir) {
+    if (v.optifine) return null;
+    final mods = listInstanceFiles(dir, InstanceFolder.mods).where((f) => !f.disabled).map((f) => f.name.toLowerCase());
+    if (mods.any((n) => n.startsWith('iris') || n.contains('optifine') || n.startsWith('oculus'))) return null;
+    return '注意：${v.id} 中没有找到 Iris 或 OptiFine，光影包需要它们才能使用';
+  }
+
+  // ---------- Java、内存与系统 ----------
+
+  String _javaLabel(JavaPref j) => switch (j) {
+    JavaGlobal() => '跟随全局设置',
+    JavaAuto() => '自动选择',
+    JavaExist(:final path) || JavaRelative(:final path) => state.redactor().apply(path),
+  };
+
+  String _memoryLabel(InstanceSettings s) => switch (s.memoryMode) {
+    'custom' => '自定义 ${ramFromTick(s.memoryTick).toStringAsFixed(1)} GB',
+    'auto' => '自动分配',
+    _ => '跟随全局设置',
+  };
+
+  Future<String> _listJavas() async {
+    final list = await state.javas();
+    final r = state.redactor();
+    final global = state.config.javaPath;
+    return [
+      '全局设置：${global.isEmpty ? '自动选择' : r.apply(global)}',
+      if (list.isEmpty) '没有找到 Java（启动时会按需自动下载）',
+      for (final j in list)
+        '- Java ${j.major}（${j.version}，${j.is64 ? 64 : 32} 位${j.managed ? '，启动器下载' : ''}）：${r.apply(j.path)}',
+    ].join('\n');
+  }
+
+  Future<String> _systemInfo() async {
+    final mem = systemMemory();
+    final env = Platform.environment;
+    final lines = [
+      '系统：${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+      '内存：共 ${mem.total.toStringAsFixed(1)} GB，当前空闲 ${mem.free.toStringAsFixed(1)} GB',
+      '处理器：${env['PROCESSOR_IDENTIFIER'] ?? '未知'}，${Platform.numberOfProcessors} 个逻辑核心',
+    ];
+    if (Platform.isWindows) {
+      // 固定的查询命令，只读取显卡名称与驱动版本
+      try {
+        final r = await Process.run('powershell.exe', [
+          '-NoProfile',
+          '-Command',
+          'Get-CimInstance Win32_VideoController | ForEach-Object { "\$(\$_.Name)|\$(\$_.DriverVersion)|\$(\$_.DriverDate)" }',
+        ]).timeout(const Duration(seconds: 15));
+        for (final l in '${r.stdout}'.split(RegExp(r'\r?\n')).where((l) => l.trim().isNotEmpty)) {
+          final parts = l.split('|');
+          final date = parts.length > 2 && parts[2].length >= 8 ? parts[2].substring(0, 8) : '';
+          lines.add(
+            '显卡：${parts[0].trim()}，驱动 ${parts.length > 1 ? parts[1].trim() : '未知'}${date.isEmpty ? '' : '（$date）'}',
+          );
+        }
+      } catch (_) {
+        lines.add('显卡：无法读取');
+      }
+    }
+    return lines.join('\n');
+  }
+
+  /// 配置文件：只允许 config 文件夹中的文件与 options*.txt，且必须是不太大的文本文件
+  Future<(String, String)> _configFile(InstanceInfo v, Object? path) async {
+    final dir = await _gameDir(v);
+    final abs = _inside(dir, '${path ?? ''}');
+    final rel = p.relative(abs, from: dir).replaceAll('\\', '/');
+    final allowed = rel.startsWith('config/') || RegExp(r'^options[\w-]*\.txt$').hasMatch(rel);
+    if (!allowed) throw ToolError('只能读写 config 文件夹中的文件和 options*.txt：$rel');
+    if (!File(abs).existsSync()) throw ToolError('文件不存在：$rel');
+    if (File(abs).lengthSync() > 1 << 20) throw ToolError('文件太大：$rel');
+    final bytes = await File(abs).readAsBytes();
+    if (bytes.take(4096).contains(0)) throw ToolError('不是文本文件：$rel');
+    return (abs, rel);
+  }
+
   // ---------- 辅助 ----------
 
   InstanceInfo _version(Map<String, dynamic> a) {
@@ -693,6 +1141,7 @@ class AiToolbox {
       InstanceFolder.mods,
     ).where((f) => f.name.endsWith('.jar') || f.disabled).toList();
     final worlds = worldsOf(dir);
+    final required = await resolveVersion(state.paths, v.id).then((j) => j.javaMajor ?? 8).catchError((_) => 8);
     final java = switch (s.java) {
       JavaGlobal() => '跟随全局设置',
       JavaAuto() => '自动选择',
@@ -701,7 +1150,7 @@ class AiToolbox {
     return [
       '版本：${v.id}（${describeVersion(v)}）',
       '运行目录：${dir == state.paths.root ? '游戏文件夹根目录（未隔离）' : 'versions/${v.id}（已隔离）'}',
-      'Java：${state.redactor().apply(java)}',
+      'Java：${state.redactor().apply(java)}（这个版本需要 Java $required 或更高）',
       '内存：${switch (s.memoryMode) {
         'custom' => '自定义',
         'auto' => '自动',

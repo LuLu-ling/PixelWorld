@@ -295,6 +295,24 @@ void main() {
       expect(await failWith(418, 'teapot'), '请求失败（HTTP 418）：teapot');
     });
 
+    test('响应头之前断开时自动重试', () async {
+      var n = 0;
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      server.listen((socket) async {
+        await socket.first;
+        if (n++ == 0) {
+          socket.destroy();
+          return;
+        }
+        socket.write('HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n$ok');
+        await socket.flush();
+        await socket.close();
+      });
+      expect(await aiChat(at(server.port), 's', const [AiMessage('user', 'hi')]).join(), '好');
+      expect(n, 2);
+    });
+
     test('回答中途断开', () async {
       final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(server.close);

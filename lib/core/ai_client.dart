@@ -498,6 +498,9 @@ Future<HttpClientResponse> _post(HttpClient client, Uri url, Map<String, dynamic
       if (after != null && after > 0 && after <= 30) wait = Duration(seconds: after);
     } on SocketException catch (e) {
       if (attempt >= 2) throw AiException('无法连接 ${s.host}：${e.message}');
+    } on HttpException catch (e) {
+      // 服务端在返回响应头之前断开（回答还没开始），可以安全重试
+      if (attempt >= 2) throw AiException('与 ${s.host} 的连接中断：${e.message}');
     } on TimeoutException {
       throw AiException('${s.host} 长时间没有响应，请稍后重试');
     }

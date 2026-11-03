@@ -381,8 +381,17 @@ class _ChatViewState extends State<_ChatView> {
               Expanded(
                 child: Text(s?.title ?? '新对话', overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
               ),
-              if (ai.ready)
+              if (ai.ready) ...[
+                if (s != null) _ContextMeter(chats: widget.chats, session: s, ai: ai),
+                const SizedBox(width: 12),
                 Text(ai.model, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+              ],
+              if (s != null)
+                IconButton(
+                  tooltip: widget.chats.canCompact(s) ? '压缩上下文：把较早的对话压缩成摘要' : '对话较短，暂时不需要压缩',
+                  icon: const Icon(Icons.compress),
+                  onPressed: ai.ready && !busy && widget.chats.canCompact(s) ? () => widget.chats.compact(s, ai) : null,
+                ),
               IconButton(
                 tooltip: 'AI 设置',
                 icon: const Icon(Icons.tune),
@@ -399,7 +408,8 @@ class _ChatViewState extends State<_ChatView> {
                     controller: _scroll,
                     padding: const EdgeInsets.fromLTRB(28, 8, 28, 16),
                     children: [
-                      for (var i = 0; i < messages.length; i++)
+                      for (var i = 0; i < messages.length; i++) ...[
+                        if (s!.summary != null && i == s.summaryUntil) _SummaryDivider(summary: s.summary!),
                         if (messages[i].isUser)
                           _UserMessage(text: messages[i].content)
                         else if (!messages[i].isTool) ...[
@@ -411,9 +421,21 @@ class _ChatViewState extends State<_ChatView> {
                                   ? _retry
                                   : null,
                             ),
-                          for (final c in messages[i].toolCalls) _ToolCard(chats: widget.chats, session: s!, call: c),
+                          for (final c in messages[i].toolCalls) _ToolCard(chats: widget.chats, session: s, call: c),
                           if (_turnEnd(messages, i, busy)) _TurnStats(messages: _turnOf(messages, i)),
                         ],
+                      ],
+                      if (s != null && widget.chats.isCompacting(s.id))
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            children: [
+                              SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                              SizedBox(width: 12),
+                              Text('正在压缩上下文…'),
+                            ],
+                          ),
+                        ),
                       if (busy && streaming != null)
                         streaming.isEmpty
                             ? const Padding(
@@ -841,6 +863,97 @@ class _TurnStats extends StatelessWidget {
           parts.join('  ·  '),
           style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
+      ),
+    );
+  }
+}
+
+/// 标题栏的上下文用量：已用 / 上下文长度
+class _ContextMeter extends StatelessWidget {
+  const _ContextMeter({required this.chats, required this.session, required this.ai});
+
+  final ChatStore chats;
+  final ChatSession session;
+  final AiSettings ai;
+
+  static String _k(int v) => v >= 1000000
+      ? '${(v / 1000000).toStringAsFixed(v % 1000000 == 0 ? 0 : 1)}M'
+      : v >= 1000
+      ? '${(v / 1000).toStringAsFixed(v >= 100000 ? 0 : 1)}k'
+      : '$v';
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final c = chats.contextOf(session, ai);
+    final ratio = (c.used / c.window).clamp(0.0, 1.0);
+    final color = ratio > 0.9 ? scheme.error : (ratio > 0.75 ? scheme.tertiary : scheme.primary);
+    return Tooltip(
+      message:
+          '上下文：${c.estimated ? '约 ' : ''}${c.used} / ${c.window} tokens\n'
+          '包括系统提示、工具说明和发给模型的对话${session.summary == null ? '' : '（较早的部分已压缩为摘要）'}',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox.square(
+            dimension: 16,
+            child: CircularProgressIndicator(
+              value: ratio < 0.02 ? 0.02 : ratio,
+              strokeWidth: 3,
+              color: color,
+              backgroundColor: scheme.surfaceContainerHighest,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '${c.estimated ? '约 ' : ''}${_k(c.used)} / ${_k(c.window)}',
+            style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 压缩分界：以上的对话发给模型时已换成摘要
+class _SummaryDivider extends StatelessWidget {
+  const _SummaryDivider({required this.summary});
+
+  final String summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          const Expanded(child: Divider()),
+          const SizedBox(width: 12),
+          Icon(Icons.compress, size: 16, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Text('以上的对话已压缩为摘要', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+          TextButton(
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('对话摘要'),
+                content: SizedBox(
+                  width: 560,
+                  child: SingleChildScrollView(
+                    child: SelectionArea(child: MarkdownBody(data: summary)),
+                  ),
+                ),
+                actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('关闭'))],
+              ),
+            ),
+            child: const Text('查看摘要'),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(child: Divider()),
+        ],
       ),
     );
   }

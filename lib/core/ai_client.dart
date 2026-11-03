@@ -511,7 +511,7 @@ String _describeError(int? status, String body, AiSettings s) {
   final lower = raw.toLowerCase();
   String? hint;
   if (RegExp(r'context.?length|context window|too many tokens|prompt is too long|input.*too long').hasMatch(lower)) {
-    hint = '对话内容超出了模型能处理的长度，请新建一个对话';
+    hint = '对话内容超出了模型能处理的长度，请点对话上方的「压缩上下文」按钮，或新建一个对话';
   } else if (RegExp(
     r'model.*(not.?exist|not.?found|does not exist|invalid)|unknown model|no such model|supported.*model names?|model names? .*you passed',
   ).hasMatch(lower)) {

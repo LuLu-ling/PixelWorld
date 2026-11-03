@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import 'accounts.dart' show newId;
 import 'ai_client.dart';
+import 'ai_context.dart';
 import 'ai_prompt.dart';
 import 'ai_tools.dart';
 import 'paths.dart';
@@ -59,11 +60,12 @@ class ChatMessage {
   bool get isUser => role == 'user';
   bool get isTool => role == 'tool';
 
-  AiMessage toAi() => AiMessage(
+  /// keepBlocks 为 false 时不传回原始内容块（压缩过的对话中已完成的轮次）
+  AiMessage toAi({bool keepBlocks = true}) => AiMessage(
     role,
     content,
     toolCalls: toolCalls,
-    blocks: blocks,
+    blocks: keepBlocks ? blocks : null,
     reasoning: reasoning,
     toolCallId: toolCallId,
     isError: status == ToolStatus.error,
@@ -112,6 +114,8 @@ class ChatSession {
     required this.created,
     required this.updated,
     required this.messages,
+    this.summary,
+    this.summaryUntil = 0,
   });
 
   final String id;
@@ -119,6 +123,10 @@ class ChatSession {
   final DateTime created;
   DateTime updated;
   final List<ChatMessage> messages;
+
+  /// 上下文压缩：summaryUntil 之前的消息发给模型时用 summary 代替（界面上仍然显示）
+  String? summary;
+  int summaryUntil;
 
   /// 某个工具调用的结果
   ChatMessage? resultOf(String callId) => messages.where((m) => m.isTool && m.toolCallId == callId).firstOrNull;
@@ -129,6 +137,8 @@ class ChatSession {
     'created': created.toIso8601String(),
     'updated': updated.toIso8601String(),
     'messages': [for (final m in messages) m.toJson()],
+    'summary': ?summary,
+    if (summary != null) 'summaryUntil': summaryUntil,
   };
 
   static ChatSession fromJson(Map<String, dynamic> j) => ChatSession(
@@ -139,6 +149,8 @@ class ChatSession {
     messages: [
       for (final m in (j['messages'] as List? ?? const []).whereType<Map<String, dynamic>>()) ChatMessage.fromJson(m),
     ],
+    summary: j['summary'] as String?,
+    summaryUntil: (j['summaryUntil'] as num?)?.toInt() ?? 0,
   );
 }
 
@@ -170,12 +182,17 @@ class ChatStore extends ChangeNotifier {
   bool Function() toolsEnabled = () => true;
   bool Function() confirmRead = () => false;
 
+  /// 模型的上下文长度，以及自动压缩的阈值（0 表示不自动压缩）
+  int Function(AiSettings) contextWindow = (_) => defaultContextWindow;
+  int Function() compactAt = () => 64000;
+
   /// 当前打开的会话；null 表示新对话（发送第一条消息时创建）
   String? currentId;
 
   final _streaming = <String, String>{};
   final _errors = <String, String>{};
   final _busy = <String>{};
+  final _compacting = <String>{};
 
   /// 每次停止时加一，用来丢弃已停止的请求的后续结果
   final _gen = <String, int>{};
@@ -208,6 +225,73 @@ class ChatStore extends ChangeNotifier {
   ChatSession? byId(String id) => sessions.where((s) => s.id == id).firstOrNull;
 
   bool isBusy(String id) => _busy.contains(id);
+  bool isCompacting(String id) => _compacting.contains(id);
+
+  /// 当前上下文的用量：最近一次请求的实际用量加上之后新增的内容；没有用量数据时估算
+  ({int used, int window, bool estimated}) contextOf(ChatSession s, AiSettings ai) {
+    final window = contextWindow(ai);
+    final ms = s.messages;
+    final last = ms.lastIndexWhere((m) => m.inputTokens != null);
+    if (last >= 0 && last >= s.summaryUntil) {
+      final after = ms.skip(last + 1).fold<int>(0, (a, m) => a + estimateTokens(m.content));
+      return (used: ms[last].inputTokens! + (ms[last].outputTokens ?? 0) + after, window: window, estimated: after > 0);
+    }
+    final text = [s.summary ?? '', for (final m in ms.skip(s.summary == null ? 0 : s.summaryUntil)) m.content].join();
+    return (used: promptOverheadTokens + estimateTokens(text), window: window, estimated: true);
+  }
+
+  /// 压缩的分界：保留最近 [keepRecentTurns] 轮，分界总在用户消息处，不会拆开工具调用与结果
+  int? _cutIndex(ChatSession s) {
+    final users = [
+      for (var i = 0; i < s.messages.length; i++)
+        if (s.messages[i].isUser && i > s.summaryUntil) i,
+    ];
+    if (users.length < keepRecentTurns) return null;
+    final cut = users[users.length - keepRecentTurns];
+    return cut > s.summaryUntil ? cut : null;
+  }
+
+  bool canCompact(ChatSession s) => _cutIndex(s) != null;
+
+  /// 把较早的对话压缩成摘要；成功时返回 true
+  Future<bool> compact(ChatSession s, AiSettings ai) async {
+    final cut = _cutIndex(s);
+    if (cut == null || _compacting.contains(s.id)) return false;
+    _compacting.add(s.id);
+    _errors.remove(s.id);
+    notifyListeners();
+    try {
+      final text = transcriptOf(
+        s.messages
+            .sublist(s.summary == null ? 0 : s.summaryUntil, cut)
+            .map(
+              (m) => (
+                role: m.role,
+                content: m.content,
+                calls: [for (final c in m.toolCalls) (name: c.name, args: c.args)],
+              ),
+            ),
+      );
+      final prompt = '${s.summary == null ? '' : '【已有的摘要】\n${s.summary}\n\n'}【需要压缩的对话】\n$text';
+      final out = StringBuffer();
+      await for (final e in aiStream(ai, compactSystemPrompt, [AiMessage('user', prompt)])) {
+        if (e is AiText) out.write(e.text);
+      }
+      final summary = out.toString().trim();
+      if (summary.isEmpty) throw AiException('模型没有返回摘要');
+      s
+        ..summary = summary
+        ..summaryUntil = cut;
+      await _save(s);
+      return true;
+    } catch (e) {
+      _errors[s.id] = '压缩上下文失败：$e';
+      return false;
+    } finally {
+      _compacting.remove(s.id);
+      notifyListeners();
+    }
+  }
 
   /// 正在生成的回答（尚未完成）
   String? streamingOf(String id) => _streaming[id];
@@ -245,8 +329,25 @@ class ChatStore extends ChangeNotifier {
     if (session == null) sessions.insert(0, s);
     s.messages.add(ChatMessage('user', text));
     currentId = s.id;
-    unawaited(_run(s, ai));
+    unawaited(_sendFlow(s, ai));
     return s;
+  }
+
+  /// 上下文超过阈值（不超过上下文长度的 75%）时先压缩，再请求回答
+  Future<void> _sendFlow(ChatSession s, AiSettings ai) async {
+    final at = compactAt();
+    if (at > 0 && canCompact(s)) {
+      final c = contextOf(s, ai);
+      final limit = at < c.window * 0.75 ? at : (c.window * 0.75).round();
+      if (c.used > limit) {
+        final gen = _gen[s.id] ?? 0;
+        _busy.add(s.id);
+        await compact(s, ai);
+        // 压缩期间用户停止了对话
+        if ((_gen[s.id] ?? 0) != gen) return;
+      }
+    }
+    await _run(s, ai);
   }
 
   /// 重新生成：去掉最后一条文字回答（如果有），再次请求
@@ -260,9 +361,13 @@ class ChatStore extends ChangeNotifier {
   /// 发给接口的历史：没有结果的工具调用（例如确认时关闭了启动器）补上「已取消」
   List<AiMessage> _history(ChatSession s) {
     final out = <AiMessage>[];
-    for (var i = 0; i < s.messages.length; i++) {
+    final start = s.summary == null ? 0 : s.summaryUntil.clamp(0, s.messages.length);
+    // 压缩后历史的开头变了，已完成的轮次不再传回原始内容块（思考块与原来的上下文绑定）
+    final lastUser = s.messages.lastIndexWhere((m) => m.isUser);
+    if (s.summary != null) out.add(AiMessage('user', '$summaryLead\n\n${s.summary}'));
+    for (var i = start; i < s.messages.length; i++) {
       final m = s.messages[i];
-      out.add(m.toAi());
+      out.add(m.toAi(keepBlocks: s.summary == null || i > lastUser));
       if (m.toolCalls.isEmpty) continue;
       // 这条回答之后紧跟的工具结果
       final answered = <String>{};

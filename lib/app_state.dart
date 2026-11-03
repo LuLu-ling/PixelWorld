@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 import 'app_info.dart';
 import 'core/accounts.dart';
 import 'core/ai_chat.dart';
+import 'core/ai_context.dart';
 import 'core/ai_tools.dart';
 import 'core/cat_ini.dart';
 import 'core/config.dart';
@@ -44,7 +45,10 @@ class AppState extends ChangeNotifier {
     chats
       ..toolbox = AiToolbox(this)
       ..toolsEnabled = (() => config.aiTools)
-      ..confirmRead = (() => config.aiConfirmRead);
+      ..confirmRead = (() => config.aiConfirmRead)
+      ..contextWindow = ((ai) =>
+          config.aiContextWindow > 0 ? config.aiContextWindow : knownContextWindow(ai.model) ?? defaultContextWindow)
+      ..compactAt = (() => config.aiCompactAt);
   }
 
   static Future<AppState> create() async {

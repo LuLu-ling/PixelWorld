@@ -78,6 +78,9 @@ class LauncherConfig extends ChangeNotifier {
     // 允许 AI 执行启动器操作（修改操作都需要用户确认）；只读操作是否也需要确认
     'aiTools': true,
     'aiConfirmRead': false,
+    // 上下文长度（0 表示按模型自动判断）与自动压缩的阈值（0 表示不自动压缩）
+    'aiContextWindow': 0,
+    'aiCompactAt': 64000,
   };
 
   static File get _file => File(p.join(Paths.appData, 'config.json'));
@@ -146,4 +149,6 @@ class LauncherConfig extends ChangeNotifier {
   bool get aiConfirm => _get('aiConfirm');
   bool get aiTools => _get('aiTools');
   bool get aiConfirmRead => _get('aiConfirmRead');
+  int get aiContextWindow => (_data['aiContextWindow'] as num).toInt();
+  int get aiCompactAt => (_data['aiCompactAt'] as num).toInt();
 }

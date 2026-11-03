@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
+
+import 'package:flutter/services.dart';
+
 import '../core/ai_client.dart';
+import '../core/ai_context.dart';
 
 /// AI 排障的接口设置：用户自己填写接口地址、模型与 API Key
 class AiSettingsForm extends StatefulWidget {
@@ -22,6 +26,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
   final _url = TextEditingController();
   final _model = TextEditingController();
   final _key = TextEditingController();
+  final _ctx = TextEditingController();
   bool _showKey = false;
   bool _testing = false;
   String? _result;
@@ -37,6 +42,8 @@ class AiSettingsFormState extends State<AiSettingsForm> {
     _url.text = s.baseUrl;
     _model.text = s.model;
     _key.text = s.apiKey;
+    final ctx = AppScope.read(context).config.aiContextWindow;
+    _ctx.text = ctx > 0 ? '$ctx' : '';
   }
 
   @override
@@ -44,6 +51,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
     _url.dispose();
     _model.dispose();
     _key.dispose();
+    _ctx.dispose();
     super.dispose();
   }
 
@@ -51,7 +59,9 @@ class AiSettingsFormState extends State<AiSettingsForm> {
       AiSettings(provider: _provider, baseUrl: _url.text.trim(), model: _model.text.trim(), apiKey: _key.text.trim());
 
   Future<void> save() async {
-    await _current.save(AppScope.read(context).config);
+    final cfg = AppScope.read(context).config;
+    await _current.save(cfg);
+    await cfg.update({'aiContextWindow': int.tryParse(_ctx.text.trim()) ?? 0});
     if (!mounted) return;
     toast(context, '已保存');
     widget.onSaved?.call();
@@ -201,6 +211,47 @@ class AiSettingsFormState extends State<AiSettingsForm> {
                   )
                 : IconButton(tooltip: '获取模型列表', icon: const Icon(Icons.list_alt), onPressed: _pickModel),
           ),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _ctx,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: '上下文长度（tokens）',
+                  hintText: '留空自动：${knownContextWindow(_model.text.trim()) ?? defaultContextWindow}',
+                  helperText: '见服务商文档；未知的模型默认按 $defaultContextWindow 计算',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonFormField<int>(
+                initialValue: const [32000, 64000, 128000, 256000, 0].contains(cfg.aiCompactAt)
+                    ? cfg.aiCompactAt
+                    : 64000,
+                decoration: const InputDecoration(
+                  labelText: '自动压缩上下文',
+                  helperText: '超过后把较早的对话压缩成摘要，节省费用',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 32000, child: Text('超过 32k tokens 时')),
+                  DropdownMenuItem(value: 64000, child: Text('超过 64k tokens 时')),
+                  DropdownMenuItem(value: 128000, child: Text('超过 128k tokens 时')),
+                  DropdownMenuItem(value: 256000, child: Text('超过 256k tokens 时')),
+                  DropdownMenuItem(value: 0, child: Text('不自动压缩')),
+                ],
+                onChanged: (v) => cfg.update({'aiCompactAt': v ?? 64000}),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         SwitchListTile(

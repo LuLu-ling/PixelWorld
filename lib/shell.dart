@@ -7,6 +7,7 @@ import 'app_info.dart';
 import 'app_scope.dart';
 import 'core/crash.dart';
 import 'core/task.dart';
+import 'platform.dart';
 import 'widgets/task_steps.dart';
 import 'pages/ai_page.dart';
 import 'pages/diagnose_page.dart';
@@ -147,7 +148,7 @@ class _TitleBar extends StatelessWidget {
       child: Stack(
         children: [
           // 空白处可拖动窗口，双击最大化
-          Positioned.fill(child: DragToMoveArea(child: const SizedBox.expand())),
+          if (isDesktop) Positioned.fill(child: DragToMoveArea(child: const SizedBox.expand())),
           Positioned(
             left: subTitle == null ? 20 : 8,
             top: 0,
@@ -189,8 +190,9 @@ class _TitleBar extends StatelessWidget {
               ),
             ),
           // 窗口按钮左侧：任务入口
-          const Positioned(right: 46 * 3 + 4, top: 4, child: _TasksButton()),
-          const Positioned(right: 0, top: 0, child: WindowButtons()),
+          // 手机上没有窗口按钮，任务入口放在最右侧
+          Positioned(right: isDesktop ? 46 * 3 + 4 : 8, top: 4, child: const _TasksButton()),
+          if (isDesktop) const Positioned(right: 0, top: 0, child: WindowButtons()),
         ],
       ),
     );

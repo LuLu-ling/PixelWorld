@@ -28,6 +28,7 @@ import 'core/modrinth.dart';
 import 'core/paths.dart';
 import 'core/precheck.dart';
 import 'core/task.dart';
+import 'platform.dart';
 import 'widgets/loader_label.dart';
 
 enum GameState { idle, preparing, running }
@@ -344,6 +345,7 @@ class AppState extends ChangeNotifier {
     required ({int width, int height}) launcherSize,
     required ({int width, int height}) screenSize,
   }) async {
+    if (!isDesktop) throw Exception(mobileLaunchUnsupported);
     if (gameState != GameState.idle) throw Exception('游戏已在运行');
     final id = config.selectedVersion;
     if (id.isEmpty) throw Exception('请先选择一个游戏版本');
@@ -519,7 +521,7 @@ class AppState extends ChangeNotifier {
 
   // ---------- 启动器可见性，与 PCL-CE 的 LauncherVisibility 一致 ----------
 
-  Window? get _window => WindowManager.instance.getCurrent();
+  Window? get _window => isDesktop ? WindowManager.instance.getCurrent() : null;
 
   void _afterLaunched(String after) {
     switch (after) {

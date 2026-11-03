@@ -40,7 +40,7 @@ const _gb = 1024 * 1024 * 1024;
       calloc.free(s);
     }
   }
-  if (Platform.isLinux) {
+  if (Platform.isLinux || Platform.isAndroid) {
     final info = <String, int>{};
     for (final line in File('/proc/meminfo').readAsLinesSync()) {
       final m = RegExp(r'^(\w+):\s+(\d+)').firstMatch(line);

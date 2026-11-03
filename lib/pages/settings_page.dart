@@ -5,9 +5,10 @@ import '../app_info.dart';
 import '../app_scope.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
+import '../widgets/ai_settings.dart';
 import 'settings_sections.dart';
 
-enum _Section { launch, java, manage, appearance, misc, about }
+enum _Section { launch, java, manage, appearance, ai, misc, about }
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -27,6 +28,7 @@ class _SettingsPageState extends State<SettingsPage> {
     ]),
     SideNavGroup('启动器', [
       SideNavItem(_Section.appearance, '个性化', Icons.palette_outlined),
+      SideNavItem(_Section.ai, 'AI 排障', Icons.auto_awesome_outlined),
       SideNavItem(_Section.misc, '其他', Icons.tune),
     ]),
     SideNavGroup('关于', [SideNavItem(_Section.about, '关于与致谢', Icons.info_outline)]),
@@ -46,6 +48,25 @@ class _SettingsPageState extends State<SettingsPage> {
               _Section.java => const JavaSection(),
               _Section.misc => const MiscSection(),
               _Section.appearance => const _AppearanceSection(),
+              _Section.ai => ListView(
+                padding: const EdgeInsets.all(28),
+                children: const [
+                  SettingsGroup(
+                    title: 'AI 排障',
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+                        child: Text(
+                          '游戏崩溃后，可以把截取的日志发送给你自己的 AI 服务分析原因。'
+                          '支持 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、OpenRouter、本机 Ollama 等）和 Anthropic 接口；'
+                          '费用由你的 AI 服务商收取。',
+                        ),
+                      ),
+                      Padding(padding: EdgeInsets.fromLTRB(20, 8, 20, 20), child: AiSettingsForm()),
+                    ],
+                  ),
+                ],
+              ),
               _Section.about => const _AboutSection(),
               _ => MigratingPlaceholder(title: label),
             },

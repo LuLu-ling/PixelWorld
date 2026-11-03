@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_info.dart';
 import 'app_scope.dart';
+import 'core/crash.dart';
 import 'core/task.dart';
 import 'widgets/task_steps.dart';
+import 'pages/diagnose_page.dart';
 import 'pages/download_page.dart';
 import 'pages/home_page.dart';
 import 'pages/instance_page.dart';
@@ -18,9 +22,15 @@ import 'widgets/window_buttons.dart';
 enum MainPage { home, download, settings, tools }
 
 /// 从主页面进入的子页面：标题栏显示返回按钮和标题，代替主导航
-enum SubPage { versions, log, instance, tasks }
+enum SubPage { versions, log, instance, tasks, diagnose }
 
-const _subTitles = {SubPage.versions: '版本选择', SubPage.log: '游戏日志', SubPage.instance: '版本设置', SubPage.tasks: '任务'};
+const _subTitles = {
+  SubPage.versions: '版本选择',
+  SubPage.log: '游戏日志',
+  SubPage.instance: '版本设置',
+  SubPage.tasks: '任务',
+  SubPage.diagnose: '错误分析',
+};
 
 const _nav = [
   (page: MainPage.home, icon: Icons.rocket_launch_outlined, active: Icons.rocket_launch, label: '启动'),
@@ -53,6 +63,24 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   MainPage _page = MainPage.home;
   SubPage? _sub;
+  StreamSubscription<CrashReport>? _crashes;
+  final _navKey = GlobalKey();
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 游戏崩溃时弹出提示
+    _crashes ??= AppScope.read(context).crashes.listen((report) {
+      final ctx = _navKey.currentContext;
+      if (ctx != null && ctx.mounted) showCrashDialog(ctx, report);
+    });
+  }
+
+  @override
+  void dispose() {
+    _crashes?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +89,7 @@ class _ShellState extends State<Shell> {
       back: () => setState(() => _sub = null),
       child: Scaffold(
         body: Stack(
+          key: _navKey,
           children: [
             Column(
               children: [
@@ -76,6 +105,7 @@ class _ShellState extends State<Shell> {
                     SubPage.log => const LogPage(),
                     SubPage.instance => const InstancePage(),
                     SubPage.tasks => const TasksPage(),
+                    SubPage.diagnose => const DiagnosePage(),
                     null => IndexedStack(
                       index: _page.index,
                       children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage()],

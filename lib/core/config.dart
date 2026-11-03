@@ -70,6 +70,11 @@ class LauncherConfig extends ChangeNotifier {
     // 首页的使用提示与 Minecraft 版本动态
     'homeHints': true,
     'homeNews': true,
+    // AI 排障：接口格式、地址与模型（API Key 加密保存在 ai.dat）；发送前是否让用户确认内容
+    'aiProvider': 'openai',
+    'aiBaseUrl': '',
+    'aiModel': '',
+    'aiConfirm': true,
   };
 
   static File get _file => File(p.join(Paths.appData, 'config.json'));
@@ -132,4 +137,8 @@ class LauncherConfig extends ChangeNotifier {
   bool get hintBuy => _get('hintBuy');
   bool get homeHints => _get('homeHints');
   bool get homeNews => _get('homeNews');
+  String get aiProvider => _get('aiProvider');
+  String get aiBaseUrl => _get('aiBaseUrl');
+  String get aiModel => _get('aiModel');
+  bool get aiConfirm => _get('aiConfirm');
 }

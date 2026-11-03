@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -7,14 +8,16 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
 import '../app_scope.dart';
+import '../core/crash.dart';
 import '../core/task.dart';
 import '../core/tools.dart';
 import '../widgets/format.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
+import 'diagnose_page.dart';
 import 'versions_page.dart';
 
-enum _Section { lobby, toolbox, download, skin, server, achievement }
+enum _Section { lobby, diagnose, toolbox, download, skin, server, achievement }
 
 /// 工具（PCL 的布局）：联机与实用工具
 class ToolsPage extends StatefulWidget {
@@ -30,6 +33,7 @@ class _ToolsPageState extends State<ToolsPage> {
   static const _groups = [
     SideNavGroup('联机', [SideNavItem(_Section.lobby, '联机大厅', Icons.lan_outlined, trailing: '规划中')]),
     SideNavGroup('实用工具', [
+      SideNavItem(_Section.diagnose, '错误分析', Icons.troubleshoot),
       SideNavItem(_Section.toolbox, '百宝箱', Icons.handyman_outlined),
       SideNavItem(_Section.download, '自定义下载', Icons.download_for_offline_outlined),
       SideNavItem(_Section.skin, '皮肤与头像', Icons.face_outlined),
@@ -48,6 +52,7 @@ class _ToolsPageState extends State<ToolsPage> {
           child: ContentPanel(
             child: switch (_section) {
               _Section.lobby => const _Lobby(),
+              _Section.diagnose => const _Diagnose(),
               _Section.toolbox => const _Toolbox(),
               _Section.download => const _CustomDownload(),
               _Section.skin => const _SkinTools(),
@@ -95,6 +100,88 @@ class _Lobby extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// ---------- 错误分析 ----------
+
+class _Diagnose extends StatelessWidget {
+  const _Diagnose();
+
+  Future<void> _lastRun(BuildContext context) async {
+    final report = await AppScope.read(context).analyzeLastRun();
+    if (!context.mounted) return;
+    if (report == null) return toast(context, '本次打开启动器后还没有启动过游戏');
+    openDiagnosis(context, report);
+  }
+
+  Future<void> _file(BuildContext context) async {
+    final f = await openFile(
+      acceptedTypeGroups: const [
+        XTypeGroup(label: '日志', extensions: ['log', 'txt']),
+      ],
+    );
+    if (f == null || !context.mounted) return;
+    final text = utf8.decode(await f.readAsBytes(), allowMalformed: true);
+    if (!context.mounted) return;
+    _open(context, f.name, text);
+  }
+
+  void _open(BuildContext context, String name, String text) {
+    if (text.trim().isEmpty) return toast(context, '内容为空');
+    openDiagnosis(context, reportFromText(name, text, AppScope.read(context).redactor()));
+  }
+
+  Future<void> _paste(BuildContext context) async {
+    final ctrl = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('粘贴日志'),
+        content: SizedBox(
+          width: 640,
+          child: TextField(
+            controller: ctrl,
+            autofocus: true,
+            minLines: 12,
+            maxLines: 20,
+            decoration: const InputDecoration(hintText: '粘贴崩溃报告或日志内容', border: OutlineInputBorder()),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, ctrl.text), child: const Text('分析')),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (text != null && context.mounted) _open(context, '粘贴的日志', text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget tool(IconData icon, String title, String subtitle, String action, VoidCallback onTap) => ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      trailing: FilledButton.tonal(onPressed: onTap, child: Text(action)),
+    );
+    return _page([
+      SettingsGroup(
+        title: '错误分析',
+        children: [
+          tool(Icons.history, '最近一次游戏', '分析本次打开启动器后最近一次运行的游戏', '分析', () => _lastRun(context)),
+          tool(Icons.description_outlined, '日志文件', '选择崩溃报告（crash-reports）或日志文件（logs）', '选择', () => _file(context)),
+          tool(Icons.content_paste, '粘贴日志', '粘贴别人发给你的崩溃报告或日志', '粘贴', () => _paste(context)),
+        ],
+      ),
+      Text(
+        '启动器先用本地规则匹配常见问题；在「设置 → AI 排障」填写自己的 AI 服务后，还可以让 AI 分析日志。'
+        '游戏崩溃时会自动弹出提示。',
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
+    ]);
   }
 }
 

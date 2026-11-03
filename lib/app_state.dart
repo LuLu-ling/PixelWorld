@@ -9,6 +9,7 @@ import 'app_info.dart';
 import 'core/accounts.dart';
 import 'core/cat_ini.dart';
 import 'core/config.dart';
+import 'core/crash.dart';
 import 'core/download.dart';
 import 'core/extra_loaders.dart';
 import 'core/install.dart';
@@ -24,6 +25,7 @@ import 'core/modrinth.dart';
 import 'core/paths.dart';
 import 'core/precheck.dart';
 import 'core/task.dart';
+import 'widgets/loader_label.dart';
 
 enum GameState { idle, preparing, running }
 
@@ -95,6 +97,32 @@ class AppState extends ChangeNotifier {
 
   /// 版本设置页正在查看的版本
   String instanceId = '';
+
+  /// 最近一次启动的游戏，用于崩溃分析
+  GameRun? lastRun;
+
+  final _crashes = StreamController<CrashReport>.broadcast();
+
+  /// 游戏崩溃（非正常退出）时发出收集到的崩溃信息
+  Stream<CrashReport> get crashes => _crashes.stream;
+
+  /// 错误分析页正在查看的内容
+  CrashReport? diagnosis;
+
+  /// 从日志中去掉的隐私信息：所有账户的玩家名、UUID 与令牌
+  Redactor redactor({List<String> extra = const []}) => Redactor(
+    tokens: [
+      for (final a in accounts.accounts) ...[a.accessToken, ?a.refreshToken],
+    ],
+    names: [for (final a in accounts.accounts) a.name, ...extra],
+    uuids: [for (final a in accounts.accounts) a.uuid],
+  );
+
+  /// 重新收集最近一次游戏的信息
+  Future<CrashReport?> analyzeLastRun() async {
+    final run = lastRun;
+    return run == null ? null : collectCrash(run, log.value);
+  }
 
   /// 最近的游戏日志（最多保留 5000 行）
   final log = ValueNotifier<List<String>>(const []);
@@ -292,7 +320,10 @@ class AppState extends ChangeNotifier {
 
   void _launcherLog(String line) => _log(['[${AppInfo.name}] $line']);
 
-  void killGame() => _game?.kill();
+  void killGame() {
+    lastRun?.killed = true;
+    _game?.kill();
+  }
 
   /// 启动当前选择的版本。返回 false 表示用户在劝导中取消了启动。
   Future<bool> launch(
@@ -410,6 +441,23 @@ class AppState extends ChangeNotifier {
       } else {
         _game = proc;
         gameState = GameState.running;
+        final run = lastRun = GameRun(
+          versionId: id,
+          description: describeVersion(info),
+          gameDir: gameDir,
+          loaderLibs: [
+            for (final l in v.libraries)
+              if (RegExp(
+                r'^(net\.fabricmc:fabric-loader|org\.quiltmc:quilt-loader|net\.minecraftforge:(forge|fmlloader)|net\.neoforged:(neoforge|forge|fancymodloader)|com\.cleanroommc:cleanroom|optifine:optifine|net\.labymod:)',
+              ).hasMatch('${l['name']}'))
+                '${l['name']}',
+          ],
+          javaPath: java.path,
+          javaMajor: java.major,
+          memoryGb: memory.max,
+          startedAt: DateTime.now(),
+          secrets: redactor(extra: [if (inst.server.trim().isNotEmpty) inst.server.trim().split(':').first]),
+        );
         final parser = LogParser(_log);
         decodeOutput(proc.stdout).listen(parser.push);
         decodeOutput(proc.stderr).listen(parser.push);
@@ -419,9 +467,10 @@ class AppState extends ChangeNotifier {
             _launcherLog('游戏已退出，代码 $code');
             _game = null;
             lastExitCode = code;
+            run.exitCode = code;
             gameState = GameState.idle;
             notifyListeners();
-            _afterExited(config.afterLaunch);
+            unawaited(_checkCrash(run));
           }),
         );
       }
@@ -435,6 +484,23 @@ class AppState extends ChangeNotifier {
     } finally {
       task = null;
       notifyListeners();
+    }
+  }
+
+  /// 游戏退出后检查是否崩溃：退出代码非 0（不是用户结束的），或生成了崩溃报告
+  Future<void> _checkCrash(GameRun run) async {
+    var crashed = false;
+    try {
+      final report = await collectCrash(run, log.value);
+      crashed = !run.killed && (run.exitCode != 0 || report.sources.any((s) => s.name != '游戏输出'));
+      if (crashed) {
+        _launcherLog('游戏崩溃了，可以在错误分析中查看原因');
+        _crashes.add(report);
+      }
+    } catch (e) {
+      _launcherLog('收集崩溃信息失败：$e');
+    } finally {
+      _afterExited(config.afterLaunch, crashed: crashed);
     }
   }
 
@@ -454,10 +520,16 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  void _afterExited(String after) {
+  void _afterExited(String after, {bool crashed = false}) {
     switch (after) {
-      case 'hideAndExit':
+      // 崩溃时不退出，显示启动器以便查看原因
+      case 'hideAndExit' when !crashed:
         exit(0);
+      case 'hideAndExit':
+        _window
+          ?..show()
+          ..restore()
+          ..focus();
       case 'hideAndReopen' || 'minimizeAndReopen':
         _window
           ?..show()

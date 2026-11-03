@@ -4,6 +4,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
+import '../core/android_runtime.dart';
 import '../core/config.dart';
 import '../core/instance.dart';
 import '../core/instance_config.dart';
@@ -359,6 +360,29 @@ class _SetupState extends State<_Setup> {
                 onSelected: (v) => v == null ? null : _chooseJava(v),
               ),
             ),
+            if (Platform.isAndroid)
+              ListTile(
+                contentPadding: pad,
+                leading: const Icon(Icons.memory),
+                title: const Text('渲染器'),
+                subtitle: Text(
+                  _s.renderer.isEmpty
+                      ? '跟随全局设置「${androidRenderers[cfg.androidRenderer] ?? cfg.androidRenderer}」'
+                      : androidRendererHints[_s.renderer] ?? '',
+                ),
+                trailing: DropdownMenu<String>(
+                  key: ValueKey(_s.renderer),
+                  width: 320,
+                  initialSelection: _s.renderer,
+                  requestFocusOnTap: false,
+                  inputDecorationTheme: const InputDecorationTheme(isDense: true, border: OutlineInputBorder()),
+                  dropdownMenuEntries: [
+                    const DropdownMenuEntry(value: '', label: '跟随全局设置'),
+                    for (final e in androidRenderers.entries) DropdownMenuEntry(value: e.key, label: e.value),
+                  ],
+                  onSelected: (v) => v == null ? null : _save({'PclpwAndroidRenderer': v}),
+                ),
+              ),
           ],
         ),
         SettingsGroup(
@@ -412,6 +436,7 @@ class _SetupState extends State<_Setup> {
                               preLaunchCommand: _s.preLaunchCommand,
                               preLaunchWait: _s.preLaunchWait,
                               classpathHead: _s.classpathHead,
+                              renderer: _s.renderer,
                             ),
                           ),
                           onChangeEnd: (v) => _save({key: v.round()}),

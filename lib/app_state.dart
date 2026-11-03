@@ -405,10 +405,16 @@ class AppState extends ChangeNotifier {
 
       t.beginStep('准备启动');
       t.setStage('解压本地库');
+      // 26.x 用 SDL3 代替 GLFW 管理窗口与输入
+      final sdl = v.libraries.any((l) => '${l['name']}'.startsWith('org.lwjgl:lwjgl-sdl:'));
       // 安卓上用运行时自带的 LWJGL 与本地库代替游戏自带的
-      final android = isDesktop ? null : await AndroidRuntime.prepare();
+      final android = isDesktop ? null : await AndroidRuntime.prepare(sdl: sdl);
       final nativesDir = android?.nativeLibDir ?? nativesDirFor(g, id);
       if (android == null) await extractNatives(g, v, nativesDir);
+      // 1.12.2 及以前用 LWJGL 2，通过 lwjglx 跑在 LWJGL 3 上
+      final lwjgl2 = v.libraries.any((l) => '${l['name']}'.startsWith('org.lwjgl.lwjgl:lwjgl:2.'));
+      // 21w10a 起改用 OpenGL core profile，之前的版本用固定管线，需要 SFPEW 模拟
+      final ffp = (DateTime.tryParse(v.releaseTime ?? '') ?? DateTime(2000)).isBefore(DateTime.utc(2021, 3, 10));
 
       final memory = planMemory(
         cfg,
@@ -438,6 +444,7 @@ class AppState extends ChangeNotifier {
         windowSize: size,
         demo: demo,
         classpathHead: android?.lwjglClasspath ?? const [],
+        classpathTail: android != null && lwjgl2 ? [android.lwjglx] : const [],
         skipLibrary: android == null ? null : (name) => name.startsWith('org.lwjgl'),
       );
       var args = buildArgs(ctx);
@@ -446,7 +453,19 @@ class AppState extends ChangeNotifier {
         final tmp = p.join(Paths.appData, 'game_tmp');
         await Directory(tmp).create(recursive: true);
         final writable = RegExp(r'^(-Djna\.tmpdir|-Dorg\.lwjgl\.system\.SharedLibraryExtractPath|-Dio\.netty\.native\.workdir)=');
-        args = [for (final a in args) writable.hasMatch(a) ? '${a.substring(0, a.indexOf('=') + 1)}$tmp' : a];
+        args = [
+          for (final a in args)
+            if (writable.hasMatch(a))
+              '${a.substring(0, a.indexOf('=') + 1)}$tmp'
+            // 新版本写成 ${natives_directory}/java，安卓上本地库都在本地库目录里
+            else if (a.startsWith('-Djava.library.path='))
+              '-Djava.library.path=${android.nativeLibDir}'
+            else
+              a,
+        ];
+        // 26.x 默认先尝试 Vulkan：游戏没有处理安卓 Vulkan 表面的屏幕旋转（画面变成竖的），
+        // 表面丢失时也会直接崩溃，所以固定用 OpenGL（经 SDL 与 MobileGlues）
+        if (sdl && !args.contains('--graphicsBackend')) args.addAll(['--graphicsBackend', 'opengl']);
       }
 
       t.setStage('准备启动');
@@ -459,7 +478,33 @@ class AppState extends ChangeNotifier {
         _launcherLog('工作目录: $gameDir');
         if (demo) _launcherLog('以试玩模式启动');
         _launcherLog('渲染比例: ${(cfg.renderScale * 100).round()}%');
-        await AndroidRuntime.launch(javaHome: java.path, gameDir: gameDir, args: args, scale: cfg.renderScale);
+        // 版本设置优先，其次全局设置；「自动」按显卡选择
+        final gpu = await androidGpu().catchError((_) => AndroidGpu(const {}));
+        final renderer = resolveAndroidRenderer(inst.renderer.isNotEmpty ? inst.renderer : cfg.androidRenderer, gpu);
+        // SFPEW 只用在 MobileGlues 上，Zink 本身就支持固定管线
+        final sfpew = ffp && renderer.renderer == 'mobileglues';
+        // Zink 搭配高通自带的 Vulkan 驱动时画面不刷新，骁龙上改用自带的 Turnip
+        final turnip = renderer.renderer == 'zink' && gpu.isAdreno;
+        _launcherLog('显卡: $gpu');
+        _launcherLog(
+          '渲染器: ${androidRenderers[renderer.renderer]}（${renderer.reason}）'
+          '${sfpew ? ' + SFPEW（固定管线模拟）' : ''}${turnip ? ' + Turnip 驱动' : ''}，LWJGL ${android.lwjgl}'
+          '${lwjgl2 ? '（LWJGL 2 兼容层）' : ''}${sdl ? '，SDL3' : ''}',
+        );
+        if (renderer.renderer == 'zink' && !gpu.hasVulkan11) {
+          _launcherLog('警告：这台设备没有声明 Vulkan 1.1，所选渲染器可能无法启动');
+        }
+        await AndroidRuntime.launch(
+          javaHome: java.path,
+          gameDir: gameDir,
+          args: args,
+          scale: cfg.renderScale,
+          inputQueue: v.gameArguments != null,
+          ffp: ffp,
+          lwjgl: android.lwjgl,
+          renderer: renderer.renderer,
+          turnip: turnip,
+        );
         await config.update({'launchCount': count});
         gameState = GameState.running;
         final run = lastRun = _gameRun(id, info, gameDir, v, java, memory, inst);

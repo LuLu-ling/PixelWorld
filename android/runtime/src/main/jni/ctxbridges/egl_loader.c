@@ -69,3 +69,18 @@ __attribute__((visibility("default")))
 void *getProcAddress(const char* procname){
     return eglGetProcAddress_p(procname);
 }
+
+// PCL.PW: LWJGL looks up OpenGL functions through glXGetProcAddress in the library named by
+// -Dorg.lwjgl.opengl.libname. Renderers that are only an EGL implementation (Mesa Zink, the system
+// GLES driver) do not export it, so libpojavexec is used as that library and answers through the
+// renderer's eglGetProcAddress, loaded the same way as for the context (POJAVEXEC_EGL).
+__attribute__((visibility("default")))
+void *glXGetProcAddress(const char* procname) {
+    if (eglGetProcAddress_p == NULL && !dlsym_EGL()) return NULL;
+    return eglGetProcAddress_p(procname);
+}
+
+__attribute__((visibility("default")))
+void *glXGetProcAddressARB(const char* procname) {
+    return glXGetProcAddress(procname);
+}

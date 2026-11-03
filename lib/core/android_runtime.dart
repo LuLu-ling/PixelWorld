@@ -15,21 +15,35 @@ import 'version.dart';
 abstract final class AndroidRuntime {
   static const _channel = MethodChannel('pclpw/runtime');
 
-  /// 解压 LWJGL，返回本地库目录与替换游戏自带 LWJGL 的 classpath
-  static Future<({String nativeLibDir, List<String> lwjglClasspath})> prepare() async {
-    final r = (await _channel.invokeMapMethod<String, dynamic>('prepare'))!;
-    return (nativeLibDir: r['nativeLibDir'] as String, lwjglClasspath: (r['lwjglClasspath'] as List).cast<String>());
+  /// 解压 LWJGL，返回本地库目录、替换游戏自带 LWJGL 的 classpath，以及 LWJGL 2 兼容层（lwjglx）。
+  /// [sdl]：游戏用 SDL3 代替 GLFW（26.x），需要 LWJGL 3.4.1
+  static Future<({String nativeLibDir, List<String> lwjglClasspath, String lwjglx, String lwjgl})> prepare({
+    bool sdl = false,
+  }) async {
+    final r = (await _channel.invokeMapMethod<String, dynamic>('prepare', {'sdl': sdl}))!;
+    return (
+      nativeLibDir: r['nativeLibDir'] as String,
+      lwjglClasspath: (r['lwjglClasspath'] as List).cast<String>(),
+      lwjglx: r['lwjglx'] as String,
+      lwjgl: r['lwjglVersion'] as String,
+    );
   }
 
   /// 游戏日志（游戏在独立进程中运行，输出写到这个文件）
   static String get logFile => p.join(Paths.appData, 'game_logs', 'latest.log');
 
-  /// 在独立进程中启动游戏；[args] 是 JVM 参数、主类与游戏参数
+  /// 在独立进程中启动游戏；[args] 是 JVM 参数、主类与游戏参数。
+  /// [inputQueue]：1.13+ 在游戏线程上处理输入；[ffp]：1.17 之前的固定管线，需要 SFPEW 模拟
   static Future<void> launch({
     required String javaHome,
     required String gameDir,
     required List<String> args,
     double scale = 1,
+    bool inputQueue = true,
+    bool ffp = false,
+    String lwjgl = '3.3.3',
+    String renderer = 'mobileglues',
+    bool turnip = false,
   }) async {
     await File(logFile).parent.create(recursive: true);
     if (File(logFile).existsSync()) await File(logFile).delete();
@@ -40,6 +54,11 @@ abstract final class AndroidRuntime {
       'logFile': logFile,
       'args': args,
       'scale': scale,
+      'inputQueue': inputQueue,
+      'ffp': ffp,
+      'lwjgl': lwjgl,
+      'renderer': renderer,
+      'turnip': turnip,
     });
   }
 
@@ -110,6 +129,73 @@ abstract final class AndroidRuntime {
   }
 }
 
+/// 安卓上的渲染器（名字与运行时 GameRuntime 一致）；auto 按显卡选择
+/// MobileGlues + ANGLE（运行时名 angle）暂不提供：在骁龙 8 Gen 3 上 ANGLE 初始化后界面线程卡死被系统结束。
+/// 已选的会按「自动」处理
+const androidRenderers = {
+  'auto': '自动',
+  'mobileglues': 'MobileGlues（推荐）',
+  'zink': 'Zink（OpenGL 转 Vulkan）',
+  'system_gles': '系统 GLES 驱动（仅限支持 GLES 的模组）',
+};
+
+/// 各渲染器的说明，显示在设置里
+const androidRendererHints = {
+  'auto': '按显卡自动选择，目前几乎所有设备都会用 MobileGlues',
+  'mobileglues': 'OpenGL 转 OpenGL ES，速度快，支持所有版本（旧版本自动加 SFPEW 模拟固定管线）',
+  'zink': 'Mesa Zink：完整的 OpenGL 4.6，需要 Vulkan 1.1。骁龙（Adreno）上自动改用自带的开源驱动 Turnip，'
+      '适合 MobileGlues 画面出错时使用',
+  'system_gles': '直接使用系统 GLES 驱动，不做转译。原版 Minecraft 无法以此运行',
+};
+
+/// 显卡信息（系统 GLES 驱动报告的名称与 Vulkan 版本）
+class AndroidGpu {
+  AndroidGpu(Map<String, dynamic> m)
+    : renderer = '${m['renderer'] ?? ''}',
+      vendor = '${m['vendor'] ?? ''}',
+      glesVersion = '${m['glesVersion'] ?? ''}',
+      vulkan = '${m['vulkan'] ?? ''}',
+      soc = '${m['soc'] ?? ''}';
+
+  final String renderer, vendor, glesVersion, vulkan, soc;
+
+  /// GLES 主版本，例如 "OpenGL ES 3.2 V@..." 为 3
+  int get glesMajor => int.tryParse(RegExp(r'OpenGL ES (\d+)').firstMatch(glesVersion)?.group(1) ?? '') ?? 0;
+
+  bool get hasVulkan11 {
+    final parts = vulkan.split('.');
+    final major = int.tryParse(parts.first) ?? 0, minor = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    return major > 1 || (major == 1 && minor >= 1);
+  }
+
+  bool get isAdreno => renderer.toLowerCase().contains('adreno');
+  bool get isMali => renderer.toLowerCase().contains('mali');
+
+  @override
+  String toString() => [
+    if (renderer.isNotEmpty) renderer,
+    if (glesVersion.isNotEmpty) glesVersion.split(' ').take(3).join(' '),
+    vulkan.isEmpty ? '无 Vulkan' : 'Vulkan $vulkan',
+    if (soc.isNotEmpty) soc,
+  ].join(' · ');
+}
+
+AndroidGpu? _gpu;
+
+/// 读取显卡信息（只读一次）
+Future<AndroidGpu> androidGpu() async =>
+    _gpu ??= AndroidGpu((await AndroidRuntime._channel.invokeMapMethod<String, dynamic>('gpu')) ?? const {});
+
+/// 把设置中的渲染器（可能是 auto）换成实际使用的渲染器，并给出理由
+({String renderer, String reason}) resolveAndroidRenderer(String pref, AndroidGpu gpu) {
+  if (pref != 'auto' && androidRenderers.containsKey(pref)) return (renderer: pref, reason: '设置指定');
+  // MobileGlues 需要 OpenGL ES 3；更老的驱动只能走 Vulkan
+  if (gpu.glesMajor > 0 && gpu.glesMajor < 3 && gpu.hasVulkan11) {
+    return (renderer: 'zink', reason: '显卡不支持 OpenGL ES 3');
+  }
+  return (renderer: 'mobileglues', reason: '自动选择');
+}
+
 /// 安卓版 OpenJDK（AngelAuraMC 构建，GPLv2 + Classpath Exception）
 int androidJavaMajor(int required) => required <= 8
     ? 8
@@ -125,9 +211,6 @@ String _jreUrl(int major) =>
 /// 按版本需要下载并解压安卓版 Java
 Future<JavaInfo> ensureAndroidJava(VersionJson v, Downloader dl, TaskProgress task) async {
   final major = androidJavaMajor(v.javaMajor ?? 8);
-  if (major == 8) {
-    throw Exception('安卓版暂时只能启动 Minecraft 1.17 及以上版本（需要 Java 17 或更新），旧版本的支持正在开发中');
-  }
   final root = p.join(Paths.appData, 'android-java');
   final home = p.join(root, 'jre$major');
   final marker = File(p.join(home, '.installed'));

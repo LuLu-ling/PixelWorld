@@ -8,11 +8,16 @@ import android.content.Intent;
 import android.net.Uri;
 import android.util.DisplayMetrics;
 import android.view.Choreographer;
+import android.view.MotionEvent;
 
 import androidx.annotation.Keep;
 import androidx.annotation.Nullable;
 
+import net.kdt.pojavlaunch.EfficientAndroidLWJGLKeycode;
+import net.kdt.pojavlaunch.Logger;
 import net.kdt.pojavlaunch.LwjglGlfwKeycode;
+
+import org.libsdl.app.SDLActivity;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -22,8 +27,9 @@ import java.util.ArrayList;
 import dalvik.annotation.optimization.CriticalNative;
 
 /**
- * Bridge between Android input and the GLFW stub running inside the JVM.
- * Derived from Amethyst-Android's CallbackBridge (LGPL-3.0); SDL and gamepad remapping removed.
+ * Bridge between Android input and the game running inside the JVM: the GLFW stub, and SDL3
+ * for versions that use it (26.x). Derived from Amethyst-Android's CallbackBridge (LGPL-3.0);
+ * gamepad remapping removed.
  */
 public class CallbackBridge {
     public static final Choreographer sChoreographer = Choreographer.getInstance();
@@ -37,6 +43,11 @@ public class CallbackBridge {
     public static volatile int windowWidth, windowHeight;
     public static volatile int physicalWidth, physicalHeight;
     public static float mouseX, mouseY;
+    /** Cursor movement since the last event, sent to SDL while the cursor is grabbed */
+    public static float deltaX, deltaY;
+    /** The game initialized SDL3, so input also goes to SDL */
+    public static volatile boolean sdlEnabled = false;
+    private static int sMouseButtonState = 0;
     public volatile static boolean holdingAlt, holdingCapslock, holdingCtrl, holdingNumlock, holdingShift;
 
     /** Application context, used for the clipboard and for opening links */
@@ -50,9 +61,15 @@ public class CallbackBridge {
     }
 
     public static void sendCursorPos(float x, float y) {
+        deltaX = x - mouseX;
+        deltaY = y - mouseY;
         mouseX = x;
         mouseY = y;
         nativeSendCursorPos(mouseX, mouseY);
+        if (!sdlEnabled) return;
+        // SDL reads absolute positions in menus and relative motion while grabbed
+        if (isGrabbing) SDLActivity.onNativeMouse(0, MotionEvent.ACTION_MOVE, deltaX, deltaY, true);
+        else SDLActivity.onNativeMouse(0, MotionEvent.ACTION_MOVE, x, y, false);
     }
 
     public static void sendKeycode(int keycode, char keychar, int scancode, int modifiers, boolean isDown) {
@@ -61,11 +78,19 @@ public class CallbackBridge {
             nativeSendCharMods(keychar, modifiers);
             nativeSendChar(keychar);
         }
+        if (!sdlEnabled || keycode == 0) return;
+        int android = EfficientAndroidLWJGLKeycode.getAndroidKeycode(keycode);
+        if (isDown) SDLActivity.onNativeKeyDown(android);
+        else SDLActivity.onNativeKeyUp(android);
     }
 
     public static void sendChar(char keychar, int modifiers) {
         nativeSendCharMods(keychar, modifiers);
         nativeSendChar(keychar);
+        if (!sdlEnabled) return;
+        int android = EfficientAndroidLWJGLKeycode.getAndroidKeycode(keychar);
+        SDLActivity.onNativeKeyDown(android);
+        SDLActivity.onNativeKeyUp(android);
     }
 
     public static void sendKeyPress(int keyCode, int modifiers, boolean status) {
@@ -79,10 +104,26 @@ public class CallbackBridge {
 
     public static void sendMouseButton(int button, boolean status) {
         nativeSendMouseButton(button, status ? 1 : 0, getCurrentMods());
+        if (!sdlEnabled) return;
+        int bit;
+        switch (button) {
+            case LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_LEFT: bit = MotionEvent.BUTTON_PRIMARY; break;
+            case LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_RIGHT: bit = MotionEvent.BUTTON_SECONDARY; break;
+            case LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_MIDDLE: bit = MotionEvent.BUTTON_TERTIARY; break;
+            // SDL swaps back and forward
+            case LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_5: bit = MotionEvent.BUTTON_BACK; break;
+            case LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_4: bit = MotionEvent.BUTTON_FORWARD; break;
+            default: return;
+        }
+        // SDL expects MotionEvent.getButtonState(): the buttons still held after this event
+        if (status) sMouseButtonState |= bit;
+        else sMouseButtonState &= ~bit;        SDLActivity.onNativeMouse(sMouseButtonState, status ? MotionEvent.ACTION_DOWN : MotionEvent.ACTION_UP,
+                mouseX, mouseY, false);
     }
 
     public static void sendScroll(float xoffset, float yoffset) {
         nativeSendScroll(xoffset, yoffset);
+        if (sdlEnabled) SDLActivity.onNativeMouse(0, MotionEvent.ACTION_SCROLL, xoffset, yoffset, false);
     }
 
     public static void sendUpdateWindowSize(int w, int h) {
@@ -119,11 +160,27 @@ public class CallbackBridge {
         }
     }
 
-    // Called from JRE side; SDL integration is not supported
+    public static final int NOTIF_TYPE_SDL = 0;
+    public static final int ACTION_INIT_LAUNCHER_INTEGRATION = 0;
+
+    // Called from JRE side when the game calls SDL_Init (the SDLInit override in the LWJGL 3.4 stub)
     @Keep
     @SuppressWarnings("unused")
     public static boolean notifyLauncher(int type, int... action) {
-        return false;
+        if (type != NOTIF_TYPE_SDL || action.length == 0 || action[0] != ACTION_INIT_LAUNCHER_INTEGRATION) return false;
+        if (sdlEnabled) return true;
+        try {
+            System.loadLibrary("SDL3");
+            org.libsdl.app.SDL.setupJNI();
+            sdlEnabled = true;
+            // SDL needs the surface size for input; the surface itself is attached by GameActivity
+            if (SDLActivity.getSDLSurface() != null) SDLActivity.getSDLSurface().nativeResize(windowWidth, windowHeight);
+            Logger.appendToLog("PCL.PW runtime: SDL enabled");
+            return true;
+        } catch (Throwable e) {
+            Logger.appendToLog("PCL.PW runtime: cannot initialize SDL: " + e);
+            return false;
+        }
     }
 
     public static int getCurrentMods() {
@@ -156,8 +213,7 @@ public class CallbackBridge {
     @Keep
     @SuppressWarnings("unused")
     private static void onGrabStateChanged(final boolean grabbing) {
-        isGrabbing = grabbing;
-        sChoreographer.postFrameCallbackDelayed((time) -> {
+        isGrabbing = grabbing;        sChoreographer.postFrameCallbackDelayed((time) -> {
             if (isGrabbing != grabbing) return;
             synchronized (grabListeners) {
                 for (GrabListener g : grabListeners) g.onGrabState(grabbing);

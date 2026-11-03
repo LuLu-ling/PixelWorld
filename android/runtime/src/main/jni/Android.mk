@@ -42,6 +42,30 @@ LOCAL_SRC_FILES := \
 LOCAL_CFLAGS += -DADRENO_POSSIBLE
 include $(BUILD_SHARED_LIBRARY)
 
+# Turnip loader hook (Amethyst-Android, LGPL-3.0): loaded first into the namespace of the system
+# Vulkan loader, so the loader opens libvulkan_freedreno.so instead of the vendor driver
+LOCAL_PATH := $(HERE_PATH)/driver_helper/turnip
+include $(CLEAR_VARS)
+LOCAL_MODULE := linkerhook
+LOCAL_LDLIBS := -llog
+LOCAL_C_INCLUDES := $(HERE_PATH)
+LOCAL_SHARED_LIBRARIES := androidnsbypass
+LOCAL_SRC_FILES := hook.c
+# Symbol lookup prefers this library over everything else
+LOCAL_LDFLAGS := -z global
+include $(BUILD_SHARED_LIBRARY)
+
+# Single-window shim loaded by LWJGL in place of SDL3 (26.x); links libSDL3.so from jniLibs
+LOCAL_PATH := $(HERE_PATH)/sdlshim
+include $(CLEAR_VARS)
+LOCAL_MODULE := pclpw_sdlshim
+LOCAL_SRC_FILES := sdl_window_shim.c
+LOCAL_LDLIBS := -ldl -llog
+LOCAL_LDFLAGS := -L$(HERE_PATH)/../jniLibs/$(TARGET_ARCH_ABI) -lSDL3
+LOCAL_DISABLE_FATAL_LINKER_WARNINGS := true
+include $(BUILD_SHARED_LIBRARY)
+
+LOCAL_PATH := $(HERE_PATH)
 # Fake library for the linker, deleted from the output by Gradle
 include $(CLEAR_VARS)
 LOCAL_MODULE := awt_headless

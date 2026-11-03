@@ -58,12 +58,17 @@ class MainActivity : FlutterActivity() {
         MethodChannel(messenger, "pclpw/runtime").setMethodCallHandler { call, result ->
             when (call.method) {
                 "prepare" -> background(result) {
+                    // 用 SDL 的版本（26.x）需要 LWJGL 3.4.1
+                    val lwjgl = if (call.argument<Boolean>("sdl") == true) GameRuntime.LWJGL_SDL_VERSION else GameRuntime.LWJGL_VERSION
                     mapOf(
                         "nativeLibDir" to applicationInfo.nativeLibraryDir,
-                        "lwjglClasspath" to GameRuntime.lwjglClasspath(this),
-                        "lwjglVersion" to GameRuntime.LWJGL_VERSION,
+                        "lwjglClasspath" to GameRuntime.lwjglClasspath(this, lwjgl),
+                        "lwjglx" to GameRuntime.lwjglxJar(this),
+                        "lwjglVersion" to lwjgl,
                     )
                 }
+                // 显卡信息，用于选择渲染器
+                "gpu" -> background(result) { GameRuntime.gpuInfo(this) }
                 "installJre" -> background(result) {
                     GameRuntime.installJre(this, File(call.argument<String>("archive")!!), File(call.argument<String>("dest")!!))
                     null
@@ -75,6 +80,11 @@ class MainActivity : FlutterActivity() {
                         .putExtra(GameActivity.EXTRA_LOG_FILE, call.argument<String>("logFile"))
                         .putExtra(GameActivity.EXTRA_ARGS, call.argument<List<String>>("args")!!.toTypedArray())
                         .putExtra(GameActivity.EXTRA_SCALE, (call.argument<Double>("scale") ?: 1.0).toFloat())
+                        .putExtra(GameActivity.EXTRA_INPUT_QUEUE, call.argument<Boolean>("inputQueue") ?: true)
+                        .putExtra(GameActivity.EXTRA_FFP, call.argument<Boolean>("ffp") ?: false)
+                        .putExtra(GameActivity.EXTRA_LWJGL, call.argument<String>("lwjgl") ?: GameRuntime.LWJGL_VERSION)
+                        .putExtra(GameActivity.EXTRA_RENDERER, call.argument<String>("renderer") ?: GameRuntime.MOBILEGLUES)
+                        .putExtra(GameActivity.EXTRA_TURNIP, call.argument<Boolean>("turnip") ?: false)
                     GameRuntime.exitFile(this).delete()
                     startActivity(intent)
                     result.success(null)

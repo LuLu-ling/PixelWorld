@@ -100,11 +100,15 @@ class LaunchContext {
     required this.windowSize,
     required this.demo,
     this.classpathHead = const [],
+    this.classpathTail = const [],
     this.skipLibrary,
   });
 
   /// 放在 classpath 最前面的 jar（安卓上替换游戏自带的 LWJGL）
   final List<String> classpathHead;
+
+  /// 放在 classpath 最后的 jar（安卓上 LWJGL 2 版本的兼容层）
+  final List<String> classpathTail;
 
   /// 不放进 classpath 的库（按库名判断）
   final bool Function(String name)? skipLibrary;
@@ -144,6 +148,7 @@ List<String> buildArgs(LaunchContext ctx) {
     if (head.trim().isNotEmpty) cp.insert(0, head.trim());
   }
   cp.insertAll(0, ctx.classpathHead);
+  cp.addAll(ctx.classpathTail);
 
   final versionType = inst.versionType.isNotEmpty ? inst.versionType : cfg.versionType;
   final assetsId = '${v.assetIndex?['id'] ?? v.assets ?? 'legacy'}';

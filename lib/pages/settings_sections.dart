@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
+import '../core/android_runtime.dart';
 import '../core/config.dart';
 import '../core/java.dart';
 import '../core/memory.dart';
@@ -212,6 +215,54 @@ class _RenderScaleRowState extends State<_RenderScaleRow> {
   }
 }
 
+/// 安卓：渲染器，并显示识别到的显卡与「自动」实际会选的渲染器
+class _RendererRow extends StatefulWidget {
+  const _RendererRow();
+
+  @override
+  State<_RendererRow> createState() => _RendererRowState();
+}
+
+class _RendererRowState extends State<_RendererRow> {
+  AndroidGpu? _gpu;
+
+  @override
+  void initState() {
+    super.initState();
+    androidGpu().then((g) => mounted ? setState(() => _gpu = g) : null).catchError((_) {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cfg = AppScope.of(context).config;
+    final pref = cfg.androidRenderer;
+    final gpu = _gpu;
+    final auto = gpu == null ? null : resolveAndroidRenderer('auto', gpu);
+    return ListTile(
+      contentPadding: _rowPadding,
+      leading: const Icon(Icons.memory),
+      title: const Text('渲染器'),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(androidRendererHints[pref] ?? ''),
+          if (gpu != null) Text('显卡：$gpu'),
+          if (pref == 'auto' && auto != null) Text('当前会使用：${androidRenderers[auto.renderer]}（${auto.reason}）'),
+          const Text('可以在版本设置里为单个版本另选渲染器'),
+        ],
+      ),
+      trailing: DropdownMenu<String>(
+        width: 240,
+        initialSelection: pref,
+        requestFocusOnTap: false,
+        inputDecorationTheme: const InputDecorationTheme(isDense: true, border: OutlineInputBorder()),
+        dropdownMenuEntries: [for (final e in androidRenderers.entries) DropdownMenuEntry(value: e.key, label: e.value)],
+        onSelected: (v) => v == null ? null : cfg.update({'androidRenderer': v}),
+      ),
+    );
+  }
+}
+
 class LaunchSection extends StatelessWidget {
   const LaunchSection({super.key});
 
@@ -236,6 +287,7 @@ class LaunchSection extends StatelessWidget {
             ),
             // 手机上游戏总是全屏，调的是渲染分辨率
             if (!isDesktop) const _RenderScaleRow(),
+            if (Platform.isAndroid) const _RendererRow(),
             if (isDesktop)
               _SelectRow<String>(
                 icon: Icons.crop_landscape,

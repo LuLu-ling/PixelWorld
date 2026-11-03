@@ -43,11 +43,102 @@ import java.util.TimeZone;
  */
 public final class GameRuntime {
     private static final String TAG = "PCLPW-Runtime";
+    /** Default LWJGL; 26.x needs {@link #LWJGL_SDL_VERSION} */
     public static final String LWJGL_VERSION = "3.3.3";
-    public static final String RENDERER = "opengles_mobileglues";
+    /** LWJGL with SDL3 support, for versions that use SDL instead of GLFW */
+    public static final String LWJGL_SDL_VERSION = "3.4.1";
     public static final String RENDERER_LIB = "libmobileglues.so";
 
+    /** Renderers the launcher can choose; see {@link #rendererConfig} */
+    public static final String MOBILEGLUES = "mobileglues";
+    /** MobileGlues running its GLES calls on ANGLE (GLES over Vulkan) */
+    public static final String MOBILEGLUES_ANGLE = "angle";
+    /** Mesa Zink: desktop OpenGL 4.6 over the device's Vulkan driver */
+    public static final String ZINK = "zink";
+    /** The device's own GLES driver without translation, only for mods that render with GLES */
+    public static final String SYSTEM_GLES = "system_gles";
+
+    /**
+     * Environment of a renderer: the AMETHYST_RENDERER name the native bridge understands, the EGL
+     * library it creates contexts with, and the library LWJGL loads OpenGL from (it must export
+     * glXGetProcAddress; libpojavexec does that for plain EGL implementations).
+     */
+    static final class RendererConfig {
+        final String amethyst, egl, gl;
+        final boolean ffpWrapper;
+
+        RendererConfig(String amethyst, String egl, String gl, boolean ffpWrapper) {
+            this.amethyst = amethyst;
+            this.egl = egl;
+            this.gl = gl;
+            this.ffpWrapper = ffpWrapper;
+        }
+    }
+
+    static RendererConfig rendererConfig(String renderer) {
+        switch (renderer) {
+            case ZINK:
+                // Zink is a full desktop GL, so it needs no fixed-function wrapper
+                return new RendererConfig("opengles3_desktopgl_zink_kopper", "libEGL_mesa.so", "libpojavexec.so", false);
+            case SYSTEM_GLES:
+                return new RendererConfig("opengles_system_gles", null, "libpojavexec.so", false);
+            default:
+                return new RendererConfig("opengles_mobileglues", RENDERER_LIB, RENDERER_LIB, true);
+        }
+    }
+    /** Emulates the fixed-function pipeline on top of the renderer, for versions before 1.17 */
+    public static final String FFP_WRAPPER_LIB = "libSimpleFPEWrapper.so";
+    /** LWJGL 2 API on top of LWJGL 3, for 1.12.2 and older */
+    public static final String LWJGLX_JAR = "lwjgl-lwjglx.jar";
+
     private GameRuntime() {}
+
+    // ---------- Device ----------
+
+    /**
+     * The GPU as the system GLES driver reports it (a 1x1 offscreen context), and the Vulkan
+     * version the device declares; used to pick a renderer.
+     */
+    public static Map<String, Object> gpuInfo(Context context) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        android.opengl.EGLDisplay display = android.opengl.EGL14.eglGetDisplay(android.opengl.EGL14.EGL_DEFAULT_DISPLAY);
+        int[] version = new int[2];
+        if (android.opengl.EGL14.eglInitialize(display, version, 0, version, 1)) {
+            int[] attribs = {
+                    android.opengl.EGL14.EGL_RENDERABLE_TYPE, 0x40 /* EGL_OPENGL_ES3_BIT */,
+                    android.opengl.EGL14.EGL_SURFACE_TYPE, android.opengl.EGL14.EGL_PBUFFER_BIT,
+                    android.opengl.EGL14.EGL_NONE};
+            android.opengl.EGLConfig[] configs = new android.opengl.EGLConfig[1];
+            int[] count = new int[1];
+            if (android.opengl.EGL14.eglChooseConfig(display, attribs, 0, configs, 0, 1, count, 0) && count[0] > 0) {
+                android.opengl.EGLContext ctx = android.opengl.EGL14.eglCreateContext(display, configs[0],
+                        android.opengl.EGL14.EGL_NO_CONTEXT, new int[]{android.opengl.EGL14.EGL_CONTEXT_CLIENT_VERSION, 3,
+                                android.opengl.EGL14.EGL_NONE}, 0);
+                android.opengl.EGLSurface surface = android.opengl.EGL14.eglCreatePbufferSurface(display, configs[0],
+                        new int[]{android.opengl.EGL14.EGL_WIDTH, 1, android.opengl.EGL14.EGL_HEIGHT, 1,
+                                android.opengl.EGL14.EGL_NONE}, 0);
+                if (ctx != android.opengl.EGL14.EGL_NO_CONTEXT
+                        && android.opengl.EGL14.eglMakeCurrent(display, surface, surface, ctx)) {
+                    out.put("renderer", android.opengl.GLES20.glGetString(android.opengl.GLES20.GL_RENDERER));
+                    out.put("vendor", android.opengl.GLES20.glGetString(android.opengl.GLES20.GL_VENDOR));
+                    out.put("glesVersion", android.opengl.GLES20.glGetString(android.opengl.GLES20.GL_VERSION));
+                    android.opengl.EGL14.eglMakeCurrent(display, android.opengl.EGL14.EGL_NO_SURFACE,
+                            android.opengl.EGL14.EGL_NO_SURFACE, android.opengl.EGL14.EGL_NO_CONTEXT);
+                }
+                if (surface != android.opengl.EGL14.EGL_NO_SURFACE) android.opengl.EGL14.eglDestroySurface(display, surface);
+                if (ctx != android.opengl.EGL14.EGL_NO_CONTEXT) android.opengl.EGL14.eglDestroyContext(display, ctx);
+            }
+            android.opengl.EGL14.eglTerminate(display);
+        }
+        // Highest declared Vulkan API version, e.g. 0x403000 = 1.3
+        int vulkan = 0;
+        for (android.content.pm.FeatureInfo f : context.getPackageManager().getSystemAvailableFeatures()) {
+            if (android.content.pm.PackageManager.FEATURE_VULKAN_HARDWARE_VERSION.equals(f.name)) vulkan = f.version;
+        }
+        out.put("vulkan", vulkan == 0 ? "" : ((vulkan >> 22) + "." + ((vulkan >> 12) & 0x3ff)));
+        out.put("soc", Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? Build.SOC_MODEL : Build.HARDWARE);
+        return out;
+    }
 
     // ---------- Install ----------
 
@@ -102,19 +193,35 @@ public final class GameRuntime {
         return arch.isDirectory() ? arch : new File(jreHome, "lib");
     }
 
-    /** Copies the bundled LWJGL jars to app storage; returns their folder */
-    public static File extractLwjgl(Context context) throws IOException {
-        File dir = new File(context.getFilesDir(), "lwjgl3/" + LWJGL_VERSION);
+    /**
+     * Copies the bundled LWJGL jars to app storage; returns their folder. 3.4.1 also has its own
+     * native libraries in {@code natives/}: they share file names with the 3.3.3 ones in the APK's
+     * native library folder, so they cannot go there.
+     */
+    public static File extractLwjgl(Context context, String lwjgl) throws IOException {
+        File dir = new File(context.getFilesDir(), "lwjgl3/" + lwjgl);
         File marker = new File(dir, ".version");
         String version = String.valueOf(appVersionCode(context));
         if (marker.exists() && version.equals(readText(marker))) return dir;
         if (dir.exists()) deleteRecursive(dir);
         dir.mkdirs();
         AssetManager assets = context.getAssets();
-        String base = "lwjgl3/" + LWJGL_VERSION;
+        String base = "lwjgl3/" + lwjgl;
         String[] names = assets.list(base);
-        if (names == null || names.length == 0) throw new IOException("LWJGL jars are missing from the APK");
+        if (names == null || names.length == 0) throw new IOException("LWJGL " + lwjgl + " is missing from the APK");
         for (String name : names) {
+            String[] sub = assets.list(base + "/" + name);
+            if (sub != null && sub.length > 0) {
+                // A folder (natives)
+                File out = new File(dir, name);
+                out.mkdirs();
+                for (String s : sub) {
+                    try (InputStream in = assets.open(base + "/" + name + "/" + s); OutputStream os = new FileOutputStream(new File(out, s))) {
+                        copy(in, os);
+                    }
+                }
+                continue;
+            }
             try (InputStream in = assets.open(base + "/" + name); OutputStream out = new FileOutputStream(new File(dir, name))) {
                 copy(in, out);
             }
@@ -126,14 +233,20 @@ public final class GameRuntime {
         return dir;
     }
 
+    /** Native libraries of an LWJGL version, or null when they are the ones in the APK */
+    static File lwjglNatives(Context context, String lwjgl) {
+        File dir = new File(context.getFilesDir(), "lwjgl3/" + lwjgl + "/natives");
+        return dir.isDirectory() ? dir : null;
+    }
+
     /** Classpath entries that replace the game's own LWJGL libraries */
-    public static List<String> lwjglClasspath(Context context) throws IOException {
-        File dir = extractLwjgl(context);
+    public static List<String> lwjglClasspath(Context context, String lwjgl) throws IOException {
+        File dir = extractLwjgl(context, lwjgl);
         List<String> out = new ArrayList<>();
-        // Core first, then the merged modules (which contain the GLFW stub), then the rest
+        // Core first, then the merged modules (which contain the GLFW stub and SDL overrides), then the rest
         out.add(new File(dir, "lwjgl.jar").getAbsolutePath());
-        out.add(new File(dir, "lwjgl-" + LWJGL_VERSION + "-merged-modules.jar").getAbsolutePath());
-        File[] jars = dir.listFiles((d, name) -> name.endsWith(".jar"));
+        out.add(new File(dir, "lwjgl-" + lwjgl + "-merged-modules.jar").getAbsolutePath());
+        File[] jars = dir.listFiles((d, name) -> name.endsWith(".jar") && !name.equals(LWJGLX_JAR));
         if (jars != null) {
             Arrays.sort(jars);
             for (File f : jars) {
@@ -143,17 +256,34 @@ public final class GameRuntime {
         return out;
     }
 
+    /** The LWJGL 2 compatibility jar; LWJGL 2 versions put it at the end of the classpath */
+    public static String lwjglxJar(Context context) throws IOException {
+        return new File(extractLwjgl(context, LWJGL_VERSION), LWJGLX_JAR).getAbsolutePath();
+    }
+
     // ---------- Launch ----------
 
     /**
      * Starts the JVM on the current thread and blocks until the game exits.
      *
      * @param args JVM arguments, main class and game arguments (without the program name)
+     * @param ffp  the game uses the fixed-function pipeline, so SFPEW wraps the renderer
+     * @param lwjgl the LWJGL version whose jars are on the classpath
+     * @param renderer one of {@link #MOBILEGLUES}, {@link #MOBILEGLUES_ANGLE}, {@link #ZINK}, {@link #SYSTEM_GLES}
+     * @param turnip Zink on Adreno: use the bundled Turnip driver instead of the vendor Vulkan driver
      */
     public static int launch(Activity activity, File jreHome, File gameDir, File logFile, List<String> args,
-                             int width, int height) throws Throwable {
+                             int width, int height, boolean ffp, String lwjgl, String renderer,
+                             boolean turnip) throws Throwable {
+        RendererConfig rc = rendererConfig(renderer);
+        // SFPEW only wraps MobileGlues
+        ffp = ffp && rc.ffpWrapper;
+        String glLib = ffp ? FFP_WRAPPER_LIB : rc.gl;
         Context app = activity.getApplicationContext();
         String nativeDir = app.getApplicationInfo().nativeLibraryDir;
+        // LWJGL's own libraries; other libraries (renderer, SDL3, OpenAL) stay in the APK folder
+        File natives = lwjglNatives(app, lwjgl);
+        String lwjglDir = natives != null ? natives.getAbsolutePath() : nativeDir;
         String home = jreHome.getAbsolutePath();
         File lib = jreLibDir(jreHome);
         File cache = app.getCacheDir();
@@ -166,7 +296,8 @@ public final class GameRuntime {
         CallbackBridge.sContext = app;
 
         String ldPath = lib.getAbsolutePath() + "/jli:" + lib.getAbsolutePath() + ":"
-                + "/system/lib64:/vendor/lib64:/vendor/lib64/hw:" + nativeDir;
+                + "/system/lib64:/vendor/lib64:/vendor/lib64/hw:"
+                + (natives != null ? lwjglDir + ":" : "") + nativeDir;
 
         Map<String, String> env = new LinkedHashMap<>();
         env.put("POJAV_NATIVEDIR", nativeDir);
@@ -182,9 +313,23 @@ public final class GameRuntime {
         env.put("MESA_GLSL_CACHE_DIR", cache.getAbsolutePath());
         env.put("LD_LIBRARY_PATH", ldPath);
         env.put("PATH", home + "/bin:" + Os.getenv("PATH"));
-        env.put("AMETHYST_RENDERER", RENDERER);
-        env.put("MG_DIR_PATH", new File(app.getFilesDir(), "MobileGlues").getAbsolutePath());
-        env.put("POJAVEXEC_EGL", RENDERER_LIB);
+        env.put("AMETHYST_RENDERER", rc.amethyst);
+        File mgDir = new File(app.getFilesDir(), "MobileGlues");
+        env.put("MG_DIR_PATH", mgDir.getAbsolutePath());
+        if (rc.egl != null) env.put("POJAVEXEC_EGL", rc.egl);
+        if (ffp) env.put("SFPEW_EGL", rc.egl);
+        if (ZINK.equals(renderer)) {
+            env.put("MESA_GL_VERSION_OVERRIDE", "4.6COMPAT");
+            env.put("MESA_GLSL_VERSION_OVERRIDE", "460");
+            // Mesa looks for <dir>/libzink_dri.so; without this it uses a path from the build machine
+            env.put("LIBGL_DRIVERS_PATH", nativeDir);
+            // The native bridge then loads the system Vulkan loader with liblinkerhook, which
+            // swaps the vendor driver for libvulkan_freedreno.so (see egl_bridge.c load_turnip_vulkan)
+            if (turnip) env.put("POJAV_LOAD_TURNIP", "1");
+        }
+        // SDL creates the GL context itself (26.x), with the same renderer
+        env.put("SDL_OPENGL_LIBRARY", glLib);
+        if (rc.egl != null) env.put("SDL_EGL_LIBRARY", nativeDir + "/" + rc.egl);
         env.put("AWTSTUB_WIDTH", String.valueOf(width));
         env.put("AWTSTUB_HEIGHT", String.valueOf(height));
         env.put("DALVIK_APPLICATION", Tools.jObjectToString(activity.getApplication()));
@@ -192,15 +337,20 @@ public final class GameRuntime {
         for (Map.Entry<String, String> e : env.entrySet()) {
             Os.setenv(e.getKey(), e.getValue(), true);
         }
-        new File(app.getFilesDir(), "MobileGlues").mkdirs();
+        if (rc.egl == null) Os.unsetenv("POJAVEXEC_EGL");
+        mgDir.mkdirs();
+        if (rc.egl != null && rc.egl.equals(RENDERER_LIB)) writeMobileGluesConfig(mgDir, MOBILEGLUES_ANGLE.equals(renderer));
 
         File server = new File(lib, "server/libjvm.so");
         String jvmDir = new File(lib, server.exists() ? "server" : "client").getAbsolutePath();
         JREUtils.setLdLibraryPath(jvmDir + ":" + ldPath);
 
-        if (!JREUtils.dlopen(RENDERER_LIB) && !JREUtils.dlopen(nativeDir + "/" + RENDERER_LIB)) {
+        // MobileGlues reads its config when loaded, so the config is written first
+        if (RENDERER_LIB.equals(rc.gl) && !JREUtils.dlopen(RENDERER_LIB) && !JREUtils.dlopen(nativeDir + "/" + RENDERER_LIB)) {
             throw new IOException("Cannot load the renderer " + RENDERER_LIB);
         }
+        Logger.appendToLog("PCL.PW runtime: renderer " + renderer + (ffp ? " + SFPEW" : "")
+                + (turnip && ZINK.equals(renderer) ? " + Turnip" : ""));
 
         List<String> argv = new ArrayList<>();
         argv.add("java");
@@ -222,13 +372,22 @@ public final class GameRuntime {
                 "-Dfml.earlyprogresswindow=false",
                 "-Dloader.disable_forked_guis=true",
                 "-Djdk.lang.Process.launchMechanism=FORK",
-                "-Dorg.lwjgl.opengl.libname=" + RENDERER_LIB,
-                "-Dorg.lwjgl.freetype.libname=" + nativeDir + "/libfreetype.so",
+                // LWJGL loads the GL library by this name; SFPEW then loads the renderer itself
+                "-Dorg.lwjgl.opengl.libname=" + glLib,
+                "-Dfml.ignoreInvalidMinecraftCertificates=true",
+                "-Dorg.lwjgl.freetype.libname=" + lwjglDir + "/libfreetype.so",
                 "-Dorg.lwjgl.system.allocator=system",
-                "-Dorg.lwjgl.librarypath=" + nativeDir,
+                // Our spirv-cross build is the shared C API library (26.x loads it at startup)
+                "-Dorg.lwjgl.spvc.libname=spirv-cross-c-shared",
+                // SDL3 through a shim that lets Minecraft's several windows share Android's one window
+                "-Dorg.lwjgl.sdl.libname=" + nativeDir + "/libpclpw_sdlshim.so",
+                "-Dorg.lwjgl.librarypath=" + lwjglDir,
                 "-XX:ActiveProcessorCount=" + java.lang.Runtime.getRuntime().availableProcessors()
         ));
-        argv.addAll(args);
+        // 26.x: rename shader uniform blocks that MobileGlues would mangle (see agent/ShaderNamesAgent)
+        File agent = new File(app.getFilesDir(), "lwjgl3/" + lwjgl + "/agent/pclpw-agent.jar");
+        if (agent.isFile()) argv.add("-javaagent:" + agent.getAbsolutePath());
+        argv.addAll(withWindowSize(args, width, height));
         Logger.appendToLog("PCL.PW runtime: " + String.join(" ", redact(argv)));
 
         loadJavaLibraries(jreHome, jvmDir, nativeDir);
@@ -240,6 +399,26 @@ public final class GameRuntime {
         int code = VMLauncher.launchJVM(argv.toArray(new String[0]));
         Logger.appendToLog("Java exit code: " + code);
         return code;
+    }
+
+    /**
+     * MobileGlues settings (MG_DIR_PATH/config.json). Every key is written, because a missing key
+     * reads as -1. ANGLE: 3 forces it on, 2 forces it off.
+     */
+    private static void writeMobileGluesConfig(File dir, boolean angle) throws IOException {
+        String json = "{\n"
+                + "  \"enableANGLE\": " + (angle ? 3 : 2) + ",\n"
+                + "  \"enableNoError\": 0,\n"
+                + "  \"enableExtComputeShader\": 0,\n"
+                + "  \"enableExtTimerQuery\": 0,\n"
+                + "  \"enableExtDirectStateAccess\": 0,\n"
+                + "  \"angleDepthClearFixMode\": 0,\n"
+                + "  \"customGLVersion\": 40,\n"
+                + "  \"fsr1Setting\": 0,\n"
+                + "  \"hideMGEnvLevel\": 0,\n"
+                + "  \"maxGlslCacheSize\": 0\n"
+                + "}\n";
+        writeText(new File(dir, "config.json"), json);
     }
 
     private static void loadJavaLibraries(File jreHome, String jvmDir, String nativeDir) {
@@ -263,6 +442,28 @@ public final class GameRuntime {
             if (f.isFile() && f.getName().endsWith(".so")) out.add(f);
             else if (f.isDirectory()) out.addAll(listLibs(f));
         }
+        return out;
+    }
+
+    /**
+     * Sets the game's --width/--height to the surface size. SDL on Android always makes the window
+     * the size of the surface without sending a resize event, and 26.x keeps the requested size
+     * for mapping the mouse, so with the launcher's 854x480 every tap would land in the wrong place.
+     */
+    private static List<String> withWindowSize(List<String> args, int width, int height) {
+        List<String> out = new ArrayList<>(args);
+        boolean w = false, h = false;
+        for (int i = 0; i + 1 < out.size(); i++) {
+            if (out.get(i).equals("--width")) {
+                out.set(i + 1, String.valueOf(width));
+                w = true;
+            } else if (out.get(i).equals("--height")) {
+                out.set(i + 1, String.valueOf(height));
+                h = true;
+            }
+        }
+        if (!w) out.addAll(Arrays.asList("--width", String.valueOf(width)));
+        if (!h) out.addAll(Arrays.asList("--height", String.valueOf(height)));
         return out;
     }
 

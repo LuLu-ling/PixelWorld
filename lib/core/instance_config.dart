@@ -46,6 +46,7 @@ class InstanceSettings {
     required this.preLaunchCommand,
     required this.preLaunchWait,
     required this.classpathHead,
+    required this.renderer,
   });
 
   /// null 表示尚未决定，首次启动时按全局策略决定并写入
@@ -64,6 +65,9 @@ class InstanceSettings {
   final String preLaunchCommand;
   final bool preLaunchWait;
   final String classpathHead;
+
+  /// 安卓渲染器，空表示跟随全局设置（PCL.PW 独有的键，PCL-CE 会原样保留）
+  final String renderer;
 }
 
 /// PCL-CE 的实例独立配置：`versions/<id>/PCL/config.v1.yml`（扁平的 YAML 映射）。
@@ -141,6 +145,7 @@ InstanceSettings readInstanceSettings(String? versionDir) {
     preLaunchCommand: _str(r['VersionAdvanceRun']),
     preLaunchWait: _bool(r['VersionAdvanceRunWait']) ?? true,
     classpathHead: _str(r['VersionAdvanceClasspathHead']),
+    renderer: _str(r['PclpwAndroidRenderer']),
   );
 }
 

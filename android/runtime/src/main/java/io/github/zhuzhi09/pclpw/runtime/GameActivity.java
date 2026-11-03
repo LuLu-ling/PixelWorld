@@ -18,6 +18,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.TextureView;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowInsets;
@@ -35,6 +36,8 @@ import net.kdt.pojavlaunch.Logger;
 import net.kdt.pojavlaunch.LwjglGlfwKeycode;
 import net.kdt.pojavlaunch.utils.JREUtils;
 
+import org.libsdl.app.SDLActivity;
+import org.libsdl.app.SDLSurface;
 import org.lwjgl.glfw.CallbackBridge;
 
 import java.io.File;
@@ -54,12 +57,26 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
     public static final String EXTRA_LOG_FILE = "logFile";
     public static final String EXTRA_ARGS = "args";
     public static final String EXTRA_SCALE = "scale";
+    /** The game reads input from the queue pumped by glfwPollEvents (versions with {@code arguments}) */
+    public static final String EXTRA_INPUT_QUEUE = "inputQueue";
+    /** The game uses the fixed-function pipeline (before 1.17), so SFPEW wraps the renderer */
+    public static final String EXTRA_FFP = "ffp";
+    /** LWJGL version of the runtime: 3.3.3, or 3.4.1 for versions that use SDL3 (26.x) */
+    public static final String EXTRA_LWJGL = "lwjgl";
+    /** One of the GameRuntime renderer names */
+    public static final String EXTRA_RENDERER = "renderer";
+    /** Zink on Adreno: load the bundled Turnip driver */
+    public static final String EXTRA_TURNIP = "turnip";
 
     private static final String TAG = "PCLPW-Game";
     private static boolean sStarted = false;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private SurfaceView surface;
+    private FrameLayout root;
+    /** The game surface: a SurfaceView, or a TextureView for Zink (see createTextureView) */
+    private View surface;
+    /** SDL's view of our surface; SDL draws on the native surface we hand it */
+    private SDLSurface sdlSurface;
     /** In-game control groups, shown only while the game grabs the cursor */
     private final ArrayList<View> controls = new ArrayList<>();
 
@@ -98,10 +115,15 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         scale = getIntent().getFloatExtra(EXTRA_SCALE, 1f);
 
-        FrameLayout root = new FrameLayout(this);
+        root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
-        surface = new SurfaceView(this);
-        surface.getHolder().addCallback(this);
+        if (GameRuntime.ZINK.equals(getIntent().getStringExtra(EXTRA_RENDERER))) {
+            surface = createTextureView();
+        } else {
+            SurfaceView view = new SurfaceView(this);
+            view.getHolder().addCallback(this);
+            surface = view;
+        }
         surface.setFocusable(true);
         surface.setFocusableInTouchMode(true);
         surface.setOnTouchListener(this::onSurfaceTouch);
@@ -180,17 +202,72 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         // calls back here with the scaled size. Use the view size, or the scale would be applied again.
         int viewW = surface.getWidth() > 0 ? surface.getWidth() : width;
         int viewH = surface.getHeight() > 0 ? surface.getHeight() : height;
-        CallbackBridge.physicalWidth = viewW;
-        CallbackBridge.physicalHeight = viewH;
         int w = Math.max(1, Math.round(viewW * scale)), h = Math.max(1, Math.round(viewH * scale));
         if (width != w || height != h) {
             // Wait for the callback with the target size
             holder.setFixedSize(w, h);
             return;
         }
+        onSurfaceReady(holder.getSurface(), viewW, viewH, w, h);
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        onSurfaceGone();
+    }
+
+    /**
+     * Zink draws through Vulkan, and a SurfaceView's Vulkan surface reports the display rotation
+     * (pre-transform), which Mesa does not apply, so the picture comes out sideways. A TextureView
+     * is composed by the app with no rotation (as Amethyst does for Zink).
+     */
+    private TextureView createTextureView() {
+        TextureView view = new TextureView(this);
+        view.setOpaque(true);
+        view.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+            private android.view.Surface native_;
+
+            private void ready(android.graphics.SurfaceTexture texture, int viewW, int viewH) {
+                int w = Math.max(1, Math.round(viewW * scale)), h = Math.max(1, Math.round(viewH * scale));
+                texture.setDefaultBufferSize(w, h);
+                if (native_ == null) native_ = new android.view.Surface(texture);
+                onSurfaceReady(native_, viewW, viewH, w, h);
+            }
+
+            @Override
+            public void onSurfaceTextureAvailable(android.graphics.SurfaceTexture texture, int width, int height) {
+                native_ = null;
+                ready(texture, width, height);
+            }
+
+            @Override
+            public void onSurfaceTextureSizeChanged(android.graphics.SurfaceTexture texture, int width, int height) {
+                ready(texture, width, height);
+            }
+
+            @Override
+            public boolean onSurfaceTextureDestroyed(android.graphics.SurfaceTexture texture) {
+                onSurfaceGone();
+                if (native_ != null) native_.release();
+                native_ = null;
+                return true;
+            }
+
+            @Override
+            public void onSurfaceTextureUpdated(android.graphics.SurfaceTexture texture) {
+            }
+        });
+        return view;
+    }
+
+    /** The game surface has its final (scaled) size */
+    private void onSurfaceReady(android.view.Surface native_, int viewW, int viewH, int w, int h) {
+        CallbackBridge.physicalWidth = viewW;
+        CallbackBridge.physicalHeight = viewH;
         CallbackBridge.windowWidth = w;
         CallbackBridge.windowHeight = h;
-        JREUtils.setupBridgeWindow(holder.getSurface());
+        JREUtils.setupBridgeWindow(native_);
+        if (usesSdl()) attachSdl(native_, viewW, viewH);
         // Minecraft starts with the --width/--height size and only learns the real one through the
         // size callback; the flag stays set until the game pumps events, so it is safe to send early
         CallbackBridge.sendUpdateWindowSize(w, h);
@@ -199,9 +276,33 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         startGame(w, h);
     }
 
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
+    private void onSurfaceGone() {
+        if (sdlSurface != null) sdlSurface.surfaceDestroyed(null);
         JREUtils.releaseBridgeWindow();
+    }
+
+    private boolean usesSdl() {
+        return "3.4.1".equals(getIntent().getStringExtra(EXTRA_LWJGL));
+    }
+
+    /**
+     * Hands our surface to SDL's Android glue (following Amethyst's MinecraftGLSurface). SDL is
+     * not started by an SDLActivity here; it becomes active when the game calls SDL_Init.
+     */
+    private void attachSdl(android.view.Surface native_, int viewW, int viewH) {
+        if (sdlSurface == null) {
+            org.libsdl.app.SDL.initialize();
+            org.libsdl.app.SDL.setContext(this);
+            sdlSurface = new SDLSurface(this);
+            SDLActivity.externalInitialize(sdlSurface, root, native_);
+        } else {
+            SDLSurface.setNativeSurface(native_);
+        }
+        if (CallbackBridge.sdlEnabled) {
+            // SDL keeps the unscaled size for input; the drawable size comes from nativeResize
+            sdlSurface.surfaceChanged(null, 0, viewW, viewH);
+            sdlSurface.nativeResize(CallbackBridge.windowWidth, CallbackBridge.windowHeight);
+        }
     }
 
     private void startGame(int width, int height) {
@@ -214,13 +315,17 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         File gameDir = new File(extras.getString(EXTRA_GAME_DIR));
         File logFile = new File(extras.getString(EXTRA_LOG_FILE));
         ArrayList<String> args = new ArrayList<>(Arrays.asList(extras.getStringArray(EXTRA_ARGS)));
-        // LWJGL 3 versions read input from a queue on the game thread; calling GLFW callbacks
-        // from the UI thread (the LWJGL 2 path) is ignored by the game
-        CallbackBridge.nativeSetUseInputStackQueue(true);
+        boolean ffp = extras.getBoolean(EXTRA_FFP, false);
+        // 1.13+ reads input from a queue on the game thread, where GLFW callbacks called from
+        // the UI thread are ignored; LWJGL 2 versions (through lwjglx) poll the state instead
+        CallbackBridge.nativeSetUseInputStackQueue(extras.getBoolean(EXTRA_INPUT_QUEUE, true));
         Thread t = new Thread(() -> {
             int code;
             try {
-                code = GameRuntime.launch(this, javaHome, gameDir, logFile, args, width, height);
+                String lwjgl = extras.getString(EXTRA_LWJGL, GameRuntime.LWJGL_VERSION);
+                String renderer = extras.getString(EXTRA_RENDERER, GameRuntime.MOBILEGLUES);
+                code = GameRuntime.launch(this, javaHome, gameDir, logFile, args, width, height, ffp, lwjgl, renderer,
+                        extras.getBoolean(EXTRA_TURNIP, false));
             } catch (Throwable e) {
                 Log.e(TAG, "Launch failed", e);
                 Logger.appendToLog("PCL.PW runtime: launch failed: " + Log.getStackTraceString(e));

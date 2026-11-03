@@ -6,11 +6,14 @@ import 'package:path/path.dart' as p;
 
 import '../app_state.dart';
 import '../widgets/loader_label.dart';
+import '../widgets/optifine_compat.dart';
 import 'ai_client.dart';
 import 'crash.dart';
 import 'instance.dart';
 import 'instance_config.dart';
+import 'install.dart';
 import 'instance_files.dart';
+import 'loaders.dart';
 import 'modrinth.dart';
 import 'paths.dart';
 
@@ -174,6 +177,86 @@ class AiToolbox {
         final q = '${a['query'] ?? ''}'.trim();
         if (q.isEmpty) throw ToolError('请提供搜索关键词');
         return ToolPlan('在 Modrinth 搜索「$q」', () => _search(v, q));
+      },
+    ),
+    AiToolDef(
+      spec: AiTool(
+        'list_game_versions',
+        '列出可以安装的 Minecraft Java 版版本，以及最新的正式版和快照。',
+        _schema({
+          'type': {
+            'type': 'string',
+            'enum': ['release', 'snapshot', 'all'],
+            'description': '默认 release（正式版）',
+          },
+          'query': {'type': 'string', 'description': '可选：按版本号筛选，例如 1.20'},
+        }),
+      ),
+      kind: ToolKind.read,
+      label: '查看可安装的版本',
+      prepare: (a) async =>
+          ToolPlan('查看可安装的 Minecraft 版本', () => _gameVersions('${a['type'] ?? 'release'}', '${a['query'] ?? ''}')),
+    ),
+    AiToolDef(
+      spec: AiTool(
+        'list_loader_versions',
+        '列出某个 Minecraft 版本可用的加载器版本（新的在前，标注推荐的稳定版）。'
+            'loader 可选：${LoaderKind.values.map((k) => k.name).join('、')}。OptiFine 会注明需要的 Forge 版本。',
+        _schema(
+          {
+            'game_version': {'type': 'string', 'description': 'Minecraft 版本号，例如 1.20.1'},
+            'loader': {
+              'type': 'string',
+              'enum': [for (final k in LoaderKind.values) k.name],
+            },
+          },
+          ['game_version', 'loader'],
+        ),
+      ),
+      kind: ToolKind.read,
+      label: '查看加载器版本',
+      prepare: (a) async {
+        final kind = _loaderKind(a['loader']);
+        final game = '${a['game_version'] ?? ''}'.trim();
+        if (kind == null) throw ToolError('不支持的加载器：${a['loader']}');
+        return ToolPlan('查看 $game 的 ${kind.label} 版本', () => _loaderVersions(kind, game));
+      },
+    ),
+    AiToolDef(
+      spec: AiTool(
+        'install_game',
+        '安装一个 Minecraft 版本，可以同时安装加载器与 OptiFine，完成后会选中这个版本。'
+            '不指定 loader 时安装原版；loader 为 optifine 时安装独立的 OptiFine 版本。'
+            '不指定 loader_version 时使用推荐的稳定版。optifine 参数用于在 Forge、NeoForge、Fabric 等加载器上把 OptiFine 作为模组一起安装。'
+            '安装需要下载较多文件，可能要几分钟。',
+        _schema(
+          {
+            'game_version': {'type': 'string', 'description': 'Minecraft 版本号，例如 1.20.1'},
+            'loader': {
+              'type': 'string',
+              'enum': [for (final k in LoaderKind.values) k.name],
+            },
+            'loader_version': {'type': 'string', 'description': 'list_loader_versions 返回的完整版本号'},
+            'optifine': {'type': 'string', 'description': '可选：同时安装的 OptiFine 版本（list_loader_versions 返回的版本号）'},
+            'name': {'type': 'string', 'description': '可选：版本名称，默认按加载器自动命名'},
+          },
+          ['game_version'],
+        ),
+      ),
+      kind: ToolKind.write,
+      label: '安装游戏版本',
+      prepare: _prepareInstall,
+    ),
+    AiToolDef(
+      spec: AiTool('select_version', '把启动页当前选择的版本切换为指定的已安装版本。', _schema({'version': _versionParam}, ['version'])),
+      kind: ToolKind.write,
+      label: '切换版本',
+      prepare: (a) async {
+        final v = _version(a);
+        return ToolPlan('把当前版本切换为 ${v.id}', () async {
+          await state.selectVersion(v.id);
+          return '已切换为 ${v.id}';
+        }, details: ['${v.id}（${describeVersion(v)}）']);
       },
     ),
     AiToolDef(
@@ -380,6 +463,124 @@ class AiToolbox {
   List<AiTool> get specs => [for (final t in all) t.spec];
 
   AiToolDef? find(String name) => all.where((t) => t.spec.name == name).firstOrNull;
+
+  // ---------- 安装游戏 ----------
+
+  static LoaderKind? _loaderKind(Object? v) {
+    final s = '${v ?? ''}'.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]'), '');
+    if (s.isEmpty) return null;
+    return LoaderKind.values.where((k) => k.name == s).firstOrNull;
+  }
+
+  Future<String> _gameVersions(String type, String query) async {
+    final r = await remoteVersions(state.downloader);
+    final q = query.trim();
+    final list = r.list.where((v) {
+      if (q.isNotEmpty && !v.id.contains(q)) return false;
+      return switch (type) {
+        'snapshot' => v.type == 'snapshot',
+        'all' => true,
+        _ => v.type == 'release',
+      };
+    }).toList();
+    return [
+      '最新正式版：${r.latestRelease}，最新快照：${r.latestSnapshot}',
+      if (list.isEmpty) '没有符合条件的版本',
+      for (final v in list.take(60)) '- ${v.id}（${v.type}${v.fool ? '，愚人节版本' : ''}，${v.releaseTime.split('T').first}）',
+      if (list.length > 60) '……共 ${list.length} 个，只列出最新的 60 个，可以用 query 筛选',
+    ].join('\n');
+  }
+
+  Future<String> _loaderVersions(LoaderKind kind, String game) async {
+    final list = await loaderVersions(state.downloader, kind, game);
+    if (list.isEmpty) return '${kind.label} 没有适用于 $game 的版本';
+    final recommended = list.where((v) => v.stable).firstOrNull ?? list.first;
+    return [
+      '推荐：${recommended.version}',
+      for (final v in list.take(30))
+        '- ${v.version}${v.stable ? '' : '（测试版）'}'
+            '${kind == LoaderKind.optifine ? (v.requiredForge == null
+                      ? '，不兼容 Forge'
+                      : v.requiredForge!.isEmpty
+                      ? ''
+                      : '，需要 Forge ${v.requiredForge}') : ''}',
+      if (list.length > 30) '……共 ${list.length} 个，只列出最新的 30 个',
+    ].join('\n');
+  }
+
+  Future<ToolPlan> _prepareInstall(Map<String, dynamic> a) async {
+    final game = '${a['game_version'] ?? ''}'.trim();
+    if (game.isEmpty) throw ToolError('请提供 Minecraft 版本号');
+    final remote = await remoteVersions(state.downloader);
+    final rv = remote.list.where((v) => v.id == game).firstOrNull;
+    if (rv == null) throw ToolError('没有名为 $game 的 Minecraft 版本，可以先用 list_game_versions 查看');
+
+    final loaderArg = '${a['loader'] ?? ''}'.trim();
+    final kind = loaderArg.isEmpty || loaderArg == 'vanilla' ? null : _loaderKind(loaderArg);
+    if (loaderArg.isNotEmpty && loaderArg != 'vanilla' && kind == null) throw ToolError('不支持的加载器：$loaderArg');
+
+    // 加载器版本：指定的必须存在；没有指定时用推荐的稳定版
+    var loaderVersion = '';
+    if (kind != null) {
+      final list = await loaderVersions(state.downloader, kind, game);
+      if (list.isEmpty) throw ToolError('${kind.label} 没有适用于 $game 的版本');
+      final wanted = '${a['loader_version'] ?? ''}'.trim();
+      final pick = wanted.isEmpty
+          ? (list.where((v) => v.stable).firstOrNull ?? list.first)
+          : list.where((v) => v.version == wanted || v.label == wanted).firstOrNull;
+      if (pick == null) throw ToolError('${kind.label} 没有版本 $wanted，可以先用 list_loader_versions 查看');
+      loaderVersion = pick.version;
+    }
+
+    // OptiFine 作为模组一起安装（与 PCL 相同）
+    final ofArg = '${a['optifine'] ?? ''}'.trim();
+    String? optifine;
+    if (ofArg.isNotEmpty) {
+      if (kind == LoaderKind.optifine) throw ToolError('loader 已经是 optifine，不需要再指定 optifine');
+      if (!canAddOptiFine(loaderOfKind(kind))) throw ToolError('${kind?.label ?? '原版'} 不能与 OptiFine 一起安装');
+      final list = await loaderVersions(state.downloader, LoaderKind.optifine, game);
+      final of = list.where((v) => v.version == ofArg || v.label == ofArg).firstOrNull;
+      if (of == null) throw ToolError('OptiFine 没有适用于 $game 的版本 $ofArg');
+      if (kind == LoaderKind.forge && of.requiredForge == null) throw ToolError('OptiFine $ofArg 不兼容 Forge');
+      optifine = of.version;
+    }
+
+    final nameArg = '${a['name'] ?? ''}'.trim();
+    final name = nameArg.isEmpty ? null : nameArg;
+    final shown = name ?? defaultVersionName(kind, game, loaderVersion);
+    try {
+      // 由官方安装器命名的加载器（Forge 等）只在指定名称时检查
+      if (name != null || kind == null || kind == LoaderKind.fabric || kind == LoaderKind.quilt) {
+        checkVersionName(state.paths, shown);
+      }
+    } catch (e) {
+      throw ToolError(errorMessage(e));
+    }
+
+    return ToolPlan(
+      '安装 $shown',
+      () async {
+        final id = await state.installVersion(
+          game,
+          loader: kind,
+          loaderVersion: loaderVersion,
+          name: name,
+          optifine: optifine,
+        );
+        return '已安装为 $id，并已设为当前选择的版本';
+      },
+      details: [
+        'Minecraft $game（${rv.type == 'release' ? '正式版' : rv.type}）',
+        if (kind != null) loaderComponent(kind, game, loaderVersion),
+        if (optifine != null)
+          '${loaderComponent(LoaderKind.optifine, game, optifine)}（${optiFineNote(loaderOfKind(kind), null)}）',
+        '版本名称：$shown',
+        '从${state.config.downloadSource == 'bmclapi' ? ' BMCLAPI 镜像' : '官方源'}下载，可能需要几分钟；进度可以在任务页查看',
+      ],
+    );
+  }
+
+  static String errorMessage(Object e) => '$e'.replaceFirst(RegExp(r'^Exception: ?'), '');
 
   // ---------- 辅助 ----------
 

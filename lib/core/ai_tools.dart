@@ -122,8 +122,11 @@ class AiToolbox {
         final dir = await _gameDir(v);
         final rel = '${a['path'] ?? ''}'.trim();
         final abs = rel.isEmpty ? dir : _inside(dir, rel);
-        if (!Directory(abs).existsSync()) throw ToolError('文件夹不存在：$rel');
-        return ToolPlan('查看 ${v.id}/${rel.isEmpty ? '' : rel}', () async => _listDir(dir, abs));
+        // 文件夹不存在是正常的查看结果（例如还没有装光影），不算失败
+        return ToolPlan(
+          '查看 ${v.id}/${rel.isEmpty ? '' : rel}',
+          () async => Directory(abs).existsSync() ? _listDir(dir, abs) : '文件夹不存在：$rel',
+        );
       },
     ),
     AiToolDef(

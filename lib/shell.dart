@@ -147,7 +147,7 @@ class _TitleBar extends StatelessWidget {
       child: Stack(
         children: [
           // 空白处可拖动窗口，双击最大化
-          const Positioned.fill(child: DragToMoveArea(child: SizedBox.expand())),
+          Positioned.fill(child: DragToMoveArea(child: const SizedBox.expand())),
           Positioned(
             left: subTitle == null ? 20 : 8,
             top: 0,

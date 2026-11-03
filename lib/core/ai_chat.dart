@@ -116,6 +116,7 @@ class ChatSession {
     required this.messages,
     this.summary,
     this.summaryUntil = 0,
+    this.summaryAt = 0,
   });
 
   final String id;
@@ -128,6 +129,9 @@ class ChatSession {
   String? summary;
   int summaryUntil;
 
+  /// 压缩时的消息数：在此之前的用量是压缩前测得的，不再代表当前上下文
+  int summaryAt;
+
   /// 某个工具调用的结果
   ChatMessage? resultOf(String callId) => messages.where((m) => m.isTool && m.toolCallId == callId).firstOrNull;
 
@@ -139,6 +143,7 @@ class ChatSession {
     'messages': [for (final m in messages) m.toJson()],
     'summary': ?summary,
     if (summary != null) 'summaryUntil': summaryUntil,
+    if (summary != null) 'summaryAt': summaryAt,
   };
 
   static ChatSession fromJson(Map<String, dynamic> j) => ChatSession(
@@ -151,6 +156,7 @@ class ChatSession {
     ],
     summary: j['summary'] as String?,
     summaryUntil: (j['summaryUntil'] as num?)?.toInt() ?? 0,
+    summaryAt: (j['summaryAt'] as num?)?.toInt() ?? 0,
   );
 }
 
@@ -232,7 +238,7 @@ class ChatStore extends ChangeNotifier {
     final window = contextWindow(ai);
     final ms = s.messages;
     final last = ms.lastIndexWhere((m) => m.inputTokens != null);
-    if (last >= 0 && last >= s.summaryUntil) {
+    if (last >= 0 && (s.summary == null || last >= s.summaryAt)) {
       final after = ms.skip(last + 1).fold<int>(0, (a, m) => a + estimateTokens(m.content));
       return (used: ms[last].inputTokens! + (ms[last].outputTokens ?? 0) + after, window: window, estimated: after > 0);
     }
@@ -281,7 +287,8 @@ class ChatStore extends ChangeNotifier {
       if (summary.isEmpty) throw AiException('模型没有返回摘要');
       s
         ..summary = summary
-        ..summaryUntil = cut;
+        ..summaryUntil = cut
+        ..summaryAt = s.messages.length;
       await _save(s);
       return true;
     } catch (e) {

@@ -71,8 +71,8 @@ class CrashReport {
   final List<String> mods;
   final List<Finding> findings;
 
-  /// 与 AI 的对话（离开错误分析页后保留）：第一条为 toPrompt() 的内容
-  final chat = <({String role, String content})>[];
+  /// 用 AI 分析时创建的会话
+  String? sessionId;
 
   /// 游戏是否真的崩溃了（有崩溃报告、JVM 错误日志，或日志里有已知问题）
   bool get hasEvidence => sources.any((s) => s.name != '游戏输出') || findings.isNotEmpty;

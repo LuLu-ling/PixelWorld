@@ -1,14 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../app_scope.dart';
 import '../core/ai_client.dart';
 import '../core/crash.dart';
 import '../shell.dart';
-import '../widgets/ai_settings.dart';
+import 'ai_page.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
 
@@ -65,129 +61,24 @@ Future<void> showCrashDialog(BuildContext context, CrashReport report) async {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('关闭')),
         TextButton(onPressed: () => Navigator.pop(context, 'log'), child: const Text('查看日志')),
-        FilledButton(onPressed: () => Navigator.pop(context, 'diagnose'), child: const Text('错误分析')),
+        TextButton(onPressed: () => Navigator.pop(context, 'diagnose'), child: const Text('错误分析')),
+        FilledButton.icon(
+          onPressed: () => Navigator.pop(context, 'ai'),
+          icon: const Icon(Icons.auto_awesome, size: 18),
+          label: const Text('AI 分析'),
+        ),
       ],
     ),
   );
   if (!context.mounted) return;
   if (action == 'log') ShellNav.of(context).open(SubPage.log);
   if (action == 'diagnose') openDiagnosis(context, report);
+  if (action == 'ai') await startAiDiagnosis(context, report);
 }
 
 /// 错误分析：环境、本地规则的结论、日志摘录与 AI 分析
-class DiagnosePage extends StatefulWidget {
+class DiagnosePage extends StatelessWidget {
   const DiagnosePage({super.key});
-
-  @override
-  State<DiagnosePage> createState() => _DiagnosePageState();
-}
-
-class _DiagnosePageState extends State<DiagnosePage> {
-  final _input = TextEditingController();
-  StreamSubscription<String>? _sub;
-  String _streaming = '';
-  String? _error;
-
-  @override
-  void dispose() {
-    _sub?.cancel();
-    _input.dispose();
-    super.dispose();
-  }
-
-  bool get _busy => _sub != null;
-
-  /// 发送前让用户看到将要发送的内容
-  Future<bool> _confirm(AiSettings s, String text) async {
-    final cfg = AppScope.read(context).config;
-    if (!cfg.aiConfirm) return true;
-    var remember = false;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setLocal) => AlertDialog(
-          title: const Text('发送以下内容'),
-          content: SizedBox(
-            width: 640,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('将发送 ${text.length} 个字符到 ${s.host}（模型 ${s.model}）。玩家名、令牌、UUID、用户目录与 IP 地址已替换。'),
-                const SizedBox(height: 12),
-                Flexible(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: SingleChildScrollView(child: SelectableText(text, style: _mono)),
-                  ),
-                ),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: const Text('以后不再询问'),
-                  value: remember,
-                  onChanged: (v) => setLocal(() => remember = v ?? false),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('发送')),
-          ],
-        ),
-      ),
-    );
-    if (ok == true && remember) await cfg.update({'aiConfirm': false});
-    return ok == true;
-  }
-
-  Future<void> _send(CrashReport report, String text) async {
-    final state = AppScope.read(context);
-    final s = AiSettings.load(state.config);
-    if (!s.ready) {
-      await showAiSettingsDialog(context);
-      return;
-    }
-    // 只有第一次发送日志时确认，之后的追问是用户自己输入的
-    if (report.chat.isEmpty && !await _confirm(s, text)) return;
-    if (!mounted) return;
-    setState(() {
-      report.chat.add((role: 'user', content: text));
-      _streaming = '';
-      _error = null;
-    });
-    final history = [for (final m in report.chat) AiMessage(m.role, m.content)];
-    _sub = aiChat(s, diagnoseSystemPrompt, history).listen(
-      (chunk) => setState(() => _streaming += chunk),
-      onError: (Object e) => setState(() {
-        _error = errorText(e);
-        // 失败的提问撤回，可以重试
-        report.chat.removeLast();
-        _finish(report, keep: false);
-      }),
-      onDone: () => setState(() => _finish(report)),
-      cancelOnError: true,
-    );
-  }
-
-  void _finish(CrashReport report, {bool keep = true}) {
-    if (keep && _streaming.isNotEmpty) report.chat.add((role: 'assistant', content: _streaming));
-    _streaming = '';
-    _sub = null;
-  }
-
-  void _stop(CrashReport report) {
-    _sub?.cancel();
-    setState(() {
-      if (_streaming.isNotEmpty) _streaming += '\n\n（已停止）';
-      _finish(report);
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -199,37 +90,7 @@ class _DiagnosePageState extends State<DiagnosePage> {
       return const ContentPanel(child: Center(child: Text('没有要分析的内容')));
     }
     final ai = AiSettings.load(state.config);
-    // 第一条是自动生成的日志内容，不显示
-    final visible = report.chat.skip(1).toList();
-
-    Widget bubble(String role, String text) {
-      final user = role == 'user';
-      return Align(
-        alignment: user ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 760),
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: user ? scheme.primaryContainer : scheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: user
-              ? SelectableText(text, style: TextStyle(color: scheme.onPrimaryContainer))
-              : MarkdownBody(
-                  data: text,
-                  selectable: true,
-                  styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
-                    code: _mono.copyWith(backgroundColor: scheme.surfaceContainerHighest),
-                    codeblockDecoration: BoxDecoration(
-                      color: scheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-        ),
-      );
-    }
+    final session = report.sessionId == null ? null : state.chats.byId(report.sessionId!);
 
     return Padding(
       padding: const EdgeInsets.only(left: 12),
@@ -277,103 +138,20 @@ class _DiagnosePageState extends State<DiagnosePage> {
             SettingsGroup(
               title: 'AI 分析',
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (report.chat.isEmpty && !_busy)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                ai.ready
-                                    ? '将日志摘录与环境信息发送给 ${ai.host}（${ai.model}）分析。'
-                                    : '使用你自己的 AI 服务分析日志：需要先填写接口地址、模型和 API Key。',
-                                style: TextStyle(color: scheme.onSurfaceVariant),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            if (!ai.ready)
-                              FilledButton.tonal(
-                                onPressed: () async {
-                                  await showAiSettingsDialog(context);
-                                  setState(() {});
-                                },
-                                child: const Text('设置'),
-                              )
-                            else
-                              FilledButton.icon(
-                                onPressed: () => _send(report, report.toPrompt()),
-                                icon: const Icon(Icons.auto_awesome),
-                                label: const Text('开始分析'),
-                              ),
-                          ],
-                        ),
-                      for (final m in visible) bubble(m.role, m.content),
-                      if (_busy)
-                        _streaming.isEmpty
-                            ? const Padding(
-                                padding: EdgeInsets.only(bottom: 12),
-                                child: Row(
-                                  children: [
-                                    SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                                    SizedBox(width: 12),
-                                    Text('正在分析…'),
-                                  ],
-                                ),
-                              )
-                            : bubble('assistant', _streaming),
-                      if (_error != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Text('分析失败：$_error', style: TextStyle(color: scheme.error)),
-                        ),
-                      if (report.chat.isNotEmpty || _busy)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _input,
-                                enabled: !_busy,
-                                minLines: 1,
-                                maxLines: 4,
-                                decoration: const InputDecoration(
-                                  hintText: '继续提问，例如“具体要删除哪个模组？”',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                ),
-                                onSubmitted: (_) => _ask(report),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            if (_busy)
-                              OutlinedButton(onPressed: () => _stop(report), child: const Text('停止'))
-                            else ...[
-                              FilledButton(onPressed: () => _ask(report), child: const Text('发送')),
-                              const SizedBox(width: 4),
-                              IconButton(
-                                tooltip: '复制最后的回答',
-                                icon: const Icon(Icons.copy_outlined),
-                                onPressed: visible.isEmpty
-                                    ? null
-                                    : () {
-                                        Clipboard.setData(ClipboardData(text: visible.last.content));
-                                        toast(context, '已复制');
-                                      },
-                              ),
-                            ],
-                          ],
-                        ),
-                      if (report.chat.isEmpty && _error != null && ai.ready)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton(
-                            onPressed: () => showAiSettingsDialog(context),
-                            child: const Text('检查 AI 设置'),
-                          ),
-                        ),
-                    ],
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  leading: Icon(Icons.auto_awesome, color: scheme.primary),
+                  title: Text(session != null ? '已有 AI 对话' : '用 AI 分析'),
+                  subtitle: Text(
+                    session != null
+                        ? '在 AI 页面继续这次崩溃的对话'
+                        : ai.ready
+                        ? '新建一个对话，把下面的日志摘录与环境信息发送给 ${ai.host}（${ai.model}）'
+                        : '使用你自己的 AI 服务分析日志，需要先填写接口地址、模型和 API Key',
+                  ),
+                  trailing: FilledButton.tonal(
+                    onPressed: () => startAiDiagnosis(context, report),
+                    child: Text(session != null ? '查看对话' : 'AI 分析'),
                   ),
                 ),
               ],
@@ -424,12 +202,5 @@ class _DiagnosePageState extends State<DiagnosePage> {
         ),
       ),
     );
-  }
-
-  void _ask(CrashReport report) {
-    final q = _input.text.trim();
-    if (q.isEmpty || _busy) return;
-    _input.clear();
-    _send(report, q);
   }
 }

@@ -7,6 +7,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app_info.dart';
 import 'core/accounts.dart';
+import 'core/ai_chat.dart';
 import 'core/cat_ini.dart';
 import 'core/config.dart';
 import 'core/crash.dart';
@@ -97,6 +98,9 @@ class AppState extends ChangeNotifier {
 
   /// 版本设置页正在查看的版本
   String instanceId = '';
+
+  /// AI 助手的对话（单独通知，避免回答生成时整个界面重建）
+  final chats = ChatStore.load();
 
   /// 最近一次启动的游戏，用于崩溃分析
   GameRun? lastRun;

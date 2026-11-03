@@ -8,6 +8,7 @@ import 'app_scope.dart';
 import 'core/crash.dart';
 import 'core/task.dart';
 import 'widgets/task_steps.dart';
+import 'pages/ai_page.dart';
 import 'pages/diagnose_page.dart';
 import 'pages/download_page.dart';
 import 'pages/home_page.dart';
@@ -19,7 +20,7 @@ import 'pages/tools_page.dart';
 import 'pages/versions_page.dart';
 import 'widgets/window_buttons.dart';
 
-enum MainPage { home, download, settings, tools }
+enum MainPage { home, download, settings, tools, ai }
 
 /// 从主页面进入的子页面：标题栏显示返回按钮和标题，代替主导航
 enum SubPage { versions, log, instance, tasks, diagnose }
@@ -37,14 +38,18 @@ const _nav = [
   (page: MainPage.download, icon: Icons.download_outlined, active: Icons.download, label: '下载'),
   (page: MainPage.settings, icon: Icons.settings_outlined, active: Icons.settings, label: '设置'),
   (page: MainPage.tools, icon: Icons.construction_outlined, active: Icons.construction, label: '工具'),
+  (page: MainPage.ai, icon: Icons.auto_awesome_outlined, active: Icons.auto_awesome, label: 'AI'),
 ];
 
 /// 页面切换，供各页面打开子页面或返回
 class ShellNav extends InheritedWidget {
-  const ShellNav({super.key, required this.open, required this.back, required super.child});
+  const ShellNav({super.key, required this.open, required this.back, required this.goMain, required super.child});
 
   final void Function(SubPage) open;
   final VoidCallback back;
+
+  /// 关闭子页面并切换到某个主页面
+  final void Function(MainPage) goMain;
 
   static ShellNav of(BuildContext context) => context.getInheritedWidgetOfExactType<ShellNav>()!;
 
@@ -87,6 +92,10 @@ class _ShellState extends State<Shell> {
     return ShellNav(
       open: (s) => setState(() => _sub = s),
       back: () => setState(() => _sub = null),
+      goMain: (p) => setState(() {
+        _sub = null;
+        _page = p;
+      }),
       child: Scaffold(
         body: Stack(
           key: _navKey,
@@ -108,7 +117,7 @@ class _ShellState extends State<Shell> {
                     SubPage.diagnose => const DiagnosePage(),
                     null => IndexedStack(
                       index: _page.index,
-                      children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage()],
+                      children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage(), AiPage()],
                     ),
                   },
                 ),

@@ -19,7 +19,8 @@ android {
         applicationId = "io.github.zhuzhi09.pcl_pw"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // 游戏运行时需要 Android 8.0 及以上
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
@@ -36,6 +37,26 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+android {
+    packaging {
+        jniLibs {
+            // 游戏运行时会 dlopen 这些库，需要解压到 nativeLibraryDir
+            useLegacyPackaging = true
+            excludes += listOf("**/libawt_headless.so")
+            // xdl 的 prefab 包与 ndk-build 输出各带一份
+            pickFirsts += listOf("**/libxdl.so", "**/libc++_shared.so")
+        }
+    }
+    // 资源中的 LWJGL jar 不要压缩
+    androidResources {
+        noCompress += listOf("jar")
+    }
+}
+
+dependencies {
+    implementation(project(":runtime"))
 }
 
 kotlin {

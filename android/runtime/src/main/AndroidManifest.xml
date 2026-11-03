@@ -1,0 +1,15 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- 游戏在独立进程中运行：Java 虚拟机退出时不会带走启动器 -->
+        <activity
+            android:name="io.github.zhuzhi09.pclpw.runtime.GameActivity"
+            android:process=":game"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="io.github.zhuzhi09.pclpw.game"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|density|uiMode|navigation"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:windowSoftInputMode="adjustNothing" />
+    </application>
+</manifest>

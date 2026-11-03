@@ -10,19 +10,72 @@ import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import io.github.zhuzhi09.pclpw.runtime.GameActivity
+import io.github.zhuzhi09.pclpw.runtime.GameRuntime
+import java.io.File
+import kotlin.concurrent.thread
 
-/** 共享存储：游戏文件夹放在 /storage/emulated/0 下，卸载应用后仍然保留 */
 class MainActivity : FlutterActivity() {
     private var pending: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "pclpw/storage").setMethodCallHandler { call, result ->
+        val messenger = flutterEngine.dartExecutor.binaryMessenger
+        // 共享存储：游戏文件夹放在 /storage/emulated/0 下，卸载应用后仍然保留
+        MethodChannel(messenger, "pclpw/storage").setMethodCallHandler { call, result ->
             when (call.method) {
                 "externalRoot" -> result.success(Environment.getExternalStorageDirectory().absolutePath)
                 "hasAccess" -> result.success(hasAccess())
                 "requestAccess" -> requestAccess(result)
                 else -> result.notImplemented()
+            }
+        }
+        // 游戏运行时（android/runtime 模块）
+        MethodChannel(messenger, "pclpw/runtime").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "prepare" -> background(result) {
+                    mapOf(
+                        "nativeLibDir" to applicationInfo.nativeLibraryDir,
+                        "lwjglClasspath" to GameRuntime.lwjglClasspath(this),
+                        "lwjglVersion" to GameRuntime.LWJGL_VERSION,
+                    )
+                }
+                "installJre" -> background(result) {
+                    GameRuntime.installJre(this, File(call.argument<String>("archive")!!), File(call.argument<String>("dest")!!))
+                    null
+                }
+                "launch" -> {
+                    val intent = Intent(this, GameActivity::class.java)
+                        .putExtra(GameActivity.EXTRA_JAVA_HOME, call.argument<String>("javaHome"))
+                        .putExtra(GameActivity.EXTRA_GAME_DIR, call.argument<String>("gameDir"))
+                        .putExtra(GameActivity.EXTRA_LOG_FILE, call.argument<String>("logFile"))
+                        .putExtra(GameActivity.EXTRA_ARGS, call.argument<List<String>>("args")!!.toTypedArray())
+                        .putExtra(GameActivity.EXTRA_SCALE, (call.argument<Double>("scale") ?: 1.0).toFloat())
+                    GameRuntime.exitFile(this).delete()
+                    startActivity(intent)
+                    result.success(null)
+                }
+                "isRunning" -> {
+                    val am = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
+                    result.success(am.runningAppProcesses?.any { it.processName == "$packageName:game" } == true)
+                }
+                "lastExit" -> {
+                    val f = GameRuntime.exitFile(this)
+                    result.success(if (f.exists()) f.readText().also { f.delete() } else null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    /** 在后台线程执行，完成后在主线程返回结果 */
+    private fun background(result: MethodChannel.Result, job: () -> Any?) {
+        thread {
+            try {
+                val value = job()
+                runOnUiThread { result.success(value) }
+            } catch (e: Throwable) {
+                runOnUiThread { result.error("runtime", e.message ?: e.toString(), null) }
             }
         }
     }

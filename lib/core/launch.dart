@@ -99,7 +99,15 @@ class LaunchContext {
     required this.gameDir,
     required this.windowSize,
     required this.demo,
+    this.classpathHead = const [],
+    this.skipLibrary,
   });
+
+  /// 放在 classpath 最前面的 jar（安卓上替换游戏自带的 LWJGL）
+  final List<String> classpathHead;
+
+  /// 不放进 classpath 的库（按库名判断）
+  final bool Function(String name)? skipLibrary;
 
   final GamePaths g;
   final LauncherConfig cfg;
@@ -121,7 +129,10 @@ List<String> buildArgs(LaunchContext ctx) {
   final LaunchContext(:g, :cfg, :v, :acc, :java, :memory, :inst) = ctx;
 
   // classpath：OptiFine 放在倒数第二位，实例可指定 classpath 头部
-  final libs = resolveLibraries(g, v).where((l) => l.classpath).toList();
+  final libs = resolveLibraries(
+    g,
+    v,
+  ).where((l) => l.classpath && !(ctx.skipLibrary?.call(l.name) ?? false)).toList();
   final optifine = libs.where((l) => RegExp(r'^optifine:optifine:', caseSensitive: false).hasMatch(l.name)).firstOrNull;
   final cp = <String>{
     for (final l in libs)
@@ -132,6 +143,7 @@ List<String> buildArgs(LaunchContext ctx) {
   for (final head in inst.classpathHead.split(';').reversed) {
     if (head.trim().isNotEmpty) cp.insert(0, head.trim());
   }
+  cp.insertAll(0, ctx.classpathHead);
 
   final versionType = inst.versionType.isNotEmpty ? inst.versionType : cfg.versionType;
   final assetsId = '${v.assetIndex?['id'] ?? v.assets ?? 'legacy'}';

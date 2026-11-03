@@ -12,6 +12,8 @@ import 'core/ai_context.dart';
 import 'core/ai_tools.dart';
 import 'core/cat_ini.dart';
 import 'core/config.dart';
+import 'core/android_runtime.dart';
+import 'core/version.dart' show VersionJson;
 import 'core/crash.dart';
 import 'core/download.dart';
 import 'core/extra_loaders.dart';
@@ -345,7 +347,6 @@ class AppState extends ChangeNotifier {
     required ({int width, int height}) launcherSize,
     required ({int width, int height}) screenSize,
   }) async {
-    if (!isDesktop) throw Exception(mobileLaunchUnsupported);
     if (gameState != GameState.idle) throw Exception('游戏已在运行');
     final id = config.selectedVersion;
     if (id.isEmpty) throw Exception('请先选择一个游戏版本');
@@ -357,8 +358,10 @@ class AppState extends ChangeNotifier {
     if (needsOwnershipCheck(acc, hintBuy: config.hintBuy)) {
       switch (await prompts.askOwnership()) {
         case OwnershipChoice.cancel:
-        case OwnershipChoice.buy:
           return false;
+        // 与 PCL 相同：打开商店页面后照常以离线账户启动
+        case OwnershipChoice.buy:
+          break;
         case OwnershipChoice.demo:
           demo = true;
       }
@@ -390,12 +393,14 @@ class AppState extends ChangeNotifier {
 
       t.beginStep('检查文件');
       final v = await ensureVersionFiles(g, id, dl, t, resourcesDir: () => p.join(gameDir, 'resources'));
-      final java = await ensureJava(v, inst.java, cfg.javaPath, dl, t);
+      final java = isDesktop ? await ensureJava(v, inst.java, cfg.javaPath, dl, t) : await ensureAndroidJava(v, dl, t);
 
       t.beginStep('准备启动');
       t.setStage('解压本地库');
-      final nativesDir = nativesDirFor(g, id);
-      await extractNatives(g, v, nativesDir);
+      // 安卓上用运行时自带的 LWJGL 与本地库代替游戏自带的
+      final android = isDesktop ? null : await AndroidRuntime.prepare();
+      final nativesDir = android?.nativeLibDir ?? nativesDirFor(g, id);
+      if (android == null) await extractNatives(g, v, nativesDir);
 
       final memory = planMemory(
         cfg,
@@ -424,12 +429,46 @@ class AppState extends ChangeNotifier {
         gameDir: gameDir,
         windowSize: size,
         demo: demo,
+        classpathHead: android?.lwjglClasspath ?? const [],
+        skipLibrary: android == null ? null : (name) => name.startsWith('org.lwjgl'),
       );
-      final args = buildArgs(ctx);
+      var args = buildArgs(ctx);
+      if (android != null) {
+        // 本地库目录是只读的，需要写入的临时目录换到应用数据目录
+        final tmp = p.join(Paths.appData, 'game_tmp');
+        await Directory(tmp).create(recursive: true);
+        final writable = RegExp(r'^(-Djna\.tmpdir|-Dorg\.lwjgl\.system\.SharedLibraryExtractPath|-Dio\.netty\.native\.workdir)=');
+        args = [for (final a in args) writable.hasMatch(a) ? '${a.substring(0, a.indexOf('=') + 1)}$tmp' : a];
+      }
 
       t.setStage('准备启动');
       await prepareOptions(cfg, gameDir, v.releaseTime).catchError((_) {});
       await writeCatIni(p.join(g.root, 'PCL.ini'), 'Version', id).catchError((_) {});
+      if (android != null) {
+        t.beginStep('启动游戏');
+        _launcherLog('Java: ${java.path}（安卓版 Java ${java.major}）');
+        _launcherLog('内存: ${memory.max.toStringAsFixed(1)} GB');
+        _launcherLog('工作目录: $gameDir');
+        if (demo) _launcherLog('以试玩模式启动');
+        await AndroidRuntime.launch(javaHome: java.path, gameDir: gameDir, args: args);
+        await config.update({'launchCount': count});
+        gameState = GameState.running;
+        final run = lastRun = _gameRun(id, info, gameDir, v, java, memory, inst);
+        final parser = LogParser(_log);
+        unawaited(
+          AndroidRuntime.watch(parser.push).then((code) {
+            parser.push('\n');
+            _launcherLog('游戏已退出，代码 $code');
+            lastExitCode = code;
+            run.exitCode = code;
+            gameState = GameState.idle;
+            notifyListeners();
+            unawaited(_checkCrash(run));
+          }),
+        );
+        t.complete();
+        return true;
+      }
       if (cfg.gpuPreference) await setGpuPreference(java.path);
       await writeLaunchScript(java.path, args, gameDir, acc, '启动 - $id');
       await runPreLaunch(cfg.preLaunchCommand, cfg.preLaunchWait, g.root, _launcherLog);
@@ -456,23 +495,7 @@ class AppState extends ChangeNotifier {
       } else {
         _game = proc;
         gameState = GameState.running;
-        final run = lastRun = GameRun(
-          versionId: id,
-          description: describeVersion(info),
-          gameDir: gameDir,
-          loaderLibs: [
-            for (final l in v.libraries)
-              if (RegExp(
-                r'^(net\.fabricmc:fabric-loader|org\.quiltmc:quilt-loader|net\.minecraftforge:(forge|fmlloader)|net\.neoforged:(neoforge|forge|fancymodloader)|com\.cleanroommc:cleanroom|optifine:optifine|net\.labymod:)',
-              ).hasMatch('${l['name']}'))
-                '${l['name']}',
-          ],
-          javaPath: java.path,
-          javaMajor: java.major,
-          memoryGb: memory.max,
-          startedAt: DateTime.now(),
-          secrets: redactor(extra: [if (inst.server.trim().isNotEmpty) inst.server.trim().split(':').first]),
-        );
+        final run = lastRun = _gameRun(id, info, gameDir, v, java, memory, inst);
         final parser = LogParser(_log);
         decodeOutput(proc.stdout).listen(parser.push);
         decodeOutput(proc.stderr).listen(parser.push);
@@ -501,6 +524,32 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  GameRun _gameRun(
+    String id,
+    InstanceInfo info,
+    String gameDir,
+    VersionJson v,
+    JavaInfo java,
+    MemoryPlan memory,
+    InstanceSettings inst,
+  ) => GameRun(
+    versionId: id,
+    description: describeVersion(info),
+    gameDir: gameDir,
+    loaderLibs: [
+      for (final l in v.libraries)
+        if (RegExp(
+          r'^(net\.fabricmc:fabric-loader|org\.quiltmc:quilt-loader|net\.minecraftforge:(forge|fmlloader)|net\.neoforged:(neoforge|forge|fancymodloader)|com\.cleanroommc:cleanroom|optifine:optifine|net\.labymod:)',
+        ).hasMatch('${l['name']}'))
+          '${l['name']}',
+    ],
+    javaPath: java.path,
+    javaMajor: java.major,
+    memoryGb: memory.max,
+    startedAt: DateTime.now(),
+    secrets: redactor(extra: [if (inst.server.trim().isNotEmpty) inst.server.trim().split(':').first]),
+  );
 
   /// 游戏退出后检查是否崩溃：退出代码非 0（不是用户结束的），或生成了崩溃报告
   Future<void> _checkCrash(GameRun run) async {

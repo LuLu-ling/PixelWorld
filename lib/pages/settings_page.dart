@@ -197,6 +197,12 @@ class _AboutSection extends StatelessWidget {
               'PCL 社区版（PCL-CE）的开发者们，本软件与 PCL-CE 的数据兼容',
               AppInfo.pclCeRepoUrl,
             ),
+            link(
+              Icons.android,
+              '安卓版游戏运行时',
+              '基于 Amethyst-Android（LGPL-3.0）、MobileGlues、LWJGL 与 OpenJDK，单独以 LGPL-3.0 开源',
+              '${AppInfo.repoUrl}/blob/main/android/runtime/NOTICE.md',
+            ),
             link(Icons.flutter_dash, 'Flutter', '跨平台界面框架', 'https://flutter.dev'),
             link(Icons.palette_outlined, 'Material Design 3', '界面设计语言与配色算法', 'https://m3.material.io'),
           ],

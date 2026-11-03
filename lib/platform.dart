@@ -6,8 +6,6 @@ import 'package:flutter/material.dart';
 /// 桌面端：有窗口管理、文件管理器，可以启动游戏
 bool get isDesktop => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
-/// 安卓版还不能启动游戏（需要安卓版的 Java 运行时与渲染层）
-const mobileLaunchUnsupported = '安卓版暂时不能启动游戏：需要安卓版的 Java 运行时与渲染层，正在开发中。可以先安装版本、下载资源和使用 AI 助手。';
 
 /// 手机屏幕较小：把界面按比例缩小，按至少 960 × 520 的尺寸布局，保持与桌面端相同的布局
 class MobileScale extends StatelessWidget {

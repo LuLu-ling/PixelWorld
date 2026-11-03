@@ -18,12 +18,12 @@ class DialogLaunchPrompts implements LaunchPrompts {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.verified_user_outlined),
-        title: const Text('需要正版账号'),
+        title: const Text('支持正版游戏'),
         content: const SizedBox(
           width: 400,
           child: Text(
-            '登录过一次正版账号后，才能使用离线账户启动游戏。\n\n'
-            '还没有 Minecraft 的话，可以先购买正版支持开发者，或者以试玩模式体验。'
+            '你还没有登录过正版账号。Minecraft 是付费游戏，请购买正版支持开发者。\n\n'
+            '选择「购买正版」会打开商店页面，然后照常启动游戏；也可以以试玩模式体验。'
             '登录一次正版账号后，就不会再出现这个提示了。',
           ),
         ),

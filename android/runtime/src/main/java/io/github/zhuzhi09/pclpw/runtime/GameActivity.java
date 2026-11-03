@@ -60,7 +60,23 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SurfaceView surface;
-    private View controls;
+    /** In-game control groups, shown only while the game grabs the cursor */
+    private final ArrayList<View> controls = new ArrayList<>();
+
+    /** Adds views to the root and remembers them as in-game controls */
+    private final class ControlLayer {
+        private final FrameLayout root;
+
+        ControlLayer(FrameLayout root) {
+            this.root = root;
+        }
+
+        void addView(View v, FrameLayout.LayoutParams lp) {
+            v.setVisibility(View.GONE);
+            controls.add(v);
+            root.addView(v, lp);
+        }
+    }
     private JoystickView joystick;
     private EditText textInput;
     private float scale = 1f;
@@ -95,8 +111,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         textInput = createTextInput();
         root.addView(textInput, new FrameLayout.LayoutParams(1, 1));
 
-        controls = createControls();
-        root.addView(controls, new FrameLayout.LayoutParams(-1, -1));
+        createControls(root);
         root.addView(createTopBar(), new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END));
         setContentView(root);
         // The decor view exists only after setContentView
@@ -324,7 +339,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
 
     @Override
     public void onGrabState(boolean grabbing) {
-        controls.setVisibility(grabbing ? View.VISIBLE : View.GONE);
+        for (View v : controls) v.setVisibility(grabbing ? View.VISIBLE : View.GONE);
         // Opening a menu must not leave movement keys held down
         if (!grabbing && joystick != null) joystick.reset();
         if (grabbing) {
@@ -468,8 +483,13 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         return b;
     }
 
-    private View createControls() {
-        FrameLayout layer = new FrameLayout(this);
+    /**
+     * Adds the control groups directly to the root. A full-screen container would become the
+     * touch target of the first finger and then receive every later finger as well, so the
+     * game view could not be dragged while a button is held.
+     */
+    private void createControls(FrameLayout root) {
+        ControlLayer layer = new ControlLayer(root);
         int s = 56;
 
         // Movement joystick, bottom left; push to the edge to sprint
@@ -510,11 +530,6 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         FrameLayout.LayoutParams lpHot = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
         lpHot.setMargins(0, 0, 0, dp(64));
         layer.addView(hotbar, lpHot);
-
-        layer.setVisibility(View.GONE);
-        // Touches outside the buttons go to the game view
-        layer.setClickable(false);
-        return layer;
     }
 
     /** Always visible: pause, chat and keyboard */

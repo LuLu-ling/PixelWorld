@@ -83,6 +83,8 @@ class LauncherConfig extends ChangeNotifier {
     'aiCompactAt': 64000,
     // 安卓：首次打开时已经询问过游戏文件夹放在哪里
     'storageAsked': false,
+    // 安卓：游戏的渲染分辨率相对屏幕分辨率的比例（代替桌面端的窗口大小）
+    'renderScale': 1.0,
   };
 
   static File get _file => File(p.join(Paths.appData, 'config.json'));
@@ -115,6 +117,7 @@ class LauncherConfig extends ChangeNotifier {
 
   String get gameDir => _get('gameDir');
   bool get storageAsked => _get('storageAsked');
+  double get renderScale => (_data['renderScale'] as num).toDouble().clamp(0.25, 1.0);
   List<GameFolder> get gameFolders =>
       (_data['gameFolders'] as List).whereType<Map<String, dynamic>>().map(GameFolder.fromJson).toList();
   int get isolationMode => (_data['isolationMode'] as num).toInt();

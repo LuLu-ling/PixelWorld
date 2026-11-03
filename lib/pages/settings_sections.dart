@@ -5,6 +5,7 @@ import '../app_scope.dart';
 import '../core/config.dart';
 import '../core/java.dart';
 import '../core/memory.dart';
+import '../platform.dart';
 import '../widgets/pcl_import_dialog.dart';
 import '../widgets/settings_group.dart';
 
@@ -167,6 +168,50 @@ class _TextRowState extends State<_TextRow> {
 
 // ---------- 启动 ----------
 
+/// 安卓：渲染比例。降低后画面更模糊，但帧率更高、发热更少
+class _RenderScaleRow extends StatefulWidget {
+  const _RenderScaleRow();
+
+  @override
+  State<_RenderScaleRow> createState() => _RenderScaleRowState();
+}
+
+class _RenderScaleRowState extends State<_RenderScaleRow> {
+  double? _value;
+
+  @override
+  Widget build(BuildContext context) {
+    final cfg = AppScope.of(context).config;
+    final value = _value ?? cfg.renderScale;
+    // 屏幕的实际像素（横屏），与界面缩放无关
+    final screen = View.of(context).physicalSize;
+    final w = (screen.longestSide * value).round(), h = (screen.shortestSide * value).round();
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      leading: const Icon(Icons.aspect_ratio),
+      title: Text('渲染比例：${(value * 100).round()}%'),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('游戏分辨率 $w × $h。降低后画面更模糊，但帧率更高、发热更少'),
+          Slider(
+            value: value,
+            min: 0.25,
+            max: 1,
+            divisions: 15,
+            label: '${(value * 100).round()}%',
+            onChanged: (v) => setState(() => _value = v),
+            onChangeEnd: (v) async {
+              await cfg.update({'renderScale': v});
+              if (mounted) setState(() => _value = null);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class LaunchSection extends StatelessWidget {
   const LaunchSection({super.key});
 
@@ -189,20 +234,23 @@ class LaunchSection extends StatelessWidget {
               options: isolationModes,
               onChanged: (v) => set({'isolationMode': v}),
             ),
-            _SelectRow<String>(
-              icon: Icons.crop_landscape,
-              title: '游戏窗口',
-              value: cfg.windowMode,
-              options: const {
-                'default': '默认（854 × 480）',
-                'launcher': '与启动器一致',
-                'maximized': '最大化',
-                'fullscreen': '全屏',
-                'custom': '自定义大小',
-              },
-              onChanged: (v) => set({'windowMode': v}),
-            ),
-            if (cfg.windowMode == 'custom') ...[
+            // 手机上游戏总是全屏，调的是渲染分辨率
+            if (!isDesktop) const _RenderScaleRow(),
+            if (isDesktop)
+              _SelectRow<String>(
+                icon: Icons.crop_landscape,
+                title: '游戏窗口',
+                value: cfg.windowMode,
+                options: const {
+                  'default': '默认（854 × 480）',
+                  'launcher': '与启动器一致',
+                  'maximized': '最大化',
+                  'fullscreen': '全屏',
+                  'custom': '自定义大小',
+                },
+                onChanged: (v) => set({'windowMode': v}),
+              ),
+            if (isDesktop && cfg.windowMode == 'custom') ...[
               _TextRow(
                 icon: Icons.width_normal_outlined,
                 title: '窗口宽度',
@@ -216,26 +264,29 @@ class LaunchSection extends StatelessWidget {
                 onSaved: (v) => set({'windowHeight': int.tryParse(v) ?? cfg.windowHeight}),
               ),
             ],
-            _SelectRow<String>(
-              icon: Icons.rocket_launch_outlined,
-              title: '游戏启动后',
-              value: cfg.afterLaunch,
-              options: const {
-                'keep': '保持不变',
-                'minimizeAndReopen': '最小化，游戏退出后恢复',
-                'hideAndReopen': '隐藏，游戏退出后恢复',
-                'hideAndExit': '隐藏，游戏退出后关闭',
-                'exit': '直接关闭启动器',
-              },
-              onChanged: (v) => set({'afterLaunch': v}),
-            ),
-            _SelectRow<String>(
-              icon: Icons.speed,
-              title: '进程优先级',
-              value: cfg.processPriority,
-              options: const {'high': '高', 'aboveNormal': '较高', 'normal': '中', 'belowNormal': '较低'},
-              onChanged: (v) => set({'processPriority': v}),
-            ),
+            // 以下两项只对桌面端的游戏进程有效
+            if (isDesktop)
+              _SelectRow<String>(
+                icon: Icons.rocket_launch_outlined,
+                title: '游戏启动后',
+                value: cfg.afterLaunch,
+                options: const {
+                  'keep': '保持不变',
+                  'minimizeAndReopen': '最小化，游戏退出后恢复',
+                  'hideAndReopen': '隐藏，游戏退出后恢复',
+                  'hideAndExit': '隐藏，游戏退出后关闭',
+                  'exit': '直接关闭启动器',
+                },
+                onChanged: (v) => set({'afterLaunch': v}),
+              ),
+            if (isDesktop)
+              _SelectRow<String>(
+                icon: Icons.speed,
+                title: '进程优先级',
+                value: cfg.processPriority,
+                options: const {'high': '高', 'aboveNormal': '较高', 'normal': '中', 'belowNormal': '较低'},
+                onChanged: (v) => set({'processPriority': v}),
+              ),
             _TextRow(
               icon: Icons.label_outline,
               title: '版本类型显示',

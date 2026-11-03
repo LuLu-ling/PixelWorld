@@ -450,7 +450,8 @@ class AppState extends ChangeNotifier {
         _launcherLog('内存: ${memory.max.toStringAsFixed(1)} GB');
         _launcherLog('工作目录: $gameDir');
         if (demo) _launcherLog('以试玩模式启动');
-        await AndroidRuntime.launch(javaHome: java.path, gameDir: gameDir, args: args);
+        _launcherLog('渲染比例: ${(cfg.renderScale * 100).round()}%');
+        await AndroidRuntime.launch(javaHome: java.path, gameDir: gameDir, args: args, scale: cfg.renderScale);
         await config.update({'launchCount': count});
         gameState = GameState.running;
         final run = lastRun = _gameRun(id, info, gameDir, v, java, memory, inst);

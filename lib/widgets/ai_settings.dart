@@ -103,6 +103,19 @@ class AiSettingsFormState extends State<AiSettingsForm> {
     }
   }
 
+  /// 从剪贴板粘贴（不需要点开输入框，手机上不会弹出键盘）
+  Widget _pasteButton(TextEditingController c) => IconButton(
+    tooltip: '粘贴',
+    icon: const Icon(Icons.content_paste),
+    onPressed: () async {
+      final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text?.trim() ?? '';
+      if (!mounted) return;
+      if (text.isEmpty) return toast(context, '剪贴板是空的');
+      setState(() => c.text = text);
+      toast(context, '已粘贴');
+    },
+  );
+
   bool _loadingModels = false;
 
   /// 从接口获取模型列表并选择
@@ -187,6 +200,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
             labelText: '接口地址',
             hintText: _provider == AiProvider.anthropic ? 'https://api.anthropic.com' : 'https://api.example.com/v1',
             border: const OutlineInputBorder(),
+            suffixIcon: _pasteButton(_url),
           ),
         ),
         const SizedBox(height: 12),
@@ -200,10 +214,16 @@ class AiSettingsFormState extends State<AiSettingsForm> {
             labelText: 'API Key',
             helperText: '加密保存在本机，只会发送给上面填写的接口地址；本机运行的服务可以不填',
             border: const OutlineInputBorder(),
-            suffixIcon: IconButton(
-              tooltip: _showKey ? '隐藏' : '显示',
-              icon: Icon(_showKey ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-              onPressed: () => setState(() => _showKey = !_showKey),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _pasteButton(_key),
+                IconButton(
+                  tooltip: _showKey ? '隐藏' : '显示',
+                  icon: Icon(_showKey ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                  onPressed: () => setState(() => _showKey = !_showKey),
+                ),
+              ],
             ),
           ),
         ),

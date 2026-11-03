@@ -341,7 +341,7 @@ class _InstallProgress extends StatelessWidget {
                             Expanded(
                               child: Text(t.stage, style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis),
                             ),
-                            if (t.total > 0) Text('${t.done} / ${t.total}', style: theme.textTheme.labelSmall),
+                            if (t.total > 0) Text(t.countText, style: theme.textTheme.labelSmall),
                           ],
                         ),
                         const SizedBox(height: 6),

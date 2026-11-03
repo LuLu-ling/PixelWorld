@@ -60,7 +60,17 @@ class TaskProgress extends ChangeNotifier {
   /// 详细日志（最多保留 2000 行）
   final log = <String>[];
 
+  /// [done]、[total] 是字节数而不是文件数
+  bool bytes = false;
+
   double? get fraction => total > 0 ? done / total : null;
+
+  /// 进度数字：文件数，或按字节计时的 MB
+  String get countText {
+    if (!bytes) return '$done / $total';
+    String mb(int b) => (b / 1024 / 1024).toStringAsFixed(1);
+    return '${mb(done)} / ${mb(total)} MB';
+  }
 
   Duration get elapsed => (endedAt ?? DateTime.now()).difference(startedAt);
 
@@ -78,6 +88,7 @@ class TaskProgress extends ChangeNotifier {
     detail = '';
     done = 0;
     total = 0;
+    bytes = false;
     _append(s);
     notifyListeners();
   }
@@ -87,6 +98,14 @@ class TaskProgress extends ChangeNotifier {
     done = d;
     total = t;
     if (first) _append('共 $t 个文件需要下载');
+    notifyListeners();
+  }
+
+  /// 单个文件的下载进度（字节）
+  void progressBytes(int d, int t) {
+    bytes = true;
+    done = d;
+    total = t;
     notifyListeners();
   }
 

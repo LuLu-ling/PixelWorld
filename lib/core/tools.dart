@@ -145,8 +145,7 @@ Future<void> downloadToFile(String url, String path, TaskProgress task) async {
     await for (final chunk in res) {
       sink.add(chunk);
       done += chunk.length;
-      // 进度以 KB 计，避免数字过大
-      task.progress(done ~/ 1024, total > 0 ? total ~/ 1024 : 0);
+      task.progressBytes(done, total > 0 ? total : 0);
     }
     await sink.close();
     if (File(path).existsSync()) await File(path).delete();

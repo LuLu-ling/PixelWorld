@@ -134,7 +134,7 @@ class _TaskCardState extends State<_TaskCard> {
                             ),
                             if (t.total > 0)
                               Text(
-                                '${t.done} / ${t.total}（${((t.fraction ?? 0) * 100).toStringAsFixed(0)}%）',
+                                '${t.countText}（${((t.fraction ?? 0) * 100).toStringAsFixed(0)}%）',
                                 style: theme.textTheme.labelMedium,
                               ),
                           ],

@@ -159,6 +159,9 @@ public final class GameRuntime {
         File cache = app.getCacheDir();
 
         logFile.getParentFile().mkdirs();
+        // The native side opens the file without O_CREAT
+        //noinspection ResultOfMethodCallIgnored
+        logFile.createNewFile();
         Logger.begin(logFile.getAbsolutePath());
         CallbackBridge.sContext = app;
 

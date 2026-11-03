@@ -80,7 +80,6 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         installCrashLogger();
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         scale = getIntent().getFloatExtra(EXTRA_SCALE, 1f);
-        hideSystemBars();
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
@@ -99,6 +98,8 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         root.addView(controls, new FrameLayout.LayoutParams(-1, -1));
         root.addView(createTopBar(), new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END));
         setContentView(root);
+        // The decor view exists only after setContentView
+        hideSystemBars();
         CallbackBridge.addGrabListener(this);
     }
 

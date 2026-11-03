@@ -1,9 +1,33 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_info.dart';
 import '../app_state.dart';
 import '../core/precheck.dart';
+import '../platform.dart';
+
+/// 等启动器离开前台后再回到前台；浏览器没有把启动器切走时（3 秒内）直接返回
+Future<void> _waitUntilBack() async {
+  final back = Completer<void>();
+  final left = Completer<void>();
+  final listener = AppLifecycleListener(
+    onStateChange: (s) {
+      if (s == AppLifecycleState.resumed) {
+        if (left.isCompleted && !back.isCompleted) back.complete();
+      } else if (!left.isCompleted) {
+        left.complete();
+      }
+    },
+  );
+  try {
+    final wentAway = await left.future.then((_) => true).timeout(const Duration(seconds: 3), onTimeout: () => false);
+    if (wentAway) await back.future;
+  } finally {
+    listener.dispose();
+  }
+}
 
 /// 正版购买劝导与赞助劝导的对话框
 class DialogLaunchPrompts implements LaunchPrompts {
@@ -37,7 +61,12 @@ class DialogLaunchPrompts implements LaunchPrompts {
         ],
       ),
     );
-    if (choice == OwnershipChoice.buy) await launchUrl(Uri.parse(buyMinecraftUrl));
+    if (choice == OwnershipChoice.buy) {
+      final opened = await launchUrl(Uri.parse(buyMinecraftUrl));
+      // 手机上浏览器在启动器的任务里打开，同时启动游戏会被系统切回浏览器，游戏界面来不及准备就关掉了，
+      // 所以等用户从购买页回来再启动
+      if (opened && !isDesktop) await _waitUntilBack();
+    }
     if (choice == OwnershipChoice.demo && context.mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('游戏将以试玩模式启动'), behavior: SnackBarBehavior.floating, width: 420));

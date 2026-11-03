@@ -61,6 +61,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SurfaceView surface;
     private View controls;
+    private JoystickView joystick;
     private EditText textInput;
     private float scale = 1f;
 
@@ -324,6 +325,8 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
     @Override
     public void onGrabState(boolean grabbing) {
         controls.setVisibility(grabbing ? View.VISIBLE : View.GONE);
+        // Opening a menu must not leave movement keys held down
+        if (!grabbing && joystick != null) joystick.reset();
         if (grabbing) {
             // Center the virtual cursor so camera movement starts from a known point
             CallbackBridge.sendCursorPos(CallbackBridge.windowWidth / 2f, CallbackBridge.windowHeight / 2f);
@@ -437,10 +440,12 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
             int a = e.getActionMasked();
             if (a == MotionEvent.ACTION_DOWN) {
                 v.setPressed(true);
+                v.setAlpha(0.55f);
                 CallbackBridge.setModifiers(key, true);
                 CallbackBridge.sendKeyPress(key, CallbackBridge.getCurrentMods(), true);
             } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
                 v.setPressed(false);
+                v.setAlpha(1f);
                 CallbackBridge.setModifiers(key, false);
                 CallbackBridge.sendKeyPress(key, CallbackBridge.getCurrentMods(), false);
             }
@@ -467,37 +472,32 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         FrameLayout layer = new FrameLayout(this);
         int s = 56;
 
-        // Movement pad, bottom left
-        LinearLayout pad = new LinearLayout(this);
-        pad.setOrientation(LinearLayout.VERTICAL);
-        pad.setGravity(Gravity.CENTER_HORIZONTAL);
-        pad.addView(keyButton("W", LwjglGlfwKeycode.GLFW_KEY_W, s));
-        LinearLayout mid = new LinearLayout(this);
-        mid.addView(keyButton("A", LwjglGlfwKeycode.GLFW_KEY_A, s));
-        mid.addView(keyButton("S", LwjglGlfwKeycode.GLFW_KEY_S, s));
-        mid.addView(keyButton("D", LwjglGlfwKeycode.GLFW_KEY_D, s));
-        pad.addView(mid);
-        FrameLayout.LayoutParams lpPad = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.START);
-        lpPad.setMargins(dp(24), 0, 0, dp(20));
-        layer.addView(pad, lpPad);
+        // Movement joystick, bottom left; push to the edge to sprint
+        joystick = new JoystickView(this);
+        FrameLayout.LayoutParams lpStick = new FrameLayout.LayoutParams(dp(160), dp(160), Gravity.BOTTOM | Gravity.START);
+        lpStick.setMargins(dp(36), 0, 0, dp(28));
+        layer.addView(joystick, lpStick);
 
         // Actions, bottom right
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.VERTICAL);
         actions.setGravity(Gravity.END);
         LinearLayout row1 = new LinearLayout(this);
+        row1.addView(keyButton("列表", LwjglGlfwKeycode.GLFW_KEY_TAB, s));
+        row1.addView(keyButton("副手", LwjglGlfwKeycode.GLFW_KEY_F, s));
         row1.addView(keyButton("丢弃", LwjglGlfwKeycode.GLFW_KEY_Q, s));
         row1.addView(keyButton("背包", LwjglGlfwKeycode.GLFW_KEY_E, s));
         actions.addView(row1);
         LinearLayout row2 = new LinearLayout(this);
+        row2.setGravity(Gravity.BOTTOM);
         row2.addView(toggleButton("潜行", LwjglGlfwKeycode.GLFW_KEY_LEFT_SHIFT, s));
-        row2.addView(keyButton("跳", LwjglGlfwKeycode.GLFW_KEY_SPACE, s + 16));
+        row2.addView(keyButton("跳跃", LwjglGlfwKeycode.GLFW_KEY_SPACE, s + 24));
         actions.addView(row2);
         FrameLayout.LayoutParams lpAct = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.END);
-        lpAct.setMargins(0, 0, dp(24), dp(20));
+        lpAct.setMargins(0, 0, dp(28), dp(24));
         layer.addView(actions, lpAct);
 
-        // Hotbar scroll and perspective, bottom center
+        // Hotbar and view, bottom center (above the hotbar)
         LinearLayout hotbar = new LinearLayout(this);
         Button prev = button("◀", 44);
         prev.setOnClickListener(v -> CallbackBridge.sendScroll(0, 1));
@@ -505,6 +505,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         next.setOnClickListener(v -> CallbackBridge.sendScroll(0, -1));
         hotbar.addView(prev);
         hotbar.addView(keyButton("视角", LwjglGlfwKeycode.GLFW_KEY_F5, 44));
+        hotbar.addView(keyButton("隐藏", LwjglGlfwKeycode.GLFW_KEY_F1, 44));
         hotbar.addView(next);
         FrameLayout.LayoutParams lpHot = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
         lpHot.setMargins(0, 0, 0, dp(64));

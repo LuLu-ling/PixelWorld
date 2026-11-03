@@ -345,7 +345,9 @@ class ChatStore extends ChangeNotifier {
         _busy.remove(s.id);
         // 失败时保留已生成的文字
         final partial = _streaming.remove(s.id) ?? '';
-        if (partial.isNotEmpty) s.messages.add(ChatMessage('assistant', partial));
+        if (partial.isNotEmpty) {
+          s.messages.add(ChatMessage('assistant', _errors.containsKey(s.id) ? '$partial\n\n（回答中断）' : partial));
+        }
         s.updated = DateTime.now();
         unawaited(_save(s));
         notifyListeners();

@@ -180,7 +180,7 @@ Future<List<String>> aiListModels(AiSettings s) async {
     }
     final res = await req.close().timeout(const Duration(seconds: 20));
     final body = await res.transform(utf8.decoder).join();
-    if (res.statusCode != 200) throw AiException('获取模型列表失败（HTTP ${res.statusCode}）：${_errorMessage(body)}');
+    if (res.statusCode != 200) throw AiException('获取模型列表失败：${_describeError(res.statusCode, body, s)}');
     final data = (jsonDecode(body) as Map)['data'] as List? ?? const [];
     final models = data.whereType<Map>().where((m) => m['id'] != null).toList();
     // OpenAI 兼容接口按创建时间从新到旧排列（有时间时）
@@ -310,21 +310,7 @@ Stream<AiEvent> aiStream(
 
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 20);
   try {
-    final req = await client.postUrl(url);
-    req.headers.contentType = ContentType.json;
-    req.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
-    if (anthropic) {
-      req.headers.set('x-api-key', s.apiKey);
-      req.headers.set('anthropic-version', '2026-10-21');
-    } else if (s.apiKey.isNotEmpty) {
-      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer ${s.apiKey}');
-    }
-    req.add(utf8.encode(jsonEncode(body)));
-    final res = await req.close();
-    if (res.statusCode != 200) {
-      final text = await res.transform(utf8.decoder).join();
-      throw AiException('请求失败（HTTP ${res.statusCode}）：${_errorMessage(text)}');
-    }
+    final res = await _post(client, url, body, s);
 
     final text = StringBuffer();
     String? stop;
@@ -338,7 +324,8 @@ Stream<AiEvent> aiStream(
     int? outputTokens;
     int? toInt(Object? v) => (v as num?)?.toInt();
 
-    await for (final line in res.transform(utf8.decoder).transform(const LineSplitter())) {
+    // 长时间没有任何数据（包括服务端的保活注释）时视为超时
+    await for (final line in res.transform(utf8.decoder).transform(const LineSplitter()).timeout(_idleTimeout)) {
       if (!line.startsWith('data:')) continue;
       final data = line.substring(5).trim();
       if (data.isEmpty || data == '[DONE]') continue;
@@ -348,7 +335,7 @@ Stream<AiEvent> aiStream(
       } catch (_) {
         continue;
       }
-      if (ev['error'] != null) throw AiException(_errorMessage(data));
+      if (ev['error'] != null) throw AiException(_describeError(null, data, s));
       if (anthropic) {
         final index = (ev['index'] as num?)?.toInt() ?? 0;
         switch (ev['type']) {
@@ -467,12 +454,89 @@ Stream<AiEvent> aiStream(
       outputTokens: outputTokens,
     );
   } on SocketException catch (e) {
-    throw AiException('无法连接 ${s.host}：${e.message}');
+    throw AiException('与 ${s.host} 的连接中断：${e.message}');
+  } on HttpException catch (e) {
+    throw AiException('与 ${s.host} 的连接中断：${e.message}');
   } on HandshakeException {
-    throw AiException('与 ${s.host} 的安全连接失败');
+    throw AiException('与 ${s.host} 的安全连接失败，请检查接口地址或网络代理');
+  } on TimeoutException {
+    throw AiException('${s.host} 长时间没有响应，请稍后重试');
   } finally {
     client.close(force: true);
   }
+}
+
+/// 等待回答开始与回答过程中允许的最长静默时间
+const _headerTimeout = Duration(seconds: 90);
+const _idleTimeout = Duration(seconds: 180);
+
+/// 临时性的错误：限流、服务端错误、过载（Anthropic 为 529）
+const _retryable = {408, 429, 500, 502, 503, 504, 529};
+
+/// 发送请求；临时性的错误与连接失败最多重试两次，遵循 Retry-After
+Future<HttpClientResponse> _post(HttpClient client, Uri url, Map<String, dynamic> body, AiSettings s) async {
+  for (var attempt = 0; ; attempt++) {
+    Duration wait = Duration(seconds: attempt == 0 ? 1 : 4);
+    try {
+      final req = await client.postUrl(url);
+      req.headers.contentType = ContentType.json;
+      req.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
+      if (s.provider == AiProvider.anthropic) {
+        req.headers.set('x-api-key', s.apiKey);
+        req.headers.set('anthropic-version', '2026-10-21');
+      } else if (s.apiKey.isNotEmpty) {
+        req.headers.set(HttpHeaders.authorizationHeader, 'Bearer ${s.apiKey}');
+      }
+      req.add(utf8.encode(jsonEncode(body)));
+      final res = await req.close().timeout(_headerTimeout);
+      if (res.statusCode == 200) return res;
+      final text = await res.transform(utf8.decoder).join();
+      if (attempt >= 2 || !_retryable.contains(res.statusCode)) {
+        throw AiException(_describeError(res.statusCode, text, s));
+      }
+      final after = int.tryParse(res.headers.value('retry-after') ?? '');
+      if (after != null && after > 0 && after <= 30) wait = Duration(seconds: after);
+    } on SocketException catch (e) {
+      if (attempt >= 2) throw AiException('无法连接 ${s.host}：${e.message}');
+    } on TimeoutException {
+      throw AiException('${s.host} 长时间没有响应，请稍后重试');
+    }
+    await Future<void>.delayed(wait);
+  }
+}
+
+/// 把接口错误转成用户看得懂的说明，并附上服务商的原文（便于排查）
+String _describeError(int? status, String body, AiSettings s) {
+  final raw = _errorMessage(body);
+  final lower = raw.toLowerCase();
+  String? hint;
+  if (RegExp(r'context.?length|context window|too many tokens|prompt is too long|input.*too long').hasMatch(lower)) {
+    hint = '对话内容超出了模型能处理的长度，请新建一个对话';
+  } else if (RegExp(
+    r'model.*(not.?exist|not.?found|does not exist|invalid)|unknown model|no such model|supported.*model names?|model names? .*you passed',
+  ).hasMatch(lower)) {
+    hint = '模型「${s.model}」不存在或不可用，请检查模型名，或点模型旁的按钮获取可用的模型';
+  } else if (RegExp(r'insufficient.?balance|insufficient_quota|余额|quota|billing|credit').hasMatch(lower) ||
+      status == 402) {
+    hint = '账户余额或额度不足，请到服务商的控制台充值或检查额度';
+  } else if (RegExp(r'overload').hasMatch(lower)) {
+    hint = 'AI 服务当前过载，请稍后重试';
+  } else {
+    hint = switch (status) {
+      400 || 422 => '请求被拒绝，可能是这个模型或服务商不支持当前的请求方式',
+      401 => 'API Key 无效或已过期，请在设置中检查',
+      403 => '没有权限使用这个模型或接口，请检查账户权限或地区限制',
+      404 => '接口地址或模型不存在，请检查接口地址（OpenAI 兼容接口通常以 /v1 结尾）',
+      408 || 504 => 'AI 服务响应超时，请稍后重试',
+      413 => '发送的内容太长，请新建一个对话',
+      429 => '请求太频繁，请稍后再试',
+      500 || 502 || 503 || 529 => 'AI 服务暂时不可用，请稍后重试',
+      _ => null,
+    };
+  }
+  final code = status == null ? '' : 'HTTP $status';
+  if (hint == null) return '请求失败（$code）：$raw';
+  return '$hint（${[code, raw].where((e) => e.isNotEmpty).join('：')}）';
 }
 
 /// 从错误响应中取出说明文字

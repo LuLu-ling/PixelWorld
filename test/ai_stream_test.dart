@@ -224,4 +224,106 @@ void main() {
     ]);
     expect(auth.last, 'k2');
   });
+
+  group('错误处理', () {
+    AiSettings at(int port) =>
+        AiSettings(provider: AiProvider.openai, baseUrl: 'http://127.0.0.1:$port/v1', model: 'm', apiKey: 'k');
+    final ok =
+        'data: ${jsonEncode({
+          'choices': [
+            {
+              'delta': {'content': '好'},
+            },
+          ],
+        })}\n\ndata: [DONE]\n\n';
+
+    test('临时错误自动重试', () async {
+      var n = 0;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((req) async {
+        await req.drain<void>();
+        if (n++ < 2) {
+          req.response.statusCode = 503;
+          req.response.write('{"error":{"message":"Server overloaded"}}');
+        } else {
+          req.response.headers.contentType = ContentType('text', 'event-stream', charset: 'utf-8');
+          req.response.write(ok);
+        }
+        await req.response.close();
+      });
+      expect(await aiChat(at(server.port), 's', const [AiMessage('user', 'hi')]).join(), '好');
+      expect(n, 3);
+    });
+
+    Future<String> failWith(int status, String body) async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((req) async {
+        await req.drain<void>();
+        req.response.statusCode = status;
+        req.response.write(body);
+        await req.response.close();
+      });
+      try {
+        await aiChat(at(server.port), 's', const [AiMessage('user', 'hi')]).join();
+        return '';
+      } catch (e) {
+        return '$e';
+      } finally {
+        await server.close(force: true);
+      }
+    }
+
+    test('常见错误的说明', () async {
+      expect(
+        await failWith(401, '{"error":{"message":"Authentication Fails, Your api key: ****-key is invalid"}}'),
+        startsWith('API Key 无效'),
+      );
+      expect(
+        await failWith(400, '{"error":{"message":"Model Not Exist","type":"invalid_request_error"}}'),
+        startsWith('模型「m」不存在'),
+      );
+      // DeepSeek 实际返回的模型名错误
+      expect(
+        await failWith(
+          400,
+          '{"error":{"message":"The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed x."}}',
+        ),
+        startsWith('模型「m」不存在'),
+      );
+      expect(await failWith(402, '{"error":{"message":"Insufficient Balance"}}'), startsWith('账户余额或额度不足'));
+      expect(await failWith(418, 'teapot'), '请求失败（HTTP 418）：teapot');
+    });
+
+    test('回答中途断开', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      server.listen((socket) async {
+        await socket.first;
+        socket.write(
+          'HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncontent-length: 5000\r\n\r\n'
+          'data: ${jsonEncode({
+            'choices': [
+              {
+                'delta': {'content': '一半'},
+              },
+            ],
+          })}\n\n',
+        );
+        await socket.flush();
+        socket.destroy();
+      });
+      final got = <String>[];
+      Object? error;
+      try {
+        await for (final t in aiChat(at(server.port), 's', const [AiMessage('user', 'hi')])) {
+          got.add(t);
+        }
+      } catch (e) {
+        error = e;
+      }
+      expect(got, ['一半']);
+      expect('$error', contains('连接中断'));
+    });
+  });
 }

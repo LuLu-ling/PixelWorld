@@ -1,8 +1,8 @@
-/// 名称与外部链接。名称规则见仓库根目录的 PCL-GUIDE.md。
+﻿/// 名称与外部链接。名称规则见仓库根目录的 PCL-GUIDE.md。
 abstract final class AppInfo {
   static const name = 'PCL.PW';
   static const fullName = 'PCL.PW（PixelsWorld 修改版）';
-  static const version = '0.1.0';
+  static const version = '0.2.0';
 
   static const repoUrl = 'https://github.com/zhuzhi-09/PCL.PW';
 

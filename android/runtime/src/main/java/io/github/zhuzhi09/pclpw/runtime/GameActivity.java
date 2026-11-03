@@ -289,7 +289,8 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
                     moved = true;
                 }
                 if (CallbackBridge.isGrabbing()) {
-                    CallbackBridge.sendCursorPos(CallbackBridge.mouseX + toWindowX(x - lastX), CallbackBridge.mouseY + toWindowY(y - lastY));
+                    // Camera turns by screen pixels, so the render scale does not change the sensitivity
+                    CallbackBridge.sendCursorPos(CallbackBridge.mouseX + (x - lastX), CallbackBridge.mouseY + (y - lastY));
                 } else {
                     CallbackBridge.sendCursorPos(toWindowX(x), toWindowY(y));
                 }

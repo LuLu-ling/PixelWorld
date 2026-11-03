@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../core/ai_client.dart';
 import '../core/ai_context.dart';
+import '../platform.dart';
 
 /// AI 排障的接口设置：用户自己填写接口地址、模型与 API Key
 class AiSettingsForm extends StatefulWidget {
@@ -28,6 +29,10 @@ class AiSettingsFormState extends State<AiSettingsForm> {
   final _key = TextEditingController();
   final _ctx = TextEditingController();
   bool _showKey = false;
+
+  /// 手机上密码框会让输入法切换成安全键盘（横屏时挤占界面、无法粘贴），
+  /// 所以输入时显示明文，离开输入框后再隐藏
+  final _keyFocus = FocusNode();
   bool _testing = false;
   String? _result;
   bool _ok = false;
@@ -44,6 +49,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
     _key.text = s.apiKey;
     final ctx = AppScope.read(context).config.aiContextWindow;
     _ctx.text = ctx > 0 ? '$ctx' : '';
+    _keyFocus.addListener(() => setState(() {}));
   }
 
   @override
@@ -52,6 +58,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
     _model.dispose();
     _key.dispose();
     _ctx.dispose();
+    _keyFocus.dispose();
     super.dispose();
   }
 
@@ -185,7 +192,10 @@ class AiSettingsFormState extends State<AiSettingsForm> {
         const SizedBox(height: 12),
         TextField(
           controller: _key,
-          obscureText: !_showKey,
+          focusNode: _keyFocus,
+          obscureText: !_showKey && (isDesktop || !_keyFocus.hasFocus),
+          autocorrect: false,
+          enableSuggestions: false,
           decoration: InputDecoration(
             labelText: 'API Key',
             helperText: '加密保存在本机，只会发送给上面填写的接口地址；本机运行的服务可以不填',
@@ -293,6 +303,20 @@ class AiSettingsFormState extends State<AiSettingsForm> {
 }
 
 Future<void> showAiSettingsDialog(BuildContext context) {
+  // 手机上键盘会占掉大半屏幕，用全屏页面代替对话框
+  if (!isDesktop) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          appBar: AppBar(title: const Text('AI 排障设置')),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+            children: [AiSettingsForm(onSaved: () => Navigator.pop(context))],
+          ),
+        ),
+      ),
+    );
+  }
   final form = GlobalKey<AiSettingsFormState>();
   return showDialog<void>(
     context: context,

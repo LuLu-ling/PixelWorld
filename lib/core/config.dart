@@ -81,6 +81,8 @@ class LauncherConfig extends ChangeNotifier {
     // 上下文长度（0 表示按模型自动判断）与自动压缩的阈值（0 表示不自动压缩）
     'aiContextWindow': 0,
     'aiCompactAt': 64000,
+    // 安卓：首次打开时已经询问过游戏文件夹放在哪里
+    'storageAsked': false,
   };
 
   static File get _file => File(p.join(Paths.appData, 'config.json'));
@@ -112,6 +114,7 @@ class LauncherConfig extends ChangeNotifier {
   T _get<T>(String key) => _data[key] as T;
 
   String get gameDir => _get('gameDir');
+  bool get storageAsked => _get('storageAsked');
   List<GameFolder> get gameFolders =>
       (_data['gameFolders'] as List).whereType<Map<String, dynamic>>().map(GameFolder.fromJson).toList();
   int get isolationMode => (_data['isolationMode'] as num).toInt();

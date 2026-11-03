@@ -6,6 +6,7 @@ import '../app_scope.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
 import '../widgets/ai_settings.dart';
+import '../widgets/storage_location.dart';
 import 'settings_sections.dart';
 
 enum _Section { launch, java, manage, appearance, ai, misc, about }
@@ -36,7 +37,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final label = _groups.expand((g) => g.items).firstWhere((i) => i.value == _section).label;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -47,6 +47,7 @@ class _SettingsPageState extends State<SettingsPage> {
               _Section.launch => const LaunchSection(),
               _Section.java => const JavaSection(),
               _Section.misc => const MiscSection(),
+              _Section.manage => const GameStorageSection(),
               _Section.appearance => const _AppearanceSection(),
               _Section.ai => ListView(
                 padding: const EdgeInsets.all(28),
@@ -68,7 +69,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 ],
               ),
               _Section.about => const _AboutSection(),
-              _ => MigratingPlaceholder(title: label),
             },
           ),
         ),

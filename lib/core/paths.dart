@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import 'android_storage.dart';
+
 /// 启动器自身的目录。游戏目录相关的路径见 [GamePaths]。
 abstract final class Paths {
   static late final String appData;
@@ -10,6 +12,7 @@ abstract final class Paths {
   static Future<void> init() async {
     appData = (await getApplicationSupportDirectory()).path;
     await Directory(appData).create(recursive: true);
+    await AndroidStorage.init();
   }
 
   /// 启动器所在目录

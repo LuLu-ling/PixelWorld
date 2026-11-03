@@ -1,8 +1,8 @@
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
 import '../core/pcl_import.dart';
+import '../pages/file_manager_page.dart';
 
 /// 从 PCL-CE 导入设置、游戏文件夹与账户
 Future<void> showPclImport(BuildContext context) =>
@@ -26,7 +26,7 @@ class _PclImportDialogState extends State<_PclImportDialog> {
   String? _error;
 
   Future<void> _pickDir() async {
-    final dir = await getDirectoryPath(confirmButtonText: '选择');
+    final dir = await pickFolder(context);
     if (dir != null) setState(() => _pclDir = dir);
   }
 

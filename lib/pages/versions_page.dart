@@ -1,14 +1,15 @@
 import 'dart:io';
 
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
 import '../app_scope.dart';
+import '../core/android_storage.dart';
 import '../core/config.dart';
 import '../core/paths.dart';
 import '../shell.dart';
 import '../widgets/loader_label.dart';
+import 'file_manager_page.dart';
 import '../widgets/side_nav.dart';
 
 /// 版本选择：左侧游戏文件夹，右侧该文件夹中的版本（PCL 的布局）
@@ -40,6 +41,10 @@ class VersionsPage extends StatelessWidget {
     if (hasVersions(Paths.officialMinecraftDir)) {
       push(GameFolder(name: '官方启动器文件夹', path: Paths.officialMinecraftDir, custom: false));
     }
+    // 手机存储中的文件夹在重装应用后仍然存在
+    if (Platform.isAndroid && hasVersions(AndroidStorage.gameDir)) {
+      push(GameFolder(name: '手机存储', path: AndroidStorage.gameDir, custom: false));
+    }
     push(GameFolder(name: '启动器默认文件夹', path: p.join(Paths.appData, '.minecraft'), custom: false));
     // 当前目录即使不在列表中也要显示
     push(GameFolder(name: p.basename(cfg.gameDir), path: cfg.gameDir, custom: true));
@@ -48,7 +53,7 @@ class VersionsPage extends StatelessWidget {
 
   Future<void> _addFolder(BuildContext context) async {
     final state = AppScope.read(context);
-    final dir = await getDirectoryPath(confirmButtonText: '添加');
+    final dir = await pickFolder(context, confirm: '添加');
     if (dir == null) return;
     final list = state.config.gameFolders.where((f) => p.normalize(f.path) != p.normalize(dir)).toList()
       ..add(GameFolder(name: p.basename(dir), path: dir, custom: true));

@@ -5,6 +5,8 @@ import 'package:window_manager/window_manager.dart';
 import 'app_info.dart';
 import 'app_scope.dart';
 import 'app_state.dart';
+import 'core/instance_files.dart';
+import 'pages/file_manager_page.dart';
 import 'installer/installer_app.dart';
 import 'installer/installer_core.dart';
 import 'platform.dart';
@@ -32,8 +34,14 @@ Future<void> main(List<String> args) async {
     // 手机上使用横屏，布局与桌面端相同
     await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
   }
+  // 手机上「打开文件夹」使用内置的文件管理器
+  mobileFileManager = (path) async {
+    await appNavigator.currentState?.push(FileManagerPage.route(path));
+  };
   runApp(AppScope(state: state, child: const PclPwApp()));
 }
+
+final appNavigator = GlobalKey<NavigatorState>();
 
 /// 浅色 / 深色 / 跟随系统。主题色固定，只能切换明暗。
 ThemeMode themeModeOf(String v) => switch (v) {
@@ -50,6 +58,7 @@ class PclPwApp extends StatelessWidget {
     final state = AppScope.of(context);
     return MaterialApp(
       title: AppInfo.name,
+      navigatorKey: appNavigator,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),

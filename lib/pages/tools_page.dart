@@ -15,6 +15,7 @@ import '../widgets/format.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
 import 'diagnose_page.dart';
+import 'file_manager_page.dart';
 import 'versions_page.dart';
 
 enum _Section { lobby, diagnose, toolbox, download, skin, server, achievement }
@@ -299,7 +300,7 @@ class _CustomDownloadState extends State<_CustomDownload> {
   Future<void> _start() async {
     final url = _url.text.trim();
     var dir = _dir;
-    dir ??= await getDirectoryPath(confirmButtonText: '保存到这里');
+    dir ??= await pickFolder(context, confirm: '保存到');
     if (dir == null || !mounted) return;
     setState(() => _dir = dir);
     final name = _name.text.trim().isEmpty ? fileNameFromUrl(url) : _name.text.trim();
@@ -342,7 +343,7 @@ class _CustomDownloadState extends State<_CustomDownload> {
           Expanded(child: Text(_dir == null ? '保存位置：开始下载时选择' : '保存位置：$_dir', overflow: TextOverflow.ellipsis)),
           TextButton(
             onPressed: () async {
-              final d = await getDirectoryPath(confirmButtonText: '选择');
+              final d = await pickFolder(context);
               if (d != null) setState(() => _dir = d);
             },
             child: const Text('选择'),

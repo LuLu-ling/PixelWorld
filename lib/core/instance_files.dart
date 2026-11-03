@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
+import 'android_storage.dart';
 import 'paths.dart';
 
 /// 版本运行目录下的资源文件夹
@@ -60,10 +61,16 @@ Future<void> setModEnabled(InstanceFile f, bool enabled) async {
   if (target != f.path) await File(f.path).rename(target);
 }
 
+/// 手机上打开内置的文件管理器（由界面层设置）
+Future<void> Function(String path)? mobileFileManager;
+
 /// 在系统文件管理器中打开文件夹或文件；文件夹不存在时先创建
 Future<void> openInFileManager(String path, {bool create = true}) async {
-  if (Platform.isAndroid || Platform.isIOS) throw Exception('手机上暂时不能打开文件夹');
   if (create && p.extension(path).isEmpty) await Directory(path).create(recursive: true);
+  if (Platform.isAndroid || Platform.isIOS) {
+    if (mobileFileManager == null) throw Exception('手机上暂时不能打开文件夹');
+    return mobileFileManager!(path);
+  }
   if (Platform.isWindows) {
     await Process.start('explorer.exe', [path]);
   } else if (Platform.isMacOS) {
@@ -73,13 +80,15 @@ Future<void> openInFileManager(String path, {bool create = true}) async {
   }
 }
 
-/// 删除都进回收站，避免误删存档。手机上没有回收站，移到应用数据目录的 trash 文件夹
+/// 手机上的回收站：与文件在同一个分区，移动时只需重命名
+String mobileTrashFor(String path) =>
+    AndroidStorage.isShared(path) ? p.join(AndroidStorage.launcherDir, '.trash') : p.join(Paths.appData, 'trash');
+
+/// 删除都进回收站，避免误删存档。手机上没有回收站，移到启动器的 trash 文件夹
 Future<void> moveToTrash(String path) async {
   if (Platform.isAndroid || Platform.isIOS) {
     final now = DateTime.now().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
-    final target = p.join(Paths.appData, 'trash', now, p.basename(path));
-    await Directory(p.dirname(target)).create(recursive: true);
-    await (FileSystemEntity.isDirectorySync(path) ? Directory(path).rename(target) : File(path).rename(target));
+    await moveEntity(path, p.join(mobileTrashFor(path), now, p.basename(path)));
     return;
   }
   if (Platform.isWindows) {

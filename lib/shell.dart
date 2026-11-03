@@ -19,6 +19,7 @@ import 'pages/settings_page.dart';
 import 'pages/tasks_page.dart';
 import 'pages/tools_page.dart';
 import 'pages/versions_page.dart';
+import 'widgets/storage_location.dart';
 import 'widgets/window_buttons.dart';
 
 enum MainPage { home, download, settings, tools, ai }
@@ -80,7 +81,16 @@ class _ShellState extends State<Shell> {
       final ctx = _navKey.currentContext;
       if (ctx != null && ctx.mounted) showCrashDialog(ctx, report);
     });
+    if (!_askedStorage) {
+      _askedStorage = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _navKey.currentContext;
+        if (ctx != null && ctx.mounted) askStorageOnFirstRun(ctx);
+      });
+    }
   }
+
+  bool _askedStorage = false;
 
   @override
   void dispose() {

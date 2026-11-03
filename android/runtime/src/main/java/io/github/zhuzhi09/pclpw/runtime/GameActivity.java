@@ -160,10 +160,10 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         CallbackBridge.windowWidth = w;
         CallbackBridge.windowHeight = h;
         JREUtils.setupBridgeWindow(holder.getSurface());
-        if (sStarted) {
-            CallbackBridge.sendUpdateWindowSize(w, h);
-            return;
-        }
+        // Minecraft starts with the --width/--height size and only learns the real one through the
+        // size callback; the flag stays set until the game pumps events, so it is safe to send early
+        CallbackBridge.sendUpdateWindowSize(w, h);
+        if (sStarted) return;
         sStarted = true;
         startGame(w, h);
     }
@@ -183,6 +183,9 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         File gameDir = new File(extras.getString(EXTRA_GAME_DIR));
         File logFile = new File(extras.getString(EXTRA_LOG_FILE));
         ArrayList<String> args = new ArrayList<>(Arrays.asList(extras.getStringArray(EXTRA_ARGS)));
+        // LWJGL 3 versions read input from a queue on the game thread; calling GLFW callbacks
+        // from the UI thread (the LWJGL 2 path) is ignored by the game
+        CallbackBridge.nativeSetUseInputStackQueue(true);
         Thread t = new Thread(() -> {
             int code;
             try {

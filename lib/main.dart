@@ -31,8 +31,9 @@ Future<void> main(List<String> args) async {
     window.show();
     window.focus();
   } else {
-    // 手机上使用横屏，布局与桌面端相同
+    // 手机上使用横屏，布局与桌面端相同；隐藏系统状态栏与导航栏，电量和网络显示在标题栏
     await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
   // 手机上「打开文件夹」使用内置的文件管理器
   mobileFileManager = (path) async {

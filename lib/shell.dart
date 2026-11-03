@@ -19,6 +19,7 @@ import 'pages/settings_page.dart';
 import 'pages/tasks_page.dart';
 import 'pages/tools_page.dart';
 import 'pages/versions_page.dart';
+import 'widgets/device_status.dart';
 import 'widgets/storage_location.dart';
 import 'widgets/window_buttons.dart';
 
@@ -202,6 +203,8 @@ class _TitleBar extends StatelessWidget {
           // 窗口按钮左侧：任务入口
           // 手机上没有窗口按钮，任务入口放在最右侧
           Positioned(right: isDesktop ? 46 * 3 + 4 : 8, top: 4, child: const _TasksButton()),
+          // 手机上全屏显示，电量与网络放在任务入口左侧
+          if (!isDesktop) const Positioned(right: 64, top: 0, bottom: 0, child: Center(child: DeviceStatus())),
           if (isDesktop) const Positioned(right: 0, top: 0, child: WindowButtons()),
         ],
       ),

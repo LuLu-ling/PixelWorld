@@ -120,6 +120,11 @@ void updateWindowSize(void* window) {
 }
 
 void pojavPumpEvents(void* window) {
+#ifdef DEBUG
+    if (pojav_environ->shouldUpdateMouse || pojav_environ->outTargetIndex != pojav_environ->outEventIndex)
+        LOGD("PumpEvents window=%p showing=%p mouse=%d cursorCb=%p buttonCb=%p", window, (void*) pojav_environ->showingWindow,
+             pojav_environ->shouldUpdateMouse, pojav_environ->GLFW_invoke_CursorPos, pojav_environ->GLFW_invoke_MouseButton);
+#endif
     if(pojav_environ->shouldUpdateMouse) {
         // Floored because some anticheats (Hypixel) don't like the input being too accurate.
         // Actual GLFW actually uses doubles so this is totally wrong on their end.
@@ -167,6 +172,9 @@ void pojavPumpEvents(void* window) {
 /** Prepare the library for sending out callbacks to all windows */
 void pojavStartPumping() {
     size_t counter = atomic_load_explicit(&pojav_environ->eventCounter, memory_order_acquire);
+#ifdef DEBUG
+    if (counter > 0) LOGD("Pumping %zu events, environ=%p", counter, pojav_environ);
+#endif
     size_t index = pojav_environ->outEventIndex;
 
     unsigned targetIndex = index + counter;
@@ -374,7 +382,8 @@ JNIEXPORT void JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeSendCursorEnter(
 
 void critical_send_cursor_pos(jfloat x, jfloat y) {
 #ifdef DEBUG
-    LOGD("Sending cursor position \n");
+    LOGD("Sending cursor position %f,%f cb=%p ready=%d queue=%d environ=%p\n", x, y,
+         pojav_environ->GLFW_invoke_CursorPos, pojav_environ->isInputReady, pojav_environ->isUseStackQueueCall, pojav_environ);
 #endif
     if (pojav_environ->GLFW_invoke_CursorPos && pojav_environ->isInputReady) {
 #ifdef DEBUG

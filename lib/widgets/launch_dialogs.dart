@@ -23,14 +23,17 @@ class DialogLaunchPrompts implements LaunchPrompts {
           width: 400,
           child: Text(
             '你还没有登录过正版账号。Minecraft 是付费游戏，请购买正版支持开发者。\n\n'
-            '选择「购买正版」会打开商店页面，然后照常启动游戏；也可以以试玩模式体验。'
+            '可以先打开购买页面，同时以离线模式开始游戏；也可以以试玩模式体验。'
             '登录一次正版账号后，就不会再出现这个提示了。',
           ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, OwnershipChoice.cancel), child: const Text('返回')),
           TextButton(onPressed: () => Navigator.pop(context, OwnershipChoice.demo), child: const Text('试玩')),
-          FilledButton(onPressed: () => Navigator.pop(context, OwnershipChoice.buy), child: const Text('购买正版')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, OwnershipChoice.buy),
+            child: const Text('带我去购买页，并先离线游玩'),
+          ),
         ],
       ),
     );

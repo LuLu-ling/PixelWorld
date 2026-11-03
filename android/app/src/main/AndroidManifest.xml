@@ -2,6 +2,8 @@
     xmlns:tools="http://schemas.android.com/tools">
     <!-- 下载游戏文件、模组与访问 AI 服务 -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 标题栏显示网络状态 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- 游戏文件夹可以放在共享存储，卸载后保留。Android 11 起用「所有文件访问权限」 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>

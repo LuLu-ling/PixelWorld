@@ -3,7 +3,10 @@ package io.github.zhuzhi09.pcl_pw
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
 import android.provider.Settings
@@ -29,6 +32,27 @@ class MainActivity : FlutterActivity() {
                 "requestAccess" -> requestAccess(result)
                 else -> result.notImplemented()
             }
+        }
+        // 标题栏显示的电量与网络（启动器全屏时系统状态栏被隐藏）
+        MethodChannel(messenger, "pclpw/device").setMethodCallHandler { call, result ->
+            if (call.method != "status") return@setMethodCallHandler result.notImplemented()
+            val battery = getSystemService(BATTERY_SERVICE) as BatteryManager
+            val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+            val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+            val network = when {
+                caps == null -> "none"
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+                else -> "other"
+            }
+            result.success(
+                mapOf(
+                    "battery" to battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY),
+                    "charging" to battery.isCharging,
+                    "network" to network,
+                ),
+            )
         }
         // 游戏运行时（android/runtime 模块）
         MethodChannel(messenger, "pclpw/runtime").setMethodCallHandler { call, result ->

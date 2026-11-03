@@ -2,7 +2,7 @@
 abstract final class AppInfo {
   static const name = 'PCL.PW';
   static const fullName = 'PCL.PW（PixelsWorld 修改版）';
-  static const version = '0.2.1';
+  static const version = '0.3.0';
 
   static const repoUrl = 'https://github.com/zhuzhi-09/PCL.PW';
 

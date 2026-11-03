@@ -30,11 +30,22 @@ android {
         versionName = flutter.versionName
     }
 
+    // 发布签名：CI 通过环境变量提供密钥库；本地没有设置时用调试签名
+    val releaseKeystore = System.getenv("PCLPW_KEYSTORE")?.takeIf { file(it).exists() }
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("PCLPW_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("PCLPW_KEY_ALIAS")
+                keyPassword = System.getenv("PCLPW_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (releaseKeystore != null) "release" else "debug")
         }
     }
 }

@@ -17,7 +17,21 @@ PCL.PW 是一个跨平台的 Minecraft 启动器，页面布局参考 PCL，视�
 
 ## 状态
 
-项目正在从 Electron 版重写为 Flutter 版，目前完成了界面框架（PCL 布局、MD3 配色、浅色 / 深色模式、关于页），游戏启动、下载、账户等功能正在迁移。
+项目仍在开发中，已经可以日常使用：版本下载与安装、模组加载器、正版与离线账户、启动游戏、崩溃分析等功能可用。
+
+| 平台 | 状态 |
+|---|---|
+| Windows | 可用 |
+| Android | 可用（需要 Android 8.0 及以上、64 位 ARM），游戏运行时见 [android/runtime](android/runtime/NOTICE.md) |
+| macOS | 正在测试，暂不提供下载 |
+| Linux | 尚未适配 |
+
+## 下载
+
+在 [Releases](https://github.com/zhuzhi-09/PCL.PW/releases) 页面下载：
+
+- **正式版**：推送 `v*` 标签时自动构建发布。
+- **Nightly**：`main` 分支每次更新后自动构建，发布为名为 `nightly` 的预发布版本，包含最新改动，可能不稳定。
 
 ## 构建
 
@@ -37,7 +51,15 @@ flutter build windows --release --no-tree-shake-icons
 dart run tool/build_installer.dart
 ```
 
-安装程序只为当前用户安装，不需要管理员权限；外壳用系统自带的 .NET Framework 编译器编译。推送 `v*` 标签时，GitHub Actions 会自动打包并上传到草稿 Release。
+安装程序只为当前用户安装，不需要管理员权限；外壳用系统自带的 .NET Framework 编译器编译。
+
+安卓版（arm64）：
+
+```bash
+flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons
+```
+
+自动发布由 [.github/workflows/release.yml](.github/workflows/release.yml) 完成。安卓的发布签名来自仓库 Secrets：`ANDROID_KEYSTORE_BASE64`（密钥库的 base64）、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`；没有配置时使用调试签名。
 
 ## 许可证
 

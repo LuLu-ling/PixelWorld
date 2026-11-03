@@ -1,12 +1,24 @@
-# 推送 v* 标签时打包 Windows 版并上传到对应的 GitHub Release（草稿）
+# 构建并发布 Windows 与安卓版
+# - 推送到 main：更新 nightly 预发布（每次替换为最新构建）
+# - 推送 v* 标签：发布正式版；标签带 "-"（如 v0.3.0-beta）时标为预发布
+# macOS 版正在测试，暂不发布
 name: Release
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+
+env:
+  FLUTTER_VERSION: 3.47.9
 
 jobs:
   windows:
@@ -15,16 +27,89 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
       - name: Build
         run: |
           flutter pub get
           dart run tool/build_installer.dart
-      - name: Upload
-        shell: bash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/*-setup.exe
+            dist/*-portable.zip
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      # 没有配置签名密钥时用调试签名（每次构建的签名不同，无法覆盖安装）
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "PCLPW_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::没有配置 ANDROID_KEYSTORE_BASE64，APK 使用调试签名"
+          fi
+      - name: Build
+        env:
+          PCLPW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          PCLPW_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          PCLPW_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          flutter pub get
+          flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons
+          version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/PCL.PW-$version-android-arm64.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/*.apk
+
+  publish:
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "PCL.PW $GITHUB_REF_NAME" --notes "第三方基于 PCL 二次创作的测试版本，详见 README。"
-          gh release upload "$GITHUB_REF_NAME" dist/*-setup.exe dist/*-portable.zip --clobber
+          version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
+          sha=${GITHUB_SHA::7}
+          about="本软件是第三方基于 PCL 二次创作的产物，与 PCL 及其作者无关，请勿就本软件的问题打扰 PCL 作者。"
+          downloads=$'- Windows：安装包（`*-setup.exe`）或便携版（`*-portable.zip`）\n- 安卓：`*-android-arm64.apk`，需要 Android 8.0 及以上、64 位 ARM 处理器\n- macOS：正在测试，暂不提供下载'
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+            notes=$(printf '%s\n\n%s\n' "$downloads" "$about")
+            flags=(--title "PCL.PW $tag" --notes "$notes" --verify-tag)
+            case "$tag" in *-*) flags+=(--prerelease) ;; *) flags+=(--latest) ;; esac
+            gh release delete "$tag" --yes 2>/dev/null || true
+            gh release create "$tag" "${flags[@]}" dist/*
+          else
+            # 文件名标明 nightly 与提交号，避免和正式版混淆
+            for f in dist/PCL.PW-"$version"-*; do mv "$f" "${f/PCL.PW-$version-/PCL.PW-nightly-$sha-}"; done
+            notes=$(printf '自动构建的测试版，来自 main 分支的 %s，可能不稳定。\n\n%s\n\n%s\n' "$GITHUB_SHA" "$downloads" "$about")
+            gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
+            gh release create nightly --prerelease --target "$GITHUB_SHA" \
+              --title "PCL.PW Nightly ($sha)" --notes "$notes" dist/*
+          fi

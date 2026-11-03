@@ -59,6 +59,15 @@ class MainActivity : FlutterActivity() {
                     val am = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
                     result.success(am.runningAppProcesses?.any { it.processName == "$packageName:game" } == true)
                 }
+                // 本应用（含游戏进程）自某个时间点以来的系统日志，用于排查游戏进程崩溃
+                "logcat" -> background(result) {
+                    val since = call.argument<Number>("since")!!.toLong()
+                    val t = String.format(java.util.Locale.ROOT, "%d.%03d", since / 1000, since % 1000)
+                    val p = ProcessBuilder("logcat", "-d", "-v", "threadtime", "-T", t).redirectErrorStream(true).start()
+                    val text = p.inputStream.bufferedReader().readText()
+                    p.waitFor()
+                    if (text.length > 200_000) text.substring(text.length - 200_000) else text
+                }
                 "lastExit" -> {
                     val f = GameRuntime.exitFile(this)
                     result.success(if (f.exists()) f.readText().also { f.delete() } else null)

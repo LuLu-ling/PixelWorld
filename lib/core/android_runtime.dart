@@ -33,6 +33,7 @@ abstract final class AndroidRuntime {
   }) async {
     await File(logFile).parent.create(recursive: true);
     if (File(logFile).existsSync()) await File(logFile).delete();
+    _launchedAt = DateTime.now();
     await _channel.invokeMethod('launch', {
       'javaHome': javaHome,
       'gameDir': gameDir,
@@ -40,6 +41,18 @@ abstract final class AndroidRuntime {
       'args': args,
       'scale': scale,
     });
+  }
+
+  static DateTime? _launchedAt;
+
+  /// 本应用自启动游戏以来的系统日志（包括游戏进程的原生崩溃信息）
+  static Future<String> systemLog() async {
+    final since = (_launchedAt ?? DateTime.now().subtract(const Duration(minutes: 1))).subtract(const Duration(seconds: 2));
+    try {
+      return await _channel.invokeMethod<String>('logcat', {'since': since.millisecondsSinceEpoch}) ?? '';
+    } catch (e) {
+      return '读取系统日志失败：$e';
+    }
   }
 
   static Future<bool> isRunning() async => await _channel.invokeMethod<bool>('isRunning') ?? false;
@@ -81,7 +94,13 @@ abstract final class AndroidRuntime {
       if (!running && (started || DateTime.now().isAfter(deadline))) break;
     }
     read();
-    return await lastExit() ?? code ?? 0;
+    final exit = await lastExit() ?? code ?? (started ? 0 : -1);
+    if (!started) onLog('\n[PCL.PW] 游戏进程没有启动，或启动后立即退出了。\n');
+    // 异常退出时附上系统日志，原生库加载失败等问题只会出现在这里
+    if (exit != 0 || offset == 0) {
+      onLog('\n---------- 系统日志（logcat） ----------\n${await systemLog()}\n');
+    }
+    return exit;
   }
 }
 

@@ -77,6 +77,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        installCrashLogger();
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         scale = getIntent().getFloatExtra(EXTRA_SCALE, 1f);
         hideSystemBars();
@@ -99,6 +100,25 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         root.addView(createTopBar(), new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END));
         setContentView(root);
         CallbackBridge.addGrabListener(this);
+    }
+
+    /** Java exceptions in this process go to the game log, so the launcher can show them */
+    private void installCrashLogger() {
+        String path = getIntent().getStringExtra(EXTRA_LOG_FILE);
+        if (path == null) return;
+        Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((thread, e) -> {
+            try {
+                File f = new File(path);
+                f.getParentFile().mkdirs();
+                try (java.io.FileWriter w = new java.io.FileWriter(f, true)) {
+                    w.write("\nPCL.PW runtime: uncaught exception in thread " + thread.getName() + "\n" + Log.getStackTraceString(e) + "\n");
+                }
+            } catch (Throwable ignored) {
+            }
+            GameRuntime.recordExit(this, -1, false);
+            if (previous != null) previous.uncaughtException(thread, e);
+        });
     }
 
     @Override

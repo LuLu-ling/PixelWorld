@@ -2,10 +2,13 @@ import 'accounts.dart';
 
 /// 启动前的正版购买劝导与赞助劝导。
 ///
-/// 按《PCL 存储库合理使用指南》第 4 条，需要与 PCL 的 McLaunchPrecheck 一致或更严格。
-/// PCL 按系统语言区分两种规则；PCL.PW 不按地区或语言区分，所有人都使用其中更严格的一种：
-/// 没有登录过正版账号时，每次离线启动都弹出提示，可以购买正版（打开商店页面后照常启动，与 PCL 相同）、
-/// 试玩（--demo）或返回。登录过一次正版账号后（hintBuy），不再进行正版购买劝导。
+/// PCL 按系统语言区分两种规则；PCL.PW 不按地区或语言区分：没有登录过正版账号时，每次离线启动都弹出提示，
+/// 可以打开购买页面（不启动）、这次先离线启动、试玩（--demo）或返回。登录过一次正版账号后（hintBuy），
+/// 不再进行正版购买劝导。
+///
+/// 注意：PCL 的 McLaunchPrecheck 中，能继续离线启动的唯一选项「购买正版」会先打开商店页面；
+/// 这里的「这次先启动」不打开商店，比 PCL 宽松（2026-11-04 按项目作者的决定修改），
+/// 与《PCL 存储库合理使用指南》第 4 条「与 PCL 一致或更严格」不一致。
 
 /// 弹出赞助劝导的启动次数（与 PCL 相同）
 const sponsorCounts = {
@@ -22,5 +25,5 @@ bool needsOwnershipCheck(Account acc, {required bool hintBuy}) => !hintBuy && ac
 /// 本次启动是否弹出赞助劝导
 bool shouldAskSponsor(int launchCount) => sponsorCounts.contains(launchCount);
 
-/// 正版验证对话框的选择
-enum OwnershipChoice { buy, demo, cancel }
+/// 正版验证对话框的选择：打开购买页面（不启动）、这次先离线启动、试玩、返回
+enum OwnershipChoice { store, launch, demo, cancel }

@@ -185,6 +185,17 @@ Future<JavaInfo> _describe(String path) async {
   return info;
 }
 
+/// 已知会因为 Java 版本过高而无法运行的版本，返回提示文字；没有已知问题时返回 null。
+/// LaunchWrapper（Forge 1.12.2 及更早、OptiFine 独立版、LiteLoader 等）把系统类加载器当作 URLClassLoader 使用，
+/// Java 9 起不再是，游戏会在加载时崩溃
+String? javaTooNewWarning(VersionJson v, int javaMajor) {
+  if (v.mainClass == 'net.minecraft.launchwrapper.Launch' && javaMajor > 8) {
+    return '这个版本通过 LaunchWrapper 启动（Forge 1.12.2 及更早、OptiFine、LiteLoader 等），'
+        '只能在 Java 8 上运行，使用 Java $javaMajor 很可能在加载时崩溃。';
+  }
+  return null;
+}
+
 /// 为指定版本选择合适的 Java，必要时自动下载。
 /// 优先级与 PCL-CE 一致：实例指定 > 全局指定 > 自动选择。
 Future<JavaInfo> ensureJava(VersionJson v, JavaPref pref, String globalJava, Downloader dl, TaskProgress task) async {

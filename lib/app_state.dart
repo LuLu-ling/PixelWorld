@@ -39,6 +39,9 @@ enum GameState { idle, preparing, running }
 abstract interface class LaunchPrompts {
   Future<OwnershipChoice> askOwnership();
   Future<void> askSponsor(int launchCount);
+
+  /// 所选 Java 可能与版本不兼容时询问是否仍然启动
+  Future<bool> confirmJava(String message);
 }
 
 /// 全局状态：设置、账户、版本列表、游戏进程与日志
@@ -365,10 +368,10 @@ class AppState extends ChangeNotifier {
     var demo = false;
     if (needsOwnershipCheck(acc, hintBuy: config.hintBuy)) {
       switch (await prompts.askOwnership()) {
-        case OwnershipChoice.cancel:
+        // 打开购买页面时不启动游戏
+        case OwnershipChoice.cancel || OwnershipChoice.store:
           return false;
-        // 与 PCL 相同：打开商店页面后照常以离线账户启动
-        case OwnershipChoice.buy:
+        case OwnershipChoice.launch:
           break;
         case OwnershipChoice.demo:
           demo = true;
@@ -404,6 +407,13 @@ class AppState extends ChangeNotifier {
       final java = isDesktop
           ? await ensureJava(v, inst.java, cfg.javaPath, dl, t)
           : await ensureAndroidJava(v, dl, t, pref: inst.java, globalJava: cfg.javaPath);
+
+      final javaWarning = javaTooNewWarning(v, java.major);
+      if (javaWarning != null && !await prompts.confirmJava(javaWarning)) {
+        tasks.remove(t);
+        gameState = GameState.idle;
+        return false;
+      }
 
       t.beginStep('准备启动');
       t.setStage('解压本地库');

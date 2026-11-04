@@ -6,28 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../app_info.dart';
 import '../app_state.dart';
 import '../core/precheck.dart';
-import '../platform.dart';
-
-/// 等启动器离开前台后再回到前台；浏览器没有把启动器切走时（3 秒内）直接返回
-Future<void> _waitUntilBack() async {
-  final back = Completer<void>();
-  final left = Completer<void>();
-  final listener = AppLifecycleListener(
-    onStateChange: (s) {
-      if (s == AppLifecycleState.resumed) {
-        if (left.isCompleted && !back.isCompleted) back.complete();
-      } else if (!left.isCompleted) {
-        left.complete();
-      }
-    },
-  );
-  try {
-    final wentAway = await left.future.then((_) => true).timeout(const Duration(seconds: 3), onTimeout: () => false);
-    if (wentAway) await back.future;
-  } finally {
-    listener.dispose();
-  }
-}
 
 /// 正版购买劝导与赞助劝导的对话框
 class DialogLaunchPrompts implements LaunchPrompts {
@@ -47,31 +25,42 @@ class DialogLaunchPrompts implements LaunchPrompts {
           width: 400,
           child: Text(
             '你还没有登录过正版账号。Minecraft 是付费游戏，请购买正版支持开发者。\n\n'
-            '可以先打开购买页面，同时以离线模式开始游戏；也可以以试玩模式体验。'
+            '可以先去购买页面看看，也可以这次先以离线模式开始游戏，或者以试玩模式体验。'
             '登录一次正版账号后，就不会再出现这个提示了。',
           ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, OwnershipChoice.cancel), child: const Text('返回')),
           TextButton(onPressed: () => Navigator.pop(context, OwnershipChoice.demo), child: const Text('试玩')),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, OwnershipChoice.buy),
-            child: const Text('带我去购买页，并先离线游玩'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, OwnershipChoice.launch), child: const Text('这次先启动')),
+          FilledButton(onPressed: () => Navigator.pop(context, OwnershipChoice.store), child: const Text('带我去商店')),
         ],
       ),
     );
-    if (choice == OwnershipChoice.buy) {
-      final opened = await launchUrl(Uri.parse(buyMinecraftUrl));
-      // 手机上浏览器在启动器的任务里打开，同时启动游戏会被系统切回浏览器，游戏界面来不及准备就关掉了，
-      // 所以等用户从购买页回来再启动
-      if (opened && !isDesktop) await _waitUntilBack();
-    }
+    // 只打开购买页面，不启动游戏
+    if (choice == OwnershipChoice.store) await launchUrl(Uri.parse(buyMinecraftUrl));
     if (choice == OwnershipChoice.demo && context.mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('游戏将以试玩模式启动'), behavior: SnackBarBehavior.floating, width: 420));
     }
     return choice ?? OwnershipChoice.cancel;
+  }
+
+  @override
+  Future<bool> confirmJava(String message) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.warning_amber_rounded),
+        title: const Text('Java 版本可能不兼容'),
+        content: SizedBox(width: 400, child: Text('$message\n\n可以在版本设置中把 Java 改为 Java 8 或自动选择。')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('返回')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('仍然启动')),
+        ],
+      ),
+    );
+    return ok == true;
   }
 
   @override

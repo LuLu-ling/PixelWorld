@@ -1,5 +1,5 @@
-import '../core/instance.dart';
-import '../core/loaders.dart';
+import 'instance.dart';
+import 'loaders.dart';
 
 /// OptiFine 与加载器的搭配（参照 PCL：有加载器时 OptiFine 作为模组放进 mods）
 

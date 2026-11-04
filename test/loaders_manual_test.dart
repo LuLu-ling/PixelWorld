@@ -9,7 +9,7 @@ import 'package:pcl_pw/core/instance.dart';
 import 'package:pcl_pw/core/loaders.dart';
 import 'package:pcl_pw/core/paths.dart';
 import 'package:pcl_pw/core/task.dart';
-import 'package:pcl_pw/widgets/optifine_compat.dart';
+import 'package:pcl_pw/core/optifine_compat.dart';
 
 void main() {
   final dir = Platform.environment['PW_TEST_GAME_DIR'];

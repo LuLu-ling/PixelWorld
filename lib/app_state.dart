@@ -31,7 +31,7 @@ import 'core/paths.dart';
 import 'core/precheck.dart';
 import 'core/task.dart';
 import 'platform.dart';
-import 'widgets/loader_label.dart';
+import 'core/loader_names.dart';
 
 enum GameState { idle, preparing, running }
 

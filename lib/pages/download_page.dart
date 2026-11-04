@@ -6,7 +6,7 @@ import '../core/instance.dart';
 import '../core/loaders.dart';
 import '../core/modrinth.dart';
 import '../widgets/loader_icon.dart';
-import '../widgets/optifine_compat.dart';
+import '../core/optifine_compat.dart';
 import '../widgets/side_nav.dart';
 import 'resources.dart';
 

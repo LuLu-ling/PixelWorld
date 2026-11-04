@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import '../app_scope.dart';
 import '../core/android_storage.dart';
 import '../core/config.dart';
+import '../core/loader_names.dart';
 import '../core/paths.dart';
 import '../shell.dart';
 import '../widgets/loader_label.dart';

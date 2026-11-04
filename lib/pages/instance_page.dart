@@ -13,11 +13,11 @@ import '../core/java.dart';
 import '../core/memory.dart';
 import '../shell.dart';
 import '../core/extra_loaders.dart';
+import '../core/loader_names.dart';
 import '../core/loaders.dart';
+import '../core/optifine_compat.dart';
 import '../widgets/format.dart';
 import '../widgets/loader_icon.dart';
-import '../widgets/loader_label.dart';
-import '../widgets/optifine_compat.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
 

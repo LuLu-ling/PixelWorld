@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -71,6 +73,28 @@ class _TaskCard extends StatefulWidget {
 
 class _TaskCardState extends State<_TaskCard> {
   late bool _expanded = widget.task.state == TaskState.failed;
+
+  /// 运行中的任务每秒刷新一次耗时（任务本身只在有新进度时通知）
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || widget.task.state != TaskState.running) {
+        timer.cancel();
+        if (mounted) setState(() {});
+        return;
+      }
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
 
   static String _duration(Duration d) =>
       d.inMinutes > 0 ? '${d.inMinutes} 分 ${d.inSeconds % 60} 秒' : '${d.inSeconds} 秒';

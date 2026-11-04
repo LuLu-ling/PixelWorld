@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
-import 'package:pcl_pw/core/ai_client.dart';
+import 'package:pcl_pw/core/ai/ai_client.dart';
 import 'package:pcl_pw/core/crash.dart';
 
 void main() {

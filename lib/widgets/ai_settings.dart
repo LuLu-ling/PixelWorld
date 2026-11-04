@@ -4,8 +4,8 @@ import '../app_scope.dart';
 
 import 'package:flutter/services.dart';
 
-import '../core/ai_client.dart';
-import '../core/ai_context.dart';
+import '../core/ai/ai_client.dart';
+import '../core/ai/ai_context.dart';
 import '../core/secure.dart';
 import '../platform.dart';
 

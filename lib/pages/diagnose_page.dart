@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
-import '../core/ai_client.dart';
+import '../core/ai/ai_client.dart';
 import '../core/crash.dart';
 import '../shell.dart';
 import 'ai_page.dart';

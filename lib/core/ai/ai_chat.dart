@@ -5,12 +5,12 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
-import 'accounts.dart' show newId;
+import '../accounts.dart' show newId;
 import 'ai_client.dart';
 import 'ai_context.dart';
 import 'ai_prompt.dart';
 import 'ai_tools.dart';
-import 'paths.dart';
+import '../paths.dart';
 
 /// 工具调用的结果状态
 enum ToolStatus { done, denied, error, cancelled }

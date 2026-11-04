@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pcl_pw/core/ai_client.dart';
+import 'package:pcl_pw/core/ai/ai_client.dart';
 
 /// 模拟接口：按路径返回预先写好的事件流，并记录收到的请求
 Future<(HttpServer, List<Map<String, dynamic>>)> _server(List<String> Function(String path) events) async {

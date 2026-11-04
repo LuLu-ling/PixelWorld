@@ -3,23 +3,23 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
-import '../app_state.dart';
+import '../../app_state.dart';
 import 'ai_client.dart';
-import 'android_storage.dart' show moveEntity;
-import 'backup.dart';
-import 'crash.dart';
-import 'instance.dart';
-import 'instance_config.dart';
-import 'install.dart';
-import 'instance_files.dart';
-import 'loader_names.dart';
-import 'loaders.dart';
-import 'memory.dart';
-import 'modrinth.dart';
-import 'optifine_compat.dart';
-import 'paths.dart';
-import 'safe_path.dart';
-import 'version.dart';
+import '../android_storage.dart' show moveEntity;
+import '../backup.dart';
+import '../crash.dart';
+import '../instance.dart';
+import '../instance_config.dart';
+import '../install.dart';
+import '../instance_files.dart';
+import '../loader_names.dart';
+import '../loaders.dart';
+import '../memory.dart';
+import '../modrinth.dart';
+import '../optifine_compat.dart';
+import '../paths.dart';
+import '../safe_path.dart';
+import '../version.dart';
 
 /// 操作的类型：只读操作默认直接执行；其余都要用户允许
 enum ToolKind {

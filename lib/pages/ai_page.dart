@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../app_scope.dart';
-import '../core/ai_chat.dart';
-import '../core/ai_client.dart';
-import '../core/ai_tools.dart';
-import '../core/ai_prompt.dart';
+import '../core/ai/ai_chat.dart';
+import '../core/ai/ai_client.dart';
+import '../core/ai/ai_tools.dart';
+import '../core/ai/ai_prompt.dart';
 import '../core/crash.dart';
 import '../shell.dart';
 import '../widgets/ai_settings.dart';

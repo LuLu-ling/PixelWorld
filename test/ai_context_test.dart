@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pcl_pw/core/ai_chat.dart';
-import 'package:pcl_pw/core/ai_client.dart';
-import 'package:pcl_pw/core/ai_context.dart';
+import 'package:pcl_pw/core/ai/ai_chat.dart';
+import 'package:pcl_pw/core/ai/ai_client.dart';
+import 'package:pcl_pw/core/ai/ai_context.dart';
 
 void main() {
   test('估算与已知的上下文长度', () {

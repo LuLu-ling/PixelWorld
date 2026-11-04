@@ -3,7 +3,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pcl_pw/core/tools.dart';
+import 'package:pcl_pw/core/toolbox.dart';
 
 void main() {
   final on = Platform.environment['PW_TEST_TOOLS'] == '1';

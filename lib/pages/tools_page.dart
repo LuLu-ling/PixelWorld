@@ -10,7 +10,7 @@ import 'package:path/path.dart' as p;
 import '../app_scope.dart';
 import '../core/crash.dart';
 import '../core/task.dart';
-import '../core/tools.dart';
+import '../core/toolbox.dart';
 import '../widgets/format.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';

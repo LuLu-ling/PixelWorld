@@ -7,9 +7,9 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app_info.dart';
 import 'core/accounts.dart';
-import 'core/ai_chat.dart';
-import 'core/ai_context.dart';
-import 'core/ai_tools.dart';
+import 'core/ai/ai_chat.dart';
+import 'core/ai/ai_context.dart';
+import 'core/ai/ai_tools.dart';
 import 'core/cat_ini.dart';
 import 'core/config.dart';
 import 'core/android_runtime.dart';

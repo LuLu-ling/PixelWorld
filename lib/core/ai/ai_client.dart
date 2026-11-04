@@ -5,9 +5,9 @@ import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
-import 'config.dart';
-import 'paths.dart';
-import 'secure.dart';
+import '../config.dart';
+import '../paths.dart';
+import '../secure.dart';
 
 /// 接口格式：OpenAI 兼容（DeepSeek、通义千问、Kimi、OpenRouter、Ollama 等）或 Anthropic
 enum AiProvider { openai, anthropic }

@@ -12,7 +12,7 @@ modified or replaced on its own, as the LGPL requires.
 |---|---|---|
 | `src/main/jni` (except `nsbypass/`) | [Amethyst-Android](https://github.com/AngelAuraMC/Amethyst-Android) `app_pojavlauncher/src/main/jni`, commit `28d6e12`; SDL3 include replaced with three constants | LGPL-3.0 |
 | `src/main/jni/jre_launcher.c` | Boardwalk / OpenJDK launcher code via Amethyst | GPLv2 with Classpath Exception |
-| `src/main/jni/nsbypass/` | [androidnsbypass](https://github.com/alexytomi/androidnsbypass) | MIT / BSD-2-Clause |
+| `src/main/jni/nsbypass/` | [androidnsbypass](https://github.com/alexytomi/androidnsbypass); built by `src/main/jni/Android.mk`, the upstream `CMakeLists.txt` is kept but not used | MIT / BSD-2-Clause |
 | `src/main/java/org/lwjgl/glfw/CallbackBridge.java`, `net/kdt/pojavlaunch/*` | Amethyst-Android, trimmed (no SDL, no gamepad remapper) | LGPL-3.0 |
 | `src/main/java/io/github/zhuzhi09/pclpw/runtime/*` | written for PCL.PW; environment and JVM arguments follow Amethyst's `JREUtils` | LGPL-3.0 |
 | `src/main/jniLibs/arm64-v8a/libmobileglues.so` | [MobileGlues](https://github.com/MobileGL-Dev/MobileGlues), prebuilt from Amethyst `libs/MobileGlues-release.aar` | LGPL-2.1 |

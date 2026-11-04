@@ -1,5 +1,5 @@
 // 手动运行的启动测试：按启动器的流程启动 PW_TEST_GAME_DIR 中的版本（试玩模式），60 秒后检查是否仍在运行。
-//   PW_TEST_GAME_DIR=... PW_TEST_VERSIONS=a,b flutter test test/launch_manual_test.dart
+//   PW_TEST_GAME_DIR=... PW_TEST_VERSIONS=a,b flutter test test/manual/launch_manual_test.dart
 import 'dart:convert';
 import 'dart:io';
 

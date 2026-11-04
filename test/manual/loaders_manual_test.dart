@@ -1,5 +1,5 @@
 // 手动运行的联网测试：真实安装 OptiFine、Cleanroom、LabyMod 到 PW_TEST_GAME_DIR。
-//   PW_TEST_GAME_DIR=... flutter test test/loaders_manual_test.dart
+//   PW_TEST_GAME_DIR=... flutter test test/manual/loaders_manual_test.dart
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';

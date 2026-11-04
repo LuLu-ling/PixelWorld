@@ -25,7 +25,7 @@ env:
 
 jobs:
   # 静态分析与自动化测试，失败时不构建、不发布。
-  # 需要真实游戏环境的 *_manual_test.dart 没有设置环境变量时会自动跳过
+  # 需要真实游戏环境的 test/manual/ 没有设置环境变量时会自动跳过
   check:
     runs-on: ubuntu-latest
     steps:

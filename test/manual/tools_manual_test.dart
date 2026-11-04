@@ -1,5 +1,5 @@
 // 手动运行的联网测试：工具页的服务器查询、皮肤、成就图片与清理范围。
-//   PW_TEST_TOOLS=1 PW_TEST_GAME_DIR=... flutter test test/tools_manual_test.dart
+//   PW_TEST_TOOLS=1 PW_TEST_GAME_DIR=... flutter test test/manual/tools_manual_test.dart
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';

@@ -307,10 +307,15 @@ Future<String> _runInstaller(
       RegExp(r'There was an error during installation|Exception in thread "main"').hasMatch(r.output)) {
     throw Exception('$label 安装器运行失败\n${tail()}');
   }
-  final added = _versionIds(g).difference(before);
-  if (added.isNotEmpty) return added.first;
-  // 已安装过同一个版本时，安装器覆盖原有的版本，不会新增文件夹
+  // 优先用安装器自带的版本名（已安装过同一个版本时，安装器会覆盖它，不新增文件夹）。
+  // 不能只看前后新增了哪些文件夹：排队时同时进行的其他安装也会新增版本，会认错版本
   if (expectedId != null && File(g.versionJson(expectedId)).existsSync()) return expectedId;
+  final added = _versionIds(g).difference(before);
+  final candidates = added.length > 1 ? added.where((id) => id.contains(gameVersion)).toSet() : added;
+  if (candidates.length == 1) return candidates.single;
+  if (candidates.length > 1) {
+    throw Exception('$label 安装器之后出现了多个新版本（${candidates.join('、')}），无法确定是哪一个');
+  }
   throw Exception('$label 安装器没有生成新的版本');
 }
 

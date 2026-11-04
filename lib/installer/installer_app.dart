@@ -6,8 +6,8 @@ import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 
 import '../app_info.dart';
-import '../shell.dart' show AppLogo;
 import '../theme.dart';
+import '../widgets/app_logo.dart';
 import '../widgets/window_buttons.dart';
 import 'installer_core.dart';
 

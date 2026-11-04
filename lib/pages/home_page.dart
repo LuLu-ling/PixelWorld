@@ -9,6 +9,7 @@ import '../core/loader_names.dart';
 import '../platform.dart';
 import '../shell.dart';
 import '../widgets/accounts_dialog.dart';
+import '../widgets/app_logo.dart';
 import '../widgets/launch_dialogs.dart';
 import '../widgets/loader_label.dart';
 import '../widgets/side_nav.dart';

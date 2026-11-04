@@ -688,5 +688,6 @@ class AppState extends ChangeNotifier {
     return (allocated: plan.max, free: mem.free, total: mem.total);
   }
 
-  Future<List<JavaInfo>> javas() => listJavas();
+  /// 启动器可以使用的 Java：安卓上是已安装的安卓版 Java，桌面上是检测到的 Java
+  Future<List<JavaInfo>> javas() async => Platform.isAndroid ? installedAndroidJavas() : listJavas();
 }

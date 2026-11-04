@@ -5,12 +5,14 @@ import 'package:path/path.dart' as p;
 
 import '../../app_state.dart';
 import 'ai_client.dart';
+import '../android_runtime.dart' show androidJavaAt, androidJavaHome, androidJavaMajors;
 import '../android_storage.dart' show moveEntity;
 import '../backup.dart';
 import '../crash.dart';
 import '../instance.dart';
 import '../instance_config.dart';
 import '../install.dart';
+import '../java.dart' show javaTooNewWarning;
 import '../instance_files.dart';
 import '../loader_names.dart';
 import '../loaders.dart';
@@ -996,6 +998,13 @@ class AiToolbox {
       if (list.isEmpty) '没有找到 Java（启动时会按需自动下载）',
       for (final j in list)
         '- Java ${j.major}（${j.version}，${j.is64 ? 64 : 32} 位${j.managed ? '，启动器下载' : ''}）：${r.apply(j.path)}',
+      // 安卓上只能使用启动器提供的安卓版 Java
+      if (Platform.isAndroid) ...[
+        '（安卓版只能使用启动器提供的 Java 8 / 17 / 21 / 25，可以在设置的 Java 页面下载或删除）',
+        if (androidJavaMajors.any((m) => androidJavaAt(androidJavaHome(m)) == null))
+          '未安装：${androidJavaMajors.where((m) => androidJavaAt(androidJavaHome(m)) == null).map((m) => 'Java $m').join('、')}'
+              '（自动选择时会按需下载）',
+      ],
     ].join('\n');
   }
 
@@ -1173,7 +1182,15 @@ class AiToolbox {
       InstanceFolder.mods,
     ).where((f) => f.name.endsWith('.jar') || f.disabled).toList();
     final worlds = worldsOf(dir);
-    final required = await resolveVersion(state.paths, v.id).then((j) => j.javaMajor ?? 8).catchError((_) => 8);
+    final resolved = await resolveVersion(state.paths, v.id).then<VersionJson?>((j) => j).catchError((_) => null);
+    final required = resolved?.javaMajor ?? 8;
+    // 指定的 Java 版本过高时（例如 Forge 1.12.2 用 Java 17）附上提醒，方便分析崩溃
+    final chosen = switch (s.java) {
+      JavaExist(:final path) ||
+      JavaRelative(:final path) => (await state.javas()).where((j) => p.equals(j.path, path)).firstOrNull,
+      _ => null,
+    };
+    final tooNew = resolved == null || chosen == null ? null : javaTooNewWarning(resolved, chosen.major);
     final java = switch (s.java) {
       JavaGlobal() => '跟随全局设置',
       JavaAuto() => '自动选择',
@@ -1183,6 +1200,7 @@ class AiToolbox {
       '版本：${v.id}（${describeVersion(v)}）',
       '运行目录：${dir == state.paths.root ? '游戏文件夹根目录（未隔离）' : 'versions/${v.id}（已隔离）'}',
       'Java：${state.redactor().apply(java)}（这个版本需要 Java $required 或更高）',
+      if (tooNew != null) '注意：$tooNew',
       '内存：${switch (s.memoryMode) {
         'custom' => '自定义',
         'auto' => '自动',

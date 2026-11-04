@@ -162,7 +162,7 @@ Future<String> installForgeLike(
   final component = loaderComponent(kind, gameVersion, version);
   task.beginStep(downloadStep(component));
   task.setStage('下载 $label 安装器');
-  final installer = File(p.join(Directory.systemTemp.path, 'pclpw-${kind.name}-$version-installer.jar'));
+  final installer = Paths.tempFile('${kind.name}-$version-installer.jar');
   await dl.downloadFile(DownloadItem(url: _installerUrl(kind, version), path: installer.path));
   try {
     final zip = ZipDecoder().decodeBytes(await installer.readAsBytes());
@@ -184,6 +184,7 @@ Future<String> installForgeLike(
       final innerJava = innerJson?['javaVersion'] as Map<String, dynamic>?;
       expectedId = innerJson?['id'] as String?;
       preexisting = expectedId != null && File(g.versionJson(expectedId)).existsSync();
+      await _preloadLibraries(g, [innerJson, profile], dl, task, label);
       // Cleanroom 的新版安装器有自己的命令行格式
       final args = kind == LoaderKind.cleanroom
           ? ['client', '--version', version, '-d', g.root, '--no-gui', '-y']
@@ -221,6 +222,48 @@ Future<String> installForgeLike(
     return finalId;
   } finally {
     if (installer.existsSync()) await installer.delete().catchError((_) => installer);
+  }
+}
+
+/// 先用启动器的下载器下好安装器要用的库（镜像、重试、多线程）。
+/// 安装器自带的下载器只用官方源、逐个下载、失败不重试，在手机网络下容易因为一个库失败而整体失败；
+/// 文件已存在且校验通过时安装器会跳过下载。这里失败不中止安装，安装器会自己再试一次。
+Future<void> _preloadLibraries(
+  GamePaths g,
+  List<Map<String, dynamic>?> jsons,
+  Downloader dl,
+  TaskProgress task,
+  String label,
+) async {
+  final items = <String, DownloadItem>{};
+  for (final j in jsons) {
+    for (final lib in (j?['libraries'] as List? ?? const []).whereType<Map<String, dynamic>>()) {
+      if (!rulesAllow(lib['rules'] as List?)) continue;
+      final name = lib['name'] as String?;
+      final art = (lib['downloads'] as Map?)?['artifact'] as Map?;
+      String? url, path, sha1;
+      int? size;
+      if (art != null) {
+        url = art['url'] as String?;
+        path = art['path'] as String? ?? (name == null ? null : mavenPath(name));
+        sha1 = art['sha1'] as String?;
+        size = (art['size'] as num?)?.toInt();
+      } else if (name != null && lib['url'] is String) {
+        final base = lib['url'] as String;
+        path = mavenPath(name);
+        url = '${base.endsWith('/') ? base : '$base/'}$path';
+      }
+      // 没有下载地址的是安装器自带或在本地生成的文件
+      if (url == null || url.isEmpty || path == null) continue;
+      items[path] = DownloadItem(url: url, path: p.join(g.libraries, path), sha1: sha1, size: size);
+    }
+  }
+  if (items.isEmpty) return;
+  task.setStage('下载 $label 安装器需要的依赖库');
+  try {
+    await dl.downloadAll(items.values.toList(), task.progress);
+  } catch (e) {
+    task.output('部分依赖库没有下载成功，交给安装器重试：$e');
   }
 }
 

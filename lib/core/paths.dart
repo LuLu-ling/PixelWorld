@@ -29,6 +29,13 @@ abstract final class Paths {
   }
 
   static String get runtimeDir => p.join(appData, 'runtime');
+
+  static var _tempSeq = 0;
+
+  /// 临时文件路径，每次调用都不同：同时进行的任务（例如连点两次重试）不会互相覆盖或删掉对方的文件
+  static File tempFile(String name) => File(
+    p.join(Directory.systemTemp.path, 'pclpw-$pid-${DateTime.now().microsecondsSinceEpoch}-${_tempSeq++}-$name'),
+  );
 }
 
 /// 某个 .minecraft 目录下的各类路径

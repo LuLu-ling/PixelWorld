@@ -134,14 +134,38 @@ abstract final class AndroidRuntime {
   /// 输出逐行交给 [onLine]，返回完整输出与退出代码。
   /// 只有异常退出能得到退出代码（信号、未捕获的异常）；System.exit 的代码拿不到，记为 0，
   /// 所以调用方应按结果（生成的文件等）判断是否成功。
+  /// 同一时间只能运行一个 jar（:jar 进程只能启动一次 JVM），后来的排队等前一个结束
+  static Future<void> _jarQueue = Future.value();
+
   static Future<({int code, String output})> runJar({
     required String javaHome,
     required String workDir,
     required List<String> args,
     void Function(String line)? onLine,
+  }) {
+    final previous = _jarQueue;
+    final done = Completer<void>();
+    _jarQueue = done.future;
+    return previous
+        .then((_) => _runJar(javaHome: javaHome, workDir: workDir, args: args, onLine: onLine))
+        .whenComplete(done.complete);
+  }
+
+  static Future<({int code, String output})> _runJar({
+    required String javaHome,
+    required String workDir,
+    required List<String> args,
+    void Function(String line)? onLine,
   }) async {
-    final log = File(p.join(Paths.appData, 'jar_logs', 'latest.log'));
-    await log.parent.create(recursive: true);
+    // 每次运行单独一个日志，保留最近 10 个，便于事后查看
+    final logs = Directory(p.join(Paths.appData, 'jar_logs'));
+    await logs.create(recursive: true);
+    final old = logs.listSync().whereType<File>().toList()..sort((a, b) => b.path.compareTo(a.path));
+    for (final f in old.skip(9)) {
+      await f.delete().catchError((_) => f);
+    }
+    final stamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+    final log = File(p.join(logs.path, '$stamp.log'));
     if (log.existsSync()) await log.delete();
     _launchedAt = DateTime.now();
     await _channel.invokeMethod('runJar', {
@@ -182,7 +206,8 @@ abstract final class AndroidRuntime {
       await Future<void>.delayed(const Duration(milliseconds: 300));
       read();
       final running = await _channel.invokeMethod<bool>('jarRunning') ?? false;
-      if (running) started = true;
+      // 很快退出的进程可能在两次查询之间就结束了，日志里有运行时写的第一行就说明它启动过
+      if (running || out.toString().contains('PCL.PW runtime:')) started = true;
       if (!running && (started || DateTime.now().isAfter(deadline))) break;
     }
     read();
@@ -193,7 +218,15 @@ abstract final class AndroidRuntime {
     final s = await _channel.invokeMethod<String>('jarExit');
     // 运行时启动 JVM 前会写一行「PCL.PW runtime:」；没有这一行说明进程在那之前就崩溃了
     final jvmStarted = out.toString().contains('PCL.PW runtime:');
-    final code = (s == null ? null : int.tryParse(s.split(' ').first)) ?? reported ?? (started && jvmStarted ? 0 : -1);
+    var code = (s == null ? null : int.tryParse(s.split(' ').first)) ?? reported ?? (started && jvmStarted ? 0 : -1);
+    // 安卓上拿不到 System.exit 的退出代码；Java 启动器自己报的错按失败处理
+    if (code == 0 &&
+        RegExp(
+          r'^Error: (Unable to access jarfile|Invalid or corrupt jarfile|Could not find or load main class)',
+          multiLine: true,
+        ).hasMatch(out.toString())) {
+      code = 1;
+    }
     if (!started) {
       out.writeln('[PCL.PW] jar 运行进程没有启动');
     } else if (!jvmStarted) {

@@ -54,7 +54,7 @@ Future<void> installOptiFineAsMod(
   final entry = (await optiFineVersions(dl, gameVersion)).where((v) => v.version == version).firstOrNull;
   final fileName = entry?.fileName ?? 'OptiFine_${gameVersion}_$version.jar';
   task.setStage('下载 OptiFine');
-  final tmp = File(p.join(Directory.systemTemp.path, 'pclpw-$fileName'));
+  final tmp = Paths.tempFile(fileName);
   await dl.downloadFile(
     DownloadItem(
       url: '$_bmclapi/optifine/$gameVersion/${version.substring(0, cut)}/${version.substring(cut + 1)}',
@@ -87,7 +87,7 @@ Future<String> installOptiFine(
   final type = version.substring(0, cut);
   final patch = version.substring(cut + 1);
   task.setStage('下载 OptiFine 安装包');
-  final installer = File(p.join(Directory.systemTemp.path, 'pclpw-optifine-$gameVersion-$version.jar'));
+  final installer = Paths.tempFile('optifine-$gameVersion-$version.jar');
   await dl.downloadFile(DownloadItem(url: '$_bmclapi/optifine/$gameVersion/$type/$patch', path: installer.path));
 
   task.beginStep(installStep(component));

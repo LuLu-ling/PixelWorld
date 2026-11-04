@@ -401,7 +401,9 @@ class AppState extends ChangeNotifier {
 
       t.beginStep('检查文件');
       final v = await ensureVersionFiles(g, id, dl, t, resourcesDir: () => p.join(gameDir, 'resources'));
-      final java = isDesktop ? await ensureJava(v, inst.java, cfg.javaPath, dl, t) : await ensureAndroidJava(v, dl, t);
+      final java = isDesktop
+          ? await ensureJava(v, inst.java, cfg.javaPath, dl, t)
+          : await ensureAndroidJava(v, dl, t, pref: inst.java, globalJava: cfg.javaPath);
 
       t.beginStep('准备启动');
       t.setStage('解压本地库');

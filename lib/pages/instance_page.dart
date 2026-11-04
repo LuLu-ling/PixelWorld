@@ -256,7 +256,11 @@ class _SetupState extends State<_Setup> {
   void initState() {
     super.initState();
     _s = readInstanceSettings(AppScope.read(context).paths.versionDir(widget.info.id));
-    listJavas().then((j) => mounted ? setState(() => _javas = j) : null);
+    if (Platform.isAndroid) {
+      _javas = installedAndroidJavas();
+    } else {
+      listJavas().then((j) => mounted ? setState(() => _javas = j) : null);
+    }
   }
 
   Future<void> _save(Map<String, Object> patch) async {
@@ -301,10 +305,10 @@ class _SetupState extends State<_Setup> {
     final javaOptions = <String, String>{
       'global': '跟随全局设置',
       'auto': '自动选择',
-      for (final j in _javas) 'path:${j.path}': 'Java ${j.major} · ${j.path}',
+      for (final j in _javas) 'path:${j.path}': Platform.isAndroid ? 'Java ${j.major}' : 'Java ${j.major} · ${j.path}',
       if (_javaKey.startsWith('path:') && !_javas.any((j) => 'path:${j.path}' == _javaKey))
-        _javaKey: _javaKey.substring(5),
-      'browse': '手动选择…',
+        _javaKey: Platform.isAndroid ? '${_javaKey.substring(5)}（未安装）' : _javaKey.substring(5),
+      if (!Platform.isAndroid) 'browse': '手动选择…',
     };
     return ListView(
       padding: const EdgeInsets.all(28),

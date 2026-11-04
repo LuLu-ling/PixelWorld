@@ -5,12 +5,15 @@ import 'package:flutter/material.dart';
 
 import '../app_info.dart';
 import '../app_scope.dart';
+import '../app_state.dart' show GameState;
 import '../core/android_runtime.dart';
 import '../core/config.dart';
 import '../core/java.dart';
 import '../core/memory.dart';
+import '../core/task.dart';
 import '../core/updater.dart';
 import '../platform.dart';
+import '../widgets/format.dart';
 import '../widgets/pcl_import_dialog.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/update_dialog.dart';
@@ -515,6 +518,7 @@ class _JavaSectionState extends State<JavaSection> {
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isAndroid) return const _AndroidJavaSection();
     final cfg = AppScope.of(context).config;
     final scheme = Theme.of(context).colorScheme;
     return RadioGroup<String>(
@@ -687,6 +691,143 @@ class MiscSection extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// 安卓上的 Java：启动器提供的安卓版 Java 8 / 17 / 21 / 25，可以下载、删除和固定使用其中一个
+class _AndroidJavaSection extends StatefulWidget {
+  const _AndroidJavaSection();
+
+  @override
+  State<_AndroidJavaSection> createState() => _AndroidJavaSectionState();
+}
+
+class _AndroidJavaSectionState extends State<_AndroidJavaSection> {
+  final _sizes = <int, int>{};
+  final _busy = <int>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    for (final m in androidJavaMajors) {
+      final installed = androidJavaAt(androidJavaHome(m)) != null;
+      final size = installed ? await folderSize(androidJavaHome(m)) : null;
+      if (!mounted) return;
+      setState(() => size == null ? _sizes.remove(m) : _sizes[m] = size);
+    }
+  }
+
+  Future<void> _download(int major) async {
+    final state = AppScope.read(context);
+    final t = TaskProgress('下载 Java $major（安卓版）', steps: const ['下载']);
+    setState(() => _busy.add(major));
+    try {
+      await state.track(t, () async {
+        t.beginStep('下载');
+        await installAndroidJava(major, state.downloader, t);
+      });
+    } catch (e) {
+      if (mounted) toast(context, '下载 Java $major 失败：${errorText(e)}');
+    } finally {
+      if (mounted) setState(() => _busy.remove(major));
+      await _refresh();
+    }
+  }
+
+  Future<void> _delete(int major) async {
+    final state = AppScope.read(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('删除 Java $major？'),
+        content: const Text('之后需要时会重新下载。指定使用它的版本要重新选择 Java，或改为自动选择。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('删除')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busy.add(major));
+    try {
+      await deleteAndroidJava(major);
+      if (state.config.javaPath == androidJavaHome(major)) await state.config.update({'javaPath': ''});
+    } catch (e) {
+      if (mounted) toast(context, '删除失败：${errorText(e)}');
+    } finally {
+      if (mounted) setState(() => _busy.remove(major));
+      await _refresh();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context);
+    final cfg = state.config;
+    final scheme = Theme.of(context).colorScheme;
+    // 游戏或安装器运行时不能删除 Java
+    final inUse = state.gameState != GameState.idle || state.runningTasks.isNotEmpty;
+    return RadioGroup<String>(
+      groupValue: cfg.javaPath,
+      onChanged: (v) => cfg.update({'javaPath': v ?? ''}),
+      child: ListView(
+        padding: const EdgeInsets.all(28),
+        children: [
+          SettingsGroup(
+            title: 'Java',
+            children: [
+              const RadioListTile<String>(
+                contentPadding: _rowPadding,
+                value: '',
+                title: Text('自动选择'),
+                subtitle: Text('按版本要求选择 Java 8 / 17 / 21 / 25，没有安装时自动下载'),
+              ),
+              for (final m in androidJavaMajors)
+                if (_sizes.containsKey(m))
+                  RadioListTile<String>(
+                    contentPadding: _rowPadding,
+                    value: androidJavaHome(m),
+                    title: Text('Java $m'),
+                    subtitle: Text('已安装 · ${formatSize(_sizes[m]!)}'),
+                    secondary: _busy.contains(m)
+                        ? const SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                        : IconButton(
+                            tooltip: inUse ? '游戏或任务运行时不能删除' : '删除',
+                            onPressed: inUse ? null : () => _delete(m),
+                            icon: const Icon(Icons.delete_outline),
+                          ),
+                  )
+                else
+                  ListTile(
+                    contentPadding: _rowPadding,
+                    leading: const SizedBox(width: 24),
+                    title: Text('Java $m'),
+                    subtitle: const Text('未安装'),
+                    trailing: _busy.contains(m)
+                        ? const SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                        : FilledButton.tonal(onPressed: () => _download(m), child: const Text('下载')),
+                  ),
+              if (cfg.javaPath.isNotEmpty && !androidJavaMajors.any((m) => androidJavaHome(m) == cfg.javaPath))
+                RadioListTile<String>(
+                  contentPadding: _rowPadding,
+                  value: cfg.javaPath,
+                  title: const Text('手动指定（安卓上不可用）'),
+                  subtitle: Text(cfg.javaPath, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+          ),
+          Text(
+            '安卓版 Java 来自 AngelAuraMC 的 OpenJDK 构建（GPLv2 + Classpath Exception）。'
+            '版本设置里可以为单个版本指定 Java，优先于这里的设置。',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
     );
   }
 }

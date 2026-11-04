@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
 import 'download.dart';
+import 'instance_config.dart';
 import 'java.dart';
 import 'paths.dart';
 import 'task.dart';
@@ -322,20 +323,100 @@ int androidJavaMajor(int required) => required <= 8
 String _jreUrl(int major) =>
     'https://github.com/AngelAuraMC/angelauramc-openjdk-build/releases/download/download_jre$major/jre$major-android-arm64.tar.xz';
 
-/// 按版本需要下载并解压安卓版 Java
-Future<JavaInfo> ensureAndroidJava(VersionJson v, Downloader dl, TaskProgress task) async {
-  final major = androidJavaMajor(v.javaMajor ?? 8);
-  final root = p.join(Paths.appData, 'android-java');
-  final home = p.join(root, 'jre$major');
+/// 启动器提供的安卓版 Java
+const androidJavaMajors = [8, 17, 21, 25];
+
+String androidJavaHome(int major) => p.join(Paths.appData, 'android-java', 'jre$major');
+
+/// [home] 中安装完成的安卓版 Java；没有安装或没有装完时返回 null
+JavaInfo? androidJavaAt(String home) {
   final marker = File(p.join(home, '.installed'));
-  if (!marker.existsSync()) {
-    final archive = p.join(root, 'jre$major.tar.xz');
-    task.setStage('下载 Java $major（安卓版，约 30 MB）');
-    await dl.downloadFile(DownloadItem(url: _jreUrl(major), path: archive));
-    task.setStage('解压 Java $major');
-    await AndroidRuntime._channel.invokeMethod('installJre', {'archive': archive, 'dest': home});
-    await File(archive).delete().catchError((_) => File(archive));
-    await marker.writeAsString('$major');
-  }
+  if (!marker.existsSync()) return null;
+  final major = int.tryParse(marker.readAsStringSync().trim());
+  if (major == null) return null;
   return JavaInfo(path: home, version: '$major', major: major, is64: true, managed: true);
+}
+
+/// 已安装的安卓版 Java，从新到旧
+List<JavaInfo> installedAndroidJavas() => [
+  for (final m in androidJavaMajors.reversed) ?androidJavaAt(androidJavaHome(m)),
+];
+
+final _installingJava = <int, Future<JavaInfo>>{};
+
+/// 下载并解压安卓版 Java [major]；已安装时直接返回。同一个版本同时只下载一次
+Future<JavaInfo> installAndroidJava(int major, Downloader dl, TaskProgress task) {
+  final existing = androidJavaAt(androidJavaHome(major));
+  if (existing != null) return Future.value(existing);
+  return _installingJava[major] ??= _installAndroidJava(
+    major,
+    dl,
+    task,
+  ).whenComplete(() => _installingJava.remove(major));
+}
+
+Future<JavaInfo> _installAndroidJava(int major, Downloader dl, TaskProgress task) async {
+  final home = androidJavaHome(major);
+  final archive = Paths.tempFile('jre$major.tar.xz');
+  try {
+    task.setStage('下载 Java $major（安卓版，约 30 MB）');
+    await dl.downloadFile(DownloadItem(url: _jreUrl(major), path: archive.path));
+    task.setStage('解压 Java $major');
+    // 上次没有解压完的文件先删掉
+    final dir = Directory(home);
+    if (dir.existsSync()) await dir.delete(recursive: true);
+    await AndroidRuntime._channel.invokeMethod('installJre', {'archive': archive.path, 'dest': home});
+    await File(p.join(home, '.installed')).writeAsString('$major');
+  } finally {
+    if (archive.existsSync()) await archive.delete().catchError((_) => archive);
+  }
+  return androidJavaAt(home)!;
+}
+
+/// 删除安卓版 Java [major]
+Future<void> deleteAndroidJava(int major) async {
+  final dir = Directory(androidJavaHome(major));
+  if (dir.existsSync()) await dir.delete(recursive: true);
+}
+
+/// 文件夹占用的空间（字节）
+Future<int> folderSize(String path) async {
+  var total = 0;
+  final dir = Directory(path);
+  if (!dir.existsSync()) return 0;
+  await for (final e in dir.list(recursive: true, followLinks: false)) {
+    if (e is File) total += await e.length().catchError((_) => 0);
+  }
+  return total;
+}
+
+/// 为版本选择安卓版 Java。优先级与桌面版相同：版本设置 > 全局设置 > 自动选择。
+/// 用户指定的 Java 不自动替换；没有安装或版本过低时给出明确提示
+Future<JavaInfo> ensureAndroidJava(
+  VersionJson v,
+  Downloader dl,
+  TaskProgress task, {
+  JavaPref pref = const JavaAuto(),
+  String globalJava = '',
+}) async {
+  final required = v.javaMajor ?? 8;
+  JavaInfo chosen(String home, String where) {
+    final info = androidJavaAt(home);
+    if (info == null) {
+      throw Exception('$where指定的 Java 没有安装：$home。请在设置的 Java 页面下载，或改为自动选择');
+    }
+    if (info.major < required) {
+      throw Exception('$where指定的是 Java ${info.major}，这个版本至少需要 Java $required。请重新选择 Java，或改为自动选择');
+    }
+    return info;
+  }
+
+  switch (pref) {
+    case JavaExist(:final path) when path.isNotEmpty:
+      return chosen(path, '版本设置中');
+    case JavaGlobal() when globalJava.isNotEmpty:
+      return chosen(globalJava, '全局设置中');
+    default:
+  }
+  return installAndroidJava(androidJavaMajor(required), dl, task);
 }

@@ -475,6 +475,7 @@ class AppState extends ChangeNotifier {
 
       t.setStage('准备启动');
       await prepareOptions(cfg, gameDir, v.releaseTime).catchError((_) {});
+      if (android != null) await disableForgeSplash(gameDir).catchError((_) {});
       await writeCatIni(p.join(g.root, 'PCL.ini'), 'Version', id).catchError((_) {});
       if (android != null) {
         t.beginStep('启动游戏');

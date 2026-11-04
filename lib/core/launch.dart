@@ -133,10 +133,7 @@ List<String> buildArgs(LaunchContext ctx) {
   final LaunchContext(:g, :cfg, :v, :acc, :java, :memory, :inst) = ctx;
 
   // classpath：OptiFine 放在倒数第二位，实例可指定 classpath 头部
-  final libs = resolveLibraries(
-    g,
-    v,
-  ).where((l) => l.classpath && !(ctx.skipLibrary?.call(l.name) ?? false)).toList();
+  final libs = resolveLibraries(g, v).where((l) => l.classpath && !(ctx.skipLibrary?.call(l.name) ?? false)).toList();
   final optifine = libs.where((l) => RegExp(r'^optifine:optifine:', caseSensitive: false).hasMatch(l.name)).firstOrNull;
   final cp = <String>{
     for (final l in libs)
@@ -293,6 +290,26 @@ Future<void> prepareOptions(LauncherConfig cfg, String gameDir, String? releaseT
   } else if (cfg.windowMode != 'default') {
     await writeCatIni(file, 'fullscreen', 'false');
   }
+}
+
+/// 安卓：关闭 Forge 1.7~1.12 的加载画面。加载画面在另一个线程里占用 GL 上下文，安卓上不能共享上下文，
+/// 主线程拼贴图时查不到最大贴图尺寸，报 StitcherException（atlasMax: -1x-1）。其他版本不读这个文件
+Future<void> disableForgeSplash(String gameDir) async {
+  final f = File(p.join(gameDir, 'config', 'splash.properties'));
+  if (!f.existsSync()) {
+    await f.parent.create(recursive: true);
+    await f.writeAsString('enabled=false\n');
+    return;
+  }
+  final text = await f.readAsString();
+  final enabled = RegExp(r'^enabled=.*$', multiLine: true);
+  final String fixed;
+  if (enabled.hasMatch(text)) {
+    fixed = text.replaceAll(enabled, 'enabled=false');
+  } else {
+    fixed = '${text.isEmpty || text.endsWith('\n') ? text : '$text\n'}enabled=false\n';
+  }
+  if (fixed != text) await f.writeAsString(fixed);
 }
 
 /// Windows：让 Java 使用高性能显卡（写入当前用户的图形偏好）

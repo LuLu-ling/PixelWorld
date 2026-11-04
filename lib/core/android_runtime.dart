@@ -344,15 +344,24 @@ List<JavaInfo> installedAndroidJavas() => [
 
 final _installingJava = <int, Future<JavaInfo>>{};
 
+/// 同一个 [key] 的工作同时只进行一次：进行中时返回同一个 future，结束后从 [running] 中移除
+Future<T> sharedFuture<K, T>(Map<K, Future<T>> running, K key, Future<T> Function() start) {
+  final existing = running[key];
+  if (existing != null) return existing;
+  // 回调不能写成 `() => running.remove(key)`：remove 返回的正是 whenComplete 自己的 future，会一直等待自己
+  final f = start().whenComplete(() {
+    running.remove(key);
+  });
+  running[key] = f;
+  return f;
+}
+
 /// 下载并解压安卓版 Java [major]；已安装时直接返回。同一个版本同时只下载一次
 Future<JavaInfo> installAndroidJava(int major, Downloader dl, TaskProgress task) {
   final existing = androidJavaAt(androidJavaHome(major));
   if (existing != null) return Future.value(existing);
-  return _installingJava[major] ??= _installAndroidJava(
-    major,
-    dl,
-    task,
-  ).whenComplete(() => _installingJava.remove(major));
+  // 回调不能返回 remove 的结果：那是 whenComplete 自己返回的 future，会一直等待自己
+  return sharedFuture(_installingJava, major, () => _installAndroidJava(major, dl, task));
 }
 
 Future<JavaInfo> _installAndroidJava(int major, Downloader dl, TaskProgress task) async {

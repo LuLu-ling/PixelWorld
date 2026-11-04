@@ -31,6 +31,26 @@ void main() {
     'javaVersion': {'majorVersion': major},
   });
 
+  test('同一个工作同时只进行一次，结束后能再次开始', () async {
+    final running = <int, Future<int>>{};
+    var started = 0;
+    Future<int> work() async {
+      started++;
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      return 42;
+    }
+
+    final a = sharedFuture(running, 21, work);
+    final b = sharedFuture(running, 21, work);
+    expect(identical(a, b), isTrue);
+    // 曾经因为 whenComplete 的回调返回了自己而永远不结束
+    expect(await a.timeout(const Duration(seconds: 2)), 42);
+    expect(running, isEmpty);
+    expect(started, 1);
+    await sharedFuture(running, 21, work);
+    expect(started, 2);
+  });
+
   test('列出安装完成的 Java，没有装完的不算', () {
     expect(installedAndroidJavas().map((j) => j.major), [17, 8]);
   });

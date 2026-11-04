@@ -9,6 +9,7 @@ import 'core/crash.dart';
 import 'core/task.dart';
 import 'platform.dart';
 import 'widgets/task_steps.dart';
+import 'widgets/update_dialog.dart';
 import 'pages/ai_page.dart';
 import 'pages/diagnose_page.dart';
 import 'pages/download_page.dart';
@@ -87,6 +88,11 @@ class _ShellState extends State<Shell> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final ctx = _navKey.currentContext;
         if (ctx != null && ctx.mounted) askStorageOnFirstRun(ctx);
+      });
+      // 启动后稍等一会再检查更新，不和首次运行的提示抢
+      Future<void>.delayed(const Duration(seconds: 5), () {
+        final ctx = _navKey.currentContext;
+        if (ctx != null && ctx.mounted && AppScope.read(ctx).config.updateAutoCheck) checkUpdates(ctx, manual: false);
       });
     }
   }

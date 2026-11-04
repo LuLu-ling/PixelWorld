@@ -7,8 +7,7 @@ import 'package:path/path.dart' as p;
 import 'download.dart';
 import 'extra_loaders.dart';
 import 'install.dart';
-import 'instance_config.dart';
-import 'java.dart';
+import 'java_run.dart';
 import 'loaders.dart';
 import 'paths.dart';
 import 'task.dart';
@@ -241,36 +240,29 @@ Future<String> _runInstaller(
   // 安装器的处理器需要与该版本相同或更新的 Java
   final vanilla = await resolveVersion(g, gameVersion);
   final needed = (javaVersion?['majorVersion'] as num?)?.toInt() ?? 0;
-  final java = await ensureJava(
-    needed > (vanilla.javaMajor ?? 8) ? VersionJson({'id': gameVersion, 'javaVersion': javaVersion}) : vanilla,
-    const JavaAuto(),
-    '',
-    dl,
-    task,
-  );
+  final javaFor = needed > (vanilla.javaMajor ?? 8)
+      ? VersionJson({'id': gameVersion, 'javaVersion': javaVersion})
+      : vanilla;
 
   task.setStage('运行 $label 安装器（下载依赖并处理文件，可能需要几分钟）');
   final before = _versionIds(g);
-  final proc = await Process.start(java.path, ['-jar', installer, ...args], workingDirectory: g.root);
-  final log = StringBuffer();
-  final lines = proc.stdout.transform(const Utf8Decoder(allowMalformed: true)).transform(const LineSplitter()).listen((
-    l,
-  ) {
-    log.writeln(l);
-    task.output(l);
-  });
-  proc.stderr.transform(const Utf8Decoder(allowMalformed: true)).transform(const LineSplitter()).listen((l) {
-    log.writeln(l);
-    task.output(l);
-  });
-  final code = await proc.exitCode;
+  final r = await runJava(
+    javaFor,
+    ['-jar', installer, ...args],
+    workDir: g.root,
+    dl: dl,
+    task: task,
+    onLine: task.output,
+  );
   // 安装器会在工作目录留下与安装器同名的 .log
   final installerLog = File(p.join(g.root, '${p.basename(installer)}.log'));
   if (installerLog.existsSync()) await installerLog.delete().catchError((_) => installerLog);
-  await lines.cancel();
-  if (code != 0) {
-    final tail = log.toString().trim().split('\n').reversed.take(6).toList().reversed.join('\n');
-    throw Exception('$label 安装器运行失败（退出代码 $code）\n$tail');
+  String tail() => r.output.trim().split('\n').reversed.take(8).toList().reversed.join('\n');
+  if (r.code != 0) throw Exception('$label 安装器运行失败（退出代码 ${r.code}）\n${tail()}');
+  // 安卓上拿不到 System.exit 的退出代码，安装器报告失败时按输出判断
+  if (Platform.isAndroid &&
+      RegExp(r'There was an error during installation|Exception in thread "main"').hasMatch(r.output)) {
+    throw Exception('$label 安装器运行失败\n${tail()}');
   }
   final added = _versionIds(g).difference(before);
   if (added.isNotEmpty) return added.first;

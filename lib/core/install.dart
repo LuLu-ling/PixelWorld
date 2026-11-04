@@ -185,6 +185,7 @@ String checkVersionName(GamePaths g, String name) {
 Future<String> saveVersionJson(GamePaths g, VersionJson json, Downloader dl, TaskProgress task, {String? name}) async {
   final id = name != null ? checkVersionName(g, name) : json.id;
   json.id = id;
+  json.raw.remove('_folder');
   await Directory(g.versionDir(id)).create(recursive: true);
   await File(g.versionJson(id)).writeAsString(const JsonEncoder.withIndent('  ').convert(json.raw));
   // 新安装的版本还没有决定隔离，map_to_resources 的旧版资源放在版本文件夹下

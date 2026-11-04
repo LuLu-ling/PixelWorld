@@ -21,12 +21,16 @@ class VersionJson {
   /// 显式指定的游戏 jar（LiteLoader 等直接使用原版的 jar）
   String? get jar => raw['jar'] as String?;
 
-  /// 继承链最底层（原版）的版本号，客户端 jar 从这里下载
-  String get rootJar => (raw['_rootJar'] as String?) ?? jar ?? id;
+  /// 版本文件夹名。PCL 与官方启动器都以文件夹名为准：改过名的版本，JSON 中的 id 可能还是旧名称，
+  /// 游戏 jar 却已经跟着文件夹改名了
+  String get folder => (raw['_folder'] as String?) ?? id;
+
+  /// 继承链最底层（原版）的版本文件夹，客户端 jar 从这里下载
+  String get rootJar => (raw['_rootJar'] as String?) ?? jar ?? folder;
 
   /// 启动时使用的游戏 jar。继承的版本没有指定 jar 时用自己文件夹里的副本（与官方启动器一致）：
   /// Forge 1.17+ 按版本名在模块系统中排除游戏 jar，直接用原版的 jar 会导致包冲突
-  String get launchJar => jar ?? id;
+  String get launchJar => jar ?? folder;
   String get mainClass => (raw['mainClass'] as String?) ?? '';
   String? get minecraftArguments => raw['minecraftArguments'] as String?;
   Map<String, dynamic>? get arguments => raw['arguments'] as Map<String, dynamic>?;
@@ -105,7 +109,8 @@ String _libKey(String name) {
 Future<VersionJson> readVersionJson(GamePaths g, String id) async {
   final f = File(g.versionJson(id));
   if (!f.existsSync()) throw Exception('版本 $id 未安装');
-  return VersionJson(jsonDecode(await f.readAsString()) as Map<String, dynamic>);
+  final raw = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
+  return VersionJson(raw..['_folder'] = id);
 }
 
 /// 解析 inheritsFrom（Fabric 等加载器），返回完整版本 JSON

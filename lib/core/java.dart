@@ -188,17 +188,31 @@ Future<JavaInfo> _describe(String path) async {
 /// 为指定版本选择合适的 Java，必要时自动下载。
 /// 优先级与 PCL-CE 一致：实例指定 > 全局指定 > 自动选择。
 Future<JavaInfo> ensureJava(VersionJson v, JavaPref pref, String globalJava, Downloader dl, TaskProgress task) async {
+  // 安卓上的 Java 不能作为独立进程运行，要经游戏运行时（见 java_run.dart 的 runJava）
+  if (Platform.isAndroid) throw UnsupportedError('安卓上请使用 ensureAndroidJava');
+  final major = v.javaMajor ?? 8;
+  // 用户指定的 Java 不自动替换；路径失效或版本过低时给出明确提示
+  Future<JavaInfo> chosen(String path, String where) async {
+    if (!File(path).existsSync()) {
+      throw Exception('$where指定的 Java 不存在：$path。请重新选择 Java，或改为自动选择');
+    }
+    final info = await _describe(path);
+    if (info.major < major) {
+      throw Exception('$where指定的是 Java ${info.major}，这个版本至少需要 Java $major。请重新选择 Java，或改为自动选择');
+    }
+    return info;
+  }
+
   switch (pref) {
     case JavaExist(:final path) when path.isNotEmpty:
-      return _describe(path);
+      return chosen(path, '版本设置中');
     case JavaRelative(:final path) when path.isNotEmpty:
-      return _describe(p.normalize(p.join(Paths.launcherDir, path)));
+      return chosen(p.normalize(p.join(Paths.launcherDir, path)), '版本设置中');
     case JavaGlobal() when globalJava.isNotEmpty:
-      return _describe(globalJava);
+      return chosen(globalJava, '全局设置中');
     default:
   }
 
-  final major = v.javaMajor ?? 8;
   final component = v.javaComponent ?? 'jre-legacy';
 
   final managed = _managedJavaPath(component);

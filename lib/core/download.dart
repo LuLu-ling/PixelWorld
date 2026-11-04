@@ -105,38 +105,83 @@ class Downloader {
 
   Future<String> fetchText(String url) async => utf8.decode(await _get(url));
 
-  /// 文件已存在且大小匹配即视为完整（全量校验 sha1 太慢）
+  /// 判断本地文件是否完整：
+  ///  - 有 SHA-1 时按 SHA-1 校验；校验通过的文件记下大小与修改时间，之后未变化就不再重复计算；
+  ///  - 只有大小时按大小判断（只能发现截断，发现不了同样大小的损坏）；
+  ///  - 两者都没有时只要求文件非空。
   static Future<bool> isComplete(DownloadItem item) async {
     final f = File(item.path);
-    if (!await f.exists()) return false;
-    final len = await f.length();
-    return item.size != null ? len == item.size : len > 0;
+    final FileStat stat;
+    try {
+      stat = await f.stat();
+    } on FileSystemException {
+      return false;
+    }
+    if (stat.type != FileSystemEntityType.file) return false;
+    if (item.size != null ? stat.size != item.size : stat.size == 0) return false;
+    final want = item.sha1?.toLowerCase();
+    if (want == null || want.isEmpty) return true;
+    if (VerifiedFiles.matches(item.path, stat, want)) return true;
+    final String actual;
+    try {
+      actual = (await sha1.bind(f.openRead()).first).toString();
+    } on FileSystemException {
+      return false;
+    }
+    if (actual != want) return false;
+    VerifiedFiles.record(item.path, stat, want);
+    return true;
   }
 
   static var _tmpSeq = 0;
 
+  /// 下载到临时文件，校验通过后再替换正式文件，中断或校验失败都不会留下看似完整的文件。
   /// [cancelled] 返回 true 时放弃下载（同一文件的另一个连接已经完成）
   Future<void> downloadFile(DownloadItem item, {bool Function()? cancelled}) async {
     final data = await _get(item.url, cancelled: cancelled);
-    if (item.sha1 != null && sha1.convert(data).toString() != item.sha1) {
-      throw Exception('校验失败：${item.path}');
+    final want = item.sha1?.toLowerCase();
+    if (want != null && want.isNotEmpty && sha1.convert(data).toString() != want) {
+      throw Exception('校验失败（SHA-1 不匹配）：${item.path}');
+    }
+    if (item.size != null && data.length != item.size) {
+      throw Exception('校验失败（大小应为 ${item.size}，实际 ${data.length}）：${item.path}');
     }
     if (cancelled?.call() ?? false) return;
     final f = File(item.path);
     await f.parent.create(recursive: true);
     // 同一文件可能有两个连接同时下载，临时文件名要区分
     final tmp = File('${item.path}.$pid.${_tmpSeq++}.tmp');
-    await tmp.writeAsBytes(data, flush: true);
-    await tmp.rename(item.path);
+    try {
+      await tmp.writeAsBytes(data, flush: true);
+      await tmp.rename(item.path);
+    } catch (_) {
+      await tmp.delete().catchError((_) => tmp);
+      rethrow;
+    }
+    if (want != null && want.isNotEmpty) {
+      try {
+        VerifiedFiles.record(item.path, await f.stat(), want);
+      } on FileSystemException {
+        // 记录失败只会导致下次重新校验
+      }
+    }
   }
 
   /// 并发下载，跳过已完整的文件
   Future<void> downloadAll(List<DownloadItem> items, void Function(int done, int total) onProgress) async {
-    final unique = {for (final i in items) i.path: i}.values;
+    final unique = {for (final i in items) i.path: i}.values.toList();
     final jobs = <_Job>[];
-    for (final item in unique) {
-      if (!await isComplete(item)) jobs.add(_Job(item));
+    // 检查本地文件：第一次需要计算 SHA-1，并行进行
+    var next = 0;
+    Future<void> checker() async {
+      while (next < unique.length) {
+        final item = unique[next++];
+        if (!await isComplete(item)) jobs.add(_Job(item));
+      }
     }
+
+    await Future.wait([for (var i = 0; i < 8; i++) checker()]);
+    await VerifiedFiles.save();
     // 大文件先下，免得最后剩下几个大文件单线程慢慢下
     jobs.sort((a, b) => (b.item.size ?? 0).compareTo(a.item.size ?? 0));
     var done = 0;
@@ -198,6 +243,7 @@ class Downloader {
       unawaited(worker());
     }
     await allDone.future;
+    await VerifiedFiles.save();
     if (errors.isNotEmpty) throw Exception('${errors.length} 个文件下载失败，例如：${errors.first}');
   }
 }
@@ -216,4 +262,53 @@ class _Job {
 
 class _Cancelled implements Exception {
   const _Cancelled();
+}
+
+/// 已经按 SHA-1 校验过的文件：路径 → 大小、修改时间与 SHA-1。
+/// 文件大小或修改时间变化后会重新校验。保存在启动器数据目录的 verified-files.json。
+abstract final class VerifiedFiles {
+  /// 由启动器在启动时设置；未设置时只在内存中记录（例如测试）
+  static String? storePath;
+
+  static Map<String, String>? _entries;
+  static var _dirty = false;
+
+  static Map<String, String> get _map {
+    if (_entries != null) return _entries!;
+    var loaded = <String, String>{};
+    final path = storePath;
+    if (path != null) {
+      try {
+        final j = jsonDecode(File(path).readAsStringSync());
+        if (j is Map) loaded = {for (final e in j.entries) '${e.key}': '${e.value}'};
+      } catch (_) {
+        // 文件不存在或损坏：从空记录开始，只是需要重新校验
+      }
+    }
+    return _entries = loaded;
+  }
+
+  static String _value(FileStat stat, String sha1) => '${stat.size}:${stat.modified.millisecondsSinceEpoch}:$sha1';
+
+  static bool matches(String path, FileStat stat, String sha1) => _map[path] == _value(stat, sha1);
+
+  static void record(String path, FileStat stat, String sha1) {
+    final v = _value(stat, sha1);
+    if (_map[path] == v) return;
+    _map[path] = v;
+    _dirty = true;
+  }
+
+  static Future<void> save() async {
+    final path = storePath;
+    if (path == null || !_dirty) return;
+    _dirty = false;
+    try {
+      final tmp = File('$path.tmp');
+      await tmp.writeAsString(jsonEncode(_map), flush: true);
+      await tmp.rename(path);
+    } catch (_) {
+      // 保存失败只会导致下次重新校验
+    }
+  }
 }

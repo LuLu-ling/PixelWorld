@@ -402,6 +402,83 @@ public final class GameRuntime {
     }
 
     /**
+     * Runs a jar or main class without a window or renderer: loader installers, the OptiFine
+     * patcher, or a jar the user picked. Called on a worker thread in the {@code :jar} process
+     * ({@link JarService}); the JVM cannot be started twice, so the process exits afterwards.
+     *
+     * @param args JVM options followed by {@code -jar <file> ...} or {@code -cp <path> <class> ...}
+     */
+    public static int runJar(Context context, File jreHome, File workDir, File logFile, List<String> args)
+            throws Throwable {
+        sJarMode = true;
+        // The game process loads it while setting up its window; this process has none.
+        // Loading it initialises CallbackBridge, which needs a Looper on the calling thread
+        if (android.os.Looper.myLooper() == null) android.os.Looper.prepare();
+        System.loadLibrary("pojavexec");
+        Context app = context.getApplicationContext();
+        String nativeDir = app.getApplicationInfo().nativeLibraryDir;
+        String home = jreHome.getAbsolutePath();
+        File lib = jreLibDir(jreHome);
+        File cache = app.getCacheDir();
+
+        logFile.getParentFile().mkdirs();
+        //noinspection ResultOfMethodCallIgnored
+        logFile.createNewFile();
+        Logger.begin(logFile.getAbsolutePath());
+
+        String ldPath = lib.getAbsolutePath() + "/jli:" + lib.getAbsolutePath() + ":"
+                + "/system/lib64:/vendor/lib64:" + nativeDir;
+        Map<String, String> env = new LinkedHashMap<>();
+        env.put("POJAV_NATIVEDIR", nativeDir);
+        env.put("JAVA_HOME", home);
+        env.put("HOME", workDir.getAbsolutePath());
+        env.put("TMPDIR", cache.getAbsolutePath());
+        env.put("LD_LIBRARY_PATH", ldPath);
+        env.put("PATH", home + "/bin:" + Os.getenv("PATH"));
+        for (Map.Entry<String, String> e : env.entrySet()) {
+            Os.setenv(e.getKey(), e.getValue(), true);
+        }
+        File server = new File(lib, "server/libjvm.so");
+        String jvmDir = new File(lib, server.exists() ? "server" : "client").getAbsolutePath();
+        JREUtils.setLdLibraryPath(jvmDir + ":" + ldPath);
+
+        List<String> argv = new ArrayList<>();
+        argv.add("java");
+        argv.addAll(Arrays.asList(
+                "-Djava.home=" + home,
+                "-Djava.io.tmpdir=" + cache.getAbsolutePath(),
+                "-Duser.home=" + workDir.getAbsolutePath(),
+                "-Duser.dir=" + workDir.getAbsolutePath(),
+                "-Duser.language=" + System.getProperty("user.language"),
+                "-Duser.timezone=" + TimeZone.getDefault().getID(),
+                "-Dos.name=Linux",
+                "-Dos.version=Android-" + Build.VERSION.RELEASE,
+                "-Djava.awt.headless=true",
+                "-Dext.net.resolvPath=" + new File(app.getFilesDir(), "resolv.conf").getAbsolutePath(),
+                "-Djdk.lang.Process.launchMechanism=FORK",
+                "-XX:ActiveProcessorCount=" + java.lang.Runtime.getRuntime().availableProcessors()
+        ));
+        argv.addAll(args);
+        Logger.appendToLog("PCL.PW runtime: " + String.join(" ", argv));
+
+        loadJavaLibraries(jreHome, jvmDir, nativeDir);
+        JREUtils.setupExitMethod(app);
+        JREUtils.chdir(workDir.getAbsolutePath());
+        JREUtils.initializeHooks();
+        int code = VMLauncher.launchJVM(argv.toArray(new String[0]));
+        Logger.appendToLog("Java exit code: " + code);
+        return code;
+    }
+
+    /** Set in the {@code :jar} process: exits are recorded in {@link #jarExitFile} */
+    private static boolean sJarMode;
+
+    /** Exit code of the last {@link #runJar}; only abnormal exits are known (see stdio_is.c) */
+    public static File jarExitFile(Context context) {
+        return new File(context.getFilesDir(), "jar_exit.txt");
+    }
+
+    /**
      * MobileGlues settings (MG_DIR_PATH/config.json). Every key is written, because a missing key
      * reads as -1. ANGLE: 3 forces it on, 2 forces it off.
      */
@@ -486,6 +563,14 @@ public final class GameRuntime {
     private static File sLogFile;
 
     public static void recordExit(Context context, int code, boolean isSignal) {
+        if (sJarMode) {
+            try {
+                writeText(jarExitFile(context), code + (isSignal ? " signal" : ""));
+            } catch (IOException e) {
+                Log.e(TAG, "Cannot record exit code", e);
+            }
+            return;
+        }
         // The JVM can abort while tearing down after a normal quit ("Stopping!" is Minecraft's
         // last line on a normal shutdown); that is not a crash
         if (isSignal && stoppedNormally()) return;

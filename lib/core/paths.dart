@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'android_storage.dart';
+import 'download.dart' show VerifiedFiles;
 
 /// 启动器自身的目录。游戏目录相关的路径见 [GamePaths]。
 abstract final class Paths {
@@ -13,6 +14,7 @@ abstract final class Paths {
     appData = (await getApplicationSupportDirectory()).path;
     await Directory(appData).create(recursive: true);
     await AndroidStorage.init();
+    VerifiedFiles.storePath = p.join(appData, 'verified-files.json');
   }
 
   /// 启动器所在目录

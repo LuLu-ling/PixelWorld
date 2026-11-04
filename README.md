@@ -17,7 +17,7 @@ PCL.PW 是一个跨平台的 Minecraft 启动器，页面布局参考 PCL，视�
 
 ## 状态
 
-项目仍在开发中，已经可以日常使用：版本下载与安装、模组加载器、正版与离线账户、启动游戏、崩溃分析等功能可用。
+项目仍在开发中，已经可以日常使用。
 
 | 平台 | 状态 |
 |---|---|
@@ -25,6 +25,30 @@ PCL.PW 是一个跨平台的 Minecraft 启动器，页面布局参考 PCL，视�
 | Android | 可用（需要 Android 8.0 及以上、64 位 ARM），游戏运行时见 [android/runtime](android/runtime/NOTICE.md) |
 | macOS | 正在测试，暂不提供下载 |
 | Linux | 尚未适配 |
+
+### 已支持
+
+- **版本**：下载与安装原版（正式版、快照、远古版、愚人节版本）；版本选择、改名、复制、删除；版本隔离（与 PCL-CE 规则相同）；每个版本单独的 Java、内存、参数等设置。
+- **模组加载器**：Forge、NeoForge、Fabric、Quilt、Legacy Fabric、LiteLoader、Cleanroom、OptiFine（独立安装，或作为模组与加载器一起安装）、LabyMod。安卓上暂时不能安装需要运行安装器的 Forge、NeoForge、Cleanroom 与 OptiFine，见「下一步」。
+- **资源**：从 Modrinth 搜索并安装模组、光影包、资源包、数据包，自动安装必需的前置模组；模组启用与禁用；存档、截图等文件管理。
+- **下载**：官方源与 BMCLAPI 镜像，失败自动回退；多线程下载；SHA-1 校验；结尾的慢连接自动换节点。
+- **账户**：微软正版登录与离线账户；账户在 Windows 上用 DPAPI 加密保存。
+- **Java**：自动查找本机 Java，缺少时按版本需要自动下载。
+- **启动与排错**：启动游戏、游戏日志、崩溃分析；可选的 AI 排障助手（自填接口），可以查看日志、搜索并安装模组、修改配置文件、备份与恢复，每次修改都需要你确认。
+- **从 PCL-CE 迁移**：导入全局设置、游戏文件夹与账户；直接使用 PCL-CE 的版本文件夹与版本设置。
+- **安卓**：内置游戏运行时，支持 1.0 到 26.x 的 Java 版；渲染器可选 MobileGlues、Zink（Adreno 上使用 Turnip）、系统 GLES；触屏操作按键与摇杆。
+
+### 下一步
+
+- 安卓上运行 jar：在手机上运行 Forge、NeoForge、Cleanroom、OptiFine 的安装器，也可以运行自选的 jar 文件。
+- 安卓与 macOS 上用系统密钥库（Android Keystore、钥匙串）加密账户与 API Key。
+
+### 计划支持
+
+- macOS 正式发布，Linux 适配。
+- 整合包安装（Modrinth、CurseForge）。
+- 第三方验证账户（Authlib-Injector 等）。
+- 安卓：手柄、自定义按键布局，更多渲染器选项。
 
 ## 下载
 

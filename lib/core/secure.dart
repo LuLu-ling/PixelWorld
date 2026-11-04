@@ -5,9 +5,10 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart';
 
-/// 用系统机制加密本地保存的令牌。
-/// Windows 使用 DPAPI（与当前用户绑定，Electron 的 safeStorage 也是这样做的）；
-/// 其他平台暂未接入钥匙串，原样保存。
+/// 用系统机制加密本地保存的令牌与 API Key。
+/// Windows 使用 DPAPI（与当前用户绑定，Electron 的 safeStorage 也是这样做的）。
+/// 其他平台暂未接入系统密钥库，[protect] 原样返回，数据只受应用私有目录的权限保护
+/// （安卓上已关闭应用数据备份，避免随系统备份带出）。[available] 为 false 时界面不应声称已加密。
 abstract final class SecureData {
   static bool get available => Platform.isWindows;
 

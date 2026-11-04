@@ -1,13 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:archive/archive_io.dart';
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import '../app_state.dart';
 import '../widgets/loader_label.dart';
 import '../widgets/optifine_compat.dart';
 import 'ai_client.dart';
+import 'android_storage.dart' show moveEntity;
 import 'crash.dart';
 import 'instance.dart';
 import 'instance_config.dart';
@@ -17,6 +20,7 @@ import 'loaders.dart';
 import 'memory.dart';
 import 'modrinth.dart';
 import 'paths.dart';
+import 'safe_path.dart';
 import 'version.dart';
 
 /// 操作的类型：只读操作默认直接执行；其余都要用户允许
@@ -128,10 +132,10 @@ class AiToolbox {
         final rel = '${a['path'] ?? ''}'.trim();
         final abs = rel.isEmpty ? dir : _inside(dir, rel);
         // 文件夹不存在是正常的查看结果（例如还没有装光影），不算失败
-        return ToolPlan(
-          '查看 ${v.id}/${rel.isEmpty ? '' : rel}',
-          () async => Directory(abs).existsSync() ? _listDir(dir, abs) : '文件夹不存在：$rel',
-        );
+        return ToolPlan('查看 ${v.id}/${rel.isEmpty ? '' : rel}', () async {
+          _recheck(dir, abs);
+          return Directory(abs).existsSync() ? _listDir(dir, abs) : '文件夹不存在：$rel';
+        });
       },
     ),
     AiToolDef(
@@ -499,6 +503,7 @@ class AiToolbox {
         final v = _version(a);
         final (abs, rel) = await _configFile(v, a['path']);
         return ToolPlan('读取 $rel', () async {
+          _recheck(await _gameDir(v), abs);
           final text = await File(abs).readAsString();
           return state.redactor().apply(
             text.length > 30000 ? '${text.substring(0, 30000)}\n…（文件过长，只显示前 30000 个字符）' : text,
@@ -553,6 +558,7 @@ class AiToolbox {
           '修改 $rel（${edits.length} 处）',
           () async {
             final dir = await _gameDir(v);
+            _recheck(dir, abs);
             final zip = await _backup(v, dir, [rel], 'config');
             await File(abs).writeAsString(result);
             return '已修改 $rel，原文件已备份到 ${p.basename(zip)}';
@@ -622,7 +628,9 @@ class AiToolbox {
         final enabled = a['enabled'] == true;
         final files = await _modFiles(v, a['files']);
         return ToolPlan('${enabled ? '启用' : '禁用'} ${files.length} 个模组', () async {
+          final dir = await _gameDir(v);
           for (final f in files) {
+            _recheck(dir, f.path);
             await setModEnabled(f, enabled);
           }
           return '已${enabled ? '启用' : '禁用'}：${files.map((f) => f.name).join('、')}';
@@ -692,7 +700,7 @@ class AiToolbox {
         final paths = _existing(dir, a['paths']);
         return ToolPlan('删除 ${paths.length} 项（移到回收站）', () async {
           for (final rel in paths) {
-            await moveToTrash(p.join(dir, rel));
+            await moveToTrash(_inside(dir, rel));
           }
           return '已移到回收站：${paths.join('、')}';
         }, details: ['版本：${v.id}', for (final rel in paths) '$rel（${_size(_sizeOf(p.join(dir, rel)))}）']);
@@ -721,7 +729,8 @@ class AiToolbox {
         if (mv.fileName == old.name.replaceFirst(RegExp(r'\.disabled$'), '')) throw ToolError('新旧文件相同，不需要替换');
         return ToolPlan('替换模组 ${old.name}', () async {
           final dir = await _gameDir(v);
-          final rel = p.relative(old.path, from: dir);
+          _recheck(dir, old.path);
+          final rel = p.relative(old.path, from: dir).replaceAll('\\', '/');
           final zip = await _backup(v, dir, [rel], 'replace');
           await moveToTrash(old.path);
           final r = await _install(v, mv);
@@ -747,24 +756,30 @@ class AiToolbox {
         final v = _version(a);
         final name = p.basename('${a['backup'] ?? ''}');
         final zip = p.join(_backupDir(v), name);
-        if (!name.endsWith('.zip') || !File(zip).existsSync()) throw ToolError('找不到备份：$name');
-        final manifest = await _manifest(zip);
-        if (manifest == null) throw ToolError('这个备份不是由 PCL.PW 创建的，无法恢复');
+        if (!name.endsWith('.zip') || FileSystemEntity.typeSync(zip, followLinks: false) != FileSystemEntityType.file) {
+          throw ToolError('找不到备份：$name');
+        }
         final dir = await _gameDir(v);
-        return ToolPlan('从备份 $name 恢复', () async {
-          final current = manifest
-              .where((rel) => FileSystemEntity.typeSync(p.join(dir, rel)) != FileSystemEntityType.notFound)
-              .toList();
-          String? before;
-          if (current.isNotEmpty) {
-            before = await _backup(v, dir, current, 'before-restore');
-            for (final rel in current) {
-              await moveToTrash(p.join(dir, rel));
-            }
-          }
-          await _extract(zip, dir);
-          return '已恢复：${manifest.join('、')}${before == null ? '' : '。恢复前的内容已备份到 ${p.basename(before)}'}';
-        }, details: ['版本：${v.id}', '将恢复：${manifest.join('、')}', '当前的对应内容会先备份，再移到回收站']);
+        // 恢复前完整检查一遍：清单与每个条目的路径、签名、内容摘要
+        final BackupCheck check;
+        try {
+          check = await checkBackup(zip, dir, _backupKey());
+        } on BackupException catch (e) {
+          throw ToolError(e.message);
+        }
+        for (final rel in check.paths) {
+          _inside(dir, rel);
+        }
+        return ToolPlan(
+          '从备份 $name 恢复',
+          () => _restore(v, dir, zip, check),
+          details: [
+            '版本：${v.id}',
+            '将恢复：${check.paths.join('、')}（${check.files} 个文件，${_size(check.bytes)}）',
+            if (!check.signed) '注意：这是旧版 PCL.PW 创建的备份，没有签名，无法确认内容未被修改过',
+            '先解压到临时文件夹并校验，成功后才把当前的对应内容备份并移到回收站',
+          ],
+        );
       },
     ),
   ];
@@ -1043,37 +1058,56 @@ class AiToolbox {
 
   Future<String> _gameDir(InstanceInfo v) => state.gameDirOf(v);
 
-  /// 相对路径转为绝对路径，并确认在运行目录内
+  /// 相对路径转为绝对路径，并确认在运行目录内（统一由 [resolveInside] 校验，包括符号链接）
   static String _inside(String dir, String rel) {
-    rel = rel.replaceAll('\\', '/').trim();
-    if (rel.isEmpty || p.isAbsolute(rel) || rel.split('/').contains('..')) throw ToolError('路径无效：$rel');
-    final abs = p.normalize(p.join(dir, rel));
-    if (!p.isWithin(dir, abs)) throw ToolError('只能访问版本运行目录中的文件：$rel');
-    return abs;
+    try {
+      return resolveInside(dir, rel);
+    } on UnsafePathException catch (e) {
+      throw ToolError(e.message);
+    }
   }
 
-  /// 校验路径列表并返回规范化的相对路径
+  /// 执行前再确认一次：用户确认操作可能隔了很久，期间文件可能被替换成链接
+  static void _recheck(String dir, String abs) {
+    if (p.equals(dir, abs)) return;
+    try {
+      recheckInside(dir, abs);
+    } on UnsafePathException catch (e) {
+      throw ToolError(e.message);
+    }
+  }
+
+  /// 校验路径列表并返回规范化的相对路径；去掉重复的和被其他路径包含的
   List<String> _existing(String dir, Object? list) {
     final items = (list is List ? list : const []).map((e) => '$e').where((e) => e.trim().isNotEmpty).toList();
     if (items.isEmpty) throw ToolError('请提供路径');
-    return [
+    final rels = [
       for (final rel in items)
         () {
           final abs = _inside(dir, rel);
-          if (FileSystemEntity.typeSync(abs) == FileSystemEntityType.notFound) throw ToolError('文件不存在：$rel');
+          if (FileSystemEntity.typeSync(abs, followLinks: false) == FileSystemEntityType.notFound) {
+            throw ToolError('文件不存在：$rel');
+          }
           return p.relative(abs, from: dir).replaceAll('\\', '/');
         }(),
     ];
+    return normalizePathSet(rels);
   }
 
   Future<List<InstanceFile>> _modFiles(InstanceInfo v, Object? list) async {
     final names = (list is List ? list : const []).map((e) => '$e'.trim()).where((e) => e.isNotEmpty).toList();
     if (names.isEmpty) throw ToolError('请提供模组文件名');
-    final mods = listInstanceFiles(await _gameDir(v), InstanceFolder.mods);
+    final dir = await _gameDir(v);
+    final mods = listInstanceFiles(dir, InstanceFolder.mods);
     return [
       for (final n in names)
-        mods.where((m) => m.name == n || m.name == '$n.disabled' || '${m.name}.disabled' == n).firstOrNull ??
-            (throw ToolError('mods 文件夹中没有 $n')),
+        () {
+          final m =
+              mods.where((m) => m.name == n || m.name == '$n.disabled' || '${m.name}.disabled' == n).firstOrNull ??
+              (throw ToolError('mods 文件夹中没有 $n'));
+          _inside(dir, p.relative(m.path, from: dir));
+          return m;
+        }(),
     ];
   }
 
@@ -1176,11 +1210,14 @@ class AiToolbox {
   }
 
   String _listDir(String root, String dir) {
-    final entries = Directory(dir).listSync()..sort((a, b) => a.path.toLowerCase().compareTo(b.path.toLowerCase()));
+    final entries = Directory(dir).listSync(followLinks: false)
+      ..sort((a, b) => a.path.toLowerCase().compareTo(b.path.toLowerCase()));
     if (entries.isEmpty) return '文件夹是空的';
     return [
       for (final e in entries.take(300))
-        e is Directory
+        e is Link
+            ? '- ${p.relative(e.path, from: root).replaceAll('\\', '/')}（符号链接，不能通过 AI 访问）'
+            : e is Directory
             ? '- ${p.relative(e.path, from: root).replaceAll('\\', '/')}/'
             : '- ${p.relative(e.path, from: root).replaceAll('\\', '/')}（${_size(_sizeOf(e.path))}）',
       if (entries.length > 300) '……共 ${entries.length} 项，只列出前 300 项',
@@ -1190,10 +1227,11 @@ class AiToolbox {
   Future<String> _readLog(InstanceInfo v, String kind) async {
     final dir = await _gameDir(v);
     File? f;
+    // 日志会发给 AI，同样不能经过符号链接读到运行目录之外的文件
     if (kind == 'crash') {
       final d = Directory(p.join(dir, 'crash-reports'));
-      final files = d.existsSync()
-          ? d.listSync().whereType<File>().where((f) => f.path.endsWith('.txt')).toList()
+      final files = d.existsSync() && !isLink(d.path)
+          ? d.listSync(followLinks: false).whereType<File>().where((f) => f.path.endsWith('.txt')).toList()
           : <File>[];
       files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
       f = files.firstOrNull;
@@ -1201,6 +1239,7 @@ class AiToolbox {
       f = File(p.join(dir, 'logs', kind == 'debug' ? 'debug.log' : 'latest.log'));
     }
     if (f == null || !f.existsSync()) throw ToolError('没有找到${kind == 'crash' ? '崩溃报告' : '日志'}');
+    _inside(dir, p.relative(f.path, from: dir));
     final bytes = await f.readAsBytes();
     final text = utf8.decode(
       bytes.length > 4 << 20 ? bytes.sublist(bytes.length - (4 << 20)) : bytes,
@@ -1230,81 +1269,310 @@ class AiToolbox {
 
   String _backupDir(InstanceInfo v) => p.join(state.paths.root, 'backups', v.id);
 
-  static const _manifestName = 'pclpw-backup.json';
+  /// 备份签名密钥，保存在启动器数据目录（AI 工具无法访问）
+  static List<int> _backupKey() => backupKey(Paths.appData);
 
-  /// 打包备份，返回备份文件路径。备份中记录了包含的路径，恢复时按此替换
+  /// 打包备份，返回备份文件路径
   Future<String> _backup(InstanceInfo v, String dir, List<String> paths, String label) async {
     final now = DateTime.now();
     String two(int n) => n.toString().padLeft(2, '0');
     final stamp = '${now.year}${two(now.month)}${two(now.day)}-${two(now.hour)}${two(now.minute)}${two(now.second)}';
     final safe = label.trim().replaceAll(RegExp(r'[\\/:*?"<>|\s]+'), '_');
-    final out = p.join(_backupDir(v), '$stamp${safe.isEmpty ? '' : '-$safe'}.zip');
-    await Directory(p.dirname(out)).create(recursive: true);
-    final enc = ZipFileEncoder()..create(out);
-    try {
-      for (final rel in paths) {
-        final abs = p.join(dir, rel);
-        if (FileSystemEntity.isDirectorySync(abs)) {
-          for (final f in Directory(abs).listSync(recursive: true, followLinks: false).whereType<File>()) {
-            await enc.addFile(f, p.relative(f.path, from: dir).replaceAll('\\', '/'));
-          }
-        } else {
-          await enc.addFile(File(abs), rel);
-        }
-      }
-      enc.addArchiveFile(
-        ArchiveFile.string(
-          _manifestName,
-          jsonEncode({'version': v.id, 'paths': paths, 'created': now.toIso8601String()}),
-        ),
-      );
-    } finally {
-      await enc.close();
+    final base = '$stamp${safe.isEmpty ? '' : '-$safe'}';
+    var out = p.join(_backupDir(v), '$base.zip');
+    for (var i = 2; File(out).existsSync(); i++) {
+      out = p.join(_backupDir(v), '$base-$i.zip');
     }
+    await createBackup(out, dir, paths, versionId: v.id, key: _backupKey(), created: now);
     return out;
   }
 
-  Future<List<String>?> _manifest(String zip) async {
-    final input = InputFileStream(zip);
+  /// 恢复：先解压到临时文件夹并逐个校验，全部成功后才替换当前内容
+  Future<String> _restore(InstanceInfo v, String dir, String zip, BackupCheck check) async {
+    final staging = p.join(_backupDir(v), '.restore-${DateTime.now().millisecondsSinceEpoch}');
     try {
-      final archive = ZipDecoder().decodeStream(input);
-      final m = archive.findFile(_manifestName);
-      if (m == null) return null;
-      final j = jsonDecode(utf8.decode(m.content));
-      return ((j as Map)['paths'] as List).map((e) => '$e').toList();
-    } catch (_) {
-      return null;
-    } finally {
-      await input.close();
+      await extractBackup(zip, staging, check);
+    } catch (e) {
+      await Directory(staging).delete(recursive: true).catchError((_) => Directory(staging));
+      throw ToolError('备份解压或校验失败，没有做任何修改：$e');
     }
-  }
-
-  Future<void> _extract(String zip, String dir) async {
-    final input = InputFileStream(zip);
+    // 用户确认后可能过了一段时间，替换前重新确认目标路径
+    for (final rel in check.paths) {
+      _inside(dir, rel);
+    }
+    final current = check.paths
+        .where(
+          (rel) => FileSystemEntity.typeSync(p.join(dir, rel), followLinks: false) != FileSystemEntityType.notFound,
+        )
+        .toList();
+    String? before;
+    if (current.isNotEmpty) before = await _backup(v, dir, current, 'before-restore');
+    final done = <String>[];
     try {
-      final archive = ZipDecoder().decodeStream(input);
-      for (final f in archive.files) {
-        if (!f.isFile || f.name == _manifestName) continue;
-        final abs = _inside(dir, f.name);
-        await File(abs).parent.create(recursive: true);
-        await File(abs).writeAsBytes(f.content);
+      for (final rel in check.paths) {
+        final target = _inside(dir, rel);
+        if (FileSystemEntity.typeSync(target, followLinks: false) != FileSystemEntityType.notFound) {
+          await moveToTrash(target);
+        }
+        final from = p.joinAll([staging, ...rel.split('/')]);
+        if (FileSystemEntity.typeSync(from, followLinks: false) != FileSystemEntityType.notFound) {
+          await moveEntity(from, target);
+        }
+        done.add(rel);
       }
-    } finally {
-      await input.close();
+    } catch (e) {
+      // 临时文件夹保留，里面是还没放回去的备份内容
+      throw ToolError(
+        '恢复到一半失败：$e。已恢复：${done.isEmpty ? '无' : done.join('、')}；'
+        '${before == null ? '' : '恢复前的内容已备份到 ${p.basename(before)}，也可以在回收站找到；'}'
+        '未完成的备份内容在 ${p.relative(staging, from: state.paths.root)}',
+      );
     }
+    await Directory(staging).delete(recursive: true).catchError((_) => Directory(staging));
+    return '已恢复：${check.paths.join('、')}${before == null ? '' : '。恢复前的内容已备份到 ${p.basename(before)}'}';
   }
 
   Future<String> _listBackups(InstanceInfo v) async {
     final d = Directory(_backupDir(v));
     final zips = d.existsSync()
-        ? (d.listSync().whereType<File>().where((f) => f.path.endsWith('.zip')).toList())
+        ? (d.listSync(followLinks: false).whereType<File>().where((f) => f.path.endsWith('.zip')).toList())
         : <File>[];
     if (zips.isEmpty) return '${v.id} 还没有备份';
     zips.sort((a, b) => b.path.compareTo(a.path));
     return [
       for (final z in zips.take(50))
-        '- ${p.basename(z.path)}（${_size(z.lengthSync())}）：${(await _manifest(z.path))?.join('、') ?? '不是 PCL.PW 创建的备份'}',
+        '- ${p.basename(z.path)}（${_size(z.lengthSync())}）：${(await readBackupPaths(z.path))?.join('、') ?? '不是 PCL.PW 创建的备份'}',
     ].join('\n');
+  }
+}
+
+// ---------- 备份文件格式 ----------
+//
+// zip 中的 pclpw-backup.json 记录备份的路径；第 2 版起还记录每个文件的大小与 SHA-256，
+// 并用保存在启动器数据目录的密钥做 HMAC 签名，恢复时据此确认备份由本机的 PCL.PW 创建且未被修改。
+
+const backupManifestName = 'pclpw-backup.json';
+
+/// 读取或生成备份签名密钥
+List<int> backupKey(String appData) {
+  final f = File(p.join(appData, 'backup.key'));
+  if (f.existsSync()) {
+    final b = f.readAsBytesSync();
+    if (b.length >= 32) return b;
+  }
+  final r = Random.secure();
+  final key = List.generate(32, (_) => r.nextInt(256));
+  f.parent.createSync(recursive: true);
+  f.writeAsBytesSync(key, flush: true);
+  return key;
+}
+
+String _mac(List<int> key, Map<String, dynamic> body) =>
+    Hmac(sha256, key).convert(utf8.encode(jsonEncode(body))).toString();
+
+/// 去掉重复的路径和被其他路径包含的路径（例如同时有 mods 与 mods/a.jar 时只保留 mods）
+List<String> normalizePathSet(List<String> rels) {
+  final list = {for (final r in rels) r.replaceAll('\\', '/').replaceAll(RegExp(r'/+$'), '')}.toList()
+    ..sort((a, b) => a.length.compareTo(b.length));
+  final out = <String>[];
+  for (final r in list) {
+    if (out.any((o) => r == o || r.startsWith('$o/'))) continue;
+    out.add(r);
+  }
+  return out;
+}
+
+Future<String> _sha256Of(File f) async => (await sha256.bind(f.openRead()).first).toString();
+
+Future<void> createBackup(
+  String out,
+  String dir,
+  List<String> paths, {
+  required String versionId,
+  required List<int> key,
+  DateTime? created,
+}) async {
+  paths = normalizePathSet(paths);
+  await Directory(p.dirname(out)).create(recursive: true);
+  final files = <String, Map<String, dynamic>>{};
+  final enc = ZipFileEncoder()..create(out);
+  try {
+    Future<void> add(File f) async {
+      final rel = p.relative(f.path, from: dir).replaceAll('\\', '/');
+      files[rel] = {'size': f.lengthSync(), 'sha256': await _sha256Of(f)};
+      await enc.addFile(f, rel);
+    }
+
+    for (final rel in paths) {
+      final abs = resolveInside(dir, rel);
+      final type = FileSystemEntity.typeSync(abs, followLinks: false);
+      if (type == FileSystemEntityType.directory) {
+        // 不跟随符号链接，链接本身也不备份
+        for (final f in Directory(abs).listSync(recursive: true, followLinks: false).whereType<File>()) {
+          await add(f);
+        }
+      } else if (type == FileSystemEntityType.file) {
+        await add(File(abs));
+      }
+    }
+    final body = <String, dynamic>{
+      'format': 2,
+      'version': versionId,
+      'paths': paths,
+      'created': (created ?? DateTime.now()).toIso8601String(),
+      'files': files,
+    };
+    enc.addArchiveFile(ArchiveFile.string(backupManifestName, jsonEncode({...body, 'mac': _mac(key, body)})));
+  } finally {
+    await enc.close();
+  }
+}
+
+class BackupCheck {
+  BackupCheck({required this.paths, required this.signed, required this.files, required this.bytes, this.digests});
+
+  final List<String> paths;
+
+  /// 有签名且验证通过；旧版备份没有签名
+  final bool signed;
+  final int files;
+  final int bytes;
+
+  /// 签名备份中每个文件的 SHA-256
+  final Map<String, String>? digests;
+}
+
+class BackupException implements Exception {
+  BackupException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+Map<String, dynamic>? _readManifest(Archive archive) {
+  final m = archive.findFile(backupManifestName);
+  if (m == null || !m.isFile) return null;
+  final j = jsonDecode(utf8.decode(m.content));
+  return j is Map<String, dynamic> ? j : null;
+}
+
+/// 只读取备份包含的路径，用于列出备份
+Future<List<String>?> readBackupPaths(String zip) async {
+  final input = InputFileStream(zip);
+  try {
+    final paths = _readManifest(ZipDecoder().decodeStream(input))?['paths'];
+    return paths is List ? paths.map((e) => '$e').toList() : null;
+  } catch (_) {
+    return null;
+  } finally {
+    await input.close();
+  }
+}
+
+bool _under(List<String> paths, String rel) => paths.any((r) => rel == r || rel.startsWith('$r/'));
+
+/// 不修改任何文件，检查备份能否安全地恢复
+Future<BackupCheck> checkBackup(String zip, String dir, List<int> key) async {
+  final input = InputFileStream(zip);
+  try {
+    final Archive archive;
+    final Map<String, dynamic>? manifest;
+    try {
+      archive = ZipDecoder().decodeStream(input);
+      manifest = _readManifest(archive);
+    } catch (e) {
+      throw BackupException('备份文件已损坏：$e');
+    }
+    if (manifest == null) throw BackupException('这个备份不是由 PCL.PW 创建的，无法恢复');
+    final rawPaths = manifest['paths'];
+    if (rawPaths is! List || rawPaths.isEmpty) throw BackupException('备份清单无效');
+    final paths = <String>[];
+    for (final e in rawPaths) {
+      if (e is! String) throw BackupException('备份清单无效');
+      try {
+        paths.add(splitRelative(e).join('/'));
+      } on UnsafePathException {
+        throw BackupException('备份清单中有不安全的路径：$e');
+      }
+    }
+    if (normalizePathSet(paths).length != paths.length) throw BackupException('备份清单中有重复或互相包含的路径');
+
+    // 签名：有 mac 就必须验证通过
+    Map<String, String>? digests;
+    Map<String, int>? sizes;
+    final mac = manifest['mac'];
+    if (mac != null) {
+      final body = Map<String, dynamic>.of(manifest)..remove('mac');
+      if (mac is! String || _mac(key, body) != mac) {
+        throw BackupException('备份签名不匹配：备份被修改过，或者不是在这台设备上创建的');
+      }
+      final files = manifest['files'];
+      if (files is! Map) throw BackupException('备份清单无效');
+      digests = {};
+      sizes = {};
+      for (final e in files.entries) {
+        final info = e.value;
+        if (info is! Map || info['sha256'] is! String || info['size'] is! int) throw BackupException('备份清单无效');
+        digests['${e.key}'] = info['sha256'] as String;
+        sizes['${e.key}'] = info['size'] as int;
+      }
+    }
+
+    var count = 0, bytes = 0;
+    final seen = <String>{};
+    for (final f in archive.files) {
+      if (f.name == backupManifestName) continue;
+      if (f.isSymbolicLink) throw BackupException('备份中有符号链接，不能恢复：${f.name}');
+      final String rel;
+      try {
+        rel = splitRelative(f.name).join('/');
+      } on UnsafePathException {
+        throw BackupException('备份中有不安全的路径：${f.name}');
+      }
+      if (!_under(paths, rel)) throw BackupException('备份中有清单以外的文件：${f.name}');
+      if (!f.isFile) continue;
+      if (!seen.add(rel.toLowerCase())) throw BackupException('备份中有重复的文件：${f.name}');
+      if (sizes != null && sizes[rel] != f.size) throw BackupException('备份内容与清单不符：${f.name}');
+      count++;
+      bytes += f.size;
+    }
+    if (sizes != null && sizes.length != count) throw BackupException('备份缺少清单中的文件');
+    return BackupCheck(paths: paths, signed: mac != null, files: count, bytes: bytes, digests: digests);
+  } finally {
+    await input.close();
+  }
+}
+
+/// 把检查过的备份解压到新的临时文件夹 [staging]，并核对 CRC 与（签名备份的）SHA-256
+Future<void> extractBackup(String zip, String staging, BackupCheck check) async {
+  if (FileSystemEntity.typeSync(staging, followLinks: false) != FileSystemEntityType.notFound) {
+    throw BackupException('临时文件夹已存在：$staging');
+  }
+  await Directory(staging).create(recursive: true);
+  final input = InputFileStream(zip);
+  try {
+    final archive = ZipDecoder().decodeStream(input, verify: true);
+    for (final f in archive.files) {
+      if (f.name == backupManifestName) continue;
+      if (f.isSymbolicLink) throw BackupException('备份中有符号链接：${f.name}');
+      final rel = splitRelative(f.name).join('/');
+      if (!_under(check.paths, rel)) throw BackupException('备份中有清单以外的文件：${f.name}');
+      if (!f.isFile) continue;
+      final abs = resolveInside(staging, rel);
+      await Directory(p.dirname(abs)).create(recursive: true);
+      final out = OutputFileStream(abs);
+      try {
+        f.writeContent(out);
+      } finally {
+        await out.close();
+      }
+      final want = check.digests?[rel];
+      if (want != null && await _sha256Of(File(abs)) != want) throw BackupException('文件内容与备份清单不符：$rel');
+    }
+  } finally {
+    await input.close();
   }
 }
 

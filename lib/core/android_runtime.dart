@@ -66,7 +66,9 @@ abstract final class AndroidRuntime {
 
   /// 本应用自启动游戏以来的系统日志（包括游戏进程的原生崩溃信息）
   static Future<String> systemLog() async {
-    final since = (_launchedAt ?? DateTime.now().subtract(const Duration(minutes: 1))).subtract(const Duration(seconds: 2));
+    final since = (_launchedAt ?? DateTime.now().subtract(const Duration(minutes: 1))).subtract(
+      const Duration(seconds: 2),
+    );
     try {
       return await _channel.invokeMethod<String>('logcat', {'since': since.millisecondsSinceEpoch}) ?? '';
     } catch (e) {
@@ -127,6 +129,84 @@ abstract final class AndroidRuntime {
     }
     return exit;
   }
+
+  /// 在独立进程中无界面地运行 jar，等它结束。[args] 为 JVM 参数加上 `-jar <文件> ...` 或 `-cp <路径> <主类> ...`。
+  /// 输出逐行交给 [onLine]，返回完整输出与退出代码。
+  /// 只有异常退出能得到退出代码（信号、未捕获的异常）；System.exit 的代码拿不到，记为 0，
+  /// 所以调用方应按结果（生成的文件等）判断是否成功。
+  static Future<({int code, String output})> runJar({
+    required String javaHome,
+    required String workDir,
+    required List<String> args,
+    void Function(String line)? onLine,
+  }) async {
+    final log = File(p.join(Paths.appData, 'jar_logs', 'latest.log'));
+    await log.parent.create(recursive: true);
+    if (log.existsSync()) await log.delete();
+    _launchedAt = DateTime.now();
+    await _channel.invokeMethod('runJar', {
+      'javaHome': javaHome,
+      'workDir': workDir,
+      'logFile': log.path,
+      'args': args,
+    });
+
+    final out = StringBuffer();
+    var offset = 0;
+    var pending = '';
+    int? reported;
+    void read() {
+      if (!log.existsSync()) return;
+      final len = log.lengthSync();
+      if (len <= offset) return;
+      final raf = log.openSync();
+      raf.setPositionSync(offset);
+      final bytes = raf.readSync(len - offset);
+      raf.closeSync();
+      offset = len;
+      final text = pending + utf8.decode(bytes, allowMalformed: true);
+      final lines = text.split('\n');
+      pending = lines.removeLast();
+      for (final l in lines) {
+        final line = l.trimRight();
+        final m = RegExp(r'^Java exit code: (-?\d+)$').firstMatch(line);
+        if (m != null) reported = int.parse(m.group(1)!);
+        out.writeln(line);
+        onLine?.call(line);
+      }
+    }
+
+    var started = false;
+    final deadline = DateTime.now().add(const Duration(seconds: 30));
+    while (true) {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      read();
+      final running = await _channel.invokeMethod<bool>('jarRunning') ?? false;
+      if (running) started = true;
+      if (!running && (started || DateTime.now().isAfter(deadline))) break;
+    }
+    read();
+    if (pending.isNotEmpty) {
+      out.writeln(pending);
+      onLine?.call(pending);
+    }
+    final s = await _channel.invokeMethod<String>('jarExit');
+    // 运行时启动 JVM 前会写一行「PCL.PW runtime:」；没有这一行说明进程在那之前就崩溃了
+    final jvmStarted = out.toString().contains('PCL.PW runtime:');
+    final code = (s == null ? null : int.tryParse(s.split(' ').first)) ?? reported ?? (started && jvmStarted ? 0 : -1);
+    if (!started) {
+      out.writeln('[PCL.PW] jar 运行进程没有启动');
+    } else if (!jvmStarted) {
+      out.writeln('[PCL.PW] jar 运行进程在启动 Java 前退出了');
+      final log = await systemLog();
+      final lines = log.split('\n').where((l) => l.contains(':jar') || l.contains('AndroidRuntime')).toList();
+      out.writeln((lines.length > 30 ? lines.sublist(lines.length - 30) : lines).join('\n'));
+    }
+    return (code: code, output: out.toString());
+  }
+
+  /// 结束正在运行的 jar
+  static Future<void> stopJar() => _channel.invokeMethod('stopJar');
 }
 
 /// 安卓上的渲染器（名字与运行时 GameRuntime 一致）；auto 按显卡选择
@@ -143,7 +223,8 @@ const androidRenderers = {
 const androidRendererHints = {
   'auto': '按显卡自动选择，目前几乎所有设备都会用 MobileGlues',
   'mobileglues': 'OpenGL 转 OpenGL ES，速度快，支持所有版本（旧版本自动加 SFPEW 模拟固定管线）',
-  'zink': 'Mesa Zink：完整的 OpenGL 4.6，需要 Vulkan 1.1。骁龙（Adreno）上自动改用自带的开源驱动 Turnip，'
+  'zink':
+      'Mesa Zink：完整的 OpenGL 4.6，需要 Vulkan 1.1。骁龙（Adreno）上自动改用自带的开源驱动 Turnip，'
       '适合 MobileGlues 画面出错时使用',
   'system_gles': '直接使用系统 GLES 驱动，不做转译。原版 Minecraft 无法以此运行',
 };

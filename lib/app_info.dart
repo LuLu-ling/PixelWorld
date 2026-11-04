@@ -4,6 +4,14 @@ abstract final class AppInfo {
   static const fullName = 'PCL.PW（PixelsWorld 修改版）';
   static const version = '0.3.0';
 
+  /// 构建信息，由 CI 通过 --dart-define 写入；本地构建为空
+  static const commit = String.fromEnvironment('PCLPW_COMMIT');
+
+  /// 这个构建所属的更新通道：stable、preview 或 nightly
+  static const channel = String.fromEnvironment('PCLPW_CHANNEL', defaultValue: 'stable');
+
+  static const repoApi = 'https://api.github.com/repos/zhuzhi-09/PCL.PW';
+
   static const repoUrl = 'https://github.com/zhuzhi-09/PCL.PW';
 
   // 按指南第 3 条，关于页首位为龙腾猫跃的署名及赞助链接

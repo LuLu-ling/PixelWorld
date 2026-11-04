@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../core/ai_client.dart';
 import '../core/ai_context.dart';
+import '../core/secure.dart';
 import '../platform.dart';
 
 /// AI 排障的接口设置：用户自己填写接口地址、模型与 API Key
@@ -212,7 +213,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
           enableSuggestions: false,
           decoration: InputDecoration(
             labelText: 'API Key',
-            helperText: '加密保存在本机，只会发送给上面填写的接口地址；本机运行的服务可以不填',
+            helperText: '${SecureData.available ? '加密保存在本机' : '保存在启动器的私有数据目录（未加密）'}，只会发送给上面填写的接口地址；本机运行的服务可以不填',
             border: const OutlineInputBorder(),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,

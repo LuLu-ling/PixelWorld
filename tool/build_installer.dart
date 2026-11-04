@@ -7,7 +7,13 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 Future<void> run(String exe, List<String> args, {String? cwd}) async {
-  final proc = await Process.start(exe, args, workingDirectory: cwd, mode: ProcessStartMode.inheritStdio, runInShell: true);
+  final proc = await Process.start(
+    exe,
+    args,
+    workingDirectory: cwd,
+    mode: ProcessStartMode.inheritStdio,
+    runInShell: true,
+  );
   final code = await proc.exitCode;
   if (code != 0) throw Exception('$exe 退出代码 $code');
 }
@@ -31,16 +37,22 @@ Future<void> main() async {
     exit(1);
   }
   final root = p.normalize(p.join(p.dirname(Platform.script.toFilePath()), '..'));
-  final version = RegExp(r'^version:\s*([\d.]+)', multiLine: true)
-      .firstMatch(File(p.join(root, 'pubspec.yaml')).readAsStringSync())!
-      .group(1)!;
+  final version = RegExp(
+    r'^version:\s*([\d.]+)',
+    multiLine: true,
+  ).firstMatch(File(p.join(root, 'pubspec.yaml')).readAsStringSync())!.group(1)!;
   final windir = Platform.environment['WINDIR'] ?? r'C:\Windows';
   final csc = p.join(windir, 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe');
   // 用系统自带的 bsdtar 压缩；Git Bash 里的 tar 不支持 zip
   final tar = p.join(windir, 'System32', 'tar.exe');
 
   // 当前 Flutter 版本裁剪图标字体时会漏掉部分图标
-  await run('flutter', ['build', 'windows', '--release', '--no-tree-shake-icons'], cwd: root);
+  // 更新功能用到的构建信息（CI 中设置，见 .github/workflows/release.yml）
+  final defines = [
+    for (final k in ['PCLPW_COMMIT', 'PCLPW_CHANNEL'])
+      if ((Platform.environment[k] ?? '').isNotEmpty) '--dart-define=$k=${Platform.environment[k]}',
+  ];
+  await run('flutter', ['build', 'windows', '--release', '--no-tree-shake-icons', ...defines], cwd: root);
 
   final dist = Directory(p.join(root, 'dist'));
   final name = 'PCL.PW-$version-windows-x64';

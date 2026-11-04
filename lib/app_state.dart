@@ -452,7 +452,9 @@ class AppState extends ChangeNotifier {
         // 本地库目录是只读的，需要写入的临时目录换到应用数据目录
         final tmp = p.join(Paths.appData, 'game_tmp');
         await Directory(tmp).create(recursive: true);
-        final writable = RegExp(r'^(-Djna\.tmpdir|-Dorg\.lwjgl\.system\.SharedLibraryExtractPath|-Dio\.netty\.native\.workdir)=');
+        final writable = RegExp(
+          r'^(-Djna\.tmpdir|-Dorg\.lwjgl\.system\.SharedLibraryExtractPath|-Dio\.netty\.native\.workdir)=',
+        );
         args = [
           for (final a in args)
             if (writable.hasMatch(a))
@@ -463,6 +465,9 @@ class AppState extends ChangeNotifier {
             else
               a,
         ];
+        // 安卓上的 LWJGL 不是游戏自带的版本，Sodium 0.5 会因版本号不同拒绝启动（Sodium #2561）；
+        // 这是 Sodium 自己提供的开关，只关闭这一项版本检查
+        args.insert(0, '-Dsodium.checks.issue2561=false');
         // 26.x 默认先尝试 Vulkan：游戏没有处理安卓 Vulkan 表面的屏幕旋转（画面变成竖的），
         // 表面丢失时也会直接崩溃，所以固定用 OpenGL（经 SDL 与 MobileGlues）
         if (sdl && !args.contains('--graphicsBackend')) args.addAll(['--graphicsBackend', 'opengl']);

@@ -19,9 +19,28 @@ concurrency:
 
 env:
   FLUTTER_VERSION: 3.47.9
+  # 写进程序里的构建信息，供启动器的更新功能判断通道与版本
+  PCLPW_COMMIT: ${{ github.sha }}
+  PCLPW_CHANNEL: ${{ github.ref_type != 'tag' && 'nightly' || contains(github.ref_name, '-') && 'preview' || 'stable' }}
 
 jobs:
+  # 静态分析与自动化测试，失败时不构建、不发布。
+  # 需要真实游戏环境的 *_manual_test.dart 没有设置环境变量时会自动跳过
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
   windows:
+    needs: check
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -42,6 +61,7 @@ jobs:
             dist/*-portable.zip
 
   android:
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -72,7 +92,7 @@ jobs:
           PCLPW_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           flutter pub get
-          flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons
+          flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons             --dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL"
           version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk "dist/PCL.PW-$version-android-arm64.apk"

@@ -3,14 +3,17 @@ import 'dart:io';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
+import '../app_info.dart';
 import '../app_scope.dart';
 import '../core/android_runtime.dart';
 import '../core/config.dart';
 import '../core/java.dart';
 import '../core/memory.dart';
+import '../core/updater.dart';
 import '../platform.dart';
 import '../widgets/pcl_import_dialog.dart';
 import '../widgets/settings_group.dart';
+import '../widgets/update_dialog.dart';
 
 // ---------- 通用设置行 ----------
 
@@ -256,7 +259,9 @@ class _RendererRowState extends State<_RendererRow> {
         initialSelection: pref,
         requestFocusOnTap: false,
         inputDecorationTheme: const InputDecorationTheme(isDense: true, border: OutlineInputBorder()),
-        dropdownMenuEntries: [for (final e in androidRenderers.entries) DropdownMenuEntry(value: e.key, label: e.value)],
+        dropdownMenuEntries: [
+          for (final e in androidRenderers.entries) DropdownMenuEntry(value: e.key, label: e.value),
+        ],
         onSelected: (v) => v == null ? null : cfg.update({'androidRenderer': v}),
       ),
     );
@@ -596,6 +601,38 @@ class MiscSection extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(28),
       children: [
+        SettingsGroup(
+          title: '更新',
+          children: [
+            _SelectRow<UpdateChannel>(
+              icon: Icons.alt_route,
+              title: '更新通道',
+              subtitle: '正式版最稳定；预览版包含测试中的版本；Nightly 为 main 分支的每次更新，可能不稳定',
+              value: UpdateChannel.parse(cfg.updateChannel),
+              options: {for (final c in UpdateChannel.values) c: c.label},
+              onChanged: (v) => cfg.update({'updateChannel': v.name, 'updateSkipped': ''}),
+            ),
+            _SwitchRow(
+              icon: Icons.update,
+              title: '启动时检查更新',
+              value: cfg.updateAutoCheck,
+              onChanged: (v) => cfg.update({'updateAutoCheck': v}),
+            ),
+            ListTile(
+              contentPadding: _rowPadding,
+              leading: const Icon(Icons.system_update_alt),
+              title: const Text('检查更新'),
+              subtitle: Text(
+                '当前版本 ${AppInfo.version}'
+                '${AppInfo.commit.isEmpty ? '（本地构建）' : '（${AppInfo.channel}，${AppInfo.commit.substring(0, AppInfo.commit.length.clamp(0, 7))}）'}',
+              ),
+              trailing: FilledButton.tonal(
+                onPressed: () => checkUpdates(context, manual: true),
+                child: const Text('检查'),
+              ),
+            ),
+          ],
+        ),
         SettingsGroup(
           title: 'PCL-CE',
           children: [

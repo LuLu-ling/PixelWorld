@@ -6,8 +6,7 @@ import 'package:path/path.dart' as p;
 
 import 'download.dart';
 import 'install.dart';
-import 'instance_config.dart';
-import 'java.dart';
+import 'java_run.dart';
 import 'loaders.dart';
 import 'paths.dart';
 import 'task.dart';
@@ -105,17 +104,20 @@ Future<String> installOptiFine(
     if (zip.findFile('optifine/Patcher.class') != null) {
       task.setStage('生成 OptiFine 库');
       final vanilla = await resolveVersion(g, gameVersion);
-      final java = await ensureJava(vanilla, const JavaAuto(), '', dl, task);
-      final r = await Process.run(java.path, [
-        '-cp',
-        installer.path,
-        'optifine.Patcher',
-        g.versionJar(gameVersion),
-        installer.path,
-        libFile.path,
-      ]);
-      task.output('${r.stdout}${r.stderr}');
-      if (r.exitCode != 0 || !libFile.existsSync()) throw Exception('OptiFine Patcher 运行失败（退出代码 ${r.exitCode}）');
+      if (libFile.existsSync()) await libFile.delete();
+      final r = await runJava(
+        vanilla,
+        ['-cp', installer.path, 'optifine.Patcher', g.versionJar(gameVersion), installer.path, libFile.path],
+        workDir: g.root,
+        dl: dl,
+        task: task,
+        onLine: task.output,
+      );
+      if (r.code != 0 || !libFile.existsSync() || libFile.lengthSync() == 0) {
+        final tail = r.output.trim().split('\n').reversed.take(6).toList().reversed.join('\n');
+        if (libFile.existsSync()) await libFile.delete();
+        throw Exception('OptiFine Patcher 运行失败（退出代码 ${r.code}）\n$tail');
+      }
     } else {
       await installer.copy(libFile.path);
     }

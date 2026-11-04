@@ -1,7 +1,15 @@
 package io.github.zhuzhi09.pcl_pw
 
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import android.content.ServiceConnection
+import android.content.pm.PackageInstaller
+import android.app.PendingIntent
+import android.os.IBinder
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -15,11 +23,20 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import io.github.zhuzhi09.pclpw.runtime.GameActivity
 import io.github.zhuzhi09.pclpw.runtime.GameRuntime
+import io.github.zhuzhi09.pclpw.runtime.JarService
 import java.io.File
 import kotlin.concurrent.thread
 
 class MainActivity : FlutterActivity() {
     private var pending: MethodChannel.Result? = null
+
+    /** 正在运行的 jar（JarService 进程）；进程退出后自动解除绑定 */
+    private var jarConnection: ServiceConnection? = null
+
+    private fun processRunning(suffix: String): Boolean {
+        val am = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
+        return am.runningAppProcesses?.any { it.processName == "$packageName:$suffix" } == true
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -53,6 +70,18 @@ class MainActivity : FlutterActivity() {
                     "network" to network,
                 ),
             )
+        }
+        // 启动器更新：用 PackageInstaller 安装下载好的 APK，系统会弹出确认
+        MethodChannel(messenger, "pclpw/update").setMethodCallHandler { call, result ->
+            if (call.method != "installApk") return@setMethodCallHandler result.notImplemented()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+                startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                return@setMethodCallHandler result.error("permission", "请在系统设置中允许 PCL.PW 安装应用，然后重试", null)
+            }
+            background(result) {
+                installApk(File(call.argument<String>("path")!!))
+                null
+            }
         }
         // 游戏运行时（android/runtime 模块）
         MethodChannel(messenger, "pclpw/runtime").setMethodCallHandler { call, result ->
@@ -115,12 +144,89 @@ class MainActivity : FlutterActivity() {
                     p.waitFor()
                     if (text.length > 200_000) text.substring(text.length - 200_000) else text
                 }
+                // 无界面运行 jar（加载器安装器、OptiFine Patcher、用户选择的 jar）
+                "runJar" -> {
+                    if (jarConnection != null || processRunning("jar")) {
+                        return@setMethodCallHandler result.error("runtime", "已有 jar 正在运行", null)
+                    }
+                    GameRuntime.jarExitFile(this).delete()
+                    val intent = Intent(this, JarService::class.java)
+                        .putExtra(JarService.EXTRA_JAVA_HOME, call.argument<String>("javaHome"))
+                        .putExtra(JarService.EXTRA_WORK_DIR, call.argument<String>("workDir"))
+                        .putExtra(JarService.EXTRA_LOG_FILE, call.argument<String>("logFile"))
+                        .putExtra(JarService.EXTRA_ARGS, call.argument<List<String>>("args")!!.toTypedArray())
+                    val conn = object : ServiceConnection {
+                        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {}
+
+                        override fun onServiceDisconnected(name: ComponentName?) {
+                            // 进程已退出；解除绑定，避免系统重新创建服务再运行一次
+                            unbindService(this)
+                            if (jarConnection === this) jarConnection = null
+                        }
+                    }
+                    if (!bindService(intent, conn, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)) {
+                        return@setMethodCallHandler result.error("runtime", "无法启动 jar 运行进程", null)
+                    }
+                    jarConnection = conn
+                    result.success(null)
+                }
+                "jarRunning" -> result.success(jarConnection != null || processRunning("jar"))
+                "stopJar" -> {
+                    val am = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
+                    am.runningAppProcesses?.filter { it.processName == "$packageName:jar" }?.forEach {
+                        android.os.Process.killProcess(it.pid)
+                    }
+                    result.success(null)
+                }
+                "jarExit" -> {
+                    val f = GameRuntime.jarExitFile(this)
+                    result.success(if (f.exists()) f.readText().also { f.delete() } else null)
+                }
                 "lastExit" -> {
                     val f = GameRuntime.exitFile(this)
                     result.success(if (f.exists()) f.readText().also { f.delete() } else null)
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    private fun installApk(apk: File) {
+        val installer = packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+        params.setAppPackageName(packageName)
+        val id = installer.createSession(params)
+        installer.openSession(id).use { session ->
+            apk.inputStream().use { input ->
+                session.openWrite("base.apk", 0, apk.length()).use { out ->
+                    input.copyTo(out)
+                    session.fsync(out)
+                }
+            }
+            val action = "$packageName.INSTALL_STATUS"
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
+                        // 需要用户在系统界面中确认安装
+                        PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                            @Suppress("DEPRECATION")
+                            val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+                            if (confirm != null) startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
+                        else -> runCatching { unregisterReceiver(this) }
+                    }
+                }
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(receiver, IntentFilter(action), RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                registerReceiver(receiver, IntentFilter(action))
+            }
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
+            val pending = PendingIntent.getBroadcast(this, id, Intent(action).setPackage(packageName), flags)
+            session.commit(pending.intentSender)
         }
     }
 

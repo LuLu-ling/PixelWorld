@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <!-- 无界面运行 jar（加载器安装器等），同样在独立进程中运行 -->
+        <service
+            android:name="io.github.zhuzhi09.pclpw.runtime.JarService"
+            android:process=":jar"
+            android:exported="false" />
         <!-- 游戏在独立进程中运行：Java 虚拟机退出时不会带走启动器 -->
         <activity
             android:name="io.github.zhuzhi09.pclpw.runtime.GameActivity"

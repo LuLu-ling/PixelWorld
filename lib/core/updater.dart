@@ -147,16 +147,19 @@ bool isNewer(Release r, {String currentVersion = AppInfo.version, String current
 bool get isInstalledWindowsBuild =>
     Platform.isWindows && File(p.join(p.dirname(Platform.resolvedExecutable), '.pw-install.json')).existsSync();
 
-/// 当前平台使用的发布文件；macOS 与 Linux 还没有发布包
-ReleaseAsset? assetFor(Release r, {bool? android, bool? windows, bool? installed}) {
+/// 当前平台使用的发布文件；Linux 还没有发布包
+ReleaseAsset? assetFor(Release r, {bool? android, bool? windows, bool? macos, bool? installed}) {
   android ??= Platform.isAndroid;
   windows ??= Platform.isWindows;
+  macos ??= Platform.isMacOS;
   installed ??= isInstalledWindowsBuild;
   final String suffix;
   if (android) {
     suffix = '-android-arm64.apk';
   } else if (windows) {
     suffix = installed ? '-windows-x64-setup.exe' : '-windows-x64-portable.zip';
+  } else if (macos) {
+    suffix = '-macos.dmg';
   } else {
     return null;
   }
@@ -230,6 +233,11 @@ Future<void> applyUpdate(File file) async {
   if (Platform.isAndroid) {
     // 系统会弹出安装确认；首次需要允许「安装未知应用」
     await _channel.invokeMethod('installApk', {'path': file.path});
+    return;
+  }
+  // macOS：打开下载的 dmg，由用户把新版本拖进「应用程序」替换旧版本
+  if (Platform.isMacOS) {
+    await Process.run('open', [file.path]);
     return;
   }
   if (!Platform.isWindows) throw UnsupportedError('这个平台暂不支持自动更新');

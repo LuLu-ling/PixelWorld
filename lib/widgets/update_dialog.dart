@@ -113,9 +113,13 @@ class _UpdateDialogState extends State<_UpdateDialog> {
             if (asset == null) ...[
               const SizedBox(height: 12),
               Text(
-                Platform.isMacOS || Platform.isLinux ? '这个平台还没有发布包，请到 GitHub 查看。' : '这个发布中没有适用于当前平台的文件。',
+                Platform.isLinux ? '这个平台还没有发布包，请到 GitHub 查看。' : '这个发布中没有适用于当前平台的文件。',
                 style: TextStyle(color: theme.colorScheme.error),
               ),
+            ],
+            if (Platform.isMacOS && asset != null) ...[
+              const SizedBox(height: 12),
+              Text('下载后会打开安装镜像，把 PCL.PW 拖进「应用程序」文件夹替换旧版本即可；游戏文件不受影响。', style: theme.textTheme.bodySmall),
             ],
             if (Platform.isAndroid && asset != null) ...[
               const SizedBox(height: 12),

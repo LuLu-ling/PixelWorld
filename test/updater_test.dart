@@ -64,7 +64,7 @@ void main() {
     expect(assetFor(r, android: true, windows: false)?.name, endsWith('.apk'));
     expect(assetFor(r, android: false, windows: true, installed: true)?.name, endsWith('-setup.exe'));
     expect(assetFor(r, android: false, windows: true, installed: false)?.name, endsWith('-portable.zip'));
-    expect(assetFor(r, android: false, windows: false), isNull);
+    expect(assetFor(r, android: false, windows: false, macos: false), isNull);
     final n = rel('nightly', files: ['PCL.PW-nightly-abc1234-android-arm64.apk']);
     expect(assetFor(n, android: true, windows: false)?.name, 'PCL.PW-nightly-abc1234-android-arm64.apk');
   });

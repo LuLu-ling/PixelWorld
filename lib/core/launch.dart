@@ -10,6 +10,7 @@ import 'accounts.dart';
 import 'cat_ini.dart';
 import 'config.dart';
 import 'instance_config.dart';
+import 'mac_glfw.dart';
 import 'java.dart';
 import 'memory.dart';
 import 'paths.dart';
@@ -188,6 +189,8 @@ List<String> buildArgs(LaunchContext ctx) {
     if (Platform.isMacOS) jvm.add('-XstartOnFirstThread');
     jvm.addAll([r'-Djava.library.path=${natives_directory}', '-cp', r'${classpath}']);
   }
+  // Apple 芯片的 Mac 上 1.13～1.18：使用去掉了窗口图标报错的 GLFW（mac_glfw.dart）
+  if (needsAppleSiliconGlfw(v.libraries)) jvm.add('-Dorg.lwjgl.glfw.libname=$appleSiliconGlfwPath');
   if (cfg.preferredIpStack == 'v4') {
     jvm.addAll(['-Djava.net.preferIPv4Stack=true', '-Djava.net.preferIPv4Addresses=true']);
   }

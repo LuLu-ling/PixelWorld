@@ -177,6 +177,12 @@ const _defaultLibBase = 'https://libraries.minecraft.net/';
 /// Apple 芯片的 Mac：1.13～1.18 自带的 LWJGL 3.1/3.2 没有 arm64 本地库，换成 3.3.1
 /// （Mojang 的库服务器上有 natives-macos-arm64），java-objc-bridge 1.0.0 换成同时支持 arm64 的 1.1。
 /// 先按规则筛选，替换后的库不再带规则。LWJGL 2（1.12.2 及更早）不在这里处理。
+/// Apple 芯片的 Mac 上，这个版本是否使用了替换后的 LWJGL 3.3.1（需要配套的 GLFW，见 mac_glfw.dart）
+bool needsAppleSiliconGlfw(List<Map<String, dynamic>> libraries) =>
+    Platform.isMacOS &&
+    _isArm64 &&
+    libraries.any((l) => RegExp(r'^org\.lwjgl:lwjgl:3\.[12]\.').hasMatch('${l['name']}'));
+
 List<Map<String, dynamic>> appleSiliconLibraries(List<Map<String, dynamic>> libraries) {
   final out = <Map<String, dynamic>>[];
   final seen = <String>{};

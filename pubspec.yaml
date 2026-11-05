@@ -42,3 +42,5 @@ flutter:
   # 图标源图在 assets/icon/source/，只供 tool/icons 生成图标用，不打包
   assets:
     - assets/icon/icon.png
+    # Apple 芯片的 Mac 上运行 1.13～1.18 用的 GLFW（lib/core/mac_glfw.dart）
+    - assets/macos/libglfw.3.dylib

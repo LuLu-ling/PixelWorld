@@ -13,7 +13,7 @@ import 'core/ai/ai_tools.dart';
 import 'core/cat_ini.dart';
 import 'core/config.dart';
 import 'core/android_runtime.dart';
-import 'core/version.dart' show VersionJson;
+import 'core/version.dart' show VersionJson, needsAppleSiliconGlfw;
 import 'core/crash.dart';
 import 'core/download.dart';
 import 'core/extra_loaders.dart';
@@ -23,6 +23,7 @@ import 'core/instance.dart';
 import 'core/instance_config.dart';
 import 'core/java.dart';
 import 'core/launch.dart';
+import 'core/mac_glfw.dart';
 import 'core/loaders.dart';
 import 'core/memory.dart';
 import 'core/microsoft.dart';
@@ -459,6 +460,7 @@ class AppState extends ChangeNotifier {
         classpathTail: android != null && lwjgl2 ? [android.lwjglx] : const [],
         skipLibrary: android == null ? null : (name) => name.startsWith('org.lwjgl'),
       );
+      if (needsAppleSiliconGlfw(ctx.v.libraries)) await ensureAppleSiliconGlfw();
       var args = buildArgs(ctx);
       if (android != null) {
         // 本地库目录是只读的，需要写入的临时目录换到应用数据目录

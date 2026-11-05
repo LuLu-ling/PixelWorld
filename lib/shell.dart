@@ -209,7 +209,11 @@ class _TitleBar extends StatelessWidget {
             ),
           // 窗口按钮左侧：任务入口
           // 手机上没有窗口按钮，任务入口放在最右侧
-          Positioned(right: isDesktop && !nativeWindowButtons ? 46 * 3 + 4 : 8, top: 4, child: const _TasksButton()),
+          // Windows 上与自绘窗口按钮顶端对齐；macOS 与手机上在标题栏中垂直居中
+          if (isDesktop && !nativeWindowButtons)
+            const Positioned(right: 46 * 3 + 4, top: 4, child: _TasksButton())
+          else
+            const Positioned(right: 8, top: 0, bottom: 0, child: Center(child: _TasksButton())),
           // 手机上全屏显示，电量与网络放在任务入口左侧
           if (!isDesktop) const Positioned(right: 64, top: 0, bottom: 0, child: Center(child: DeviceStatus())),
           if (isDesktop && !nativeWindowButtons) const Positioned(right: 0, top: 0, child: WindowButtons()),

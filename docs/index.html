@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<script>document.documentElement.classList.add('js');</script>
 <title>PCL.PW</title>
 <meta name="description" content="PCL.PW：基于 Plain Craft Launcher 的第三方衍生作品，电脑和手机上的 Java Minecraft 启动器，支持 Windows 与 Android。">
 <link rel="icon" href="favicon.png">
@@ -34,7 +35,10 @@
   --md-sys-color-outline: #74777f;
   --md-sys-color-outline-variant: #c4c6d0;
   --md-elevation-1: 0 1px 2px rgb(0 0 0 / .30), 0 1px 3px 1px rgb(0 0 0 / .15);
+  --md-elevation-2: 0 1px 2px rgb(0 0 0 / .30), 0 2px 6px 2px rgb(0 0 0 / .15);
   --md-motion: 200ms cubic-bezier(.2, 0, 0, 1);
+  --md-ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --md-ease-decel: cubic-bezier(.05, .7, .1, 1);
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -248,6 +252,50 @@ footer p + p { margin-top: 4px; }
   details .answer { padding: 0 16px 16px; }
   .headline-small { font-size: 22px; line-height: 28px; }
 }
+/* ---------- 动效（仅在 JS 可用且未要求减少动态效果时生效） ---------- */
+.hero-art { position: relative; }
+.hero-art img { position: relative; z-index: 1; }
+.hero-art::before {
+  content: ""; position: absolute; inset: -12%; border-radius: 50%; pointer-events: none;
+  background:
+    radial-gradient(circle at 30% 30%, var(--md-sys-color-primary-container), transparent 60%),
+    radial-gradient(circle at 70% 70%, var(--md-sys-color-tertiary-container), transparent 60%);
+  opacity: .8;
+}
+.card, .card .tile { transition: transform 300ms var(--md-ease-standard), box-shadow 300ms var(--md-ease-standard); }
+@media (hover: hover) {
+  .card:hover { box-shadow: var(--md-elevation-2); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes md-rise { from { opacity: 0; transform: translateY(16px); } }
+  @keyframes md-reveal { from { opacity: 0; transform: translateY(24px); } }
+  @keyframes md-fade { from { opacity: 0; } }
+  @keyframes md-pop { from { opacity: 0; transform: scale(.85); } }
+  @keyframes md-float { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(-6px); } 75% { transform: translateY(6px); } }
+  @keyframes md-glow { from { transform: rotate(0) scale(1); } 50% { transform: rotate(180deg) scale(1.1); } to { transform: rotate(360deg) scale(1); } }
+  @keyframes md-answer { from { opacity: 0; transform: translateY(-8px); } }
+
+  .js .app-bar { animation: md-fade 400ms var(--md-ease-standard) backwards; }
+  .js .hero-text h1 { animation: md-rise 600ms var(--md-ease-decel) 120ms backwards; }
+  .js .hero-text .tagline { animation: md-rise 600ms var(--md-ease-decel) 190ms backwards; }
+  .js .hero-text .sub { animation: md-rise 600ms var(--md-ease-decel) 260ms backwards; }
+  .js .hero-text .actions { animation: md-rise 600ms var(--md-ease-decel) 330ms backwards; }
+  .js .hero-art { animation: md-pop 600ms var(--md-ease-decel) 150ms backwards; }
+  .js .hero-art img { animation: md-float 6s ease-in-out 800ms infinite; }
+  .js .hero-art::before { animation: md-glow 40s linear infinite; }
+
+  .js .sec-head:not(.in), .js .card:not(.in), .js .notice:not(.in), .js .faq-list details:not(.in) {
+    opacity: 0; transform: translateY(24px);
+  }
+  .js .sec-head.in, .js .card.in, .js .notice.in, .js .faq-list details.in {
+    animation: md-reveal 500ms var(--md-ease-decel) var(--d, 0ms) backwards;
+  }
+  @media (hover: hover) {
+    .card:hover { transform: translateY(-2px); }
+    .card:hover .tile { transform: rotate(-6deg) scale(1.08); }
+  }
+  details[open] .answer { animation: md-answer 300ms var(--md-ease-decel); }
+}
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
@@ -366,6 +414,25 @@ footer p + p { margin-top: 4px; }
   </div>
 </footer>
 
+<script>
+// 滚动进入视口时淡入上移，只触发一次；同批进入的元素按序错开
+(function () {
+  var els = document.querySelectorAll('.sec-head, .card, .notice, .faq-list details');
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function show(el) { el.classList.add('in'); }
+  if (reduce || !('IntersectionObserver' in window)) { Array.prototype.forEach.call(els, show); return; }
+  var io = new IntersectionObserver(function (entries) {
+    var k = 0;
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      e.target.style.setProperty('--d', (k++ * 70) + 'ms');
+      show(e.target);
+      io.unobserve(e.target);
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -10% 0px' });
+  Array.prototype.forEach.call(els, function (el) { io.observe(el); });
+})();
+</script>
 <script>
 // 顶部应用栏滚动后切换为 surface-container 背景
 (function () {

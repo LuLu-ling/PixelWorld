@@ -23,7 +23,7 @@ PCL.PW 是一个跨平台的 Minecraft 启动器，属于 PCL 的衍生作品，
 |---|---|
 | Windows | 可用 |
 | Android | 可用（需要 Android 8.0 及以上、64 位 ARM），游戏运行时见 [android/runtime](android/runtime/NOTICE.md) |
-| macOS | 部分可用（macOS 12 及以上）。Apple 芯片上暂时只能启动 1.19 及以上的版本，旧版本计划在下一次大版本更新中支持；没有经过 Apple 公证 |
+| macOS | 可用（macOS 12 及以上，Apple 芯片与 Intel 通用，Apple 芯片上 1.12.2 到最新版本均已实测）；没有经过 Apple 公证 |
 | Linux | 尚未适配 |
 
 ### 已支持
@@ -45,7 +45,7 @@ PCL.PW 是一个跨平台的 Minecraft 启动器，属于 PCL 的衍生作品，
 
 ### 计划支持
 
-- macOS：Apple 芯片上启动 1.18 及更早的版本；Linux 适配。
+- Linux 适配。
 - 整合包安装（Modrinth、CurseForge）。
 - 第三方验证账户（Authlib-Injector 等）。
 - 安卓：手柄、自定义按键布局，更多渲染器选项。

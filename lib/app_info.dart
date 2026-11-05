@@ -2,7 +2,7 @@
 abstract final class AppInfo {
   static const name = 'PCL.PW';
   static const fullName = 'PCL.PW（PixelsWorld 修改版）';
-  static const version = '0.3.2';
+  static const version = '0.3.3';
 
   /// 构建信息，由 CI 通过 --dart-define 写入；本地构建为空
   static const commit = String.fromEnvironment('PCLPW_COMMIT');

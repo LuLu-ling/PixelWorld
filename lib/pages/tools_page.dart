@@ -16,9 +16,10 @@ import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
 import 'diagnose_page.dart';
 import 'file_manager_page.dart';
+import 'lan_transfer_page.dart';
 import 'versions_page.dart';
 
-enum _Section { lobby, diagnose, toolbox, download, skin, server, achievement }
+enum _Section { lobby, transfer, diagnose, toolbox, download, skin, server, achievement }
 
 /// 工具（PCL 的布局）：联机与实用工具
 class ToolsPage extends StatefulWidget {
@@ -32,7 +33,10 @@ class _ToolsPageState extends State<ToolsPage> {
   _Section _section = _Section.toolbox;
 
   static const _groups = [
-    SideNavGroup('联机', [SideNavItem(_Section.lobby, '联机大厅', Icons.lan_outlined, trailing: '规划中')]),
+    SideNavGroup('联机', [
+      SideNavItem(_Section.lobby, '联机大厅', Icons.lan_outlined, trailing: '规划中'),
+      SideNavItem(_Section.transfer, '局域网互传', Icons.swap_horiz),
+    ]),
     SideNavGroup('实用工具', [
       SideNavItem(_Section.diagnose, '错误分析', Icons.troubleshoot),
       SideNavItem(_Section.toolbox, '百宝箱', Icons.handyman_outlined),
@@ -53,6 +57,7 @@ class _ToolsPageState extends State<ToolsPage> {
           child: ContentPanel(
             child: switch (_section) {
               _Section.lobby => const _Lobby(),
+              _Section.transfer => const LanTransferPage(),
               _Section.diagnose => const _Diagnose(),
               _Section.toolbox => const _Toolbox(),
               _Section.download => const _CustomDownload(),

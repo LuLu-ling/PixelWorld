@@ -221,12 +221,11 @@ Future<String?> _installZulu8Arm64(Downloader dl, TaskProgress task) async {
   final r = await Process.run('tar', ['-xzf', archive, '-C', tmp.path]);
   await File(archive).delete();
   if (r.exitCode != 0) throw Exception('解压 Java 8 失败：${r.stderr}');
-  // 压缩包中为 <名称>/zulu-8.jre/Contents/Home
-  final bundle = tmp
-      .listSync(recursive: true)
-      .whereType<Directory>()
-      .where((d) => p.basename(d.path).endsWith('.jre') && Directory(p.join(d.path, 'Contents', 'Home')).existsSync())
-      .firstOrNull;
+  // 压缩包中的 Java 目录：<名称>/Contents/Home 或 <名称>/zulu-8.jre/Contents/Home
+  final bundle = [
+    tmp,
+    ...tmp.listSync(recursive: true).whereType<Directory>(),
+  ].where((d) => File(p.join(d.path, 'Contents', 'Home', 'bin', 'java')).existsSync()).firstOrNull;
   if (bundle == null) throw Exception('Java 8 压缩包的结构无法识别');
   if (Directory(base).existsSync()) await Directory(base).delete(recursive: true);
   await Directory(base).create(recursive: true);

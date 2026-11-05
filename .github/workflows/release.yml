@@ -35,6 +35,8 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      # window_manager 依赖的 cnativeapi 在测试时会编译本地代码，需要 GTK 3、X11、Xi 的开发包
+      - run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libx11-dev libxi-dev pkg-config
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test

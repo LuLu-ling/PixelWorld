@@ -3,7 +3,7 @@ description: "PCL.PW"
 publish_to: 'none'
 
 # 版本名 + 构建号：构建号是安卓的 versionCode，每次发布都要增加
-version: 0.3.0+23
+version: 0.3.1+24
 
 environment:
   sdk: ^3.13.7

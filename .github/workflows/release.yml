@@ -132,6 +132,8 @@ jobs:
 
   publish:
     needs: [windows, android, macos]
+    # macOS 构建失败时仍然发布 Windows 与安卓版
+    if: ${{ !cancelled() && needs.windows.result == 'success' && needs.android.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -149,7 +151,12 @@ jobs:
           downloads=$'- Windows：安装包（`*-setup.exe`）或便携版（`*-portable.zip`）\n- 安卓：`*-android-arm64.apk`，需要 Android 8.0 及以上、64 位 ARM 处理器\n- macOS：`*-macos.dmg`，需要 macOS 12 及以上，Apple 芯片与 Intel 通用。没有经过 Apple 公证，首次打开时如果提示无法验证开发者，请到「系统设置 → 隐私与安全性」中点「仍要打开」'
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             tag="$GITHUB_REF_NAME"
-            notes=$(printf '%s\n\n%s\n' "$downloads" "$about")
+            # 更新说明写在 release-notes/<标签>.md 中，没有时只写下载说明
+            if [ -f "release-notes/$tag.md" ]; then
+              notes=$(printf '%s\n\n## 下载\n\n%s\n\n%s\n' "$(cat "release-notes/$tag.md")" "$downloads" "$about")
+            else
+              notes=$(printf '%s\n\n%s\n' "$downloads" "$about")
+            fi
             flags=(--title "PCL.PW $tag" --notes "$notes" --verify-tag)
             case "$tag" in *-*) flags+=(--prerelease) ;; *) flags+=(--latest) ;; esac
             gh release delete "$tag" --yes 2>/dev/null || true

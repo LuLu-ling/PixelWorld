@@ -230,6 +230,12 @@ List<Map<String, dynamic>> appleSiliconLibraries(List<Map<String, dynamic>> libr
       }
       continue;
     }
+    // 旧版 JNA（1.12.2 等使用 4.x，java-objc-bridge 依赖它）没有 arm64 本地库，换成 5.14.0
+    if (parts.length >= 3 && parts[0] == 'net.java.dev.jna' && !parts[2].startsWith('5.')) {
+      final artifact = parts[1] == 'platform' ? 'jna-platform' : parts[1];
+      if (seen.add(artifact)) out.add({'name': 'net.java.dev.jna:$artifact:5.14.0'});
+      continue;
+    }
     if (parts.length >= 3 && parts[0] == 'net.java.jinput' && parts[1] == 'jinput-platform') {
       if (seen.add('jinput-platform')) out.add(_arm64Natives('${lib['name']}', _jinputArm64));
       continue;

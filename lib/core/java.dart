@@ -1,6 +1,7 @@
 import 'dart:ffi' show Abi;
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import 'download.dart';
@@ -189,6 +190,52 @@ Future<String?> _installRuntime(String component, Downloader dl, TaskProgress ta
   return File(java).existsSync() ? java : null;
 }
 
+/// Apple 芯片的 Mac：Mojang 没有提供 arm64 的 Java 8（jre-legacy 为空），改为下载 Azul Zulu 8（arm64，免费的 OpenJDK 构建）。
+/// 解压后放到与 Mojang 运行时相同的位置（runtime/jre-legacy/jre.bundle），按 Azul 提供的 SHA-256 校验
+Future<String?> _installZulu8Arm64(Downloader dl, TaskProgress task) async {
+  task.setStage('获取 Java 8（Azul Zulu，Apple 芯片）');
+  const api = 'https://api.azul.com/metadata/v1/zulu/packages';
+  final list = await dl.fetchJson(
+    '$api/?java_version=8&os=macos&arch=aarch64&archive_type=tar.gz&java_package_type=jre'
+    '&javafx_bundled=false&latest=true&release_status=ga&availability_types=CA&page=1&page_size=1',
+  ) as List;
+  if (list.isEmpty) return null;
+  final pkg = await dl.fetchJson('$api/${(list.first as Map)['package_uuid']}') as Map<String, dynamic>;
+  final url = '${pkg['download_url']}';
+  final sha256Hash = '${pkg['sha256_hash']}';
+  final base = p.join(Paths.runtimeDir, 'jre-legacy');
+  final archive = p.join(Paths.runtimeDir, '${pkg['name']}');
+
+  task.setStage('下载 Java 8（Azul Zulu）');
+  await dl.downloadAll([DownloadItem(url: url, path: archive, size: (pkg['size'] as num?)?.toInt())], task.progress);
+  if ((await sha256.bind(File(archive).openRead()).first).toString() != sha256Hash) {
+    await File(archive).delete();
+    throw Exception('Java 8 下载校验失败（SHA-256 不匹配）');
+  }
+
+  task.setStage('解压 Java 8');
+  final tmp = Directory('$base.extract');
+  if (tmp.existsSync()) await tmp.delete(recursive: true);
+  await tmp.create(recursive: true);
+  final r = await Process.run('tar', ['-xzf', archive, '-C', tmp.path]);
+  await File(archive).delete();
+  if (r.exitCode != 0) throw Exception('解压 Java 8 失败：${r.stderr}');
+  // 压缩包中为 <名称>/zulu-8.jre/Contents/Home
+  final bundle = tmp
+      .listSync(recursive: true)
+      .whereType<Directory>()
+      .where((d) => p.basename(d.path).endsWith('.jre') && Directory(p.join(d.path, 'Contents', 'Home')).existsSync())
+      .firstOrNull;
+  if (bundle == null) throw Exception('Java 8 压缩包的结构无法识别');
+  if (Directory(base).existsSync()) await Directory(base).delete(recursive: true);
+  await Directory(base).create(recursive: true);
+  await bundle.rename(p.join(base, 'jre.bundle'));
+  await tmp.delete(recursive: true);
+  await File(p.join(base, '.installed')).writeAsString(url);
+  final java = _managedJavaPath('jre-legacy');
+  return File(java).existsSync() ? java : null;
+}
+
 Future<JavaInfo> _describe(String path) async {
   if (!File(path).existsSync()) throw Exception('Java 路径不存在：$path');
   final info = await probeJava(path);
@@ -248,10 +295,16 @@ Future<JavaInfo> ensureJava(VersionJson v, JavaPref pref, String globalJava, Dow
   if (exact != null) return exact;
 
   var downloadError = '';
-  final downloaded = await _installRuntime(component, dl, task).catchError((Object e) {
+  var downloaded = await _installRuntime(component, dl, task).catchError((Object e) {
     downloadError = '$e';
     return null;
   });
+  if (downloaded == null && component == 'jre-legacy' && _runtimePlatform() == 'mac-os-arm64') {
+    downloaded = await _installZulu8Arm64(dl, task).catchError((Object e) {
+      downloadError = '$e';
+      return null;
+    });
+  }
   if (downloaded != null) return _describe(downloaded);
 
   // 无法下载时，退而求其次使用更新的 Java

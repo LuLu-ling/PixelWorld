@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_info.dart';
 import '../app_scope.dart';
 import '../core/news.dart';
+import '../core/site_api.dart';
+import '../core/updater.dart';
 
 /// 首页提示：正在使用的版本与免费声明（参照 PCL-CE 首页的提示）
 class HomeHints extends StatelessWidget {
@@ -61,6 +64,140 @@ class _Hint extends StatelessWidget {
               child: Text(text, style: theme.textTheme.bodyMedium?.copyWith(color: fg)),
             ),
             TextButton(onPressed: () => launchUrl(Uri.parse(action.$2)), child: Text(action.$1)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 首页公告：来自自有静态接口（notices.json），失败或没有公告时不显示任何内容
+class HomeNotices extends StatefulWidget {
+  const HomeNotices({super.key});
+
+  @override
+  State<HomeNotices> createState() => _HomeNoticesState();
+}
+
+class _HomeNoticesState extends State<HomeNotices> {
+  // 每次启动只获取一次，切换页面不会重复请求
+  final _future = loadNotices();
+
+  @override
+  Widget build(BuildContext context) {
+    final cfg = AppScope.of(context).config;
+    return FutureBuilder(
+      future: _future,
+      builder: (context, snap) {
+        final now = DateTime.now();
+        final dismissed = cfg.dismissedNotices.toSet();
+        final shown = [
+          for (final n in snap.data ?? const <Notice>[])
+            if (n.visibleFor(
+              platform: noticePlatform,
+              channel: UpdateChannel.parse(cfg.updateChannel).name,
+              version: AppInfo.version,
+              now: now,
+              dismissed: dismissed,
+            ))
+              n,
+        ];
+        if (shown.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final n in shown)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _NoticeCard(
+                    key: ValueKey(n.id),
+                    notice: n,
+                    onDismiss: () => cfg.update({
+                      'dismissedNotices': [...cfg.dismissedNotices, n.id],
+                    }),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _NoticeCard extends StatelessWidget {
+  const _NoticeCard({super.key, required this.notice, required this.onDismiss});
+
+  final Notice notice;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final (icon, bg, fg) = switch (notice.level) {
+      NoticeLevel.info => (Icons.campaign_outlined, scheme.secondaryContainer, scheme.onSecondaryContainer),
+      NoticeLevel.warning => (Icons.warning_amber_rounded, scheme.tertiaryContainer, scheme.onTertiaryContainer),
+      NoticeLevel.error => (Icons.error_outline, scheme.errorContainer, scheme.onErrorContainer),
+    };
+    final url = notice.url;
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(icon, color: fg, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Text(
+                      notice.title,
+                      style: theme.textTheme.titleSmall?.copyWith(color: fg, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  if (notice.body.trim().isNotEmpty)
+                    MarkdownBody(
+                      data: notice.body,
+                      onTapLink: (_, href, _) {
+                        final uri = href == null ? null : Uri.tryParse(href);
+                        if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
+                          launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                        p: theme.textTheme.bodyMedium?.copyWith(color: fg),
+                        a: theme.textTheme.bodyMedium?.copyWith(color: fg, decoration: TextDecoration.underline),
+                        code: theme.textTheme.bodyMedium?.copyWith(color: fg, fontFamily: 'monospace'),
+                        listBullet: theme.textTheme.bodyMedium?.copyWith(color: fg),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (url != null)
+              TextButton(
+                onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+                child: Text(notice.urlText ?? '查看详情'),
+              ),
+            if (notice.dismissible)
+              IconButton(
+                tooltip: '关闭',
+                onPressed: onDismiss,
+                icon: Icon(Icons.close, size: 20, color: fg),
+              ),
+            if (!notice.dismissible) const SizedBox(width: 8),
           ],
         ),
       ),

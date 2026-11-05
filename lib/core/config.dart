@@ -92,6 +92,8 @@ class LauncherConfig extends ChangeNotifier {
     'updateAutoCheck': true,
     // 跳过的版本（标签或 nightly 的提交号），自动检查时不再提示
     'updateSkipped': '',
+    // 已关闭的公告编号，不再显示
+    'dismissedNotices': <String>[],
   };
 
   static File get _file => File(p.join(Paths.appData, 'config.json'));
@@ -126,6 +128,7 @@ class LauncherConfig extends ChangeNotifier {
   String get updateChannel => _get('updateChannel');
   bool get updateAutoCheck => _get('updateAutoCheck');
   String get updateSkipped => _get('updateSkipped');
+  List<String> get dismissedNotices => [for (final x in (_data['dismissedNotices'] as List? ?? const [])) '$x'];
   bool get storageAsked => _get('storageAsked');
   double get renderScale => (_data['renderScale'] as num).toDouble().clamp(0.25, 1.0);
   String get androidRenderer => _get('androidRenderer');

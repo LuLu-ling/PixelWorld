@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
 import '../app_info.dart';
+import 'site_api.dart';
 
 /// 启动器的更新通道，对应 GitHub Releases 中的三类发布（见 .github/workflows/release.yml）
 enum UpdateChannel {
@@ -68,6 +69,26 @@ class Release {
           url: '${a['browser_download_url']}',
           size: (a['size'] as num?)?.toInt() ?? 0,
           sha256: RegExp(r'^sha256:([0-9a-f]{64})$').firstMatch('${a['digest'] ?? ''}')?.group(1),
+        ),
+    ],
+  );
+
+  /// 自有静态接口中的发布条目（见 update.json 的 channels）
+  factory Release.fromSite(Map<String, dynamic> j) => Release(
+    tag: '${j['tag'] ?? ''}',
+    name: '${j['name'] ?? j['tag'] ?? ''}',
+    body: '${j['body'] ?? ''}',
+    prerelease: j['prerelease'] == true,
+    commit: '${j['commit'] ?? ''}',
+    publishedAt: DateTime.tryParse('${j['publishedAt'] ?? ''}'),
+    page: '${j['page'] ?? ''}',
+    assets: [
+      for (final a in (j['assets'] as List? ?? const []).whereType<Map<String, dynamic>>())
+        ReleaseAsset(
+          name: '${a['name'] ?? ''}',
+          url: '${a['url'] ?? ''}',
+          size: (a['size'] as num?)?.toInt() ?? 0,
+          sha256: RegExp(r'^[0-9a-fA-F]{64}$').hasMatch('${a['sha256']}') ? '${a['sha256']}'.toLowerCase() : null,
         ),
     ],
   );
@@ -180,9 +201,11 @@ Future<List<Release>> fetchReleases() async {
   return [for (final j in (jsonDecode(body) as List).whereType<Map<String, dynamic>>()) Release.fromJson(j)];
 }
 
-/// 检查更新：返回比当前构建新的发布，没有时返回 null
+/// 检查更新：优先使用自有静态接口，接口不可用或内容无效时回落到 GitHub API；
+/// 返回比当前构建新的发布，没有时返回 null
 Future<Release?> checkForUpdate(UpdateChannel channel) async {
-  final r = latestRelease(await fetchReleases(), channel);
+  final site = await fetchUpdateChannels();
+  final Release? r = site != null ? site[channel.name] : latestRelease(await fetchReleases(), channel);
   return r != null && isNewer(r) ? r : null;
 }
 

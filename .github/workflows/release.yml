@@ -162,3 +162,23 @@ jobs:
             gh release create nightly --prerelease --target "$GITHUB_SHA" \
               --title "PCL.PW Nightly ($sha)" --notes "$notes" dist/*
           fi
+      # 更新启动器的更新接口：官网（site 分支）的 docs/api/v1/update.json。
+      # 公告 notices.json 在 site 分支上手动维护，这里不改动
+      - name: Update API
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=30" > "$RUNNER_TEMP/releases.json"
+          python3 tool/update_api.py "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/update.json"
+          git fetch --depth=1 origin site
+          git worktree add "$RUNNER_TEMP/site" FETCH_HEAD
+          cd "$RUNNER_TEMP/site"
+          mkdir -p docs/api/v1
+          cp "$RUNNER_TEMP/update.json" docs/api/v1/update.json
+          git add docs/api/v1/update.json
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "更新接口：${GITHUB_REF_NAME} ${GITHUB_SHA::7}"
+          git push origin HEAD:site
+          # 用 GITHUB_TOKEN 推送不一定触发 Pages 构建，主动请求一次
+          gh api -X POST "repos/$GITHUB_REPOSITORY/pages/builds" >/dev/null || true

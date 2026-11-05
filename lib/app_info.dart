@@ -12,6 +12,12 @@ abstract final class AppInfo {
 
   static const repoApi = 'https://api.github.com/repos/zhuzhi-09/PCL.PW';
 
+  /// 自有静态接口（按路径版本化），依次尝试，全部失败时更新检查回落到 GitHub API
+  static const siteApiBases = [
+    'https://pcl.pw.zhuzhi.site/api/v1',
+    'https://raw.githubusercontent.com/zhuzhi-09/PCL.PW/site/docs/api/v1',
+  ];
+
   static const repoUrl = 'https://github.com/zhuzhi-09/PCL.PW';
 
   // 按指南第 3 条，关于页首位为龙腾猫跃的署名及赞助链接

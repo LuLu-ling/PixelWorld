@@ -206,8 +206,9 @@ Future<String?> _installZulu8Arm64(Downloader dl, TaskProgress task) async {
   final base = p.join(Paths.runtimeDir, 'jre-legacy');
   final archive = p.join(Paths.runtimeDir, '${pkg['name']}');
 
+  // Azul 接口给出的 size 与 CDN 上的文件大小不一致，不按它校验；完整性由下面的 SHA-256 保证
   task.setStage('下载 Java 8（Azul Zulu）');
-  await dl.downloadAll([DownloadItem(url: url, path: archive, size: (pkg['size'] as num?)?.toInt())], task.progress);
+  await dl.downloadAll([DownloadItem(url: url, path: archive)], task.progress);
   if ((await sha256.bind(File(archive).openRead()).first).toString() != sha256Hash) {
     await File(archive).delete();
     throw Exception('Java 8 下载校验失败（SHA-256 不匹配）');

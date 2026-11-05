@@ -85,9 +85,20 @@ List<String> _candidates() {
       }
     }
   } else if (Platform.isMacOS) {
-    for (final d in _listDirs('/Library/Java/JavaVirtualMachines')) {
-      addHome(p.join(d, 'Contents', 'Home'));
+    // 系统级与用户级的 JDK（IntelliJ、Zulu 等安装到 ~/Library/Java）
+    for (final root in ['/Library/Java/JavaVirtualMachines', p.join(home, 'Library', 'Java', 'JavaVirtualMachines')]) {
+      for (final d in _listDirs(root)) {
+        addHome(p.join(d, 'Contents', 'Home'));
+      }
     }
+    // Homebrew（Apple 芯片在 /opt/homebrew，Intel 在 /usr/local）的 openjdk 与 openjdk@N
+    for (final prefix in ['/opt/homebrew/opt', '/usr/local/opt']) {
+      for (final d in _listDirs(prefix).where((d) => p.basename(d).startsWith('openjdk'))) {
+        addHome(p.join(d, 'libexec', 'openjdk.jdk', 'Contents', 'Home'));
+      }
+    }
+    // SDKMAN
+    roots.add(p.join(home, '.sdkman', 'candidates', 'java'));
   } else {
     roots.addAll(['/usr/lib/jvm', '/usr/java', '/opt/java']);
   }

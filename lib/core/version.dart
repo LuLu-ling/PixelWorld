@@ -183,6 +183,29 @@ bool needsAppleSiliconGlfw(List<Map<String, dynamic>> libraries) =>
     _isArm64 &&
     libraries.any((l) => RegExp(r'^org\.lwjgl:lwjgl:3\.[12]\.').hasMatch('${l['name']}'));
 
+const _lwjgl2 = '2.9.4-nightly-20150209';
+const _lwjgl2Arm64 = {
+  'url': 'https://github.com/MinecraftMachina/lwjgl/releases/download/2.9.4-20150209-mmachina.2/lwjgl-platform-2.9.4-nightly-20150209-natives-osx.jar',
+  'sha1': 'eff546c0b319d6ffc7a835652124c18089c67f36',
+  'size': 488316,
+};
+const _jinputArm64 = {
+  'url': 'https://github.com/r58Playz/jinput-m1/raw/main/plugins/OSX/bin/jinput-platform-2.0.5.jar',
+  'sha1': '5189eb40db3087fb11ca063b68fa4f4c20b199dd',
+  'size': 10031,
+};
+
+/// 只有 arm64 本地库的旧格式 natives 库
+Map<String, dynamic> _arm64Natives(String name, Map<String, Object> download) => {
+  'name': name,
+  'natives': {'osx': 'natives-osx-arm64'},
+  'downloads': {
+    'classifiers': {
+      'natives-osx-arm64': {...download, 'path': mavenPath('$name:natives-osx-arm64')},
+    },
+  },
+};
+
 List<Map<String, dynamic>> appleSiliconLibraries(List<Map<String, dynamic>> libraries) {
   final out = <Map<String, dynamic>>[];
   final seen = <String>{};
@@ -194,6 +217,21 @@ List<Map<String, dynamic>> appleSiliconLibraries(List<Map<String, dynamic>> libr
       if (!seen.add(artifact)) continue;
       out.add({'name': 'org.lwjgl:$artifact:3.3.1'});
       out.add({'name': 'org.lwjgl:$artifact:3.3.1:natives-macos-arm64'});
+      continue;
+    }
+    // LWJGL 2（1.12.2 及更早）：Java 部分统一用 2.9.4，本地库用社区编译的 arm64 版本（与 Prism Launcher 相同）
+    if (parts.length >= 3 && parts[0] == 'org.lwjgl.lwjgl' && parts[2].startsWith('2.9.')) {
+      final artifact = parts[1];
+      if (!seen.add(artifact)) continue;
+      if (artifact == 'lwjgl-platform') {
+        out.add(_arm64Natives('org.lwjgl.lwjgl:lwjgl-platform:$_lwjgl2', _lwjgl2Arm64));
+      } else {
+        out.add({'name': 'org.lwjgl.lwjgl:$artifact:$_lwjgl2'});
+      }
+      continue;
+    }
+    if (parts.length >= 3 && parts[0] == 'net.java.jinput' && parts[1] == 'jinput-platform') {
+      if (seen.add('jinput-platform')) out.add(_arm64Natives('${lib['name']}', _jinputArm64));
       continue;
     }
     if (parts.length >= 3 && parts[0] == 'ca.weblite' && parts[1] == 'java-objc-bridge' && parts[2] == '1.0.0') {

@@ -8,6 +8,7 @@
 <title>PCL.PW</title>
 <meta name="description" content="PCL.PW：基于 Plain Craft Launcher 的第三方衍生作品，电脑和手机上的 Java Minecraft 启动器，支持 Windows 与 Android。">
 <link rel="icon" href="favicon.png">
+<link rel="stylesheet" href="demo/demo.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap">
@@ -312,6 +313,7 @@ body { overflow-x: clip; }
     <a class="brand title-large" href="#"><img src="favicon.png" alt="">PCL.PW</a>
     <nav>
       <a class="btn text label-large opt" href="#features">功能</a>
+      <a class="btn text label-large opt" href="#demo">体验</a>
       <a class="btn text label-large" href="#download">下载</a>
       <a class="btn text label-large opt" href="#faq">常见问题</a>
       <a class="btn text label-large" href="https://github.com/zhuzhi-09/PCL.PW">GitHub</a>
@@ -349,6 +351,16 @@ body { overflow-x: clip; }
         <div class="card"><div class="tile ter"><span class="icon" aria-hidden="true">sync_alt</span></div><h3 class="title-large">局域网互传</h3><p class="body-medium">输入地址和配对码，就能在电脑和手机之间传版本、模组、配置和存档。</p></div>
         <div class="card"><div class="tile"><span class="icon" aria-hidden="true">troubleshoot</span></div><h3 class="title-large">崩溃分析</h3><p class="body-medium">自动分析崩溃原因；还可以接入你自己的 AI 接口帮忙排查，每次修改都需要你确认。</p></div>
       </div>
+    </div>
+  </section>
+
+  <section id="demo">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2 class="headline-medium">在线体验</h2>
+        <p class="lead body-large">下面是启动器界面的网页演示，可以点击试试。实际功能请下载启动器使用。</p>
+      </div>
+      <div id="pcl-demo"><p style="color:var(--md-sys-color-on-surface-variant)">演示需要启用 JavaScript。</p></div>
     </div>
   </section>
 
@@ -418,6 +430,7 @@ body { overflow-x: clip; }
   </div>
 </footer>
 
+<script src="demo/demo.js" defer></script>
 <script>
 // 滚动进入视口时淡入上移，只触发一次；同批进入的元素按序错开
 (function () {

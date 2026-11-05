@@ -178,8 +178,8 @@ class _AboutSection extends StatelessWidget {
               ),
               title: Text('${AppInfo.fullName} ${AppInfo.version}'),
               subtitle: const Text(
-                '本软件是第三方基于 PCL 独立进行二次创作的产物，'
-                '由第三方开发和维护，与 PCL 及其作者无关，也不代表 PCL 官方。'
+                '本软件是第三方基于 PCL 独立进行二次创作的产物，属于 PCL 的衍生作品，界面布局参考 PCL 社区版（PCL-CE）。'
+                '本软件由第三方开发和维护，与 PCL 及其作者无关，也不代表 PCL 官方。'
                 '请勿就本软件的问题打扰 PCL 作者。',
               ),
             ),

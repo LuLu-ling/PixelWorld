@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<script>document.documentElement.classList.add('js');</script>
+<title>PCL.PW</title>
+<meta name="description" content="PCL.PW：基于 Plain Craft Launcher 的第三方衍生作品，电脑和手机上的 Java Minecraft 启动器，支持 Windows 与 Android。">
+<link rel="icon" href="favicon.png">
+<link rel="stylesheet" href="demo/demo.css?v=4">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
+<style>
+/* ---------- MD3 颜色：种子色 #1370F3 ---------- */
+:root {
+  --md-sys-color-primary: #1b5fc8;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #d8e2ff;
+  --md-sys-color-on-primary-container: #001a41;
+  --md-sys-color-secondary: #575e71;
+  --md-sys-color-secondary-container: #dbe2f9;
+  --md-sys-color-on-secondary-container: #141b2c;
+  --md-sys-color-tertiary-container: #fbd7fc;
+  --md-sys-color-on-tertiary-container: #29132d;
+  --md-sys-color-surface: #faf8ff;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f3f3fa;
+  --md-sys-color-surface-container: #edeef4;
+  --md-sys-color-surface-container-high: #e7e8ee;
+  --md-sys-color-surface-container-highest: #e1e2e9;
+  --md-sys-color-on-surface: #191b20;
+  --md-sys-color-on-surface-variant: #44474f;
+  --md-sys-color-outline: #74777f;
+  --md-sys-color-outline-variant: #c4c6d0;
+  --md-elevation-1: 0 1px 2px rgb(0 0 0 / .30), 0 1px 3px 1px rgb(0 0 0 / .15);
+  --md-elevation-2: 0 1px 2px rgb(0 0 0 / .30), 0 2px 6px 2px rgb(0 0 0 / .15);
+  --md-motion: 200ms cubic-bezier(.2, 0, 0, 1);
+  --md-ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --md-ease-decel: cubic-bezier(.05, .7, .1, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-sys-color-primary: #adc6ff;
+    --md-sys-color-on-primary: #002e69;
+    --md-sys-color-primary-container: #004493;
+    --md-sys-color-on-primary-container: #d8e2ff;
+    --md-sys-color-secondary: #bfc6dc;
+    --md-sys-color-secondary-container: #404659;
+    --md-sys-color-on-secondary-container: #dbe2f9;
+    --md-sys-color-tertiary-container: #593e5c;
+    --md-sys-color-on-tertiary-container: #fbd7fc;
+    --md-sys-color-surface: #111318;
+    --md-sys-color-surface-container-lowest: #0c0e13;
+    --md-sys-color-surface-container-low: #191b20;
+    --md-sys-color-surface-container: #1d2024;
+    --md-sys-color-surface-container-high: #282a2f;
+    --md-sys-color-surface-container-highest: #33353a;
+    --md-sys-color-on-surface: #e1e2e9;
+    --md-sys-color-on-surface-variant: #c4c6d0;
+    --md-sys-color-outline: #8e9099;
+    --md-sys-color-outline-variant: #44474f;
+  }
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+body {
+  margin: 0;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font-family: Roboto, "Noto Sans SC", system-ui, sans-serif;
+  font-size: 16px; line-height: 24px; letter-spacing: .5px; font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  overflow-wrap: anywhere;
+}
+a { color: var(--md-sys-color-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { max-width: 100%; }
+
+/* ---------- 图标 ---------- */
+.icon {
+  font-family: "Material Symbols Rounded";
+  font-weight: normal; font-style: normal; font-size: 24px; line-height: 1;
+  letter-spacing: normal; text-transform: none; white-space: nowrap;
+  display: inline-block; flex: none; direction: ltr;
+  font-feature-settings: "liga"; -webkit-font-smoothing: antialiased;
+  user-select: none;
+  width: 1em; overflow: hidden;
+}
+
+/* ---------- MD3 字阶 ---------- */
+.display-large  { font-size: 57px; line-height: 64px; letter-spacing: -.25px; font-weight: 400; }
+.display-medium { font-size: 45px; line-height: 52px; letter-spacing: 0; font-weight: 400; }
+.headline-large { font-size: 32px; line-height: 40px; letter-spacing: 0; font-weight: 400; }
+.headline-medium{ font-size: 28px; line-height: 36px; letter-spacing: 0; font-weight: 400; }
+.headline-small { font-size: 24px; line-height: 32px; letter-spacing: 0; font-weight: 400; }
+.title-large    { font-size: 22px; line-height: 28px; letter-spacing: 0; font-weight: 400; }
+.title-medium   { font-size: 16px; line-height: 24px; letter-spacing: .15px; font-weight: 500; }
+.body-large     { font-size: 16px; line-height: 24px; letter-spacing: .5px; font-weight: 400; }
+.body-medium    { font-size: 14px; line-height: 20px; letter-spacing: .25px; font-weight: 400; }
+.body-small     { font-size: 12px; line-height: 16px; letter-spacing: .4px; font-weight: 400; }
+.label-large    { font-size: 14px; line-height: 20px; letter-spacing: .1px; font-weight: 500; }
+.label-medium   { font-size: 12px; line-height: 16px; letter-spacing: .5px; font-weight: 500; }
+h1, h2, h3, p { margin: 0; }
+
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+/* ---------- 按钮（40px / 24px 内边距 / 全圆角 / 状态层） ---------- */
+.btn {
+  position: relative; overflow: hidden; isolation: isolate;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px; padding: 0 24px; border: 0; border-radius: 9999px;
+  font-family: inherit; cursor: pointer; text-decoration: none;
+  transition: box-shadow var(--md-motion);
+}
+.btn:hover { text-decoration: none; }
+.btn::after {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: currentColor; opacity: 0;
+  transition: opacity var(--md-motion);
+}
+.btn:hover::after { opacity: .08; }
+.btn:focus-visible::after { opacity: .10; }
+.btn:active::after { opacity: .12; }
+.btn:focus-visible { outline: 3px solid var(--md-sys-color-primary); outline-offset: 2px; }
+.btn .icon { font-size: 18px; margin-left: -8px; }
+.btn.filled { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+.btn.filled:hover { box-shadow: var(--md-elevation-1); }
+.btn.s-tonal { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.btn.s-tonal:hover { box-shadow: var(--md-elevation-1); }
+.btn.outlined { background: transparent; color: var(--md-sys-color-primary); box-shadow: inset 0 0 0 1px var(--md-sys-color-outline); }
+.btn.text { background: transparent; color: var(--md-sys-color-primary); padding: 0 12px; }
+
+/* ---------- 顶部应用栏（Small） ---------- */
+.app-bar {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--md-sys-color-surface);
+  transition: background-color var(--md-motion), box-shadow var(--md-motion);
+}
+.app-bar.scrolled { background: var(--md-sys-color-surface-container); }
+.app-bar .wrap { display: flex; align-items: center; height: 64px; gap: 8px; }
+.brand {
+  display: flex; align-items: center; gap: 12px; min-width: 0;
+  color: var(--md-sys-color-on-surface); border-radius: 9999px; padding: 4px 12px 4px 0;
+}
+.brand:hover { text-decoration: none; }
+.brand img { width: 32px; height: 32px; border-radius: 8px; flex: none; }
+.app-bar nav { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+
+/* ---------- 版块 ---------- */
+main > section { padding: 40px 0; }
+.sec-head { margin-bottom: 24px; }
+.sec-head h2 { color: var(--md-sys-color-on-surface); }
+.sec-head .lead { margin-top: 8px; color: var(--md-sys-color-on-surface-variant); }
+
+/* ---------- Hero ---------- */
+.hero {
+  display: flex; align-items: center; gap: 48px;
+  background: var(--md-sys-color-surface-container);
+  border-radius: 28px; padding: 56px 64px; margin-top: 16px;
+}
+.hero-text { flex: 1; min-width: 0; }
+.hero h1 { color: var(--md-sys-color-primary); }
+.hero .tagline { margin-top: 8px; color: var(--md-sys-color-on-surface); }
+.hero .s-sub { margin-top: 16px; max-width: 560px; color: var(--md-sys-color-on-surface-variant); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 32px; }
+.hero-art { flex: none; width: 288px; height: 288px; }
+.hero-art img { display: block; width: 100%; height: 100%; border-radius: 28%; }
+
+/* ---------- 卡片：Elevated card ---------- */
+/* minmax(0, 1fr)：列宽固定，不随内容（例如下载按钮文字变长）变化 */
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.s-card {
+  background: var(--md-sys-color-surface-container-low);
+  box-shadow: var(--md-elevation-1);
+  border-radius: 16px; padding: 24px;
+  display: flex; flex-direction: column;
+}
+.s-card .s-tile {
+  width: 48px; height: 48px; border-radius: 16px; margin-bottom: 16px;
+  display: grid; place-items: center;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+.s-card .s-tile.sec { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.s-card .s-tile.ter { background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); }
+.s-card h3 { color: var(--md-sys-color-on-surface); }
+.s-card p { margin-top: 8px; color: var(--md-sys-color-on-surface-variant); }
+.dl .s-card p { flex: 1; }
+.dl .s-card .btn { margin-top: 24px; align-self: flex-start; }
+.ver { margin-top: 24px; color: var(--md-sys-color-on-surface-variant); }
+
+/* ---------- 声明：Tonal card ---------- */
+.notice {
+  display: flex; gap: 16px; align-items: flex-start;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  border-radius: 16px; padding: 24px;
+}
+.notice > .icon { font-size: 24px; margin-top: 0; }
+.notice .body { min-width: 0; }
+.notice p + p { margin-top: 12px; }
+.notice a { color: var(--md-sys-color-primary); text-decoration: underline; }
+
+/* ---------- 常见问题：可展开列表 ---------- */
+.faq-list { border-radius: 16px; background: var(--md-sys-color-surface-container-low); overflow: hidden; }
+details + details { border-top: 1px solid var(--md-sys-color-outline-variant); }
+summary {
+  position: relative; display: flex; align-items: center; gap: 16px;
+  min-height: 56px; padding: 16px 24px; cursor: pointer; list-style: none;
+  color: var(--md-sys-color-on-surface);
+}
+summary::-webkit-details-marker { display: none; }
+summary::after {
+  content: ""; position: absolute; inset: 0; background: var(--md-sys-color-on-surface);
+  opacity: 0; transition: opacity var(--md-motion); pointer-events: none;
+}
+summary:hover::after { opacity: .08; }
+summary:focus-visible::after { opacity: .10; }
+summary:active::after { opacity: .12; }
+summary:focus-visible { outline: 3px solid var(--md-sys-color-primary); outline-offset: -3px; }
+summary .q { flex: 1; min-width: 0; }
+summary .icon { color: var(--md-sys-color-on-surface-variant); transition: transform var(--md-motion); }
+details[open] summary .icon { transform: rotate(180deg); }
+details .answer { padding: 0 24px 16px; color: var(--md-sys-color-on-surface-variant); }
+
+/* ---------- 页脚 ---------- */
+footer {
+  margin-top: 32px; padding: 32px 0 40px; text-align: center;
+  color: var(--md-sys-color-on-surface-variant);
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+footer p + p { margin-top: 4px; }
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 839px) {
+  .hero { flex-direction: column-reverse; text-align: center; padding: 32px 24px; gap: 24px; }
+  .hero-art { width: 160px; height: 160px; }
+  .hero .s-sub { margin-left: auto; margin-right: auto; }
+  .actions { justify-content: center; }
+  .display-medium { font-size: 36px; line-height: 44px; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 599px) {
+  .wrap { padding: 0 16px; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .app-bar nav .opt { display: none; }
+  section { padding: 32px 0; }
+  .notice { flex-direction: column; gap: 12px; padding: 20px; }
+  summary { padding: 16px; }
+  details .answer { padding: 0 16px 16px; }
+  .headline-small { font-size: 22px; line-height: 28px; }
+}
+/* ---------- 动效（仅在 JS 可用且未要求减少动态效果时生效） ---------- */
+/* 滚动条始终占位、横向溢出直接裁掉：动画中的元素和光晕不会让页面宽度来回变化 */
+html { scrollbar-gutter: stable; overflow-x: clip; }
+body { overflow-x: clip; }
+.hero-art { position: relative; }
+.hero-art img { position: relative; z-index: 1; }
+.hero-art::before {
+  content: ""; position: absolute; inset: -12%; border-radius: 50%; pointer-events: none;
+  background:
+    radial-gradient(circle at 30% 30%, var(--md-sys-color-primary-container), transparent 60%),
+    radial-gradient(circle at 70% 70%, var(--md-sys-color-tertiary-container), transparent 60%);
+  opacity: .8;
+}
+.s-card, .s-card .s-tile { transition: transform 300ms var(--md-ease-standard), box-shadow 300ms var(--md-ease-standard); }
+@media (hover: hover) {
+  .s-card:hover { box-shadow: var(--md-elevation-2); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes md-rise { from { opacity: 0; transform: translateY(16px); } }
+  @keyframes md-reveal { from { opacity: 0; transform: translateY(24px); } }
+  @keyframes md-fade { from { opacity: 0; } }
+  @keyframes md-pop { from { opacity: 0; transform: scale(.85); } }
+  @keyframes md-float { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(-6px); } 75% { transform: translateY(6px); } }
+  @keyframes md-glow { from { transform: rotate(0) scale(1); } 50% { transform: rotate(180deg) scale(1.1); } to { transform: rotate(360deg) scale(1); } }
+  @keyframes md-answer { from { opacity: 0; transform: translateY(-8px); } }
+
+  .js .app-bar { animation: md-fade 400ms var(--md-ease-standard) backwards; }
+  .js .hero-text h1 { animation: md-rise 600ms var(--md-ease-decel) 120ms backwards; }
+  .js .hero-text .tagline { animation: md-rise 600ms var(--md-ease-decel) 190ms backwards; }
+  .js .hero-text .s-sub { animation: md-rise 600ms var(--md-ease-decel) 260ms backwards; }
+  .js .hero-text .actions { animation: md-rise 600ms var(--md-ease-decel) 330ms backwards; }
+  .js .hero-art { animation: md-pop 600ms var(--md-ease-decel) 150ms backwards; }
+  .js .hero-art img { animation: md-float 6s ease-in-out 800ms infinite; }
+  .js .hero-art::before { animation: md-glow 40s linear infinite; }
+
+  .js .sec-head:not(.in), .js .s-card:not(.in), .js .notice:not(.in), .js .faq-list details:not(.in) {
+    opacity: 0; transform: translateY(24px);
+  }
+  .js .sec-head.in, .js .s-card.in, .js .notice.in, .js .faq-list details.in {
+    animation: md-reveal 500ms var(--md-ease-decel) var(--d, 0ms) backwards;
+  }
+  @media (hover: hover) {
+    .s-card:hover { transform: translateY(-2px); }
+    .s-card:hover .s-tile { transform: rotate(-6deg) scale(1.08); }
+  }
+  details[open] .answer { animation: md-answer 300ms var(--md-ease-decel); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+<header class="app-bar" id="appbar">
+  <div class="wrap">
+    <a class="brand title-large" href="#"><img src="favicon.png" alt="">PCL.PW</a>
+    <nav>
+      <a class="btn text label-large opt" href="#features">功能</a>
+      <a class="btn text label-large opt" href="#demo">体验</a>
+      <a class="btn text label-large" href="#download">下载</a>
+      <a class="btn text label-large opt" href="#faq">常见问题</a>
+      <a class="btn text label-large" href="https://github.com/zhuzhi-09/PCL.PW">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="hero">
+      <div class="hero-text">
+        <h1 class="display-medium">PCL.PW</h1>
+        <p class="tagline headline-small">电脑和手机上的 Java Minecraft 启动器</p>
+        <p class="s-sub body-large">Plain Craft Launcher（PCL）的第三方衍生作品。界面布局参考 PCL 社区版（PCL-CE），视觉采用 Material Design 3，Windows 与 Android 通用。</p>
+        <div class="actions">
+          <a class="btn filled label-large" href="#download"><span class="icon" aria-hidden="true">download</span>立即下载</a>
+          <a class="btn s-tonal label-large" href="https://github.com/zhuzhi-09/PCL.PW">查看源代码</a>
+        </div>
+      </div>
+      <div class="hero-art"><img src="icon.png" alt="PCL.PW 图标" width="288" height="288"></div>
+    </div>
+  </div>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2 class="headline-medium">功能</h2>
+        <p class="lead body-large">常用的功能都有，安卓上也能玩。</p>
+      </div>
+      <div class="grid">
+        <div class="s-card"><div class="s-tile"><span class="icon" aria-hidden="true">extension</span></div><h3 class="title-large">模组加载器</h3><p class="body-medium">Forge、NeoForge、Fabric、Quilt、OptiFine、LiteLoader、Cleanroom、LabyMod，一键安装。</p></div>
+        <div class="s-card"><div class="s-tile sec"><span class="icon" aria-hidden="true">download</span></div><h3 class="title-large">资源下载</h3><p class="body-medium">从 Modrinth 搜索模组、光影包、资源包和数据包，自动安装前置模组。</p></div>
+        <div class="s-card"><div class="s-tile ter"><span class="icon" aria-hidden="true">smartphone</span></div><h3 class="title-large">安卓版</h3><p class="body-medium">内置游戏运行时，支持 1.0 到最新版本；可选多种渲染器，带触屏按键与摇杆。</p></div>
+        <div class="s-card"><div class="s-tile sec"><span class="icon" aria-hidden="true">bolt</span></div><h3 class="title-large">快速下载</h3><p class="body-medium">官方源与 BMCLAPI 镜像自动切换，多线程下载，文件逐个校验。</p></div>
+        <div class="s-card"><div class="s-tile ter"><span class="icon" aria-hidden="true">sync_alt</span></div><h3 class="title-large">局域网互传</h3><p class="body-medium">输入地址和配对码，就能在电脑和手机之间传版本、模组、配置和存档。</p></div>
+        <div class="s-card"><div class="s-tile"><span class="icon" aria-hidden="true">troubleshoot</span></div><h3 class="title-large">崩溃分析</h3><p class="body-medium">自动分析崩溃原因；还可以接入你自己的 AI 接口帮忙排查，每次修改都需要你确认。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="demo">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2 class="headline-medium">在线体验</h2>
+        <p class="lead body-large">下面是启动器界面的网页演示，可以点击试试。实际功能请下载启动器使用。</p>
+      </div>
+      <div id="pcl-demo"><p style="color:var(--md-sys-color-on-surface-variant)">演示需要启用 JavaScript。</p></div>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="wrap dl">
+      <div class="sec-head">
+        <h2 class="headline-medium">下载</h2>
+        <p class="lead body-large">所有版本都在 GitHub Releases 发布。</p>
+      </div>
+      <div class="grid">
+        <div class="s-card">
+          <div class="s-tile"><span class="icon" aria-hidden="true">desktop_windows</span></div><h3 class="title-large">Windows 安装版</h3>
+          <p class="body-medium">Windows 10 及以上，64 位。安装后可以自动更新。</p>
+          <a class="btn filled label-large" data-asset="windows-x64-setup.exe" href="https://github.com/zhuzhi-09/PCL.PW/releases/latest"><span class="icon" aria-hidden="true">download</span><span class="label">下载</span></a>
+        </div>
+        <div class="s-card">
+          <div class="s-tile sec"><span class="icon" aria-hidden="true">folder_zip</span></div><h3 class="title-large">Windows 便携版</h3>
+          <p class="body-medium">解压即用，适合放在 U 盘里，或者不想安装的时候用。</p>
+          <a class="btn s-tonal label-large" data-asset="windows-x64-portable.zip" href="https://github.com/zhuzhi-09/PCL.PW/releases/latest"><span class="icon" aria-hidden="true">download</span><span class="label">下载</span></a>
+        </div>
+        <div class="s-card">
+          <div class="s-tile ter"><span class="icon" aria-hidden="true">android</span></div><h3 class="title-large">Android</h3>
+          <p class="body-medium">Android 8.0 及以上，64 位 ARM 处理器。</p>
+          <a class="btn filled label-large" data-asset="android-arm64.apk" href="https://github.com/zhuzhi-09/PCL.PW/releases/latest"><span class="icon" aria-hidden="true">download</span><span class="label">下载</span></a>
+        </div>
+      </div>
+      <p class="ver body-medium" id="ver">macOS 版正在测试，Linux 版尚未适配。想尝鲜可以下载 <a href="https://github.com/zhuzhi-09/PCL.PW/releases/tag/nightly">Nightly 测试版</a>，可能不稳定。</p>
+    </div>
+  </section>
+
+  <section id="about">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2 class="headline-medium">关于</h2>
+      </div>
+      <div class="notice body-large">
+        <span class="icon" aria-hidden="true">info</span>
+        <div class="body">
+          <p><strong>PCL.PW 是第三方基于 <a href="https://github.com/Meloong-Git/PCL">Plain Craft Launcher（PCL）</a>独立进行二次创作的产物</strong>，属于 PCL 的衍生作品，界面布局参考 <a href="https://www.pclc.cc">PCL 社区版（PCL-CE）</a>。本软件由第三方开发和维护，与 PCL 及其作者龙腾猫跃无关，也不代表 PCL 官方。请勿就本软件的问题打扰 PCL 作者。</p>
+          <p>PCL 的作者是<strong>龙腾猫跃</strong>。如果 PCL 对你有帮助，欢迎<a href="https://afdian.com/a/LTCat">赞助龙腾猫跃</a>。</p>
+          <p>本项目遵循<a href="https://github.com/zhuzhi-09/PCL.PW/blob/main/PCL-GUIDE.md">《PCL 存储库合理使用指南》</a>，源代码公开。</p>
+          <p>Minecraft 是 Mojang Studios 的商标。请<a href="https://www.minecraft.net/zh-hans/store/minecraft-java-bedrock-edition-pc">购买正版 Minecraft</a> 支持开发者。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2 class="headline-medium">常见问题</h2>
+      </div>
+      <div class="faq-list">
+        <details><summary><span class="q title-medium">和 PCL、PCL-CE 是什么关系？</span><span class="icon" aria-hidden="true">expand_more</span></summary><p class="answer body-large">PCL.PW 是 PCL 的第三方衍生作品：界面布局参考 PCL-CE，用 Flutter 重新编写，视觉采用 Material Design 3，并增加了安卓版。它由第三方独立开发，与 PCL 和 PCL-CE 官方无关。可以从 PCL-CE 导入设置、游戏文件夹和账户。</p></details>
+        <details><summary><span class="q title-medium">安卓版能玩哪些版本？</span><span class="icon" aria-hidden="true">expand_more</span></summary><p class="answer body-large">支持 1.0 到最新的 Java 版，也能在手机上安装 Forge、NeoForge、OptiFine 等加载器。帧率取决于手机性能和所选的渲染器。</p></details>
+        <details><summary><span class="q title-medium">安装时提示「未知来源」或被拦截？</span><span class="icon" aria-hidden="true">expand_more</span></summary><p class="answer body-large">安卓版不在应用商店上架，需要允许浏览器或文件管理器安装应用。Windows 上如果 SmartScreen 提示，点「更多信息」→「仍要运行」。安装包都可以在 GitHub 上核对来源。</p></details>
+        <details><summary><span class="q title-medium">遇到问题去哪里反馈？</span><span class="icon" aria-hidden="true">expand_more</span></summary><p class="answer body-large">请在 <a href="https://github.com/zhuzhi-09/PCL.PW/issues">GitHub Issues</a> 反馈，不要打扰 PCL 的作者。</p></details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p class="body-small">PCL.PW（PixelsWorld 修改版）· <a href="https://github.com/zhuzhi-09/PCL.PW/blob/main/LICENSE">开源许可</a> · <a href="https://github.com/zhuzhi-09/PCL.PW">GitHub</a></p>
+    <p class="body-small">非 PCL 官方网站 · 与 Mojang Studios、Microsoft 无关</p>
+  </div>
+</footer>
+
+<script src="demo/demo.js?v=4" defer></script>
+<script>
+// 滚动进入视口时淡入上移，只触发一次；同批进入的元素按序错开
+(function () {
+  var els = document.querySelectorAll('.sec-head, .s-card, .notice, .faq-list details');
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function show(el) { el.classList.add('in'); }
+  if (reduce || !('IntersectionObserver' in window)) { Array.prototype.forEach.call(els, show); return; }
+  var io = new IntersectionObserver(function (entries) {
+    var k = 0;
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      e.target.style.setProperty('--d', (k++ * 70) + 'ms');
+      show(e.target);
+      io.unobserve(e.target);
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -10% 0px' });
+  Array.prototype.forEach.call(els, function (el) { io.observe(el); });
+})();
+</script>
+<script>
+// 顶部应用栏滚动后切换为 surface-container 背景
+(function () {
+  var bar = document.getElementById('appbar');
+  function onScroll() { bar.classList.toggle('scrolled', window.scrollY > 4); }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+
+// 读取最新正式版，把下载按钮指向对应文件；失败时保留指向 Releases 页面的链接
+fetch('https://api.github.com/repos/zhuzhi-09/PCL.PW/releases/latest')
+  .then(r => r.ok ? r.json() : Promise.reject())
+  .then(rel => {
+    for (const a of document.querySelectorAll('[data-asset]')) {
+      const asset = rel.assets.find(x => x.name.endsWith(a.dataset.asset));
+      if (asset) a.href = asset.browser_download_url;
+    }
+    for (const l of document.querySelectorAll('.dl .btn .label')) l.textContent = '下载 ' + rel.tag_name;
+  })
+  .catch(() => {});
+</script>
+</body>
+</html>

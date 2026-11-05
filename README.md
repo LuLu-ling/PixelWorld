@@ -1,6 +1,6 @@
 # PCL.PW（PixelsWorld 修改版）
 
-PCL.PW 是一个跨平台的 Minecraft 启动器，页面布局参考 PCL，视觉上遵循 Google 的 Material Design 3 设计语言，使用 Flutter 开发，目标平台为 Windows、macOS、Linux 与 Android。
+PCL.PW 是一个跨平台的 Minecraft 启动器，属于 PCL 的衍生作品，界面布局参考 [PCL 社区版（PCL-CE）](https://www.pclc.cc)，视觉上遵循 Google 的 Material Design 3 设计语言，使用 Flutter 开发，目标平台为 Windows、macOS、Linux 与 Android。
 
 > [!IMPORTANT]
 > **PCL.PW 是第三方基于 [Plain Craft Launcher（PCL）](https://github.com/Meloong-Git/PCL) 独立进行二次创作的产物**，由第三方开发和维护，与 PCL 及其作者龙腾猫跃无关，也不代表 PCL 官方。请勿就本软件的问题打扰 PCL 作者。

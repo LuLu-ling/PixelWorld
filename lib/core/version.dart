@@ -174,10 +174,36 @@ class ResolvedLibrary {
 
 const _defaultLibBase = 'https://libraries.minecraft.net/';
 
+/// Apple 芯片的 Mac：1.13～1.18 自带的 LWJGL 3.1/3.2 没有 arm64 本地库，换成 3.3.1
+/// （Mojang 的库服务器上有 natives-macos-arm64），java-objc-bridge 1.0.0 换成同时支持 arm64 的 1.1。
+/// 先按规则筛选，替换后的库不再带规则。LWJGL 2（1.12.2 及更早）不在这里处理。
+List<Map<String, dynamic>> appleSiliconLibraries(List<Map<String, dynamic>> libraries) {
+  final out = <Map<String, dynamic>>[];
+  final seen = <String>{};
+  for (final lib in libraries) {
+    if (!rulesAllow(lib['rules'] as List?)) continue;
+    final parts = '${lib['name']}'.split(':');
+    if (parts.length >= 3 && parts[0] == 'org.lwjgl' && RegExp(r'^3\.[12]\.').hasMatch(parts[2])) {
+      final artifact = parts[1];
+      if (!seen.add(artifact)) continue;
+      out.add({'name': 'org.lwjgl:$artifact:3.3.1'});
+      out.add({'name': 'org.lwjgl:$artifact:3.3.1:natives-macos-arm64'});
+      continue;
+    }
+    if (parts.length >= 3 && parts[0] == 'ca.weblite' && parts[1] == 'java-objc-bridge' && parts[2] == '1.0.0') {
+      if (seen.add('java-objc-bridge')) out.add({'name': 'ca.weblite:java-objc-bridge:1.1'});
+      continue;
+    }
+    out.add(lib);
+  }
+  return out;
+}
+
 List<ResolvedLibrary> resolveLibraries(GamePaths g, VersionJson v) {
   final out = <ResolvedLibrary>[];
   final archBits = _isX86 ? '32' : '64';
-  for (final lib in v.libraries) {
+  final libs = Platform.isMacOS && _isArm64 ? appleSiliconLibraries(v.libraries) : v.libraries;
+  for (final lib in libs) {
     if (!rulesAllow(lib['rules'] as List?)) continue;
     final name = '${lib['name']}';
     final exclude = (((lib['extract'] as Map?)?['exclude'] as List?) ?? const []).map((e) => '$e').toList();

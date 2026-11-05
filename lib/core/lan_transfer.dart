@@ -64,6 +64,9 @@ class TransferManifest {
     required this.items,
     required this.files,
     this.parents = const [],
+    this.loader,
+    this.gameVersion,
+    this.describe,
   });
 
   /// 整个版本（导入为新版本）还是部分内容（导入到已有版本）
@@ -82,6 +85,12 @@ class TransferManifest {
   /// 一起发送的依赖版本（Forge、Fabric 等版本依赖的原版），导入方没有时才导入
   final List<String> parents;
 
+  /// 发送方版本的加载器（Loader 的名称，如 fabric）、游戏版本与显示用的描述（如「Fabric · 1.20.1」）。
+  /// 较早的传输包没有这些信息
+  final String? loader;
+  final String? gameVersion;
+  final String? describe;
+
   int get bytes => files.values.fold(0, (a, b) => a + b);
 
   Map<String, dynamic> toJson() => {
@@ -92,6 +101,9 @@ class TransferManifest {
     'items': items,
     'files': files,
     'parents': parents,
+    'loader': ?loader,
+    'gameVersion': ?gameVersion,
+    'describe': ?describe,
   };
 
   static TransferManifest parse(Map<String, dynamic> j) {
@@ -123,6 +135,9 @@ class TransferManifest {
       items: names,
       files: sizes,
       parents: parents,
+      loader: j['loader'] is String ? j['loader'] as String : null,
+      gameVersion: j['gameVersion'] is String ? j['gameVersion'] as String : null,
+      describe: j['describe'] is String ? j['describe'] as String : null,
     );
   }
 }
@@ -144,6 +159,9 @@ Future<File> packTransfer({
   required String gameDir,
   required bool wholeVersion,
   required List<String> items,
+  String? loader,
+  String? gameVersion,
+  String? describe,
   void Function(int files)? onFile,
 }) async {
   final isolated = p.equals(versionDir, gameDir);
@@ -211,6 +229,9 @@ Future<File> packTransfer({
       items: included,
       files: sizes,
       parents: parents,
+      loader: loader,
+      gameVersion: gameVersion,
+      describe: describe,
     );
     enc.addArchiveFile(ArchiveFile.string(transferManifestName, jsonEncode(manifest.toJson())));
   } catch (_) {

@@ -9,6 +9,7 @@ import '../app_scope.dart';
 import '../app_state.dart';
 import '../core/instance.dart';
 import '../core/lan_transfer.dart';
+import '../core/loader_names.dart';
 import '../widgets/format.dart';
 import '../widgets/settings_group.dart';
 
@@ -196,7 +197,24 @@ class _LanTransferPageState extends State<LanTransferPage> {
       toast(context, '还没有版本，请先安装一个版本再导入');
       return Future.value();
     }
-    var chosen = versions.where((v) => v.id == m.version).firstOrNull ?? versions.first;
+    bool loaderOk(InstanceInfo v) => m.loader == null || v.loader.name == m.loader;
+    bool gameOk(InstanceInfo v) => m.gameVersion == null || v.gameVersion == m.gameVersion;
+    var chosen =
+        versions.where((v) => v.id == m.version && loaderOk(v) && gameOk(v)).firstOrNull ??
+        versions.where((v) => loaderOk(v) && gameOk(v)).firstOrNull ??
+        versions.where((v) => v.id == m.version).firstOrNull ??
+        versions.first;
+    String? warning(InstanceInfo v) {
+      final from = m.describe ?? '发送方的版本';
+      if (!loaderOk(v) && m.items.contains('mods')) {
+        return '这些模组来自 $from，但「${v.id}」是 ${describeVersion(v)}，导入后模组不会被加载。'
+            '建议先在这台设备上安装相同的加载器，或者让对方改用「整个版本」发送。';
+      }
+      if (!loaderOk(v)) return '发送方的版本是 $from，「${v.id}」是 ${describeVersion(v)}，加载器不同。';
+      if (!gameOk(v)) return '发送方的版本是 $from，「${v.id}」是 ${describeVersion(v)}，游戏版本不同，模组和存档可能不兼容。';
+      return null;
+    }
+
     final what = m.items.map((i) => transferItems[i] ?? i).join('、');
     return showDialog<InstanceInfo>(
       context: context,
@@ -215,6 +233,19 @@ class _LanTransferPageState extends State<LanTransferPage> {
               ),
               const SizedBox(height: 12),
               Text('将替换这个版本的：$what\n原来的内容会先备份到游戏文件夹的 backups 中。'),
+              if (warning(chosen) case final w?) ...[
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Theme.of(ctx).colorScheme.error),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(w, style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
           actions: [
@@ -253,6 +284,9 @@ class _LanTransferPageState extends State<LanTransferPage> {
         gameDir: gameDir,
         wholeVersion: _whole,
         items: _items.toList(),
+        loader: v.loader.name,
+        gameVersion: v.gameVersion,
+        describe: describeVersion(v),
         onFile: (n) {
           if (mounted && n % 50 == 0) setState(() => _sendStatus = '正在打包…已加入 $n 个文件');
         },
@@ -364,7 +398,10 @@ class _LanTransferPageState extends State<LanTransferPage> {
                       ? '整个版本「${t.manifest.version}」'
                       : '「${t.manifest.version}」的${t.manifest.items.map((i) => transferItems[i] ?? i).join('、')}',
                 ),
-                subtitle: Text('来自 ${t.manifest.from}（${t.address}），${formatSize(t.manifest.bytes)}'),
+                subtitle: Text(
+                  '来自 ${t.manifest.from}（${t.address}）${t.manifest.describe == null ? '' : '，${t.manifest.describe}'}，'
+                  '${formatSize(t.manifest.bytes)}',
+                ),
                 trailing: Wrap(
                   spacing: 8,
                   children: [

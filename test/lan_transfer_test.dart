@@ -51,6 +51,9 @@ void main() {
         gameDir: src,
         wholeVersion: false,
         items: ['mods', 'saves'],
+        loader: 'fabric',
+        gameVersion: '1.20.1',
+        describe: 'Fabric · 1.20.1',
       );
       await transferSend(base, server.code, zip);
       zip.deleteSync();
@@ -59,6 +62,10 @@ void main() {
     }
     expect(stopped, isNull);
     expect(got!.manifest.items, ['mods', 'saves']);
+    expect(
+      [got!.manifest.loader, got!.manifest.gameVersion, got!.manifest.describe],
+      ['fabric', '1.20.1', 'Fabric · 1.20.1'],
+    );
 
     final backup = await importTransferFiles(
       got!.file.path,

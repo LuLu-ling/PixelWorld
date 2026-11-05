@@ -24,7 +24,7 @@ Future<void> main(List<String> args) async {
     final window = WindowManager.instance.getCurrent()!;
     window.title = AppInfo.name;
     window.titleBarStyle = TitleBarStyle.hidden;
-    window.isWindowControlButtonsVisible = false;
+    window.isWindowControlButtonsVisible = nativeWindowButtons;
     window.setSize(const Size(1100, 700).toNative(), false);
     window.minimumSize = const Size(900, 560).toNative();
     window.center();

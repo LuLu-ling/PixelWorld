@@ -6,6 +6,11 @@ import 'package:flutter/material.dart';
 /// 桌面端：有窗口管理、文件管理器，可以启动游戏
 bool get isDesktop => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
+/// macOS 使用系统原生的窗口按钮（红绿灯），其他桌面平台使用启动器自己绘制的按钮
+bool get nativeWindowButtons => Platform.isMacOS;
+
+/// macOS 红绿灯按钮占用的标题栏左侧宽度
+const macTrafficLightsWidth = 72.0;
 
 /// 手机屏幕较小：把界面按比例缩小，按至少 960 × 520 的尺寸布局，保持与桌面端相同的布局
 class MobileScale extends StatelessWidget {

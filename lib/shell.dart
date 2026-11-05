@@ -168,7 +168,7 @@ class _TitleBar extends StatelessWidget {
           // 空白处可拖动窗口，双击最大化
           if (isDesktop) Positioned.fill(child: DragToMoveArea(child: const SizedBox.expand())),
           Positioned(
-            left: subTitle == null ? 20 : 8,
+            left: (nativeWindowButtons ? macTrafficLightsWidth : 0) + (subTitle == null ? 20 : 8),
             top: 0,
             bottom: 0,
             child: subTitle == null
@@ -209,10 +209,10 @@ class _TitleBar extends StatelessWidget {
             ),
           // 窗口按钮左侧：任务入口
           // 手机上没有窗口按钮，任务入口放在最右侧
-          Positioned(right: isDesktop ? 46 * 3 + 4 : 8, top: 4, child: const _TasksButton()),
+          Positioned(right: isDesktop && !nativeWindowButtons ? 46 * 3 + 4 : 8, top: 4, child: const _TasksButton()),
           // 手机上全屏显示，电量与网络放在任务入口左侧
           if (!isDesktop) const Positioned(right: 64, top: 0, bottom: 0, child: Center(child: DeviceStatus())),
-          if (isDesktop) const Positioned(right: 0, top: 0, child: WindowButtons()),
+          if (isDesktop && !nativeWindowButtons) const Positioned(right: 0, top: 0, child: WindowButtons()),
         ],
       ),
     );

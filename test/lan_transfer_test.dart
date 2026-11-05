@@ -96,6 +96,42 @@ void main() {
     zip.deleteSync();
   });
 
+  test('整个版本带上依赖的原版；本机已有原版时不覆盖', () async {
+    final root = p.join(tmp.path, 'inherit');
+    write(p.join(root, 'versions', 'forge', 'forge.json'), '{"id":"forge","inheritsFrom":"1.20.1"}');
+    write(p.join(root, 'versions', '1.20.1', '1.20.1.json'), '{"id":"1.20.1"}');
+    write(p.join(root, 'versions', '1.20.1', '1.20.1.jar'), 'jar');
+    write(p.join(root, 'versions', '1.20.1', 'saves', 'w', 'level.dat'), 'not sent');
+    final zip = await packTransfer(
+      version: 'forge',
+      versionDir: p.join(root, 'versions', 'forge'),
+      gameDir: p.join(root, 'versions', 'forge'),
+      wholeVersion: true,
+      items: const [],
+    );
+    final m = checkTransfer(zip.path);
+    expect(m.parents, ['1.20.1']);
+    expect(m.files.keys.where((k) => k.startsWith('parent/')).toSet(), {
+      'parent/1.20.1/1.20.1.json',
+      'parent/1.20.1/1.20.1.jar',
+    });
+
+    final a = p.join(tmp.path, 'inherit-a');
+    Directory(p.join(a, 'versions')).createSync(recursive: true);
+    final steps = <int>[];
+    await importTransferVersion(zip.path, m, a, onProgress: (t, d) => steps.add(d));
+    expect(steps.last, m.bytes);
+    expect(File(p.join(a, 'versions', '1.20.1', '1.20.1.jar')).readAsStringSync(), 'jar');
+    expect(File(p.join(a, 'versions', 'forge', 'forge.json')).existsSync(), isTrue);
+
+    final b = p.join(tmp.path, 'inherit-b');
+    write(p.join(b, 'versions', '1.20.1', '1.20.1.jar'), 'local');
+    await importTransferVersion(zip.path, m, b);
+    expect(File(p.join(b, 'versions', '1.20.1', '1.20.1.jar')).readAsStringSync(), 'local');
+    expect(Directory(p.join(b, 'versions')).listSync().map((e) => p.basename(e.path)).toSet(), {'1.20.1', 'forge'});
+    zip.deleteSync();
+  });
+
   test('配对码错 3 次后停止接收', () async {
     String? stopped;
     final server = await TransferServer.start(onReceived: (_) {}, onStopped: (r) => stopped = r);

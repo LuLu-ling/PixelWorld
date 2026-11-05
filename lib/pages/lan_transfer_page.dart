@@ -102,10 +102,14 @@ class _LanTransferPageState extends State<LanTransferPage> {
           '导入为新版本',
           '将「${m.version}」导入为新版本，并开启版本隔离。\n'
               '共 ${m.files.length} 个文件，${formatSize(m.bytes)}。\n\n'
+              '${m.parents.isEmpty ? '' : '依赖的原版 ${m.parents.join('、')} 也会一起导入（本机已有时保留本机的）。\n'}'
               '游戏本体依赖的库文件和资源文件没有一起传输，第一次启动时会自动补全。',
         );
         if (ok != true) return;
-        final id = await importTransferVersion(t.file.path, m, state.paths.root);
+        final id = await _withProgress(
+          '正在导入「${m.version}」',
+          (onProgress) => importTransferVersion(t.file.path, m, state.paths.root, onProgress: onProgress),
+        );
         await state.refreshVersions();
         _drop(t);
         if (mounted) toast(context, '已导入版本「$id」');
@@ -113,13 +117,18 @@ class _LanTransferPageState extends State<LanTransferPage> {
         final target = await _pickTarget(state, m);
         if (target == null) return;
         final dir = await state.gameDirOf(target);
-        final backup = await importTransferFiles(
-          t.file.path,
-          m,
-          dir,
-          targetVersion: target.id,
-          backupDir: p.join(state.paths.root, 'backups', target.id),
+        final backup = await _withProgress(
+          '正在导入到「${target.id}」',
+          (onProgress) => importTransferFiles(
+            t.file.path,
+            m,
+            dir,
+            targetVersion: target.id,
+            backupDir: p.join(state.paths.root, 'backups', target.id),
+            onProgress: onProgress,
+          ),
         );
+        await state.refreshVersions();
         _drop(t);
         if (mounted) {
           toast(context, backup == null ? '已导入到「${target.id}」' : '已导入到「${target.id}」，原来的内容已备份到 ${p.basename(backup)}');
@@ -127,6 +136,40 @@ class _LanTransferPageState extends State<LanTransferPage> {
       }
     } catch (e) {
       if (mounted) toast(context, '导入失败：$e');
+    }
+  }
+
+  /// 导入时显示不可关闭的进度对话框
+  Future<T> _withProgress<T>(String title, Future<T> Function(void Function(int total, int done)) run) async {
+    final progress = ValueNotifier<(int, int)?>(null);
+    final nav = Navigator.of(context);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Text(title),
+          content: ValueListenableBuilder(
+            valueListenable: progress,
+            builder: (ctx, v, _) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(v == null ? '正在准备…' : '${formatSize(v.$2)} / ${formatSize(v.$1)}'),
+                const SizedBox(height: 12),
+                LinearProgressIndicator(value: v == null || v.$1 == 0 ? null : v.$2 / v.$1),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    try {
+      return await run((total, done) => progress.value = (total, done));
+    } finally {
+      nav.pop();
+      progress.dispose();
     }
   }
 

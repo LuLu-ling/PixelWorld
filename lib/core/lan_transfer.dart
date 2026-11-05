@@ -4,6 +4,7 @@
 // zip 结构：
 //   pclpw-transfer.json   清单（类型、版本、来源设备、每个文件的大小）
 //   version/...           versions/<版本> 文件夹中的文件（只在发送整个版本时有）
+//   parent/<版本>/...     依赖的原版（inheritsFrom），只有版本 json 和 jar
 //   game/...              运行目录中选中的内容（mods、config、saves 等）
 
 import 'dart:async';
@@ -62,6 +63,7 @@ class TransferManifest {
     required this.from,
     required this.items,
     required this.files,
+    this.parents = const [],
   });
 
   /// 整个版本（导入为新版本）还是部分内容（导入到已有版本）
@@ -77,25 +79,33 @@ class TransferManifest {
   /// zip 中每个文件的大小
   final Map<String, int> files;
 
+  /// 一起发送的依赖版本（Forge、Fabric 等版本依赖的原版），导入方没有时才导入
+  final List<String> parents;
+
   int get bytes => files.values.fold(0, (a, b) => a + b);
 
   Map<String, dynamic> toJson() => {
-    'format': 1,
+    'format': 2,
     'wholeVersion': wholeVersion,
     'version': version,
     'from': from,
     'items': items,
     'files': files,
+    'parents': parents,
   };
 
   static TransferManifest parse(Map<String, dynamic> j) {
-    if (j['format'] != 1) throw TransferException('不支持的传输格式，请把两边的启动器更新到同一版本');
+    if (j['format'] != 2) throw TransferException('不支持的传输格式，请把两边的启动器更新到同一版本');
     final version = j['version'];
     final items = j['items'];
     final files = j['files'];
     if (version is! String || items is! List || files is! Map) throw TransferException('传输清单无效');
     splitRelative(version); // 版本名只能是一级合法的文件夹名
     if (version.contains('/') || version.contains('\\')) throw TransferException('版本名无效：$version');
+    final parents = (j['parents'] as List? ?? const []).whereType<String>().toList();
+    for (final id in parents) {
+      if (splitRelative(id).length != 1 || id == version) throw TransferException('依赖版本名无效：$id');
+    }
     final names = items.whereType<String>().toList();
     if (names.length != items.length || names.any((n) => !transferItems.containsKey(n))) {
       throw TransferException('传输清单中有不支持的内容');
@@ -112,6 +122,7 @@ class TransferManifest {
       from: (j['from'] as String?) ?? '未知设备',
       items: names,
       files: sizes,
+      parents: parents,
     );
   }
 }
@@ -162,8 +173,24 @@ Future<File> packTransfer({
       }
     }
 
+    final parents = <String>[];
     if (wholeVersion) {
       await addTree(versionDir, '', 'version/', skip: _skipInVersion);
+      // 依赖的原版也要带上，否则对方没有这个原版时版本无法识别
+      final versionsDir = p.dirname(versionDir);
+      var cur = version;
+      while (true) {
+        final parent = _inheritsFrom(p.join(versionsDir, cur, '$cur.json'));
+        if (parent == null || parent == version || parents.contains(parent)) break;
+        final dir = p.join(versionsDir, parent);
+        if (!File(p.join(dir, '$parent.json')).existsSync()) break;
+        parents.add(parent);
+        for (final name in ['$parent.json', '$parent.jar']) {
+          final f = File(p.join(dir, name));
+          if (f.existsSync()) await add(f, 'parent/$parent/$name');
+        }
+        cur = parent;
+      }
     }
     // 开启版本隔离时，整个版本已经包含运行目录中的一切
     if (!(wholeVersion && isolated)) {
@@ -183,6 +210,7 @@ Future<File> packTransfer({
       from: transferDeviceName(),
       items: included,
       files: sizes,
+      parents: parents,
     );
     enc.addArchiveFile(ArchiveFile.string(transferManifestName, jsonEncode(manifest.toJson())));
   } catch (_) {
@@ -192,6 +220,15 @@ Future<File> packTransfer({
   }
   await enc.close();
   return out;
+}
+
+String? _inheritsFrom(String json) {
+  try {
+    final v = (jsonDecode(File(json).readAsStringSync()) as Map<String, dynamic>)['inheritsFrom'];
+    return v is String && v.isNotEmpty ? v : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 /// 读取并检查收到的 zip：清单存在、每个文件都在清单中、路径安全、大小不超过清单所写
@@ -221,7 +258,7 @@ TransferManifest checkTransfer(String zip) {
   }
 }
 
-/// 返回条目解压后相对目标文件夹的路径
+/// 返回条目解压后的相对路径：整个版本时相对 versions 文件夹，部分内容时相对运行目录
 String _checkEntry(TransferManifest m, ArchiveFile f) {
   if (f.isSymbolicLink) throw TransferException('传输包中有符号链接：${f.name}');
   final want = m.files[f.name];
@@ -230,10 +267,18 @@ String _checkEntry(TransferManifest m, ArchiveFile f) {
   final String rel;
   if (f.name.startsWith('version/')) {
     if (!m.wholeVersion) throw TransferException('传输包无效：${f.name}');
-    rel = splitRelative(f.name.substring('version/'.length)).join('/');
+    rel = '${m.version}/${splitRelative(f.name.substring('version/'.length)).join('/')}';
+  } else if (f.name.startsWith('parent/')) {
+    final parts = splitRelative(f.name.substring('parent/'.length));
+    if (!m.wholeVersion || parts.length != 2 || !m.parents.contains(parts[0])) {
+      throw TransferException('传输包无效：${f.name}');
+    }
+    if (parts[1] != '${parts[0]}.json' && parts[1] != '${parts[0]}.jar') throw TransferException('传输包无效：${f.name}');
+    rel = parts.join('/');
   } else if (f.name.startsWith('game/')) {
-    rel = splitRelative(f.name.substring('game/'.length)).join('/');
-    if (!m.items.contains(rel.split('/').first)) throw TransferException('传输包中有清单以外的文件：${f.name}');
+    final r = splitRelative(f.name.substring('game/'.length)).join('/');
+    if (!m.items.contains(r.split('/').first)) throw TransferException('传输包中有清单以外的文件：${f.name}');
+    rel = m.wholeVersion ? '${m.version}/$r' : r;
   } else {
     throw TransferException('传输包无效：${f.name}');
   }
@@ -241,7 +286,12 @@ String _checkEntry(TransferManifest m, ArchiveFile f) {
 }
 
 /// 解压到新的临时文件夹 [staging]
-Future<void> _extract(String zip, TransferManifest m, String staging) async {
+Future<void> _extract(
+  String zip,
+  TransferManifest m,
+  String staging,
+  void Function(int total, int done)? onProgress,
+) async {
   if (FileSystemEntity.typeSync(staging, followLinks: false) != FileSystemEntityType.notFound) {
     throw TransferException('临时文件夹已存在：$staging');
   }
@@ -249,6 +299,8 @@ Future<void> _extract(String zip, TransferManifest m, String staging) async {
   final input = InputFileStream(zip);
   try {
     final archive = ZipDecoder().decodeStream(input, verify: true);
+    final total = m.bytes;
+    var done = 0;
     for (final f in archive.files) {
       if (f.name == transferManifestName || !f.isFile) continue;
       final rel = _checkEntry(m, f);
@@ -262,6 +314,10 @@ Future<void> _extract(String zip, TransferManifest m, String staging) async {
         await out.close();
       }
       if (File(abs).lengthSync() != m.files[f.name]) throw TransferException('文件大小与清单不符：$rel');
+      done += m.files[f.name]!;
+      onProgress?.call(total, done);
+      // 让界面有机会刷新进度
+      await Future<void>.delayed(Duration.zero);
     }
   } finally {
     await input.close();
@@ -274,8 +330,14 @@ String _stamp() {
   return '${now.year}${two(now.month)}${two(now.day)}-${two(now.hour)}${two(now.minute)}${two(now.second)}';
 }
 
-/// 把整个版本导入为 versions/<[newId] 或原名>，导入后开启版本隔离，返回版本名
-Future<String> importTransferVersion(String zip, TransferManifest m, String gameRoot) async {
+/// 把整个版本导入为 versions/<原名>，导入后开启版本隔离，返回版本名。
+/// 依赖的原版只在本机没有时导入，已有的不覆盖。
+Future<String> importTransferVersion(
+  String zip,
+  TransferManifest m,
+  String gameRoot, {
+  void Function(int total, int done)? onProgress,
+}) async {
   if (!m.wholeVersion) throw TransferException('这个传输包不是整个版本');
   final id = m.version;
   final versions = p.join(gameRoot, 'versions');
@@ -285,10 +347,16 @@ Future<String> importTransferVersion(String zip, TransferManifest m, String game
   }
   final staging = p.join(versions, '.pclpw-import-${_stamp()}');
   try {
-    await _extract(zip, m, staging);
-    if (!File(p.join(staging, '$id.json')).existsSync()) throw TransferException('传输包中没有版本文件 $id.json');
-    await writeInstanceRaw(staging, {'VersionArgumentIndieV2': true});
-    await Directory(staging).rename(dest);
+    await _extract(zip, m, staging, onProgress);
+    final main = p.join(staging, id);
+    if (!File(p.join(main, '$id.json')).existsSync()) throw TransferException('传输包中没有版本文件 $id.json');
+    for (final parent in m.parents) {
+      final to = p.join(versions, parent);
+      if (FileSystemEntity.typeSync(to, followLinks: false) != FileSystemEntityType.notFound) continue;
+      if (Directory(p.join(staging, parent)).existsSync()) await Directory(p.join(staging, parent)).rename(to);
+    }
+    await writeInstanceRaw(main, {'VersionArgumentIndieV2': true});
+    await Directory(main).rename(dest);
   } finally {
     if (Directory(staging).existsSync()) await Directory(staging).delete(recursive: true);
   }
@@ -303,12 +371,13 @@ Future<String?> importTransferFiles(
   String gameDir, {
   required String targetVersion,
   required String backupDir,
+  void Function(int total, int done)? onProgress,
 }) async {
   if (m.wholeVersion) throw TransferException('这个传输包是整个版本，请导入为新版本');
   final staging = p.join(gameDir, '.pclpw-import-${_stamp()}');
   String? backup;
   try {
-    await _extract(zip, m, staging);
+    await _extract(zip, m, staging, onProgress);
     final existing = [
       for (final item in m.items)
         if (FileSystemEntity.typeSync(p.join(gameDir, item), followLinks: false) != FileSystemEntityType.notFound) item,

@@ -186,7 +186,10 @@ List<String> buildArgs(LaunchContext ctx) {
   if (v.jvmArguments != null) {
     jvm.addAll(_expandArgs(v.jvmArguments!, features));
   } else {
-    if (Platform.isMacOS) jvm.add('-XstartOnFirstThread');
+    // LWJGL 3 在 macOS 上必须在主线程运行；LWJGL 2（1.12.2 及更早）通过 AWT 创建窗口，加上这个参数窗口不会显示
+    if (Platform.isMacOS && v.libraries.any((l) => '${l['name']}'.startsWith('org.lwjgl:lwjgl:3.'))) {
+      jvm.add('-XstartOnFirstThread');
+    }
     jvm.addAll([r'-Djava.library.path=${natives_directory}', '-cp', r'${classpath}']);
   }
   // Apple 芯片的 Mac 上 1.13～1.18：使用去掉了窗口图标报错的 GLFW（mac_glfw.dart）

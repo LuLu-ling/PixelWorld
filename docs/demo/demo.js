@@ -128,7 +128,10 @@
       if (swOn('news', true)) {
         r += '<div class="nh"><span class="a">Minecraft 版本动态</span><span class="c">来自 Minecraft Wiki</span><span class="sp"></span><button type="button" class="ibtn sm hv" data-a="refresh" aria-label="刷新">' + ic('refresh') + '</button></div>' +
           NEWS.map(function (n) {
-            return '<button type="button" class="card news hv" data-a="tip" data-v="打开 Wiki 页面"><span class="cv" style="background:' + n.c + '"></span><span class="tx"><span class="hd"><span class="badge' + (n.k === '正式版' ? ' pr' : '') + '">' + n.k + '</span><b>' + n.id + '</b><i>' + n.d + '</i></span><span class="sm" style="display:-webkit-box">' + n.t + '</span></span></button>';
+            var inner = '<span class="cv" style="background:' + (n.img ? 'var(--sc) url(&quot;' + esc(n.img) + '&quot;) center/cover no-repeat' : n.c) + '"></span><span class="tx"><span class="hd"><span class="badge' + (n.k === '正式版' ? ' pr' : '') + '">' + n.k + '</span><b>' + esc(n.id) + '</b><i>' + esc(n.d) + '</i></span><span class="sm" style="display:-webkit-box">' + esc(n.t) + '</span></span>';
+            return n.url
+              ? '<a class="card news hv" href="' + esc(n.url) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit">' + inner + '</a>'
+              : '<button type="button" class="card news hv" data-a="tip" data-v="打开 Wiki 页面">' + inner + '</button>';
           }).join('');
       }
       return left + panel(r);
@@ -373,6 +376,49 @@
     scale.appendChild(root); stage.appendChild(scale); host.innerHTML = ''; host.appendChild(stage);
     var app = root.firstChild, toast = root.lastChild;
 
+    /* 和启动器一样：取 Mojang 版本列表中最新的几个正式版与快照，再从中文 Minecraft Wiki 读取简介与配图。
+       失败时保留示例动态。 */
+    function loadNews() {
+      var WIKI = 'https://zh.minecraft.wiki';
+      fetch('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json')
+        .then(function (r) { if (!r.ok) throw r.status; return r.json(); })
+        .then(function (m) {
+          var list = m.versions.filter(function (v) { return v.type === 'release' || v.type === 'snapshot'; }).slice(0, 4);
+          var titles = list.map(function (v) { return 'Java版' + v.id; });
+          var q = 'action=query&prop=extracts|pageimages&exintro=1&explaintext=1&exsentences=3&exlimit=max&piprop=thumbnail' +
+            '&pithumbsize=640&pilimit=max&redirects=1&format=json&origin=*&titles=' + encodeURIComponent(titles.join('|'));
+          return fetch(WIKI + '/api.php?' + q)
+            .then(function (r) { return r.ok ? r.json() : {}; })
+            .catch(function () { return {}; })
+            .then(function (w) {
+              var query = w.query || {}, from = {}, pages = {};
+              (query.redirects || []).forEach(function (x) { from[x.to] = x.from; });
+              Object.keys(query.pages || {}).forEach(function (k) {
+                var p = query.pages[k];
+                if (p.missing === undefined) pages[from[p.title] || p.title] = p;
+              });
+              return list.map(function (v, i) {
+                var p = pages[titles[i]] || {};
+                return {
+                  k: v.type === 'release' ? '正式版' : '快照',
+                  id: v.id,
+                  d: (v.releaseTime || '').slice(0, 10),
+                  t: (p.extract || '').trim() || 'Wiki 页面还在编写中。',
+                  img: p.thumbnail && p.thumbnail.source,
+                  url: WIKI + '/w/' + encodeURIComponent(titles[i]),
+                  c: NEWS[i % NEWS.length].c
+                };
+              });
+            });
+        })
+        .then(function (items) {
+          if (!items.length) return;
+          NEWS = items;
+          if (S.page === 'home' && !S.sub) render(false);
+        })
+        .catch(function () { /* 网络不可用时保留示例动态 */ });
+    }
+
     function render(anim) {
       var old = app.querySelector('.scr'), top = old ? old.scrollTop : 0;
       app.innerHTML = titlebar() + '<div class="body' + (anim ? ' in' : '') + '">' + pageHtml() + '</div>';
@@ -409,7 +455,7 @@
         case 'folder': S.folder = +v; render(false); break;
         case 'sec': S[k] = v; S.q = ''; render(true); break;
         case 'filt': S.filt = v; render(false); break;
-        case 'refresh': render(false); break;
+        case 'refresh': if (S.page === 'home' && !S.sub) loadNews(); else render(false); break;
         case 'goset': S.page = 'settings'; S.secSet = 'ai'; render(true); break;
         case 'fill': var ta = app.querySelector('#pd-ai'); if (ta) { ta.value = v; ta.focus(); } break;
         case 'sw':
@@ -430,6 +476,7 @@
 
     render(false);
     fit();
+    loadNews();
     if (window.ResizeObserver) new ResizeObserver(fit).observe(stage);
     window.addEventListener('resize', fit);
   }

@@ -120,11 +120,12 @@ Future<VersionJson> resolveVersion(GamePaths g, String id, [int depth = 0]) asyn
   if (parentId == null || depth > 8) return self;
   final parent = await resolveVersion(g, parentId, depth + 1);
 
-  // 子版本库优先，同一构件只保留一份
-  final seen = <String>{};
-  final libraries = <Map<String, dynamic>>[];
-  for (final lib in [...self.libraries, ...parent.libraries]) {
-    if (seen.add(_libKey('${lib['name']}'))) libraries.add(lib);
+  // 子版本的库覆盖父版本的同名库；父版本自己的同名库（按平台规则区分，如 1.12.2 的两条 LWJGL）都保留，
+  // 否则规则筛选后可能一条都不剩
+  final childKeys = {for (final lib in self.libraries) _libKey('${lib['name']}')};
+  final libraries = <Map<String, dynamic>>[...self.libraries];
+  for (final lib in parent.libraries) {
+    if (!childKeys.contains(_libKey('${lib['name']}'))) libraries.add(lib);
   }
 
   final merged = <String, dynamic>{...parent.raw, ...self.raw};
@@ -189,6 +190,11 @@ const _lwjgl2Arm64 = {
   'sha1': 'eff546c0b319d6ffc7a835652124c18089c67f36',
   'size': 488316,
 };
+const _objcBridgeArm64 = {
+  'url': 'https://github.com/MinecraftMachina/Java-Objective-C-Bridge/releases/download/1.1.0-mmachina.1/java-objc-bridge-1.1.jar',
+  'sha1': '369a83621e3c65496348491e533cb97fe5f2f37d',
+  'size': 91947,
+};
 const _jinputArm64 = {
   'url': 'https://github.com/r58Playz/jinput-m1/raw/main/plugins/OSX/bin/jinput-platform-2.0.5.jar',
   'sha1': '5189eb40db3087fb11ca063b68fa4f4c20b199dd',
@@ -240,8 +246,23 @@ List<Map<String, dynamic>> appleSiliconLibraries(List<Map<String, dynamic>> libr
       if (seen.add('jinput-platform')) out.add(_arm64Natives('${lib['name']}', _jinputArm64));
       continue;
     }
+    // java-objc-bridge 1.0.0 没有 arm64 本地库；官方的 1.1 是 Java 11 字节码，Java 8（Forge 1.12.2 等）无法加载。
+    // 使用社区编译的 1.1.0-mmachina.1（Java 8 字节码，带 arm64 本地库，与 Prism Launcher 相同）
     if (parts.length >= 3 && parts[0] == 'ca.weblite' && parts[1] == 'java-objc-bridge' && parts[2] == '1.0.0') {
-      if (seen.add('java-objc-bridge')) out.add({'name': 'ca.weblite:java-objc-bridge:1.1'});
+      if (seen.add('java-objc-bridge')) {
+        const name = 'ca.weblite:java-objc-bridge:1.1.0-mmachina.1';
+        out.add({
+          'name': name,
+          'downloads': {
+            'artifact': {..._objcBridgeArm64, 'path': mavenPath(name)},
+          },
+        });
+      }
+      continue;
+    }
+    // text2speech 1.10 在 Apple 芯片上无法加载，换成 1.11.3（与 Prism Launcher 相同）
+    if (parts.length >= 3 && parts[0] == 'com.mojang' && parts[1] == 'text2speech' && parts[2].startsWith('1.10.')) {
+      if (seen.add('text2speech')) out.add({'name': 'com.mojang:text2speech:1.11.3'});
       continue;
     }
     out.add(lib);

@@ -68,7 +68,7 @@
     }
     function tf(k, ph, def, w) {
       var v = k in S.txt ? S.txt[k] : (def || '');
-      return '<input class="tf" type="text" data-t="' + k + '" placeholder="' + esc(ph || '') + '" value="' + esc(v) + '" autocomplete="off" style="width:' + (w || 300) + 'px">';
+      return '<input class="tf" type="text" data-t="' + k + '" placeholder="' + esc(ph || '') + '" value="' + esc(v) + '" autocomplete="off" readonly data-a="tip" data-v="输入内容" style="cursor:default;width:' + (w || 300) + 'px">';
     }
     function row(icon, title, sub, trail, attrs) {
       return '<div class="lt p20' + (sub ? ' two' : '') + '"' + (attrs || '') + '>' + (icon ? ic(icon) : '') + '<div class="t"><div class="t1">' + title + '</div>' + (sub ? '<div class="t2">' + sub + '</div>' : '') + '</div>' + (trail || '') + '</div>';
@@ -307,7 +307,7 @@
     function tool(icon, t, s, a, act) { return row(icon, t, s, a ? btn('tonal', a, act) : ''); }
     function form(title, sub, fields, bt, act) {
       return '<div class="h5">' + title + '</div><div class="sub mt8">' + sub + '</div><div class="fl mt24">' + fields.map(function (f) {
-        return '<input class="tf" type="text" data-t="' + f[0] + '" placeholder="' + esc(f[1]) + '" value="' + esc(S.txt[f[0]] || '') + '" autocomplete="off" aria-label="' + esc(f[1]) + '">';
+        return '<input class="tf" type="text" data-t="' + f[0] + '" placeholder="' + esc(f[1]) + '" value="' + esc(S.txt[f[0]] || '') + '" autocomplete="off" readonly data-a="tip" data-v="输入内容" style="cursor:default" aria-label="' + esc(f[1]) + '">';
       }).join('') + '<div>' + btn('fill', bt, act) + '</div></div>';
     }
     function tools() {
@@ -346,7 +346,7 @@
       return nav + '<div class="panel"><div class="empty" style="padding-bottom:96px"><div class="h5">有什么可以帮你？</div>' +
         '<div class="card lt two mt16" style="width:460px;text-align:left"><span class="t"><span class="t1" style="display:block">先设置 AI 服务</span><span class="t2" style="display:block">这是网页演示，无法与 AI 对话</span></span><button type="button" class="b tonal hv" data-a="goset">设置</button></div>' +
         '<div class="wrapf mt12" style="justify-content:center">' + chips + '</div></div>' +
-        '<div class="aib"><textarea data-ai="1" id="pd-ai" placeholder="输入问题，Enter 发送，Shift + Enter 换行" aria-label="输入问题"></textarea><button type="button" class="b fill hv" data-a="tip" data-v="与 AI 对话" aria-label="发送">' + ic('send') + '</button></div></div>';
+        '<div class="aib"><textarea data-ai="1" id="pd-ai" readonly data-a="tip" data-v="输入内容" style="cursor:default" placeholder="输入问题，Enter 发送，Shift + Enter 换行" aria-label="输入问题"></textarea><button type="button" class="b fill hv" data-a="tip" data-v="与 AI 对话" aria-label="发送">' + ic('send') + '</button></div></div>';
     }
 
     /* ---------- 子页面 ---------- */

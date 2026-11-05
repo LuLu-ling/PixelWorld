@@ -200,7 +200,7 @@
       return src.filter(function (x) { return !q || x[0].toLowerCase().indexOf(q) >= 0; }).map(function (x) {
         var snap = !preset && S.filt !== 'release';
         return '<button type="button" class="card lt hv" style="margin-bottom:6px;min-height:64px" data-a="tip" data-v="下载 ' + esc(x[0]) + '">' + ic(snap ? 'science' : 'view_in_ar').replace('class="ic"', 'class="ic" style="color:var(--p)"') +
-          '<span class="t"><span class="t1" style="display:flex;align-items:center;gap:8px">' + x[0] + (x[2] ? '<span class="badge pr" style="background:var(--pc)">最新</span>' : '') + '</span><span class="t2" style="display:block">发布于 ' + x[1] + '</span></span>' + ic('download') + '</button>';
+          '<span class="t"><span class="t1" style="display:flex;align-items:center;gap:8px">' + esc(x[0]) + (x[2] ? '<span class="badge pr" style="background:var(--pc)">最新</span>' : '') + '</span><span class="t2" style="display:block">发布于 ' + esc(x[1]) + '</span></span>' + ic('download') + '</button>';
       }).join('') || '<div class="sub" style="padding:24px;text-align:center">没有匹配的版本</div>';
     }
     function download() {
@@ -376,13 +376,27 @@
     scale.appendChild(root); stage.appendChild(scale); host.innerHTML = ''; host.appendChild(stage);
     var app = root.firstChild, toast = root.lastChild;
 
-    /* 和启动器一样：取 Mojang 版本列表中最新的几个正式版与快照，再从中文 Minecraft Wiki 读取简介与配图。
-       失败时保留示例动态。 */
+    /* 和启动器一样：取 Mojang 版本列表中最新的几个正式版与快照，再从中文 Minecraft Wiki 读取简介与配图；
+       同时更新下载页的版本列表。失败时保留示例数据。 */
     function loadNews() {
       var WIKI = 'https://zh.minecraft.wiki';
       fetch('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json')
         .then(function (r) { if (!r.ok) throw r.status; return r.json(); })
         .then(function (m) {
+          // 下载页的版本列表也用真实数据（愚人节版本仍用示例，官方列表不区分）
+          var latest = m.latest || {};
+          function pick(types, max) {
+            return m.versions.filter(function (v) { return types.indexOf(v.type) >= 0; }).slice(0, max).map(function (v) {
+              return [v.id, (v.releaseTime || '').slice(0, 10), v.id === latest.release || v.id === latest.snapshot ? 1 : 0];
+            });
+          }
+          DL.release = pick(['release'], 200);
+          DL.snapshot = pick(['snapshot'], 60);
+          DL.old = pick(['old_beta', 'old_alpha'], 200);
+          if (S.page === 'download' && !S.sub) {
+            var l = app.querySelector('#pd-list');
+            if (l) l.innerHTML = dlList();
+          }
           var list = m.versions.filter(function (v) { return v.type === 'release' || v.type === 'snapshot'; }).slice(0, 4);
           var titles = list.map(function (v) { return 'Java版' + v.id; });
           var q = 'action=query&prop=extracts|pageimages&exintro=1&explaintext=1&exsentences=3&exlimit=max&piprop=thumbnail' +

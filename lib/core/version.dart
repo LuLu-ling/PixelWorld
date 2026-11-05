@@ -120,11 +120,12 @@ Future<VersionJson> resolveVersion(GamePaths g, String id, [int depth = 0]) asyn
   if (parentId == null || depth > 8) return self;
   final parent = await resolveVersion(g, parentId, depth + 1);
 
-  // 子版本库优先，同一构件只保留一份
-  final seen = <String>{};
-  final libraries = <Map<String, dynamic>>[];
-  for (final lib in [...self.libraries, ...parent.libraries]) {
-    if (seen.add(_libKey('${lib['name']}'))) libraries.add(lib);
+  // 子版本的库覆盖父版本的同名库；父版本自己的同名库（按平台规则区分，如 1.12.2 的两条 LWJGL）都保留，
+  // 否则规则筛选后可能一条都不剩
+  final childKeys = {for (final lib in self.libraries) _libKey('${lib['name']}')};
+  final libraries = <Map<String, dynamic>>[...self.libraries];
+  for (final lib in parent.libraries) {
+    if (!childKeys.contains(_libKey('${lib['name']}'))) libraries.add(lib);
   }
 
   final merged = <String, dynamic>{...parent.raw, ...self.raw};

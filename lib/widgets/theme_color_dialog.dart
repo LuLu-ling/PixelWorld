@@ -29,31 +29,27 @@ class _ThemeColorDialog extends StatefulWidget {
 }
 
 class _ThemeColorDialogState extends State<_ThemeColorDialog> {
-  late int _red;
-  late int _green;
-  late int _blue;
+  late int _argb;
 
   @override
   void initState() {
     super.initState();
-    final c = Color(widget.current);
-    _red = (c.r * 255).round();
-    _green = (c.g * 255).round();
-    _blue = (c.b * 255).round();
+    _argb = widget.current;
   }
 
-  Color get _color => Color.fromARGB(255, _red, _green, _blue);
+  Color get _color => Color(_argb);
 
-  void _setColor(int argb) {
-    final c = Color(argb);
-    setState(() {
-      _red = (c.r * 255).round();
-      _green = (c.g * 255).round();
-      _blue = (c.b * 255).round();
-    });
+  String get _hex => '#${_argb.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+
+  bool get _isPreset => _presetColors.contains(_argb);
+
+  Future<void> _openCustom() async {
+    final color = await showDialog<int>(
+      context: context,
+      builder: (context) => _CustomColorDialog(initial: _argb),
+    );
+    if (color != null) setState(() => _argb = color);
   }
-
-  String get _hex => '#${_color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
 
   @override
   Widget build(BuildContext context) {
@@ -62,71 +58,174 @@ class _ThemeColorDialogState extends State<_ThemeColorDialog> {
     return AlertDialog(
       title: const Text('主题色'),
       content: SizedBox(
-        width: 400,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: _color,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: scheme.outlineVariant),
-                    ),
+        width: 380,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: _color,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: scheme.outlineVariant),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(_hex, style: theme.textTheme.titleMedium?.copyWith(fontFamily: 'monospace')),
-                        Text(
-                          '按 Material Design 3 生成整套配色',
-                          style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_hex, style: theme.textTheme.titleMedium?.copyWith(fontFamily: 'monospace')),
+                      Text(
+                        '按 Material Design 3 生成整套配色',
+                        style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Text('预设', style: theme.textTheme.labelLarge),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 9,
-                runSpacing: 9,
-                children: [
-                  for (final argb in _presetColors)
-                    InkWell(
-                      borderRadius: BorderRadius.circular(99),
-                      onTap: () => _setColor(argb),
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: Color(argb),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: _color.toARGB32() == argb ? scheme.onSurface : scheme.outlineVariant,
-                            width: _color.toARGB32() == argb ? 3 : 1,
-                          ),
-                        ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text('预设', style: theme.textTheme.labelLarge),
+            const SizedBox(height: 9),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                for (final argb in _presetColors)
+                  _ColorDot(
+                    selected: _argb == argb,
+                    onTap: () => setState(() => _argb = argb),
+                    child: Container(color: Color(argb)),
+                  ),
+                _ColorDot(
+                  selected: !_isPreset,
+                  onTap: _openCustom,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: SweepGradient(
+                        colors: [
+                          Color(0xFFFF4D4D),
+                          Color(0xFFFFD24D),
+                          Color(0xFF4DFF88),
+                          Color(0xFF4DD2FF),
+                          Color(0xFF6B4DFF),
+                          Color(0xFFFF4DC4),
+                          Color(0xFFFF4D4D),
+                        ],
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Text('自定义', style: theme.textTheme.labelLarge),
-              _channel('红', _red, (v) => setState(() => _red = v)),
-              _channel('绿', _green, (v) => setState(() => _green = v)),
-              _channel('蓝', _blue, (v) => setState(() => _blue = v)),
-            ],
+                    child: const Icon(Icons.add, size: 18, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        FilledButton(onPressed: () => Navigator.pop(context, _argb), child: const Text('使用')),
+      ],
+    );
+  }
+}
+
+class _ColorDot extends StatelessWidget {
+  const _ColorDot({required this.selected, required this.onTap, required this.child});
+
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(99),
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: selected ? scheme.onSurface : scheme.outlineVariant,
+            width: selected ? 3 : 1,
           ),
+        ),
+        padding: const EdgeInsets.all(2),
+        child: ClipOval(child: child),
+      ),
+    );
+  }
+}
+
+class _CustomColorDialog extends StatefulWidget {
+  const _CustomColorDialog({required this.initial});
+
+  final int initial;
+
+  @override
+  State<_CustomColorDialog> createState() => _CustomColorDialogState();
+}
+
+class _CustomColorDialogState extends State<_CustomColorDialog> {
+  late int _red;
+  late int _green;
+  late int _blue;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = Color(widget.initial);
+    _red = (c.r * 255).round();
+    _green = (c.g * 255).round();
+    _blue = (c.b * 255).round();
+  }
+
+  Color get _color => Color.fromARGB(255, _red, _green, _blue);
+
+  String get _hex => '#${_color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return AlertDialog(
+      title: const Text('自定义主题色'),
+      content: SizedBox(
+        width: 380,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: _color,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: scheme.outlineVariant),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Text(_hex, style: theme.textTheme.titleMedium?.copyWith(fontFamily: 'monospace')),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _channel('红', _red, (v) => setState(() => _red = v)),
+            _channel('绿', _green, (v) => setState(() => _green = v)),
+            _channel('蓝', _blue, (v) => setState(() => _blue = v)),
+          ],
         ),
       ),
       actions: [
@@ -150,10 +249,7 @@ class _ThemeColorDialogState extends State<_ThemeColorDialog> {
             onChanged: (v) => onChanged(v.round()),
           ),
         ),
-        SizedBox(
-          width: 38,
-          child: Text('$value', textAlign: TextAlign.end),
-        ),
+        SizedBox(width: 38, child: Text('$value', textAlign: TextAlign.end)),
       ],
     );
   }

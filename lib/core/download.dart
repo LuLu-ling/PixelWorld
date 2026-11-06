@@ -167,6 +167,66 @@ class Downloader {
     }
   }
 
+  /// 流式下载到文件：边下边写，按字节报告进度。用于大文件（例如安卓的 Java），
+  /// 20 秒没有新数据、速度长期过低或大小不符时中断，方便调用方换一个下载源重试。
+  Future<void> downloadStreamed(
+    DownloadItem item, {
+    void Function(int received, int total)? onProgress,
+    void Function(String message)? onInfo,
+  }) async {
+    final target = mirror(item.url);
+    final req = await _client.getUrl(Uri.parse(target));
+    final res = await req.close().timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      await res.drain<void>();
+      throw HttpException('下载失败（HTTP ${res.statusCode}）');
+    }
+    final total = res.contentLength > 0 ? res.contentLength : (item.size ?? 0);
+    onInfo?.call(
+      '已连接 ${Uri.parse(target).host}'
+      '${total > 0 ? '，文件大小 ${(total / 1048576).toStringAsFixed(1)} MB' : '，服务器没有提供文件大小'}',
+    );
+    final out = File(item.path);
+    await out.parent.create(recursive: true);
+    final tmp = File('${item.path}.$pid.${_tmpSeq++}.tmp');
+    final sink = tmp.openWrite();
+    var received = 0;
+    final watch = Stopwatch()..start();
+    onProgress?.call(0, total);
+    try {
+      // 20 秒没有新数据视为连接卡住，抛出 TimeoutException 让调用方换源
+      await for (final chunk in res.timeout(const Duration(seconds: 20))) {
+        sink.add(chunk);
+        received += chunk.length;
+        onProgress?.call(received, total);
+        final secs = watch.elapsedMilliseconds / 1000;
+        if (secs > 15 && received / secs < 24 * 1024) {
+          throw HttpException('下载速度过慢（${(received / secs / 1024).toStringAsFixed(0)} KB/s）');
+        }
+      }
+    } catch (_) {
+      try {
+        await sink.close();
+      } catch (_) {}
+      try {
+        await tmp.delete();
+      } catch (_) {}
+      rethrow;
+    }
+    await sink.close();
+    if (received == 0) throw HttpException('没有收到数据');
+    if (total > 0 && received != total) {
+      await tmp.delete().catchError((_) => tmp);
+      throw HttpException('下载不完整（$received / $total 字节）');
+    }
+    if (item.size != null && received != item.size) {
+      await tmp.delete().catchError((_) => tmp);
+      throw HttpException('下载不完整（应为 ${item.size} 字节，实际 $received）');
+    }
+    if (out.existsSync()) await out.delete();
+    await tmp.rename(out.path);
+  }
+
   /// 并发下载，跳过已完整的文件
   Future<void> downloadAll(List<DownloadItem> items, void Function(int done, int total) onProgress) async {
     final unique = {for (final i in items) i.path: i}.values.toList();

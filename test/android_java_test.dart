@@ -55,6 +55,19 @@ void main() {
     expect(installedAndroidJavas().map((j) => j.major), [17, 8]);
   });
 
+  test('下载地址先 GitHub，失败后使用 ghproxy 等镜像', () {
+    final urls = androidJreUrls(17);
+    expect(urls.first, startsWith('https://github.com/AngelAuraMC/'));
+    expect(urls.first, endsWith('jre17-android-arm64.tar.xz'));
+    expect(
+      urls[1],
+      'https://ghproxy.net/https://github.com/AngelAuraMC/'
+      'angelauramc-openjdk-build/releases/download/download_jre17/jre17-android-arm64.tar.xz',
+    );
+    expect(urls.any((u) => u.startsWith('https://gh-proxy.com/')), isTrue);
+    expect(urls.any((u) => u.startsWith('https://ghfast.top/')), isTrue);
+  });
+
   test('版本设置指定的 Java 优先于全局设置', () async {
     final j = await ensureAndroidJava(
       needs(8),

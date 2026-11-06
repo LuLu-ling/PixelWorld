@@ -93,6 +93,19 @@ class TaskProgress extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 切换阶段但保留当前进度（例如下载完成后进入解压）
+  void setStageKeepProgress(String s) {
+    stage = s;
+    _append(s);
+    notifyListeners();
+  }
+
+  /// 只更新阶段内的最新消息，不写入日志；适合下载速度这类频繁变化的内容
+  void setDetail(String s) {
+    detail = s;
+    notifyListeners();
+  }
+
   void progress(int d, int t) {
     final first = total == 0 && t > 0;
     done = d;

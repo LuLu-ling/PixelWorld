@@ -29,6 +29,7 @@ import kotlin.concurrent.thread
 
 class MainActivity : FlutterActivity() {
     private var pending: MethodChannel.Result? = null
+    private var runtimeChannel: MethodChannel? = null
 
     /** 正在运行的 jar（JarService 进程）；进程退出后自动解除绑定 */
     private var jarConnection: ServiceConnection? = null
@@ -84,7 +85,9 @@ class MainActivity : FlutterActivity() {
             }
         }
         // 游戏运行时（android/runtime 模块）
-        MethodChannel(messenger, "pclpw/runtime").setMethodCallHandler { call, result ->
+        val runtime = MethodChannel(messenger, "pclpw/runtime")
+        runtimeChannel = runtime
+        runtime.setMethodCallHandler { call, result ->
             when (call.method) {
                 "prepare" -> background(result) {
                     // 用 SDL 的版本（26.x）需要 LWJGL 3.4.1
@@ -99,7 +102,17 @@ class MainActivity : FlutterActivity() {
                 // 显卡信息，用于选择渲染器
                 "gpu" -> background(result) { GameRuntime.gpuInfo(this) }
                 "installJre" -> background(result) {
-                    GameRuntime.installJre(this, File(call.argument<String>("archive")!!), File(call.argument<String>("dest")!!))
+                    val archive = File(call.argument<String>("archive")!!)
+                    val dest = File(call.argument<String>("dest")!!)
+                    val destPath = dest.path
+                    GameRuntime.installJre(this, archive, dest) { done, total ->
+                        runOnUiThread {
+                            runtimeChannel?.invokeMethod(
+                                "jreProgress",
+                                mapOf("dest" to destPath, "done" to done, "total" to total),
+                            )
+                        }
+                    }
                     null
                 }
                 "launch" -> {

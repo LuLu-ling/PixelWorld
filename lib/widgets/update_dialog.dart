@@ -55,25 +55,42 @@ class _UpdateDialogState extends State<_UpdateDialog> {
   bool _busy = false;
   String? _error;
 
+  /// 已经下载好的安装包。授权或失败后重试时直接复用，不再重新下载
+  File? _file;
+  bool _needsPermission = false;
+
   Release get r => widget.release;
 
   Future<void> _update(ReleaseAsset asset) async {
     setState(() {
       _busy = true;
       _error = null;
-      _progress = 0;
+      _needsPermission = false;
+      _progress = _file == null ? 0 : 1;
     });
     try {
-      final file = await downloadAsset(
-        asset,
-        onProgress: (got, total) {
-          if (mounted && total > 0) setState(() => _progress = got / total);
-        },
-      );
+      final file =
+          _file ??
+          await downloadAsset(
+            asset,
+            onProgress: (got, total) {
+              if (mounted && total > 0) setState(() => _progress = got / total);
+            },
+          );
+      _file = file;
+      if (mounted) setState(() => _progress = 1);
       await applyUpdate(file);
       // Windows：安装程序或替换脚本会在启动器退出后接手
       if (Platform.isWindows) exit(0);
       if (mounted) Navigator.pop(context);
+    } on InstallPermissionException {
+      // 安装包已下载好，等用户授权后点「继续安装」即可
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _needsPermission = true;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -138,6 +155,20 @@ class _UpdateDialogState extends State<_UpdateDialog> {
               const SizedBox(height: 12),
               Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
             ],
+            if (_needsPermission) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '安装包已经下载完成。第一次安装需要在系统设置中允许「安装未知应用」；允许后回到这里点「继续安装」，不需要重新下载。',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSecondaryContainer),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -160,7 +191,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
         if (asset != null)
           FilledButton(
             onPressed: _busy ? null : () => _update(asset),
-            child: Text(Platform.isWindows ? '更新并重启' : '下载并安装'),
+            child: Text(_file != null ? '继续安装' : (Platform.isWindows ? '更新并重启' : '下载并安装')),
           ),
       ],
     );

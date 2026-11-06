@@ -1,10 +1,10 @@
 package io.github.zhuzhi09.pclpw.runtime;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.BatteryManager;
-import android.os.Debug;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -17,9 +17,8 @@ import java.io.FileReader;
 import java.util.Locale;
 
 /**
- * Samples the values shown by the in-game HUD once a second. Everything here is read from the
- * game process itself: the HUD runs in the same process as the JVM, so the heap and PSS values
- * belong to the game rather than to the launcher.
+ * Samples the values shown by the in-game HUD once a second. The Java heap comes from the game
+ * process itself; system memory and swap come from ActivityManager / /proc/meminfo.
  */
 final class HudMetrics {
 
@@ -29,7 +28,10 @@ final class HudMetrics {
         boolean fpsAvailable;
         long heapUsed;
         long heapMax;
-        long pss;
+        long systemUsed;
+        long systemTotal;
+        long swapUsed;
+        long swapTotal;
         double cpuPercent;
         float temperature;
         boolean batteryTemperature;
@@ -47,6 +49,7 @@ final class HudMetrics {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable tick = this::sample;
     private final long clkTck;
+    private final int cores;
     private final long startedAt = SystemClock.elapsedRealtime();
 
     private Callback callback;
@@ -67,6 +70,7 @@ final class HudMetrics {
         } catch (Throwable ignored) {
         }
         clkTck = hz > 0 ? hz : 100;
+        cores = Math.max(1, Runtime.getRuntime().availableProcessors());
     }
 
     /** True when frames can be counted (the Zink renderer draws through a TextureView). */
@@ -114,9 +118,7 @@ final class HudMetrics {
         s.heapMax = rt.maxMemory();
 
         try {
-            Debug.MemoryInfo info = new Debug.MemoryInfo();
-            Debug.getMemoryInfo(info);
-            s.pss = (long) info.getTotalPss() * 1024;
+            readSystemMemory(s);
         } catch (Throwable ignored) {
         }
 
@@ -135,9 +137,58 @@ final class HudMetrics {
         if (running) handler.postDelayed(tick, INTERVAL_MS);
     }
 
+    /**
+     * System RAM and swap. ActivityManager gives the same "available" figure as the system
+     * settings; /proc/meminfo also provides swap on Android.
+     */
+    private void readSystemMemory(Sample s) {
+        long total = 0;
+        long available = 0;
+        long swapTotal = 0;
+        long swapFree = 0;
+        try (BufferedReader r = new BufferedReader(new FileReader("/proc/meminfo"))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                if (line.startsWith("MemTotal:")) total = parseKb(line);
+                else if (line.startsWith("MemAvailable:")) available = parseKb(line);
+                else if (line.startsWith("SwapTotal:")) swapTotal = parseKb(line);
+                else if (line.startsWith("SwapFree:")) swapFree = parseKb(line);
+            }
+        } catch (Throwable ignored) {
+        }
+
+        if (total <= 0 || available <= 0) {
+            ActivityManager am = (ActivityManager) activity.getSystemService(Activity.ACTIVITY_SERVICE);
+            if (am != null) {
+                ActivityManager.MemoryInfo info = new ActivityManager.MemoryInfo();
+                am.getMemoryInfo(info);
+                total = info.totalMem;
+                available = info.availMem;
+            }
+        }
+
+        if (total > 0) {
+            s.systemTotal = total;
+            s.systemUsed = Math.max(0, total - available);
+        }
+        s.swapTotal = swapTotal;
+        s.swapUsed = Math.max(0, swapTotal - swapFree);
+    }
+
+    private static long parseKb(String line) {
+        int colon = line.indexOf(':');
+        if (colon < 0) return 0;
+        String[] parts = line.substring(colon + 1).trim().split("\\s+");
+        if (parts.length == 0 || parts[0].isEmpty()) return 0;
+        try {
+            return Long.parseLong(parts[0]) * 1024;
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     /** CPU usage of the whole game process, in percent of one core. */
-    private double readCpu(long now, long previous) {
-        long[] cpu = readProcStat();
+    private double readCpu(long now, long previous) {        long[] cpu = readProcStat();
         if (cpu == null) return 0;
         long ticks = cpu[0] + cpu[1];
         if (lastCpuTicks < 0 || previous == 0) {
@@ -148,7 +199,8 @@ final class HudMetrics {
         if (elapsed <= 0) return 0;
         double usedTicks = ticks - lastCpuTicks;
         lastCpuTicks = ticks;
-        return Math.max(0, usedTicks * 100.0 * 1000.0 / clkTck / elapsed);
+        double percent = usedTicks * 100.0 * 1000.0 / clkTck / elapsed / cores;
+        return Math.max(0, Math.min(100, percent));
     }
 
     private static long[] readProcStat() {

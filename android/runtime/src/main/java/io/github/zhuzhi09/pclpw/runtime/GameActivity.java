@@ -69,6 +69,10 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
     public static final String EXTRA_TURNIP = "turnip";
     /** Show the in-game overlay (frame rate, memory, quick actions) */
     public static final String EXTRA_HUD = "hud";
+    /** Show the "ask AI" item in the overlay menu */
+    public static final String EXTRA_HUD_AI = "hudAi";
+    /** Attach the tail of the game log to AI questions */
+    public static final String EXTRA_HUD_AI_LOG = "hudAiLog";
     /** Name of the instance shown in the overlay header */
     public static final String EXTRA_INSTANCE = "instance";
 
@@ -147,7 +151,9 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
                 hud = new GameHud(this, root,
                         getIntent().getStringExtra(EXTRA_INSTANCE),
                         getIntent().getStringExtra(EXTRA_RENDERER),
-                        getIntent().getStringExtra(EXTRA_LOG_FILE));
+                        getIntent().getStringExtra(EXTRA_LOG_FILE),
+                        getIntent().getBooleanExtra(EXTRA_HUD_AI, true),
+                        getIntent().getBooleanExtra(EXTRA_HUD_AI_LOG, true));
                 hud.setGameFocus(surface);
                 hud.onVisibilityListener(this::syncHudButton);
                 hud.attach();

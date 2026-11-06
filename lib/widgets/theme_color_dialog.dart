@@ -31,6 +31,7 @@ class ThemeColorPicker extends StatelessWidget {
     return Wrap(
       spacing: 10,
       runSpacing: 10,
+      alignment: WrapAlignment.center,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         for (final argb in _presetColors)

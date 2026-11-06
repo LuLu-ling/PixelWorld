@@ -113,7 +113,7 @@ class _AppearanceSection extends StatelessWidget {
               trailing: const Icon(Icons.palette_outlined),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
               child: ThemeColorPicker(
                 current: cfg.themeColor,
                 onChanged: (color) => cfg.update({'themeColor': color}),

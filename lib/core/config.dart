@@ -87,6 +87,8 @@ class LauncherConfig extends ChangeNotifier {
     'renderScale': 1.0,
     // 安卓：渲染器（见 android_runtime.dart 的 androidRenderers），版本设置可以单独覆盖
     'androidRenderer': 'auto',
+    // 安卓：游戏内叠加层（可拖动的小球，点开可以看基础信息、问 AI）
+    'gameHud': true,
     // 启动器更新：通道为空时跟随这个构建自己的通道（见 AppInfo.channel）；启动时自动检查
     'updateChannel': '',
     'updateAutoCheck': true,
@@ -135,6 +137,7 @@ class LauncherConfig extends ChangeNotifier {
   bool get storageAsked => _get('storageAsked');
   double get renderScale => (_data['renderScale'] as num).toDouble().clamp(0.25, 1.0);
   String get androidRenderer => _get('androidRenderer');
+  bool get gameHud => _data['gameHud'] as bool? ?? true;
   List<GameFolder> get gameFolders =>
       (_data['gameFolders'] as List).whereType<Map<String, dynamic>>().map(GameFolder.fromJson).toList();
   int get isolationMode => (_data['isolationMode'] as num).toInt();

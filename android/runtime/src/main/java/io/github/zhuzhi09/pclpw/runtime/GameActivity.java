@@ -67,6 +67,10 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
     public static final String EXTRA_RENDERER = "renderer";
     /** Zink on Adreno: load the bundled Turnip driver */
     public static final String EXTRA_TURNIP = "turnip";
+    /** Show the in-game overlay (frame rate, memory, quick actions) */
+    public static final String EXTRA_HUD = "hud";
+    /** Name of the instance shown in the overlay header */
+    public static final String EXTRA_INSTANCE = "instance";
 
     private static final String TAG = "PCLPW-Game";
     private static boolean sStarted = false;
@@ -79,6 +83,10 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
     private SDLSurface sdlSurface;
     /** In-game control groups, shown only while the game grabs the cursor */
     private final ArrayList<View> controls = new ArrayList<>();
+    /** The in-game overlay; null when disabled in the launcher settings */
+    private GameHud hud;
+    private Button hudButton;
+
 
     /** Adds views to the root and remembers them as in-game controls */
     private final class ControlLayer {
@@ -134,6 +142,20 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         root.addView(textInput, new FrameLayout.LayoutParams(1, 1));
 
         createControls(root);
+        if (getIntent().getBooleanExtra(EXTRA_HUD, true)) {
+            try {
+                hud = new GameHud(this, root,
+                        getIntent().getStringExtra(EXTRA_INSTANCE),
+                        getIntent().getStringExtra(EXTRA_RENDERER),
+                        getIntent().getStringExtra(EXTRA_LOG_FILE));
+                hud.setGameFocus(surface);
+                hud.onVisibilityListener(this::syncHudButton);
+                hud.attach();
+            } catch (Throwable e) {
+                Log.e(TAG, "In-game HUD failed to start", e);
+                hud = null;
+            }
+        }
         root.addView(createTopBar(), new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END));
         setContentView(root);
         // The decor view exists only after setContentView
@@ -144,8 +166,16 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                     android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-                    () -> CallbackBridge.sendKeyPress(LwjglGlfwKeycode.GLFW_KEY_ESCAPE));
+                    () -> {
+                        if (hud != null && hud.onBack()) return;
+                        CallbackBridge.sendKeyPress(LwjglGlfwKeycode.GLFW_KEY_ESCAPE);
+                    });
         }
+    }
+
+    private void syncHudButton() {
+        if (hudButton == null) return;
+        hudButton.setAlpha(hud != null && hud.isVisible() ? 1f : 0.55f);
     }
 
     /** Java exceptions in this process go to the game log, so the launcher can show them */
@@ -169,8 +199,21 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
 
     @Override
     protected void onDestroy() {
+        if (hud != null) hud.dispose();
         CallbackBridge.removeGrabListener(this);
         super.onDestroy();
+    }
+
+    @Override
+    protected void onPause() {
+        if (hud != null) hud.onPause();
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (hud != null) hud.onResume();
     }
 
     @SuppressWarnings("deprecation")
@@ -255,6 +298,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
 
             @Override
             public void onSurfaceTextureUpdated(android.graphics.SurfaceTexture texture) {
+                if (hud != null) hud.onFrame();
             }
         });
         return view;
@@ -463,6 +507,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         for (View v : controls) v.setVisibility(grabbing ? View.VISIBLE : View.GONE);
         // Opening a menu must not leave movement keys held down
         if (!grabbing && joystick != null) joystick.reset();
+        if (hud != null) hud.onGrabState(grabbing);
         if (grabbing) {
             // Center the virtual cursor so camera movement starts from a known point
             CallbackBridge.sendCursorPos(CallbackBridge.windowWidth / 2f, CallbackBridge.windowHeight / 2f);
@@ -484,6 +529,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (hud != null && hud.hasInputFocus()) return super.dispatchKeyEvent(event);
         if (textInput.hasFocus() && event.getKeyCode() != KeyEvent.KEYCODE_BACK
                 && event.getKeyCode() != KeyEvent.KEYCODE_DEL && event.getKeyCode() != KeyEvent.KEYCODE_ENTER) {
             return super.dispatchKeyEvent(event);
@@ -505,6 +551,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
     @Override
     public void onBackPressed() {
         // Android 12 and older
+        if (hud != null && hud.onBack()) return;
         CallbackBridge.sendKeyPress(LwjglGlfwKeycode.GLFW_KEY_ESCAPE);
     }
 
@@ -660,7 +707,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         layer.addView(hotbar, lpHot);
     }
 
-    /** Always visible: pause, chat and keyboard */
+    /** Always visible: pause, chat, keyboard and the assistant toggle */
     private View createTopBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setPadding(0, dp(8), dp(8), 0);
@@ -676,6 +723,12 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         bar.addView(esc);
         bar.addView(chat);
         bar.addView(keyboard);
+        if (hud != null) {
+            hudButton = button("助手", 48);
+            hudButton.setOnClickListener(v -> hud.toggleVisible());
+            bar.addView(hudButton);
+            syncHudButton();
+        }
         TextView spacer = new TextView(this);
         bar.addView(spacer);
         return bar;

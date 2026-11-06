@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
@@ -5,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 import 'app_info.dart';
 import 'app_scope.dart';
 import 'app_state.dart';
+import 'core/hud_bridge.dart';
 import 'core/instance_files.dart';
 import 'pages/file_manager_page.dart';
 import 'installer/installer_app.dart';
@@ -20,6 +24,8 @@ Future<void> main(List<String> args) async {
 
   WidgetsFlutterBinding.ensureInitialized();
   final state = await AppState.create();
+  // 安卓：游戏进程通过本机回环端口向启动器里的 AI 提问
+  if (Platform.isAndroid) unawaited(HudBridge.start(state.config));
   if (isDesktop) {
     final window = WindowManager.instance.getCurrent()!;
     window.title = AppInfo.name;

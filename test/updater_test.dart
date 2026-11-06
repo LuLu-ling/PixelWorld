@@ -1,4 +1,9 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:pcl_pw/core/updater.dart';
 
 Release rel(String tag, {bool pre = false, String commit = 'main', List<String> files = const []}) => Release.fromJson({
@@ -79,5 +84,25 @@ void main() {
     });
     expect(r.assets[0].sha256, 'a' * 64);
     expect(r.assets[1].sha256, isNull);
+  });
+
+  test('已下载的更新文件核对通过后直接复用，不再联网', () async {
+    final dir = Directory.systemTemp.createTempSync('pclpw-update-reuse');
+    try {
+      final bytes = utf8.encode('already downloaded');
+      final file = File(p.join(dir.path, 'reuse.bin'))..writeAsBytesSync(bytes);
+      final asset = ReleaseAsset(
+        name: 'reuse.bin',
+        url: 'https://example.invalid/never',
+        size: bytes.length,
+        sha256: sha256.convert(bytes).toString(),
+      );
+      var progress = -1;
+      final out = await downloadAsset(asset, directory: dir, onProgress: (done, total) => progress = done);
+      expect(out.path, file.path);
+      expect(progress, bytes.length);
+    } finally {
+      dir.deleteSync(recursive: true);
+    }
   });
 }

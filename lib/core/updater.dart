@@ -209,11 +209,29 @@ Future<Release?> checkForUpdate(UpdateChannel channel) async {
   return r != null && isNewer(r) ? r : null;
 }
 
-/// 下载发布文件到临时文件夹，核对大小与 SHA-256
-Future<File> downloadAsset(ReleaseAsset asset, {void Function(int received, int total)? onProgress}) async {
-  final dir = Directory(p.join(Directory.systemTemp.path, 'pclpw-update'));
+/// 安卓上没有「安装未知应用」权限。安装包已经下载好，授权后可以继续安装，不需要重新下载
+class InstallPermissionException implements Exception {
+  @override
+  String toString() => '需要允许安装未知应用';
+}
+
+/// 下载发布文件到临时文件夹，核对大小与 SHA-256。
+/// 如果之前已经下载过同一个文件（例如授权后重试），核对通过就直接复用。
+Future<File> downloadAsset(
+  ReleaseAsset asset, {
+  void Function(int received, int total)? onProgress,
+  Directory? directory,
+}) async {
+  final dir = directory ?? Directory(p.join(Directory.systemTemp.path, 'pclpw-update'));
   await dir.create(recursive: true);
   final out = File(p.join(dir.path, asset.name));
+  if (await _matchesAsset(out, asset)) {
+    onProgress?.call(asset.size, asset.size);
+    await _removeOtherDownloads(dir, asset.name);
+    return out;
+  }
+  // 上次中断留下的同一文件先删掉
+  if (out.existsSync()) await out.delete();
   final tmp = File('${out.path}.part');
   final req = await _client.getUrl(Uri.parse(asset.url));
   final res = await req.close().timeout(const Duration(seconds: 30));
@@ -246,7 +264,36 @@ Future<File> downloadAsset(ReleaseAsset asset, {void Function(int received, int 
     throw Exception('文件校验失败（SHA-256 不匹配）');
   }
   if (out.existsSync()) await out.delete();
-  return tmp.rename(out.path);
+  final file = await tmp.rename(out.path);
+  await _removeOtherDownloads(dir, asset.name);
+  return file;
+}
+
+/// 本地已有的文件是否与发布文件一致：大小相同，并且（有 SHA-256 时）摘要相同
+Future<bool> _matchesAsset(File file, ReleaseAsset asset) async {
+  if (!file.existsSync()) return false;
+  if (asset.size > 0 && await file.length() != asset.size) return false;
+  final want = asset.sha256;
+  if (want == null || want.isEmpty) return true;
+  try {
+    final digest = await sha256.bind(file.openRead()).first;
+    return digest.toString() == want;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// 只保留本次要安装的文件；同一个更新目录里其他版本的安装包和残留分片都删掉
+Future<void> _removeOtherDownloads(Directory dir, String keep) async {
+  try {
+    await for (final e in dir.list()) {
+      if (e is File && p.basename(e.path) != keep) {
+        await e.delete().catchError((_) => e);
+      }
+    }
+  } catch (_) {
+    // 清理失败不影响更新
+  }
 }
 
 const _channel = MethodChannel('pclpw/update');
@@ -255,7 +302,12 @@ const _channel = MethodChannel('pclpw/update');
 Future<void> applyUpdate(File file) async {
   if (Platform.isAndroid) {
     // 系统会弹出安装确认；首次需要允许「安装未知应用」
-    await _channel.invokeMethod('installApk', {'path': file.path});
+    try {
+      await _channel.invokeMethod('installApk', {'path': file.path});
+    } on PlatformException catch (e) {
+      if (e.code == 'permission') throw InstallPermissionException();
+      throw Exception(e.message ?? e.code);
+    }
     return;
   }
   // macOS：打开下载的 dmg，由用户把新版本拖进「应用程序」替换旧版本

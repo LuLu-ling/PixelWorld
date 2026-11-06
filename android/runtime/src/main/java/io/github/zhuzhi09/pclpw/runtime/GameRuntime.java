@@ -23,6 +23,7 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -142,11 +143,17 @@ public final class GameRuntime {
 
     // ---------- Install ----------
 
+    /** 解压进度：{@code done} 是已读取的压缩包字节数，{@code total} 是压缩包大小 */
+    public interface ProgressListener {
+        void onProgress(long done, long total);
+    }
+
     /** Extracts an Android JRE (.tar.xz) into {@code dest} and prepares it for in-process use */
-    public static void installJre(Context context, File archive, File dest) throws IOException {
+    public static void installJre(Context context, File archive, File dest, ProgressListener listener) throws IOException {
         if (dest.exists()) deleteRecursive(dest);
         if (!dest.mkdirs()) throw new IOException("Cannot create " + dest);
-        try (InputStream in = new BufferedInputStream(new FileInputStream(archive));
+        try (CountingInputStream in = new CountingInputStream(
+                new BufferedInputStream(new FileInputStream(archive)), archive.length(), listener);
              TarArchiveInputStream tar = new TarArchiveInputStream(new XZCompressorInputStream(in))) {
             TarArchiveEntry entry;
             byte[] buffer = new byte[64 * 1024];
@@ -651,6 +658,43 @@ public final class GameRuntime {
             return !f.getCanonicalFile().equals(f.getAbsoluteFile());
         } catch (IOException e) {
             return false;
+        }
+    }
+
+    /** 统计压缩包读取进度，最多每 100 毫秒回调一次，避免刷屏 */
+    private static final class CountingInputStream extends FilterInputStream {
+        private final long total;
+        private final ProgressListener listener;
+        private long done;
+        private long lastReport;
+
+        CountingInputStream(InputStream in, long total, ProgressListener listener) {
+            super(in);
+            this.total = total;
+            this.listener = listener;
+        }
+
+        @Override
+        public int read() throws IOException {
+            int b = super.read();
+            if (b >= 0) count(1);
+            return b;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            int n = super.read(b, off, len);
+            if (n > 0) count(n);
+            return n;
+        }
+
+        private void count(int n) {
+            done += n;
+            long now = System.currentTimeMillis();
+            if (listener != null && (now - lastReport >= 100 || done >= total)) {
+                lastReport = now;
+                listener.onProgress(done, total);
+            }
         }
     }
 }

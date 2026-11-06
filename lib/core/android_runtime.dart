@@ -16,6 +16,32 @@ import 'version.dart';
 abstract final class AndroidRuntime {
   static const _channel = MethodChannel('pclpw/runtime');
 
+  static final _jreProgress = <String, void Function(int done, int total)>{};
+  static bool _jreHandlerSet = false;
+
+  /// 解压安卓版 Java。[onProgress] 按压缩包已读取的字节报告进度
+  static Future<void> installJre(File archive, String dest, {void Function(int done, int total)? onProgress}) async {
+    if (!_jreHandlerSet) {
+      _jreHandlerSet = true;
+      _channel.setMethodCallHandler((call) async {
+        if (call.method == 'jreProgress') {
+          final args = call.arguments;
+          if (args is Map) {
+            final cb = _jreProgress['${args['dest']}'];
+            cb?.call((args['done'] as num?)?.toInt() ?? 0, (args['total'] as num?)?.toInt() ?? 0);
+          }
+        }
+        return null;
+      });
+    }
+    if (onProgress != null) _jreProgress[dest] = onProgress;
+    try {
+      await _channel.invokeMethod('installJre', {'archive': archive.path, 'dest': dest});
+    } finally {
+      _jreProgress.remove(dest);
+    }
+  }
+
   /// 解压 LWJGL，返回本地库目录、替换游戏自带 LWJGL 的 classpath，以及 LWJGL 2 兼容层（lwjglx）。
   /// [sdl]：游戏用 SDL3 代替 GLFW（26.x），需要 LWJGL 3.4.1
   static Future<({String nativeLibDir, List<String> lwjglClasspath, String lwjglx, String lwjgl})> prepare({
@@ -323,6 +349,17 @@ int androidJavaMajor(int required) => required <= 8
 String _jreUrl(int major) =>
     'https://github.com/AngelAuraMC/angelauramc-openjdk-build/releases/download/download_jre$major/jre$major-android-arm64.tar.xz';
 
+/// GitHub 直连失败或卡住时依次尝试的镜像；下载地址拼在镜像前缀后面
+const androidJreMirrors = [
+  (name: 'GitHub', prefix: ''),
+  (name: 'ghproxy.net', prefix: 'https://ghproxy.net/'),
+  (name: 'gh-proxy.com', prefix: 'https://gh-proxy.com/'),
+  (name: 'ghfast.top', prefix: 'https://ghfast.top/'),
+];
+
+/// 安卓版 Java [major] 的所有下载地址，第一个是 GitHub
+List<String> androidJreUrls(int major) => [for (final m in androidJreMirrors) '${m.prefix}${_jreUrl(major)}'];
+
 /// 启动器提供的安卓版 Java
 const androidJavaMajors = [8, 17, 21, 25];
 
@@ -366,20 +403,95 @@ Future<JavaInfo> installAndroidJava(int major, Downloader dl, TaskProgress task)
 
 Future<JavaInfo> _installAndroidJava(int major, Downloader dl, TaskProgress task) async {
   final home = androidJavaHome(major);
-  final archive = Paths.tempFile('jre$major.tar.xz');
+  final archive = await _downloadJavaArchive(major, dl, task);
   try {
-    task.setStage('下载 Java $major（安卓版，约 30 MB）');
-    await dl.downloadFile(DownloadItem(url: _jreUrl(major), path: archive.path));
-    task.setStage('解压 Java $major');
-    // 上次没有解压完的文件先删掉
+    // 解压也按压缩包读取的字节显示进度
+    final size = archive.lengthSync();
+    task.progressBytes(0, size);
+    task.setStageKeepProgress('解压 Java $major');
+    task.setDetail('正在解压 ${_mb(size)} MB…');
     final dir = Directory(home);
     if (dir.existsSync()) await dir.delete(recursive: true);
-    await AndroidRuntime._channel.invokeMethod('installJre', {'archive': archive.path, 'dest': home});
+    await AndroidRuntime.installJre(
+      archive,
+      home,
+      onProgress: (done, total) {
+        task.progressBytes(done, total);
+        if (total > 0) task.setDetail('解压中 ${(done / total * 100).toStringAsFixed(0)}%');
+      },
+    );
     await File(p.join(home, '.installed')).writeAsString('$major');
   } finally {
     if (archive.existsSync()) await archive.delete().catchError((_) => archive);
   }
   return androidJavaAt(home)!;
+}
+
+/// 依次尝试 GitHub 与镜像下载 Java 压缩包；连接卡住、速度过低或内容不对时自动换下一个。
+/// 下载过程中把连接来源、速度与进度写到任务详情里。
+Future<File> _downloadJavaArchive(int major, Downloader dl, TaskProgress task) async {
+  final archive = Paths.tempFile('jre$major.tar.xz');
+  final failures = <String>[];
+  for (final mirror in androidJreMirrors) {
+    task.setStage('下载 Java $major（${mirror.name}）');
+    var lastMs = 0;
+    var lastBytes = 0;
+    try {
+      await dl.downloadStreamed(
+        DownloadItem(url: '${mirror.prefix}${_jreUrl(major)}', path: archive.path),
+        onProgress: (done, total) {
+          task.progressBytes(done, total);
+          final now = DateTime.now().millisecondsSinceEpoch;
+          if (now - lastMs >= 500 || done == total) {
+            final speed = lastMs == 0 ? 0.0 : (done - lastBytes) * 1000 / (now - lastMs);
+            task.setDetail(
+              '${mirror.name} · ${_mb(done)}${total > 0 ? ' / ${_mb(total)}' : ''} MB'
+              '${speed > 0 ? ' · ${_mb(speed)}/s' : ''}',
+            );
+            lastMs = now;
+            lastBytes = done;
+          }
+        },
+        onInfo: task.output,
+      );
+      if (!await _isXzArchive(archive)) throw Exception('下载到的不是有效的压缩包');
+      task.progressBytes(archive.lengthSync(), archive.lengthSync());
+      task.output('Java $major 下载完成（${_mb(archive.lengthSync())} MB，来源 ${mirror.name}）');
+      return archive;
+    } catch (e) {
+      failures.add('${mirror.name}：${_shortError(e)}');
+      task.output('${mirror.name} 下载失败：${_shortError(e)}');
+    }
+  }
+  await archive.delete().catchError((_) => archive);
+  throw Exception('Java $major 下载失败，已尝试 GitHub 与镜像：\n${failures.join('\n')}');
+}
+
+String _mb(num bytes) => (bytes / 1048576).toStringAsFixed(1);
+
+String _shortError(Object e) => '$e'
+    .replaceFirst(RegExp(r'^(Exception|HttpException|SocketException|TimeoutException|HandshakeException): ?'), '')
+    .trim();
+
+/// XZ 压缩包的文件头是 FD 37 7A 58 5A 00；用来拒绝镜像返回的网页错误页
+Future<bool> _isXzArchive(File file) async {
+  try {
+    final raf = await file.open();
+    try {
+      final head = await raf.read(6);
+      return head.length == 6 &&
+          head[0] == 0xFD &&
+          head[1] == 0x37 &&
+          head[2] == 0x7A &&
+          head[3] == 0x58 &&
+          head[4] == 0x5A &&
+          head[5] == 0x00;
+    } finally {
+      await raf.close();
+    }
+  } catch (_) {
+    return false;
+  }
 }
 
 /// 删除安卓版 Java [major]

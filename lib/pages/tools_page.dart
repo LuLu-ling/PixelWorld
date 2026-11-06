@@ -15,11 +15,12 @@ import '../widgets/format.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
 import 'diagnose_page.dart';
+import 'docs_page.dart';
 import 'file_manager_page.dart';
 import 'lan_transfer_page.dart';
 import 'versions_page.dart';
 
-enum _Section { lobby, transfer, diagnose, toolbox, download, skin, server, achievement }
+enum _Section { lobby, transfer, diagnose, toolbox, download, skin, server, achievement, docs }
 
 /// 工具（PCL 的布局）：联机与实用工具
 class ToolsPage extends StatefulWidget {
@@ -45,6 +46,7 @@ class _ToolsPageState extends State<ToolsPage> {
       SideNavItem(_Section.server, '服务器查询', Icons.dns_outlined),
       SideNavItem(_Section.achievement, '成就图片', Icons.emoji_events_outlined),
     ]),
+    SideNavGroup('帮助', [SideNavItem(_Section.docs, '使用文档', Icons.menu_book_outlined)]),
   ];
 
   @override
@@ -64,6 +66,7 @@ class _ToolsPageState extends State<ToolsPage> {
               _Section.skin => const _SkinTools(),
               _Section.server => const _ServerQuery(),
               _Section.achievement => const _Achievement(),
+              _Section.docs => const DocsPage(),
             },
           ),
         ),

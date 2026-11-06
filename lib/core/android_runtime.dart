@@ -71,6 +71,8 @@ abstract final class AndroidRuntime {
     String lwjgl = '3.3.3',
     String renderer = 'mobileglues',
     bool turnip = false,
+    String instance = '',
+    bool hud = true,
   }) async {
     await File(logFile).parent.create(recursive: true);
     if (File(logFile).existsSync()) await File(logFile).delete();
@@ -86,6 +88,8 @@ abstract final class AndroidRuntime {
       'lwjgl': lwjgl,
       'renderer': renderer,
       'turnip': turnip,
+      'instance': instance,
+      'hud': hud,
     });
   }
 

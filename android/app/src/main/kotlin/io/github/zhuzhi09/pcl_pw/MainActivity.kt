@@ -127,6 +127,8 @@ class MainActivity : FlutterActivity() {
                         .putExtra(GameActivity.EXTRA_LWJGL, call.argument<String>("lwjgl") ?: GameRuntime.LWJGL_VERSION)
                         .putExtra(GameActivity.EXTRA_RENDERER, call.argument<String>("renderer") ?: GameRuntime.MOBILEGLUES)
                         .putExtra(GameActivity.EXTRA_TURNIP, call.argument<Boolean>("turnip") ?: false)
+                        .putExtra(GameActivity.EXTRA_HUD, call.argument<Boolean>("hud") ?: true)
+                        .putExtra(GameActivity.EXTRA_INSTANCE, call.argument<String>("instance") ?: "")
                     GameRuntime.exitFile(this).delete()
                     startActivity(intent)
                     result.success(null)

@@ -524,6 +524,8 @@ class AppState extends ChangeNotifier {
           lwjgl: android.lwjgl,
           renderer: renderer.renderer,
           turnip: turnip,
+          instance: id,
+          hud: cfg.gameHud,
         );
         await config.update({'launchCount': count});
         gameState = GameState.running;

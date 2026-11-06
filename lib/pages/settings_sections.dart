@@ -296,6 +296,14 @@ class LaunchSection extends StatelessWidget {
             // 手机上游戏总是全屏，调的是渲染分辨率
             if (!isDesktop) const _RenderScaleRow(),
             if (Platform.isAndroid) const _RendererRow(),
+            if (Platform.isAndroid)
+              _SwitchRow(
+                icon: Icons.dashboard_outlined,
+                title: '游戏内叠加层',
+                subtitle: '在游戏画面上显示一个可拖动的小球，点开可以看基础信息、问 AI',
+                value: cfg.gameHud,
+                onChanged: (v) => set({'gameHud': v}),
+              ),
             if (isDesktop)
               _SelectRow<String>(
                 icon: Icons.crop_landscape,

@@ -24,8 +24,9 @@ const docPages = [
 
 const docSite = 'https://pcl.pw.zhuzhi.site/docs';
 
-/// 官网不可用时从 raw.githubusercontent 读取 site 分支的内容
+/// 官网不可用时从 raw.githubusercontent 读取 site 分支的内容；GitHub 直连失败时再试镜像
 const _rawDocs = 'https://raw.githubusercontent.com/zhuzhi-09/PCL.PW/site/docs/docs';
+const _docSources = [docSite, _rawDocs, 'https://ghproxy.net/$_rawDocs', 'https://gh-proxy.com/$_rawDocs'];
 
 String docPageUrl(String id) => '$docSite/$id.html';
 
@@ -37,7 +38,7 @@ final _client = HttpClient()
 Future<String> loadDocMarkdown(String id) async {
   final cache = File(p.join(Paths.appData, 'docs-cache', '$id.md'));
   Object? error;
-  for (final base in [docSite, _rawDocs]) {
+  for (final base in _docSources) {
     try {
       final html = await _get('$base/$id.html');
       final md = htmlToMarkdown(html);

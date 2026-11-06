@@ -23,6 +23,16 @@ const _mirrors = [
   ('https://maven.neoforged.net/releases', '$_bmclapi/maven'),
 ];
 
+/// GitHub 直连失败或卡住时依次尝试的镜像
+const _githubProxies = ['https://ghproxy.net/', 'https://gh-proxy.com/', 'https://ghfast.top/'];
+
+bool _isGitHubUrl(String url) =>
+    url.startsWith('https://github.com/') || url.startsWith('https://raw.githubusercontent.com/');
+
+/// [url] 的 GitHub 镜像地址；不是 GitHub 地址时返回空列表
+List<String> githubMirrorsFor(String url) =>
+    _isGitHubUrl(url) ? [for (final proxy in _githubProxies) '$proxy$url'] : const <String>[];
+
 class DownloadItem {
   DownloadItem({required this.url, required this.path, this.sha1, this.size});
 
@@ -56,7 +66,8 @@ class Downloader {
   static const _slowSpeed = 64 * 1024;
 
   Future<List<int>> _get(String url, {int retries = 3, bool Function()? cancelled}) async {
-    final candidates = [mirror(url), if (mirror(url) != url) url]; // 镜像失败时回退到官方源
+    // 镜像失败时回退到官方源；GitHub 地址再依次尝试 ghproxy 等镜像
+    final candidates = <String>{mirror(url), if (mirror(url) != url) url, ...githubMirrorsFor(url)}.toList();
     Object? lastErr;
     for (final target in candidates) {
       // BMCLAPI 会重定向到随机的社区节点，个别节点的证书链不完整（不发送中间证书），
@@ -227,8 +238,12 @@ class Downloader {
     await tmp.rename(out.path);
   }
 
-  /// 并发下载，跳过已完整的文件
-  Future<void> downloadAll(List<DownloadItem> items, void Function(int done, int total) onProgress) async {
+  /// 并发下载，跳过已完整的文件。[onBytes] 可选，按字节报告已完成的大小
+  Future<void> downloadAll(
+    List<DownloadItem> items,
+    void Function(int done, int total) onProgress, {
+    void Function(int done, int total)? onBytes,
+  }) async {
     final unique = {for (final i in items) i.path: i}.values.toList();
     final jobs = <_Job>[];
     // 检查本地文件：第一次需要计算 SHA-1，并行进行
@@ -246,7 +261,10 @@ class Downloader {
     jobs.sort((a, b) => (b.item.size ?? 0).compareTo(a.item.size ?? 0));
     var done = 0;
     final total = jobs.length;
+    final totalBytes = jobs.fold<int>(0, (s, j) => s + (j.item.size ?? 0));
+    var doneBytes = 0;
     onProgress(0, total);
+    if (onBytes != null && totalBytes > 0) onBytes(0, totalBytes);
     if (total == 0) return;
 
     final errors = <Object>[];
@@ -254,6 +272,10 @@ class Downloader {
     void finish(_Job job) {
       job.finished = true;
       onProgress(++done, total);
+      if (onBytes != null && totalBytes > 0) {
+        doneBytes += job.item.size ?? 0;
+        onBytes(doneBytes, totalBytes);
+      }
       if (done == total) allDone.complete();
     }
 

@@ -81,4 +81,14 @@ void main() {
     expect(hits, 2);
     expect(File(path).readAsBytesSync(), body);
   });
+
+  test('GitHub 地址带 ghproxy 镜像回退，其他地址没有', () {
+    const url = 'https://github.com/a/b/releases/download/v1/x.jar';
+    final mirrors = githubMirrorsFor(url);
+    expect(mirrors, contains('https://ghproxy.net/$url'));
+    expect(mirrors, contains('https://gh-proxy.com/$url'));
+    expect(mirrors, contains('https://ghfast.top/$url'));
+    expect(githubMirrorsFor('https://raw.githubusercontent.com/a/b/main/x.json'), isNotEmpty);
+    expect(githubMirrorsFor('https://libraries.minecraft.net/x.jar'), isEmpty);
+  });
 }

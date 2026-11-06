@@ -174,8 +174,18 @@ Future<String?> _installRuntime(String component, Downloader dl, TaskProgress ta
     }
   }
 
-  task.setStage('下载 Java 运行时 ($component)');
-  await dl.downloadAll(files, task.progress);
+  task.setStage('下载 Java 运行时 ($component，${dl.useMirror ? 'BMCLAPI 镜像' : '官方源'})');
+  final watch = Stopwatch()..start();
+  await dl.downloadAll(
+    files,
+    (done, total) => task.setDetail('已下载 $done / $total 个文件'),
+    onBytes: (done, total) {
+      task.progressBytes(done, total);
+      final secs = watch.elapsedMilliseconds / 1000;
+      final speed = secs > 0 ? done / secs : 0.0;
+      task.setDetail('${_mb(done)} / ${_mb(total)}${speed > 0 ? ' · 平均 ${_mb(speed)}/s' : ''}');
+    },
+  );
 
   if (!Platform.isWindows) {
     if (executables.isNotEmpty) await Process.run('chmod', ['755', ...executables]);
@@ -208,7 +218,25 @@ Future<String?> _installZulu8Arm64(Downloader dl, TaskProgress task) async {
 
   // Azul 接口给出的 size 与 CDN 上的文件大小不一致，不按它校验；完整性由下面的 SHA-256 保证
   task.setStage('下载 Java 8（Azul Zulu）');
-  await dl.downloadAll([DownloadItem(url: url, path: archive)], task.progress);
+  var lastMs = 0;
+  var lastBytes = 0;
+  await dl.downloadStreamed(
+    DownloadItem(url: url, path: archive),
+    onProgress: (done, total) {
+      task.progressBytes(done, total);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - lastMs >= 500 || done == total) {
+        final speed = lastMs == 0 ? 0.0 : (done - lastBytes) * 1000 / (now - lastMs);
+        task.setDetail(
+          'Azul Zulu · ${_mb(done)}${total > 0 ? ' / ${_mb(total)}' : ''}'
+          '${speed > 0 ? ' · ${_mb(speed)}/s' : ''}',
+        );
+        lastMs = now;
+        lastBytes = done;
+      }
+    },
+    onInfo: task.output,
+  );
   if ((await sha256.bind(File(archive).openRead()).first).toString() != sha256Hash) {
     await File(archive).delete();
     throw Exception('Java 8 下载校验失败（SHA-256 不匹配）');
@@ -312,3 +340,5 @@ Future<JavaInfo> ensureJava(VersionJson v, JavaPref pref, String globalJava, Dow
   if (newer.isNotEmpty) return newer.first;
   throw Exception('找不到 Java $major，请在设置中手动指定 Java 路径${downloadError.isNotEmpty ? '（自动下载失败：$downloadError）' : ''}');
 }
+
+String _mb(num bytes) => '${(bytes / 1048576).toStringAsFixed(1)} MB';

@@ -94,6 +94,8 @@ class LauncherConfig extends ChangeNotifier {
     'updateSkipped': '',
     // 已关闭的公告编号，不再显示
     'dismissedNotices': <String>[],
+    // 已关闭的更新日志版本，关闭后同一个版本不再显示（换版本后重新出现）
+    'dismissedChangelog': '',
   };
 
   static File get _file => File(p.join(Paths.appData, 'config.json'));
@@ -129,6 +131,7 @@ class LauncherConfig extends ChangeNotifier {
   bool get updateAutoCheck => _get('updateAutoCheck');
   String get updateSkipped => _get('updateSkipped');
   List<String> get dismissedNotices => [for (final x in (_data['dismissedNotices'] as List? ?? const [])) '$x'];
+  String get dismissedChangelog => _get('dismissedChangelog');
   bool get storageAsked => _get('storageAsked');
   double get renderScale => (_data['renderScale'] as num).toDouble().clamp(0.25, 1.0);
   String get androidRenderer => _get('androidRenderer');

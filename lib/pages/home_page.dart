@@ -198,6 +198,7 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
                 if (state.config.homeHints) ...[const SizedBox(height: 8), const HomeHints()],
+                const ChangelogHint(),
                 const HomeNotices(),
                 if (state.config.homeNews) ...[const SizedBox(height: 16), const VersionNewsFeed()],
               ],

@@ -44,3 +44,5 @@ flutter:
     - assets/icon/icon.png
     # Apple 芯片的 Mac 上运行 1.13～1.18 用的 GLFW（lib/core/mac_glfw.dart）
     - assets/macos/libglfw.3.dylib
+    # 首页的更新日志（与发布说明同一份文件，见 lib/core/changelog.dart）
+    - release-notes/

@@ -108,6 +108,7 @@ final class GameHud {
     private boolean aiBusy;
     private View gameFocus;
     private Runnable onVisibilityChanged;
+    private GameAiDialog aiDialog;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable fadeRunnable = this::fadeBall;
 
@@ -169,7 +170,7 @@ final class GameHud {
     private LinearLayout buildMenu() {
         LinearLayout card = card(200);
         card.setPadding(dp(6), dp(6), dp(6), dp(6));
-        if (aiEnabled) card.addView(menuItem("✦", "问 AI", v -> setMode(Mode.AI)));
+        if (aiEnabled) card.addView(menuItem("✦", "问 AI", v -> openAiDialog()));
         card.addView(menuItem("i", "基础信息", v -> setMode(Mode.INFO)));
         card.addView(menuItem("×", "隐藏", v -> setVisible(false)));
         return card;
@@ -509,7 +510,10 @@ final class GameHud {
     void onGrabState(boolean grabbing) {
         // Opening a menu turns the pointer back into a cursor; a panel on top of the inventory
         // would be in the way, so close it and leave only the ball.
-        if (!grabbing) setMode(Mode.NONE);
+        if (!grabbing) {
+            if (aiDialog != null) aiDialog.hide();
+            setMode(Mode.NONE);
+        }
     }
 
     void onPause() {
@@ -517,6 +521,7 @@ final class GameHud {
         aiClient.cancel();
         hideKeyboard();
         handler.removeCallbacks(fadeRunnable);
+        if (aiDialog != null) aiDialog.onPause();
     }
 
     void onResume() {
@@ -525,12 +530,14 @@ final class GameHud {
             wake();
             scheduleFade();
         }
+        if (aiDialog != null) aiDialog.onResume();
     }
 
     void dispose() {
         stopSampling();
         aiClient.cancel();
         handler.removeCallbacks(fadeRunnable);
+        if (aiDialog != null) aiDialog.dispose();
         parent.removeView(root);
         parent.removeView(scrim);
     }
@@ -543,13 +550,17 @@ final class GameHud {
         return visible;
     }
 
-    /** True when the AI input owns the keyboard; GameActivity must not forward keys to the game. */
+    /** True when the AI dialog owns the keyboard; GameActivity must not forward keys to the game. */
     boolean hasInputFocus() {
-        return aiInput != null && aiInput.hasFocus();
+        return (aiDialog != null && aiDialog.isOpen()) || (aiInput != null && aiInput.hasFocus());
     }
 
     /** Android back: close a panel instead of sending Esc to the game. */
     boolean onBack() {
+        if (aiDialog != null && aiDialog.isOpen()) {
+            aiDialog.hide();
+            return true;
+        }
         if (mode == Mode.NONE) return false;
         setMode(Mode.NONE);
         return true;
@@ -563,7 +574,10 @@ final class GameHud {
         if (visible == value) return;
         visible = value;
         prefs.edit().putBoolean("visible", value).apply();
-        if (!value) setMode(Mode.NONE);
+        if (!value) {
+            if (aiDialog != null) aiDialog.hide();
+            setMode(Mode.NONE);
+        }
         root.animate().cancel();
         if (value) {
             root.setAlpha(0f);
@@ -610,6 +624,20 @@ final class GameHud {
         if (next == Mode.NONE) scheduleFade();
         else handler.removeCallbacks(fadeRunnable);
         root.post(this::keepOnScreen);
+    }
+
+    private void openAiDialog() {
+        if (!aiEnabled) return;
+        if (mode != Mode.NONE) setMode(Mode.NONE);
+        handler.removeCallbacks(fadeRunnable);
+        if (aiDialog == null) {
+            aiDialog = new GameAiDialog(activity, parent, this, instance, renderer, logFile, attachLog);
+            aiDialog.setOnClosed(() -> {
+                wake();
+                scheduleFade();
+            });
+        }
+        aiDialog.show();
     }
 
     // ---------- sampling ----------
@@ -739,7 +767,7 @@ final class GameHud {
         aiSend.setEnabled(!aiBusy);
     }
 
-    private String aiContext() {
+    String aiContext() {
         StringBuilder b = new StringBuilder();
         b.append("实例：").append(instance).append('\n');
         b.append("渲染器：").append(renderer.isEmpty() ? "未知" : renderer).append('\n');

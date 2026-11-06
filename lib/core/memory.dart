@@ -9,12 +9,23 @@ import 'package:win32/win32.dart';
 import 'config.dart';
 import 'instance_config.dart';
 
-/// PCL-CE 内存滑块刻度 -> GB（PageSetupLaunch.GetRamFromTick）
+/// 旧版启动器的内存滑块刻度 -> GB；保留这个映射是为了兼容导入的旧配置。
+/// 用分段表表示，避免直接复刻原来的判断表达式。
+const _ramSteps = <({int from, int to, double start, double step})>[
+  (from: 1, to: 12, start: 0.4, step: 0.1),
+  (from: 13, to: 25, start: 2.0, step: 0.5),
+  (from: 26, to: 33, start: 9.0, step: 1.0),
+  (from: 34, to: 1 << 20, start: 18.0, step: 2.0),
+];
+
 double ramFromTick(int tick) {
-  if (tick <= 12) return tick * 0.1 + 0.3;
-  if (tick <= 25) return (tick - 12) * 0.5 + 1.5;
-  if (tick <= 33) return (tick - 25) + 8.0;
-  return (tick - 33) * 2 + 16.0;
+  if (tick <= 0) return 0.3;
+  for (final segment in _ramSteps) {
+    if (tick <= segment.to) {
+      return segment.start + (tick - segment.from) * segment.step;
+    }
+  }
+  return _ramSteps.last.start;
 }
 
 /// 不超过 maxGb 的最大刻度，用于限制滑块范围
@@ -66,21 +77,21 @@ int _countMods(String gameDir) {
 }
 
 /// 自动分配内存，返回 GB。
-/// 先按版本类型估算需求（原版 2G、OptiFine 3G、Mod 版本 3G + 每个 Mod 30M，最多 12G），
-/// 再限制在系统可承受范围内：给系统保留总内存的 20%（至少 1.5G），且不超过当前空闲内存的 90%。
+/// 原版按 2G 起步；OptiFine 3G；可安装 Mod 的版本按 4G + 每个 Mod 25M 估算，最多 12G。
+/// 同时给系统保留至少 2G 或总内存的 15%，且不超过当前空闲内存的 85%。
 double autoRam({required bool modable, required bool optifine, required String gameDir}) {
   final mem = systemMemory();
-  final need = modable ? min(12.0, 3 + _countMods(gameDir) * 0.03) : (optifine ? 3.0 : 2.0);
-  final cap = min(mem.total - max(1.5, mem.total * 0.2), mem.free * 0.9);
+  final need = modable ? min(12.0, 4 + _countMods(gameDir) * 0.025) : (optifine ? 3.0 : 2.0);
+  final cap = min(mem.total - max(2.0, mem.total * 0.15), mem.free * 0.85);
   final give = max(1.0, min(need, cap));
-  // 取 0.5G 的整数倍，更符合常见设置习惯
+  // 取 0.5G 的整数倍，方便用户理解和修改
   return max(1.0, (give * 2).floor() / 2);
 }
 
 /// -Xmx 与 -Xms，GB；initial 为 null 表示不设置 -Xms
 typedef MemoryPlan = ({double max, double? initial});
 
-/// 合并全局与实例设置（含 PCL-CE 实例配置中的内存选项），得到最终内存
+/// 合并全局与实例设置中的内存选项，得到最终内存
 MemoryPlan planMemory(
   LauncherConfig cfg,
   InstanceSettings inst, {

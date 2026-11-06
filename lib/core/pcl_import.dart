@@ -358,7 +358,7 @@ Future<PclImportResult> importFromPcl(
               uuid: '${pr['uuid'] ?? ''}'.replaceAll('-', ''),
               accessToken: '${pr['accessToken'] ?? ''}'.isEmpty ? newId() : '${pr['accessToken']}',
               expiresAt: DateTime.tryParse('${pr['expiresAt'] ?? ''}')?.millisecondsSinceEpoch,
-              importedFromPcl: microsoft,
+              importedLegacy: microsoft,
             ),
           );
           result.accounts++;

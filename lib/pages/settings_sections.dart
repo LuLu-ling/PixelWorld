@@ -396,7 +396,7 @@ class LaunchSection extends StatelessWidget {
               title: 'JVM 参数',
               value: cfg.jvmArgs,
               wide: true,
-              onSaved: (v) => set({'jvmArgs': v.trim().isEmpty ? pclDefaultJvmArgs : v}),
+              onSaved: (v) => set({'jvmArgs': v.trim().isEmpty ? defaultJvmArgs : v}),
             ),
             _TextRow(
               icon: Icons.terminal,

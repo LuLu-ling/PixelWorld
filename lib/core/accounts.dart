@@ -20,7 +20,7 @@ class Account {
     required this.accessToken,
     this.refreshToken,
     this.expiresAt,
-    this.importedFromPcl = false,
+    this.importedLegacy = false,
   });
 
   final String id;
@@ -34,7 +34,7 @@ class Account {
   final int? expiresAt;
 
   /// 从 PCL-CE 导入的微软账户：刷新令牌属于 PCL-CE 的应用，过期后需要重新登录
-  final bool importedFromPcl;
+  final bool importedLegacy;
 
   Account copyWithId(String newId) => Account(
     id: newId,
@@ -44,7 +44,7 @@ class Account {
     accessToken: accessToken,
     refreshToken: refreshToken,
     expiresAt: expiresAt,
-    importedFromPcl: importedFromPcl,
+    importedLegacy: importedLegacy,
   );
 
   Map<String, dynamic> toJson() => {
@@ -55,7 +55,7 @@ class Account {
     'accessToken': accessToken,
     if (refreshToken != null) 'refreshToken': refreshToken,
     if (expiresAt != null) 'expiresAt': expiresAt,
-    if (importedFromPcl) 'importedFrom': 'pcl',
+    if (importedLegacy) 'importedFrom': 'pcl',
   };
 
   static Account fromJson(Map<String, dynamic> j) => Account(
@@ -66,7 +66,7 @@ class Account {
     accessToken: '${j['accessToken']}',
     refreshToken: j['refreshToken'] as String?,
     expiresAt: (j['expiresAt'] as num?)?.toInt(),
-    importedFromPcl: j['importedFrom'] == 'pcl',
+    importedLegacy: j['importedFrom'] == 'pcl',
   );
 }
 

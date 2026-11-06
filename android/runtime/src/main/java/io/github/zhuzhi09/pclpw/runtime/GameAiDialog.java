@@ -110,13 +110,7 @@ final class GameAiDialog {
         open = false;
         aiClient.cancel();
         busy = false;
-        if (webView != null) {
-            webView.clearFocus();
-            InputMethodManager imm = (InputMethodManager) activity.getSystemService(Activity.INPUT_METHOD_SERVICE);
-            if (imm != null) imm.hideSoftInputFromWindow(webView.getWindowToken(), 0);
-            webView.onPause();
-        }
-        if (container != null) container.setVisibility(View.GONE);
+        destroyView();
         if (onClosed != null) onClosed.run();
     }
 
@@ -130,6 +124,11 @@ final class GameAiDialog {
 
     void dispose() {
         aiClient.cancel();
+        destroyView();
+        open = false;
+    }
+
+    private void destroyView() {
         if (container != null) {
             if (imeListener != null) {
                 ViewTreeObserver observer = container.getViewTreeObserver();
@@ -140,11 +139,14 @@ final class GameAiDialog {
             container = null;
         }
         if (webView != null) {
+            InputMethodManager imm = (InputMethodManager) activity.getSystemService(Activity.INPUT_METHOD_SERVICE);
+            if (imm != null) imm.hideSoftInputFromWindow(webView.getWindowToken(), 0);
+            webView.clearFocus();
             webView.removeJavascriptInterface("PclHudNative");
             webView.destroy();
             webView = null;
         }
-        open = false;
+        pageReady = false;
     }
 
     // ---------- WebView ----------

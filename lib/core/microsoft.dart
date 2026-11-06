@@ -165,7 +165,7 @@ Future<Account> refreshIfNeeded(Account acc, String clientId) async {
   final expiresAt = acc.expiresAt ?? 0;
   if (acc.type != AccountType.microsoft || expiresAt > DateTime.now().millisecondsSinceEpoch + 5 * 60000) return acc;
   // 从 PCL-CE 导入的令牌无法用本启动器的 Client ID 刷新
-  if (acc.importedFromPcl) {
+  if (acc.importedLegacy) {
     final expired = Exception('账户 ${acc.name} 的登录已过期（导入自 PCL-CE，无法续期），请使用微软登录重新添加');
     if (acc.expiresAt != null) throw expired;
     // 没有记录过期时间：向档案接口确认令牌是否仍然有效；网络问题时照常启动

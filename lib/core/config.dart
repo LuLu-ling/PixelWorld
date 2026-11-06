@@ -6,11 +6,14 @@ import 'package:path/path.dart' as p;
 
 import 'paths.dart';
 
-/// PCL-CE 的默认 JVM 参数（LaunchAdvanceJvm）
-const pclDefaultJvmArgs =
-    '-XX:+UseG1GC -XX:-UseAdaptiveSizePolicy -XX:-OmitStackTraceInFastThrow -Djdk.lang.Process.allowAmbiguousCommands=true -Dfml.ignoreInvalidMinecraftCertificates=True -Dfml.ignorePatchDiscrepancies=True -Dlog4j2.formatMsgNoLookups=true';
+/// 默认 JVM 参数
+const defaultJvmArgs =
+    '-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -Dfml.ignoreInvalidMinecraftCertificates=true -Dfml.ignorePatchDiscrepancies=true -Dlog4j2.formatMsgNoLookups=true';
 
-/// 版本隔离默认策略，与 PCL-CE 的 LaunchArgumentIndieV2 取值一致：
+/// 旧版启动器的默认参数名，保留给已有配置重置逻辑使用
+const pclDefaultJvmArgs = defaultJvmArgs;
+
+/// 版本隔离默认策略：
 /// 0 关闭 / 1 仅隔离可安装 Mod 的版本 / 2 仅隔离非正式版 / 3 隔离非正式版与可安装 Mod 的版本 / 4 隔离所有版本
 const isolationModes = {0: '关闭', 1: '隔离可安装 Mod 的版本', 2: '隔离非正式版', 3: '隔离可安装 Mod 的版本与非正式版', 4: '隔离所有版本'};
 
@@ -44,7 +47,7 @@ class LauncherConfig extends ChangeNotifier {
     'memoryTick': 15,
     'memoryInitialTick': 0,
     'lockMemory': false,
-    'jvmArgs': pclDefaultJvmArgs,
+    'jvmArgs': defaultJvmArgs,
     'gameArgs': '',
     'preferredIpStack': 'default',
     'windowMode': 'default',

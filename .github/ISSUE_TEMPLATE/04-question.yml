@@ -1,0 +1,69 @@
+name: 使用问题
+description: 不知道怎么操作、需要确认某个功能，或文档写得不够清楚。
+title: "[提问]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先看看[使用文档](https://pcl.pw.zhuzhi.site/docs/)和[常见问题与排错](https://pcl.pw.zhuzhi.site/docs/troubleshooting.html)，很多问题那里已经有答案。
+        如果确认是 Bug，请改用「启动器 Bug」或「游戏崩溃」表单，这样能带上必要的日志字段。
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已经看过使用文档，并搜索过 [Issues](https://github.com/zhuzhi-09/PCL.PW/issues?q=is%3Aissue+)。
+          required: true
+        - label: 这不是一个可以稳定复现的 Bug；如果是 Bug，我会改用 Bug 表单。
+          required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 系统
+      options:
+        - Windows
+        - Android
+        - macOS
+        - Linux
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 启动器版本
+      description: 在「设置 → 关于」或关于页查看；Nightly 请写提交号。
+      placeholder: 例如 0.3.4，或 Nightly 8fc9de8
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: 你想问什么
+      description: 写清楚你正在做什么、卡在哪一步、希望达到什么结果。
+      placeholder: 我想……，现在不知道应该……
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已经尝试过什么
+      description: 看过哪些文档、点过哪些按钮、结果如何。
+      placeholder: 我试过……，但……
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 截图或补充信息
+      description: 有截图会更清楚；可以直接把图片拖进来。
+      placeholder: 其他可能有用的信息……
+    validations:
+      required: false

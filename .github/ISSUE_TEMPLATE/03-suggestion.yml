@@ -1,0 +1,80 @@
+name: 功能建议
+description: 对现有功能提出改进，或想要一个新的小功能。
+title: "[建议]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先搜索[已有 Issues](https://github.com/zhuzhi-09/PCL.PW/issues?q=is%3Aissue+)，避免重复。
+        建议会按影响范围和维护成本评估，不保证具体时间；欢迎说清楚使用场景，而不只是“加一个按钮”。
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已经搜索过 [Issues](https://github.com/zhuzhi-09/PCL.PW/issues?q=is%3Aissue+)，没有找到相同的建议。
+          required: true
+        - label: 我描述的需求是真实存在的，并且我愿意等待维护者评估和处理。
+          required: true
+        - label: 我确认建议内容是自己验证过的；使用 AI 整理过时，已经检查并改写。
+          required: true
+        - label: 我理解这个仓库不承诺完成时间，也不会用反复催促的方式对待处理中的 Issue。
+          required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: 建议类型
+      options:
+        - 启动器界面 / 交互
+        - 版本安装与下载
+        - Java / 内存
+        - 模组与加载器
+        - 游戏启动
+        - 游戏内叠加层 / 助手
+        - AI / 文档
+        - 安卓端
+        - 性能 / 稳定性
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: 想要的功能
+      description: 具体想增加或改变什么？尽量描述最终效果，而不是实现方式。
+      placeholder: 我希望在……页面可以……
+    validations:
+      required: true
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: 使用场景与原因
+      description: 现在为什么不好用？这个改动能解决什么问题？
+      placeholder: |
+        现在我每次都要……
+        如果能……，就可以……
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternative
+    attributes:
+      label: 备选方案
+      description: 有没有其他实现方式，或者你现在临时是怎么解决的？
+      placeholder: 也可以……；目前我用……代替。
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息
+      description: 截图、草图、参考的其他软件等。
+      placeholder: 其他可能有用的信息……
+    validations:
+      required: false

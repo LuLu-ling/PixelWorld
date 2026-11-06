@@ -90,3 +90,8 @@ flutter build apk --release --target-platform android-arm64 --no-tree-shake-icon
 PCL.PW 自身的代码以 [Apache-2.0](LICENSE) 协议开源。PCL 的相关规则见 [PCL-GUIDE.md](PCL-GUIDE.md)。
 
 Minecraft 是 Mojang Studios 的商标。本软件不是官方 Minecraft 产品，未经 Mojang 或 Microsoft 批准，也与其无关。
+
+## 赞助竹纸
+
+你可以在爱发电赞助PCL.PW的开发者竹纸，链接详见https://afdian.com/a/Paper_Zhu
+感谢爱发电提供平台支持！

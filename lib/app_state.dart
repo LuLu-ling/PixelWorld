@@ -526,6 +526,8 @@ class AppState extends ChangeNotifier {
           turnip: turnip,
           instance: id,
           hud: cfg.gameHud,
+          hudAi: cfg.gameHudAi,
+          hudAiLog: cfg.gameHudAiLog,
         );
         await config.update({'launchCount': count});
         gameState = GameState.running;

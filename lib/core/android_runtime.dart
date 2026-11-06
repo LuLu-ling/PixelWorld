@@ -73,6 +73,8 @@ abstract final class AndroidRuntime {
     bool turnip = false,
     String instance = '',
     bool hud = true,
+    bool hudAi = true,
+    bool hudAiLog = true,
   }) async {
     await File(logFile).parent.create(recursive: true);
     if (File(logFile).existsSync()) await File(logFile).delete();
@@ -90,6 +92,8 @@ abstract final class AndroidRuntime {
       'turnip': turnip,
       'instance': instance,
       'hud': hud,
+      'hudAi': hudAi,
+      'hudAiLog': hudAiLog,
     });
   }
 

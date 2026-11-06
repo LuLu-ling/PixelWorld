@@ -128,6 +128,8 @@ class MainActivity : FlutterActivity() {
                         .putExtra(GameActivity.EXTRA_RENDERER, call.argument<String>("renderer") ?: GameRuntime.MOBILEGLUES)
                         .putExtra(GameActivity.EXTRA_TURNIP, call.argument<Boolean>("turnip") ?: false)
                         .putExtra(GameActivity.EXTRA_HUD, call.argument<Boolean>("hud") ?: true)
+                        .putExtra(GameActivity.EXTRA_HUD_AI, call.argument<Boolean>("hudAi") ?: true)
+                        .putExtra(GameActivity.EXTRA_HUD_AI_LOG, call.argument<Boolean>("hudAiLog") ?: true)
                         .putExtra(GameActivity.EXTRA_INSTANCE, call.argument<String>("instance") ?: "")
                     GameRuntime.exitFile(this).delete()
                     startActivity(intent)

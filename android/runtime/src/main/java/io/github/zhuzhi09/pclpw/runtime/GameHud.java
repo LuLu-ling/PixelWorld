@@ -64,6 +64,8 @@ final class GameHud {
     private final String instance;
     private final String renderer;
     private final String logFile;
+    private final boolean aiEnabled;
+    private final boolean attachLog;
 
     private final LinearLayout root;
     private final TextView ball;
@@ -101,13 +103,16 @@ final class GameHud {
     private View gameFocus;
     private Runnable onVisibilityChanged;
 
-    GameHud(Activity activity, FrameLayout parent, String instance, String renderer, String logFile) {
+    GameHud(Activity activity, FrameLayout parent, String instance, String renderer, String logFile,
+            boolean aiEnabled, boolean attachLog) {
         this.activity = activity;
         this.parent = parent;
         this.prefs = activity.getSharedPreferences("pclpw_hud", Activity.MODE_PRIVATE);
         this.instance = TextUtils.isEmpty(instance) ? "游戏" : instance;
         this.renderer = renderer == null ? "" : renderer;
         this.logFile = logFile;
+        this.aiEnabled = aiEnabled;
+        this.attachLog = attachLog;
         this.visible = prefs.getBoolean("visible", true);
         this.metrics = new HudMetrics(activity);
         this.aiClient = new HudAiClient(activity);
@@ -161,7 +166,7 @@ final class GameHud {
     private LinearLayout buildMenu() {
         LinearLayout card = card(200);
         card.setPadding(dp(6), dp(6), dp(6), dp(6));
-        card.addView(menuItem("✦", "问 AI", v -> setMode(Mode.AI)));
+        if (aiEnabled) card.addView(menuItem("✦", "问 AI", v -> setMode(Mode.AI)));
         card.addView(menuItem("i", "基础信息", v -> setMode(Mode.INFO)));
         card.addView(menuItem("×", "隐藏", v -> setVisible(false)));
         return card;
@@ -530,6 +535,7 @@ final class GameHud {
     // ---------- modes ----------
 
     private void setMode(Mode next) {
+        if (next == Mode.AI && !aiEnabled) return;
         if (mode == next) next = Mode.NONE;
         final boolean leavingAi = mode == Mode.AI;
         mode = next;
@@ -608,7 +614,7 @@ final class GameHud {
     // ---------- AI ----------
 
     private void sendAiQuestion() {
-        if (aiBusy) return;
+        if (!aiEnabled || aiBusy) return;
         final String question = aiInput.getText().toString().trim();
         if (question.isEmpty()) return;
         aiInput.setText("");
@@ -692,9 +698,11 @@ final class GameHud {
             }
             b.append("已运行：").append(duration(s.uptimeMs)).append('\n');
         }
-        final String tail = readTail(logFile, 6000);
-        if (!tail.isEmpty()) {
-            b.append("\n最近日志（末尾）：\n```\n").append(tail).append("\n```\n");
+        if (attachLog) {
+            final String tail = readTail(logFile, 6000);
+            if (!tail.isEmpty()) {
+                b.append("\n最近日志（末尾）：\n```\n").append(tail).append("\n```\n");
+            }
         }
         return b.toString();
     }

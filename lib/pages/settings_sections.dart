@@ -304,6 +304,22 @@ class LaunchSection extends StatelessWidget {
                 value: cfg.gameHud,
                 onChanged: (v) => set({'gameHud': v}),
               ),
+            if (Platform.isAndroid && cfg.gameHud)
+              _SwitchRow(
+                icon: Icons.auto_awesome_outlined,
+                title: '游戏内 AI',
+                subtitle: '在小球菜单里显示「问 AI」，使用「设置 → AI 排障」里的接口和模型',
+                value: cfg.gameHudAi,
+                onChanged: (v) => set({'gameHudAi': v}),
+              ),
+            if (Platform.isAndroid && cfg.gameHud && cfg.gameHudAi)
+              _SwitchRow(
+                icon: Icons.article_outlined,
+                title: '提问时附带最近日志',
+                subtitle: '把游戏日志末尾一起发给 AI，方便排查崩溃；日志可能包含服务器地址和聊天内容',
+                value: cfg.gameHudAiLog,
+                onChanged: (v) => set({'gameHudAiLog': v}),
+              ),
             if (isDesktop)
               _SelectRow<String>(
                 icon: Icons.crop_landscape,

@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../app_info.dart';
 import '../app_scope.dart';
+import '../widgets/theme_color_dialog.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
 import '../widgets/ai_settings.dart';
@@ -82,6 +83,7 @@ class _AppearanceSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cfg = AppScope.of(context).config;
     return ListView(
       padding: const EdgeInsets.all(28),
       children: [
@@ -92,15 +94,29 @@ class _AppearanceSection extends StatelessWidget {
               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               leading: const Icon(Icons.dark_mode_outlined),
               title: const Text('颜色模式'),
-              subtitle: const Text('主题色固定为 PCL 主题蓝'),
+              subtitle: const Text('启动器界面的明暗模式'),
               trailing: SegmentedButton<String>(
                 segments: const [
                   ButtonSegment(value: 'system', label: Text('跟随系统'), icon: Icon(Icons.brightness_auto)),
                   ButtonSegment(value: 'light', label: Text('浅色'), icon: Icon(Icons.light_mode_outlined)),
                   ButtonSegment(value: 'dark', label: Text('深色'), icon: Icon(Icons.dark_mode_outlined)),
                 ],
-                selected: {AppScope.of(context).config.themeMode},
-                onSelectionChanged: (s) => AppScope.read(context).config.update({'themeMode': s.first}),
+                selected: {cfg.themeMode},
+                onSelectionChanged: (s) => cfg.update({'themeMode': s.first}),
+              ),
+            ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              leading: CircleAvatar(radius: 13, backgroundColor: Color(cfg.themeColor)),
+              title: const Text('主题色'),
+              subtitle: const Text('按 Material Design 3 从主题色生成整套浅色与深色配色'),
+              trailing: const Icon(Icons.palette_outlined),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+              child: ThemeColorPicker(
+                current: cfg.themeColor,
+                onChanged: (color) => cfg.update({'themeColor': color}),
               ),
             ),
           ],

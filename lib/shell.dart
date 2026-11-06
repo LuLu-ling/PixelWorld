@@ -6,10 +6,14 @@ import 'package:window_manager/window_manager.dart';
 import 'app_info.dart';
 import 'app_scope.dart';
 import 'core/crash.dart';
-import 'core/task.dart';
 import 'platform.dart';
+import 'widgets/accounts_dialog.dart';
+import 'widgets/app_logo.dart';
+import 'widgets/device_status.dart';
+import 'widgets/storage_location.dart';
 import 'widgets/task_steps.dart';
 import 'widgets/update_dialog.dart';
+import 'widgets/window_buttons.dart';
 import 'pages/ai_page.dart';
 import 'pages/diagnose_page.dart';
 import 'pages/download_page.dart';
@@ -20,31 +24,19 @@ import 'pages/settings_page.dart';
 import 'pages/tasks_page.dart';
 import 'pages/tools_page.dart';
 import 'pages/versions_page.dart';
-import 'widgets/device_status.dart';
-import 'widgets/app_logo.dart';
-import 'widgets/storage_location.dart';
-import 'widgets/window_buttons.dart';
 
 enum MainPage { home, download, settings, tools, ai }
 
-/// 从主页面进入的子页面：标题栏显示返回按钮和标题，代替主导航
+/// 从主页面进入的子页面：顶部显示返回按钮和标题
 enum SubPage { versions, log, instance, tasks, diagnose }
 
 const _subTitles = {
   SubPage.versions: '版本选择',
   SubPage.log: '游戏日志',
   SubPage.instance: '版本设置',
-  SubPage.tasks: '任务',
+  SubPage.tasks: '任务历史',
   SubPage.diagnose: '错误分析',
 };
-
-const _nav = [
-  (page: MainPage.home, icon: Icons.rocket_launch_outlined, active: Icons.rocket_launch, label: '启动'),
-  (page: MainPage.download, icon: Icons.download_outlined, active: Icons.download, label: '下载'),
-  (page: MainPage.settings, icon: Icons.settings_outlined, active: Icons.settings, label: '设置'),
-  (page: MainPage.tools, icon: Icons.construction_outlined, active: Icons.construction, label: '工具'),
-  (page: MainPage.ai, icon: Icons.auto_awesome_outlined, active: Icons.auto_awesome, label: 'AI'),
-];
 
 /// 页面切换，供各页面打开子页面或返回
 class ShellNav extends InheritedWidget {
@@ -62,7 +54,7 @@ class ShellNav extends InheritedWidget {
   bool updateShouldNotify(ShellNav old) => false;
 }
 
-/// 主窗口：标题栏里放主导航（与 PCL 相同的布局），下面是当前页面。
+/// 主窗口：左侧是品牌与页面导航，右侧是内容区。
 class Shell extends StatefulWidget {
   const Shell({super.key});
 
@@ -75,6 +67,7 @@ class _ShellState extends State<Shell> {
   SubPage? _sub;
   StreamSubscription<CrashReport>? _crashes;
   final _navKey = GlobalKey();
+  bool _sidebarCollapsed = false;
 
   @override
   void didChangeDependencies() {
@@ -106,56 +99,504 @@ class _ShellState extends State<Shell> {
     super.dispose();
   }
 
+  void _goMain(MainPage page) => setState(() {
+    _sub = null;
+    _page = page;
+  });
+
+  void _openSub(SubPage page) => setState(() => _sub = page);
+
   @override
   Widget build(BuildContext context) {
+    final pageView = switch (_sub) {
+      SubPage.versions => const VersionsPage(),
+      SubPage.log => const LogPage(),
+      SubPage.instance => const InstancePage(),
+      SubPage.tasks => const TasksPage(),
+      SubPage.diagnose => const DiagnosePage(),
+      null => IndexedStack(
+        index: _page.index,
+        children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage(), AiPage()],
+      ),
+    };
+    final subTitle = _sub == SubPage.instance ? '版本设置 - ${AppScope.of(context).instanceId}' : _subTitles[_sub];
+
     return ShellNav(
-      open: (s) => setState(() => _sub = s),
+      open: _openSub,
       back: () => setState(() => _sub = null),
-      goMain: (p) => setState(() {
-        _sub = null;
-        _page = p;
-      }),
+      goMain: _goMain,
       child: Scaffold(
         body: Stack(
           key: _navKey,
           children: [
-            Column(
-              children: [
-                _TitleBar(
-                  page: _page,
-                  subTitle: _sub == SubPage.instance ? '版本设置 - ${AppScope.of(context).instanceId}' : _subTitles[_sub],
-                  onSelect: (p) => setState(() => _page = p),
-                  onBack: () => setState(() => _sub = null),
-                ),
-                Expanded(
-                  child: switch (_sub) {
-                    SubPage.versions => const VersionsPage(),
-                    SubPage.log => const LogPage(),
-                    SubPage.instance => const InstancePage(),
-                    SubPage.tasks => const TasksPage(),
-                    SubPage.diagnose => const DiagnosePage(),
-                    null => IndexedStack(
-                      index: _page.index,
-                      children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage(), AiPage()],
+            Positioned.fill(child: ColoredBox(color: Theme.of(context).colorScheme.surface)),
+            if (isDesktop)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 236, end: _sidebarCollapsed ? 0 : 236),
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    child: _Sidebar(
+                      page: _page,
+                      sub: _sub,
+                      onMain: _goMain,
+                      onSub: _openSub,
                     ),
-                  },
+                    builder: (context, width, child) => SizedBox(
+                      width: width,
+                      child: ClipRect(
+                        child: OverflowBox(
+                          alignment: Alignment.centerLeft,
+                          minWidth: 236,
+                          maxWidth: 236,
+                          child: SizedBox(width: 236, child: child),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _TopBar(
+                          subTitle: subTitle,
+                          collapsed: _sidebarCollapsed,
+                          onToggleSidebar: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+                          onBack: () => setState(() => _sub = null),
+                        ),
+                        Expanded(child: pageView),
+                      ],
+                    ),
+                  ),
+                ],
+              )
+            else
+              Column(
+                children: [
+                  _MobileTopBar(
+                    subTitle: subTitle,
+                    onBack: () => setState(() => _sub = null),
+                    onAccount: () => showAccountsDialog(context),
+                  ),
+                  Expanded(child: pageView),
+                ],
+              ),
+            const Positioned(right: 20, bottom: 20, child: _InstallProgress()),
+          ],
+        ),
+        bottomNavigationBar: isDesktop
+            ? null
+            : _MobileNav(
+                page: _page,
+                sub: _sub,
+                onMain: _goMain,
+                onSub: _openSub,
+                onMore: () => _showMore(context),
+              ),
+      ),
+    );
+  }
+
+  void _showMore(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => _MoreSheet(
+        onMain: (page) {
+          Navigator.pop(sheetContext);
+          _goMain(page);
+        },
+        onSub: (page) {
+          Navigator.pop(sheetContext);
+          _openSub(page);
+        },
+        onAccount: () {
+          Navigator.pop(sheetContext);
+          showAccountsDialog(context);
+        },
+      ),
+    );
+  }
+}
+
+/// Android / 手机上的顶部栏：品牌、账户、电量与网络
+class _MobileTopBar extends StatelessWidget {
+  const _MobileTopBar({required this.subTitle, required this.onBack, required this.onAccount});
+
+  final String? subTitle;
+  final VoidCallback onBack;
+  final VoidCallback onAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final account = AppScope.of(context).selectedAccount;
+    return SizedBox(
+      height: 52,
+      child: Row(
+        children: [
+          if (subTitle != null) ...[
+            IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back, size: 20), tooltip: '返回'),
+            Text(subTitle!, style: theme.textTheme.titleSmall),
+          ] else ...[
+            const SizedBox(width: 14),
+            const AppLogo(size: 26),
+            const SizedBox(width: 8),
+            Text(
+              AppInfo.brandName,
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ],
+          const Spacer(),
+          const DeviceStatus(),
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: '账户',
+            onPressed: onAccount,
+            icon: CircleAvatar(
+              radius: 15,
+              backgroundColor: scheme.primaryContainer,
+              foregroundColor: scheme.onPrimaryContainer,
+              child: Text(
+                account == null ? '+' : account.name.characters.first.toUpperCase(),
+                style: theme.textTheme.labelSmall,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Android / 手机底部的 5 个入口；工具、设置等放在「更多」里。
+class _MobileNav extends StatelessWidget {
+  const _MobileNav({
+    required this.page,
+    required this.sub,
+    required this.onMain,
+    required this.onSub,
+    required this.onMore,
+  });
+
+  final MainPage page;
+  final SubPage? sub;
+  final ValueChanged<MainPage> onMain;
+  final ValueChanged<SubPage> onSub;
+  final VoidCallback onMore;
+
+  int get _index => switch (sub) {
+    SubPage.tasks => 3,
+    _ => switch (page) {
+      MainPage.home => 0,
+      MainPage.download => 1,
+      MainPage.ai => 2,
+      _ => 4,
+    },
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return NavigationBar(
+      height: 64,
+      selectedIndex: _index,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      onDestinationSelected: (index) {
+        switch (index) {
+          case 0:
+            onMain(MainPage.home);
+            break;
+          case 1:
+            onMain(MainPage.download);
+            break;
+          case 2:
+            onMain(MainPage.ai);
+            break;
+          case 3:
+            onSub(SubPage.tasks);
+            break;
+          case 4:
+            onMore();
+            break;
+        }
+      },
+      destinations: const [
+        NavigationDestination(icon: Icon(Icons.rocket_launch_outlined), label: '启动'),
+        NavigationDestination(icon: Icon(Icons.download_outlined), label: '下载'),
+        NavigationDestination(icon: Icon(Icons.auto_awesome_outlined), label: 'AI'),
+        NavigationDestination(icon: Icon(Icons.history_outlined), label: '任务'),
+        NavigationDestination(icon: Icon(Icons.more_horiz), label: '更多'),
+      ],
+    );
+  }
+}
+
+class _MoreSheet extends StatelessWidget {
+  const _MoreSheet({required this.onMain, required this.onSub, required this.onAccount});
+
+  final ValueChanged<MainPage> onMain;
+  final ValueChanged<SubPage> onSub;
+  final VoidCallback onAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          ListTile(leading: const Icon(Icons.account_circle_outlined), title: const Text('账户'), onTap: onAccount),
+          ListTile(leading: const Icon(Icons.construction_outlined), title: const Text('工具'), onTap: () => onMain(MainPage.tools)),
+          ListTile(leading: const Icon(Icons.settings_outlined), title: const Text('设置'), onTap: () => onMain(MainPage.settings)),
+          ListTile(leading: const Icon(Icons.list_alt_outlined), title: const Text('版本选择'), onTap: () => onSub(SubPage.versions)),
+          ListTile(leading: const Icon(Icons.article_outlined), title: const Text('游戏日志'), onTap: () => onSub(SubPage.log)),
+        ],
+      ),
+    );
+  }
+}
+
+/// 左侧品牌、账户和主导航
+class _Sidebar extends StatelessWidget {
+  const _Sidebar({required this.page, required this.sub, required this.onMain, required this.onSub});
+
+  final MainPage page;
+  final SubPage? sub;
+  final ValueChanged<MainPage> onMain;
+  final ValueChanged<SubPage> onSub;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final state = AppScope.of(context);
+    final account = state.selectedAccount;
+    final width = isDesktop ? 236.0 : 210.0;
+    final topInset = isDesktop && nativeWindowButtons ? macTrafficLightsWidth : 0.0;
+
+    Widget brand = Padding(
+      padding: EdgeInsets.fromLTRB(18 + topInset, 20, 16, 16),
+      child: Row(
+        children: [
+          const AppLogo(size: 38),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  AppInfo.brandName,
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: .2),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-            const Positioned(right: 20, bottom: 20, child: _InstallProgress()),
-          ],
+          ),
+        ],
+      ),
+    );
+    if (isDesktop) brand = DragToMoveArea(child: brand);
+
+    return Container(
+      width: width,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        border: Border(right: BorderSide(color: scheme.outlineVariant.withValues(alpha: .45))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          brand,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: Material(
+              color: scheme.surfaceContainerHighest.withValues(alpha: .45),
+              borderRadius: BorderRadius.circular(14),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => showAccountsDialog(context),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 17,
+                        backgroundColor: scheme.primaryContainer,
+                        foregroundColor: scheme.onPrimaryContainer,
+                        child: Text(
+                          account == null ? '+' : account.name.characters.first.toUpperCase(),
+                          style: theme.textTheme.labelLarge,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              account?.name ?? '添加账户',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelLarge,
+                            ),
+                            Text(
+                              account == null ? '账户' : (account.type.name == 'microsoft' ? '微软账户' : '离线账户'),
+                              maxLines: 1,
+                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.unfold_more, size: 16, color: scheme.onSurfaceVariant),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                _SideItem(
+                  icon: Icons.rocket_launch_outlined,
+                  activeIcon: Icons.rocket_launch,
+                  label: '启动',
+                  selected: sub == null && page == MainPage.home,
+                  onTap: () => onMain(MainPage.home),
+                ),
+                _SideItem(
+                  icon: Icons.download_outlined,
+                  activeIcon: Icons.download,
+                  label: '下载',
+                  selected: sub == null && page == MainPage.download,
+                  onTap: () => onMain(MainPage.download),
+                ),
+                _SideItem(
+                  icon: Icons.construction_outlined,
+                  activeIcon: Icons.construction,
+                  label: '工具',
+                  selected: sub == null && page == MainPage.tools,
+                  onTap: () => onMain(MainPage.tools),
+                ),
+                _SideItem(
+                  icon: Icons.settings_outlined,
+                  activeIcon: Icons.settings,
+                  label: '设置',
+                  selected: sub == null && page == MainPage.settings,
+                  onTap: () => onMain(MainPage.settings),
+                ),
+                _SideItem(
+                  icon: Icons.auto_awesome_outlined,
+                  activeIcon: Icons.auto_awesome,
+                  label: 'AI 助手',
+                  selected: sub == null && page == MainPage.ai,
+                  onTap: () => onMain(MainPage.ai),
+                ),
+                _SideItem(
+                  icon: Icons.history_outlined,
+                  activeIcon: Icons.history,
+                  label: '任务历史',
+                  selected: sub == SubPage.tasks,
+                  onTap: () => onSub(SubPage.tasks),
+                  badge: state.runningTasks.length,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+            child: Text(
+              '${AppInfo.brandName} v${AppInfo.version}',
+              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant.withValues(alpha: .7)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SideItem extends StatelessWidget {
+  const _SideItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.badge = 0,
+  });
+
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final int badge;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fg = selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Material(
+        color: selected ? scheme.primaryContainer.withValues(alpha: .72) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            height: 44,
+            child: Row(
+              children: [
+                const SizedBox(width: 14),
+                Icon(selected ? activeIcon : icon, size: 21, color: fg),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: selected ? scheme.onPrimaryContainer : scheme.onSurface,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (badge > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(color: scheme.primary, borderRadius: BorderRadius.circular(99)),
+                      child: Text('$badge', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onPrimary)),
+                    ),
+                  )
+                else
+                  const SizedBox(width: 14),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-class _TitleBar extends StatelessWidget {
-  const _TitleBar({required this.page, required this.subTitle, required this.onSelect, required this.onBack});
+/// 内容区顶部的拖动条、子页面返回按钮和窗口按钮
+class _TopBar extends StatelessWidget {
+  const _TopBar({
+    required this.subTitle,
+    required this.collapsed,
+    required this.onToggleSidebar,
+    required this.onBack,
+  });
 
-  final MainPage page;
   final String? subTitle;
-  final ValueChanged<MainPage> onSelect;
+  final bool collapsed;
+  final VoidCallback onToggleSidebar;
   final VoidCallback onBack;
 
   @override
@@ -165,118 +606,42 @@ class _TitleBar extends StatelessWidget {
       height: 56,
       child: Stack(
         children: [
-          // 空白处可拖动窗口，双击最大化
           if (isDesktop) Positioned.fill(child: DragToMoveArea(child: const SizedBox.expand())),
           Positioned(
-            left: (nativeWindowButtons ? macTrafficLightsWidth : 0) + (subTitle == null ? 20 : 8),
+            left: 6,
             top: 0,
             bottom: 0,
-            child: subTitle == null
-                ? IgnorePointer(
-                    child: Row(
-                      children: [
-                        const AppLogo(size: 20),
-                        const SizedBox(width: 10),
-                        Text(AppInfo.name, style: theme.textTheme.titleMedium),
-                      ],
-                    ),
-                  )
-                : Row(
-                    children: [
-                      IconButton(tooltip: '返回', onPressed: onBack, icon: const Icon(Icons.arrow_back)),
-                      const SizedBox(width: 4),
-                      Text(subTitle!, style: theme.textTheme.titleMedium),
-                    ],
-                  ),
+            child: Center(
+              child: SizedBox.square(
+                dimension: 40,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  tooltip: collapsed ? '展开侧栏' : '收起侧栏',
+                  onPressed: onToggleSidebar,
+                  icon: Icon(collapsed ? Icons.menu : Icons.chevron_left, size: 20),
+                ),
+              ),
+            ),
           ),
-          if (subTitle == null)
-            Center(
+          if (subTitle != null)
+            Positioned(
+              left: 52,
+              top: 0,
+              bottom: 0,
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  for (final item in _nav)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: _NavPill(
-                        icon: page == item.page ? item.active : item.icon,
-                        label: item.label,
-                        selected: page == item.page,
-                        onTap: () => onSelect(item.page),
-                      ),
-                    ),
+                  IconButton(
+                    tooltip: '返回',
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back, size: 20),
+                  ),
+                  const SizedBox(width: 2),
+                  Text(subTitle!, style: theme.textTheme.titleSmall),
                 ],
               ),
             ),
-          // 窗口按钮左侧：任务入口
-          // 手机上没有窗口按钮，任务入口放在最右侧
-          // Windows 上与自绘窗口按钮顶端对齐；macOS 与手机上在标题栏中垂直居中
-          if (isDesktop && !nativeWindowButtons)
-            const Positioned(right: 46 * 3 + 4, top: 4, child: _TasksButton())
-          else
-            const Positioned(right: 8, top: 0, bottom: 0, child: Center(child: _TasksButton())),
-          // 手机上全屏显示，电量与网络放在任务入口左侧
-          if (!isDesktop) const Positioned(right: 64, top: 0, bottom: 0, child: Center(child: DeviceStatus())),
+          if (!isDesktop) const Positioned(right: 58, top: 0, bottom: 0, child: Center(child: DeviceStatus())),
           if (isDesktop && !nativeWindowButtons) const Positioned(right: 0, top: 0, child: WindowButtons()),
-        ],
-      ),
-    );
-  }
-}
-
-/// 与 MD3 导航项相同的药丸形指示器
-class _NavPill extends StatelessWidget {
-  const _NavPill({required this.icon, required this.label, required this.selected, required this.onTap});
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final fg = selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant;
-    return Material(
-      color: selected ? scheme.secondaryContainer : Colors.transparent,
-      shape: const StadiumBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Icon(icon, size: 20, color: fg),
-              const SizedBox(width: 8),
-              Text(label, style: Theme.of(context).textTheme.labelLarge?.copyWith(color: fg)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 标题栏的任务入口；有任务进行时显示进度环
-class _TasksButton extends StatelessWidget {
-  const _TasksButton();
-
-  @override
-  Widget build(BuildContext context) {
-    final state = AppScope.of(context);
-    final running = state.runningTasks;
-    final failed = state.tasks.any((t) => t.state == TaskState.failed);
-    final scheme = Theme.of(context).colorScheme;
-    return IconButton(
-      tooltip: running.isEmpty ? '任务' : '${running.length} 个任务进行中',
-      onPressed: () => ShellNav.of(context).open(SubPage.tasks),
-      icon: Stack(
-        alignment: Alignment.center,
-        children: [
-          if (running.isNotEmpty)
-            const SizedBox.square(dimension: 28, child: CircularProgressIndicator(strokeWidth: 2)),
-          Icon(Icons.download_outlined, size: 20, color: failed ? scheme.error : null),
         ],
       ),
     );

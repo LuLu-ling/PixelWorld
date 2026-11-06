@@ -2,6 +2,9 @@
 abstract final class AppInfo {
   static const name = 'PCL.PW';
   static const fullName = 'PCL.PW（PixelsWorld 修改版）';
+
+  /// 新 UI 使用的品牌名；正式改名时再统一替换 [name]
+  static const brandName = 'Pixel World';
   static const version = '0.3.3';
 
   /// 构建信息，由 CI 通过 --dart-define 写入；本地构建为空

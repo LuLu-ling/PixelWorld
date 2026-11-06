@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
 
-/// PCL 主题蓝。按《PCL 存储库合理使用指南》，在 Windows 上界面主色相必须为蓝色，
-/// 所以不提供其他主题色。
-const Color themeSeed = Color(0xFF1370F3);
+/// Pixel World 的默认品牌色。用户可以在个性化里改成任意颜色，配色仍按 MD3 生成。
+const Color defaultThemeSeed = Color(0xFF2F6B4F);
+const Color themeSeed = defaultThemeSeed;
 
 /// 主色保留原色的饱和度；第二、第三色和中性色都用同一色相，
 /// 避免 MD3 默认把第三色偏移成别的色系。错误色仍是红色。
-DynamicScheme _blueScheme(bool dark) {
-  final source = Hct.fromInt(themeSeed.toARGB32());
+DynamicScheme _md3Scheme(bool dark, Color seed) {
+  final source = Hct.fromInt(seed.toARGB32());
   final hue = source.hue;
   final chroma = source.chroma;
   return DynamicScheme(
@@ -25,8 +25,8 @@ DynamicScheme _blueScheme(bool dark) {
 
 double _max(double a, double b) => a > b ? a : b;
 
-ColorScheme blueColorScheme(Brightness brightness) {
-  final s = _blueScheme(brightness == Brightness.dark);
+ColorScheme md3ColorScheme(Brightness brightness, {Color seed = defaultThemeSeed}) {
+  final s = _md3Scheme(brightness == Brightness.dark, seed);
   Color c(DynamicColor d) => Color(d.getArgb(s));
   return ColorScheme(
     brightness: brightness,
@@ -79,15 +79,26 @@ ColorScheme blueColorScheme(Brightness brightness) {
   );
 }
 
-ThemeData buildTheme(Brightness brightness) {
-  final scheme = blueColorScheme(brightness);
+ThemeData buildTheme(Brightness brightness, {Color seed = defaultThemeSeed}) {
+  final scheme = md3ColorScheme(brightness, seed: seed);
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
     // Windows 上 Segoe UI 没有中文字形，优先用微软雅黑
     fontFamily: 'Microsoft YaHei UI',
     fontFamilyFallback: const ['Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', 'sans-serif'],
-    scaffoldBackgroundColor: scheme.surfaceContainer,
+    scaffoldBackgroundColor: scheme.surface,
     visualDensity: VisualDensity.standard,
+    cardTheme: CardThemeData(
+      color: scheme.surfaceContainerLow,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      ),
+    ),
   );
 }

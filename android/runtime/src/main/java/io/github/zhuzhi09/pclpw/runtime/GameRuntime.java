@@ -394,6 +394,17 @@ public final class GameRuntime {
         // 26.x: rename shader uniform blocks that MobileGlues would mangle (see agent/ShaderNamesAgent)
         File agent = new File(app.getFilesDir(), "lwjgl3/" + lwjgl + "/agent/pclpw-agent.jar");
         if (agent.isFile()) argv.add("-javaagent:" + agent.getAbsolutePath());
+        // HUD: the game JVM reports its own heap; Android's Runtime describes the ART heap instead
+        File hudStats = new File(app.getFilesDir(), "hud-java-stats");
+        hudStats.delete();
+        argv.add("-Dpclpw.hud.stats=" + hudStats.getAbsolutePath());
+        File hudAgent = new File(app.getFilesDir(), "hud-agent.jar");
+        try {
+            copyAsset(app, "hud-agent.jar", hudAgent);
+        } catch (Throwable e) {
+            Log.w(TAG, "Cannot extract hud-agent.jar", e);
+        }
+        if (hudAgent.isFile()) argv.add("-javaagent:" + hudAgent.getAbsolutePath());
         argv.addAll(withWindowSize(args, width, height));
         Logger.appendToLog("PCL.PW runtime: " + String.join(" ", redact(argv)));
 
@@ -619,6 +630,12 @@ public final class GameRuntime {
         byte[] buffer = new byte[64 * 1024];
         int n;
         while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+    }
+
+    private static void copyAsset(Context context, String name, File dest) throws IOException {
+        try (InputStream in = context.getAssets().open(name); OutputStream out = new FileOutputStream(dest)) {
+            copy(in, out);
+        }
     }
 
     private static void copyFile(File from, File to) throws IOException {

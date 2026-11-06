@@ -44,8 +44,6 @@ final class GameAiDialog {
     private final GameHud owner;
     private final String instance;
     private final String renderer;
-    private final String logFile;
-    private final boolean attachLog;
     private final SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final HudAiClient aiClient;
@@ -63,14 +61,12 @@ final class GameAiDialog {
     private ViewTreeObserver.OnGlobalLayoutListener imeListener;
 
     GameAiDialog(Activity activity, FrameLayout parent, GameHud owner,
-                 String instance, String renderer, String logFile, boolean attachLog) {
+                 String instance, String renderer) {
         this.activity = activity;
         this.parent = parent;
         this.owner = owner;
         this.instance = instance;
         this.renderer = renderer;
-        this.logFile = logFile;
-        this.attachLog = attachLog;
         this.prefs = activity.getSharedPreferences("pclpw_hud_ai", Activity.MODE_PRIVATE);
         this.aiClient = new HudAiClient(activity);
     }

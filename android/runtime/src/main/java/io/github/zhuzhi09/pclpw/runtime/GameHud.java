@@ -631,8 +631,9 @@ final class GameHud {
         if (mode != Mode.NONE) setMode(Mode.NONE);
         handler.removeCallbacks(fadeRunnable);
         if (aiDialog == null) {
-            aiDialog = new GameAiDialog(activity, parent, this, instance, renderer, logFile, attachLog);
+            aiDialog = new GameAiDialog(activity, parent, this, instance, renderer);
             aiDialog.setOnClosed(() -> {
+                if (gameFocus != null) gameFocus.requestFocus();
                 wake();
                 scheduleFade();
             });

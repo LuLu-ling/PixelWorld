@@ -50,6 +50,7 @@ final class HudMetrics {
     private final Runnable tick = this::sample;
     private final long clkTck;
     private final int cores;
+    private final File javaStatsFile;
     private final long startedAt = SystemClock.elapsedRealtime();
 
     private Callback callback;
@@ -71,6 +72,7 @@ final class HudMetrics {
         }
         clkTck = hz > 0 ? hz : 100;
         cores = Math.max(1, Runtime.getRuntime().availableProcessors());
+        javaStatsFile = new File(activity.getFilesDir(), "hud-java-stats");
     }
 
     /** True when frames can be counted (the Zink renderer draws through a TextureView). */
@@ -113,9 +115,7 @@ final class HudMetrics {
         lastFrames = frames;
         lastSampleAt = now;
 
-        Runtime rt = Runtime.getRuntime();
-        s.heapUsed = rt.totalMemory() - rt.freeMemory();
-        s.heapMax = rt.maxMemory();
+        readJavaHeap(s);
 
         try {
             readSystemMemory(s);
@@ -135,6 +135,38 @@ final class HudMetrics {
 
         if (callback != null) callback.onSample(s);
         if (running) handler.postDelayed(tick, INTERVAL_MS);
+    }
+
+    /** Heap values written by {@code hud-agent.jar} inside the game JVM. */
+    private void readJavaHeap(Sample s) {
+        long used = 0;
+        long max = 0;
+        try (BufferedReader r = new BufferedReader(new FileReader(javaStatsFile))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                int eq = line.indexOf('=');
+                if (eq <= 0) continue;
+                try {
+                    long value = Long.parseLong(line.substring(eq + 1).trim());
+                    switch (line.substring(0, eq)) {
+                        case "used":
+                            used = value;
+                            break;
+                        case "max":
+                            max = value;
+                            break;
+                        default:
+                            break;
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        if (max > 0) {
+            s.heapUsed = used;
+            s.heapMax = max;
+        }
     }
 
     /**

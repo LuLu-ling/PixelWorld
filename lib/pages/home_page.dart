@@ -6,10 +6,10 @@ import '../app_scope.dart';
 import '../app_state.dart';
 import '../core/instance.dart';
 import '../core/loader_names.dart';
+import '../core/recent_worlds.dart';
 import '../platform.dart';
 import '../shell.dart';
 import '../widgets/launch_dialogs.dart';
-import '../widgets/loader_label.dart';
 import 'home_feed.dart';
 
 /// 启动页：绿色主视觉、当前实例和最近游玩。
@@ -33,10 +33,11 @@ class HomePage extends StatelessWidget {
     }
   }
 
-  Future<void> _play(BuildContext context, InstanceInfo version) async {
+  Future<void> _playWorld(BuildContext context, RecentWorld world) async {
     final state = AppScope.read(context);
-    if (state.selectedVersion?.id != version.id) {
-      await state.selectVersion(version.id);
+    final versionId = world.versionId;
+    if (versionId != null && versionId.isNotEmpty && state.selectedVersion?.id != versionId) {
+      await state.selectVersion(versionId);
     }
     if (context.mounted) await _launch(context);
   }
@@ -48,7 +49,6 @@ class HomePage extends StatelessWidget {
     final state = AppScope.of(context);
     final acc = state.selectedAccount;
     final version = state.selectedVersion;
-    final versions = state.versions.take(6).toList();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(30, 6, 30, 30),
@@ -112,10 +112,10 @@ class HomePage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        if (versions.isEmpty)
-          _EmptyVersions(onDownload: () => ShellNav.of(context).goMain(MainPage.download))
-        else
-          _RecentGrid(versions: versions, onTap: (v) => state.selectVersion(v.id), onPlay: (v) => _play(context, v)),
+        _RecentWorldsSection(
+          onSelectVersion: (id) => state.selectVersion(id),
+          onPlay: (world) => _playWorld(context, world),
+        ),
         if (state.config.homeHints) ...[const SizedBox(height: 20), const HomeHints()],
         const ChangelogHint(),
         const HomeNotices(),
@@ -382,12 +382,62 @@ class _Pill extends StatelessWidget {
   }
 }
 
-class _RecentGrid extends StatelessWidget {
-  const _RecentGrid({required this.versions, required this.onTap, required this.onPlay});
+class _RecentWorldsSection extends StatefulWidget {
+  const _RecentWorldsSection({required this.onSelectVersion, required this.onPlay});
 
-  final List<InstanceInfo> versions;
-  final ValueChanged<InstanceInfo> onTap;
-  final ValueChanged<InstanceInfo> onPlay;
+  final ValueChanged<String> onSelectVersion;
+  final ValueChanged<RecentWorld> onPlay;
+
+  @override
+  State<_RecentWorldsSection> createState() => _RecentWorldsSectionState();
+}
+
+class _RecentWorldsSectionState extends State<_RecentWorldsSection> {
+  Future<List<RecentWorld>>? _future;
+  String? _key;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final state = AppScope.of(context);
+    final config = state.config;
+    final key = [
+      config.gameDir,
+      for (final folder in config.gameFolders) folder.path,
+      state.gameState.index,
+    ].join('\u0000');
+    if (_key == key) return;
+    final first = _future == null;
+    _key = key;
+    _future = recentWorlds(config, force: !first);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<RecentWorld>>(
+      future: _future,
+      builder: (context, snapshot) {
+        final worlds = snapshot.data ?? const <RecentWorld>[];
+        if (snapshot.connectionState == ConnectionState.waiting && worlds.isEmpty) {
+          return const SizedBox(height: 92);
+        }
+        if (worlds.isEmpty) return const _EmptyWorlds();
+        return _WorldGrid(
+          worlds: worlds,
+          onSelect: widget.onSelectVersion,
+          onPlay: widget.onPlay,
+        );
+      },
+    );
+  }
+}
+
+class _WorldGrid extends StatelessWidget {
+  const _WorldGrid({required this.worlds, required this.onSelect, required this.onPlay});
+
+  final List<RecentWorld> worlds;
+  final ValueChanged<String> onSelect;
+  final ValueChanged<RecentWorld> onPlay;
 
   @override
   Widget build(BuildContext context) {
@@ -397,29 +447,32 @@ class _RecentGrid extends StatelessWidget {
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: versions.length,
+          itemCount: worlds.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: count,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 3.15,
+            childAspectRatio: 3.0,
           ),
-          itemBuilder: (context, index) => _RecentCard(
-            version: versions[index],
-            onTap: () => onTap(versions[index]),
-            onPlay: () => onPlay(versions[index]),
-          ),
+          itemBuilder: (context, index) {
+            final world = worlds[index];
+            return _WorldCard(
+              world: world,
+              onTap: world.versionId == null ? null : () => onSelect(world.versionId!),
+              onPlay: () => onPlay(world),
+            );
+          },
         );
       },
     );
   }
 }
 
-class _RecentCard extends StatelessWidget {
-  const _RecentCard({required this.version, required this.onTap, required this.onPlay});
+class _WorldCard extends StatelessWidget {
+  const _WorldCard({required this.world, required this.onTap, required this.onPlay});
 
-  final InstanceInfo version;
-  final VoidCallback onTap;
+  final RecentWorld world;
+  final VoidCallback? onTap;
   final VoidCallback onPlay;
 
   @override
@@ -441,7 +494,7 @@ class _RecentCard extends StatelessWidget {
                 height: 44,
                 decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(12)),
                 alignment: Alignment.center,
-                child: versionIcon(version, size: 25, color: scheme.onPrimaryContainer),
+                child: Icon(Icons.landscape_outlined, size: 25, color: scheme.onPrimaryContainer),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -450,14 +503,14 @@ class _RecentCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      version.id,
+                      world.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      describeVersion(version),
+                      '${world.versionId ?? world.folderName} · ${_timeAgo(world.modified)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
@@ -466,7 +519,7 @@ class _RecentCard extends StatelessWidget {
                 ),
               ),
               IconButton(
-                tooltip: '开始游戏',
+                tooltip: '启动这个版本',
                 onPressed: onPlay,
                 icon: const Icon(Icons.play_arrow),
                 style: IconButton.styleFrom(
@@ -481,26 +534,44 @@ class _RecentCard extends StatelessWidget {
       ),
     );
   }
+
+  static String _timeAgo(DateTime time) {
+    final d = DateTime.now().difference(time);
+    if (d.inMinutes < 1) return '刚刚';
+    if (d.inHours < 1) return '${d.inMinutes} 分钟前';
+    if (d.inDays < 1) return '${d.inHours} 小时前';
+    if (d.inDays < 7) return '${d.inDays} 天前';
+    return '${time.month}/${time.day}';
+  }
 }
 
-class _EmptyVersions extends StatelessWidget {
-  const _EmptyVersions({required this.onDownload});
-
-  final VoidCallback onDownload;
+class _EmptyWorlds extends StatelessWidget {
+  const _EmptyWorlds();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
       decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(18)),
       child: Row(
         children: [
-          Icon(Icons.inventory_2_outlined, color: scheme.primary),
+          Icon(Icons.landscape_outlined, color: scheme.primary),
           const SizedBox(width: 12),
-          Expanded(child: Text('还没有安装版本，先去下载一个吧。', style: theme.textTheme.bodyMedium)),
-          FilledButton.tonal(onPressed: onDownload, child: const Text('去下载')),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('似乎还没有玩过哦', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(
+                  '开始一次游戏后，最近的存档会出现在这里。',
+                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

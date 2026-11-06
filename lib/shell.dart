@@ -67,6 +67,7 @@ class _ShellState extends State<Shell> {
   SubPage? _sub;
   StreamSubscription<CrashReport>? _crashes;
   final _navKey = GlobalKey();
+  bool _sidebarCollapsed = false;
 
   @override
   void didChangeDependencies() {
@@ -107,6 +108,19 @@ class _ShellState extends State<Shell> {
 
   @override
   Widget build(BuildContext context) {
+    final pageView = switch (_sub) {
+      SubPage.versions => const VersionsPage(),
+      SubPage.log => const LogPage(),
+      SubPage.instance => const InstancePage(),
+      SubPage.tasks => const TasksPage(),
+      SubPage.diagnose => const DiagnosePage(),
+      null => IndexedStack(
+        index: _page.index,
+        children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage(), AiPage()],
+      ),
+    };
+    final subTitle = _sub == SubPage.instance ? '版本设置 - ${AppScope.of(context).instanceId}' : _subTitles[_sub];
+
     return ShellNav(
       open: _openSub,
       back: () => setState(() => _sub = null),
@@ -115,45 +129,229 @@ class _ShellState extends State<Shell> {
         body: Stack(
           key: _navKey,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _Sidebar(
-                  page: _page,
-                  sub: _sub,
-                  onMain: _goMain,
-                  onSub: _openSub,
-                ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      _TopBar(
-                        subTitle: _sub == SubPage.instance
-                            ? '版本设置 - ${AppScope.of(context).instanceId}'
-                            : _subTitles[_sub],
-                        onBack: () => setState(() => _sub = null),
+            Positioned.fill(child: ColoredBox(color: Theme.of(context).colorScheme.surface)),
+            if (isDesktop)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 236, end: _sidebarCollapsed ? 0 : 236),
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    child: _Sidebar(
+                      page: _page,
+                      sub: _sub,
+                      onMain: _goMain,
+                      onSub: _openSub,
+                    ),
+                    builder: (context, width, child) => SizedBox(
+                      width: width,
+                      child: ClipRect(
+                        child: OverflowBox(
+                          alignment: Alignment.centerLeft,
+                          minWidth: 236,
+                          maxWidth: 236,
+                          child: SizedBox(width: 236, child: child),
+                        ),
                       ),
-                      Expanded(
-                        child: switch (_sub) {
-                          SubPage.versions => const VersionsPage(),
-                          SubPage.log => const LogPage(),
-                          SubPage.instance => const InstancePage(),
-                          SubPage.tasks => const TasksPage(),
-                          SubPage.diagnose => const DiagnosePage(),
-                          null => IndexedStack(
-                            index: _page.index,
-                            children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage(), AiPage()],
-                          ),
-                        },
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ],
-            ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _TopBar(
+                          subTitle: subTitle,
+                          collapsed: _sidebarCollapsed,
+                          onToggleSidebar: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+                          onBack: () => setState(() => _sub = null),
+                        ),
+                        Expanded(child: pageView),
+                      ],
+                    ),
+                  ),
+                ],
+              )
+            else
+              Column(
+                children: [
+                  _MobileTopBar(
+                    subTitle: subTitle,
+                    onBack: () => setState(() => _sub = null),
+                    onAccount: () => showAccountsDialog(context),
+                  ),
+                  Expanded(child: pageView),
+                ],
+              ),
             const Positioned(right: 20, bottom: 20, child: _InstallProgress()),
           ],
         ),
+        bottomNavigationBar: isDesktop
+            ? null
+            : _MobileNav(
+                page: _page,
+                sub: _sub,
+                onMain: _goMain,
+                onSub: _openSub,
+                onMore: () => _showMore(context),
+              ),
+      ),
+    );
+  }
+
+  void _showMore(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => _MoreSheet(
+        onMain: (page) {
+          Navigator.pop(sheetContext);
+          _goMain(page);
+        },
+        onSub: (page) {
+          Navigator.pop(sheetContext);
+          _openSub(page);
+        },
+        onAccount: () {
+          Navigator.pop(sheetContext);
+          showAccountsDialog(context);
+        },
+      ),
+    );
+  }
+}
+
+/// Android / 手机上的顶部栏：品牌、账户、电量与网络
+class _MobileTopBar extends StatelessWidget {
+  const _MobileTopBar({required this.subTitle, required this.onBack, required this.onAccount});
+
+  final String? subTitle;
+  final VoidCallback onBack;
+  final VoidCallback onAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final account = AppScope.of(context).selectedAccount;
+    return SizedBox(
+      height: 52,
+      child: Row(
+        children: [
+          if (subTitle != null) ...[
+            IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back, size: 20), tooltip: '返回'),
+            Text(subTitle!, style: theme.textTheme.titleSmall),
+          ] else ...[
+            const SizedBox(width: 14),
+            const AppLogo(size: 26),
+            const SizedBox(width: 8),
+            Text(
+              AppInfo.brandName,
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ],
+          const Spacer(),
+          const DeviceStatus(),
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: '账户',
+            onPressed: onAccount,
+            icon: CircleAvatar(
+              radius: 15,
+              backgroundColor: scheme.primaryContainer,
+              foregroundColor: scheme.onPrimaryContainer,
+              child: Text(
+                account == null ? '+' : account.name.characters.first.toUpperCase(),
+                style: theme.textTheme.labelSmall,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Android / 手机底部的 5 个入口；工具、设置等放在「更多」里。
+class _MobileNav extends StatelessWidget {
+  const _MobileNav({
+    required this.page,
+    required this.sub,
+    required this.onMain,
+    required this.onSub,
+    required this.onMore,
+  });
+
+  final MainPage page;
+  final SubPage? sub;
+  final ValueChanged<MainPage> onMain;
+  final ValueChanged<SubPage> onSub;
+  final VoidCallback onMore;
+
+  int get _index => switch (sub) {
+    SubPage.tasks => 3,
+    _ => switch (page) {
+      MainPage.home => 0,
+      MainPage.download => 1,
+      MainPage.ai => 2,
+      _ => 4,
+    },
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return NavigationBar(
+      height: 64,
+      selectedIndex: _index,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      onDestinationSelected: (index) {
+        switch (index) {
+          case 0:
+            onMain(MainPage.home);
+            break;
+          case 1:
+            onMain(MainPage.download);
+            break;
+          case 2:
+            onMain(MainPage.ai);
+            break;
+          case 3:
+            onSub(SubPage.tasks);
+            break;
+          case 4:
+            onMore();
+            break;
+        }
+      },
+      destinations: const [
+        NavigationDestination(icon: Icon(Icons.rocket_launch_outlined), label: '启动'),
+        NavigationDestination(icon: Icon(Icons.download_outlined), label: '下载'),
+        NavigationDestination(icon: Icon(Icons.auto_awesome_outlined), label: 'AI'),
+        NavigationDestination(icon: Icon(Icons.history_outlined), label: '任务'),
+        NavigationDestination(icon: Icon(Icons.more_horiz), label: '更多'),
+      ],
+    );
+  }
+}
+
+class _MoreSheet extends StatelessWidget {
+  const _MoreSheet({required this.onMain, required this.onSub, required this.onAccount});
+
+  final ValueChanged<MainPage> onMain;
+  final ValueChanged<SubPage> onSub;
+  final VoidCallback onAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          ListTile(leading: const Icon(Icons.account_circle_outlined), title: const Text('账户'), onTap: onAccount),
+          ListTile(leading: const Icon(Icons.construction_outlined), title: const Text('工具'), onTap: () => onMain(MainPage.tools)),
+          ListTile(leading: const Icon(Icons.settings_outlined), title: const Text('设置'), onTap: () => onMain(MainPage.settings)),
+          ListTile(leading: const Icon(Icons.list_alt_outlined), title: const Text('版本选择'), onTap: () => onSub(SubPage.versions)),
+          ListTile(leading: const Icon(Icons.article_outlined), title: const Text('游戏日志'), onTap: () => onSub(SubPage.log)),
+        ],
       ),
     );
   }
@@ -310,22 +508,9 @@ class _Sidebar extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(width: 7, height: 7, decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle)),
-                    const SizedBox(width: 7),
-                    Text('服务正常', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${AppInfo.brandName} v${AppInfo.version}',
-                  style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant.withValues(alpha: .7)),
-                ),
-              ],
+            child: Text(
+              '${AppInfo.brandName} v${AppInfo.version}',
+              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant.withValues(alpha: .7)),
             ),
           ),
         ],
@@ -402,9 +587,16 @@ class _SideItem extends StatelessWidget {
 
 /// 内容区顶部的拖动条、子页面返回按钮和窗口按钮
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.subTitle, required this.onBack});
+  const _TopBar({
+    required this.subTitle,
+    required this.collapsed,
+    required this.onToggleSidebar,
+    required this.onBack,
+  });
 
   final String? subTitle;
+  final bool collapsed;
+  final VoidCallback onToggleSidebar;
   final VoidCallback onBack;
 
   @override
@@ -415,9 +607,25 @@ class _TopBar extends StatelessWidget {
       child: Stack(
         children: [
           if (isDesktop) Positioned.fill(child: DragToMoveArea(child: const SizedBox.expand())),
+          Positioned(
+            left: 6,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: SizedBox.square(
+                dimension: 40,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  tooltip: collapsed ? '展开侧栏' : '收起侧栏',
+                  onPressed: onToggleSidebar,
+                  icon: Icon(collapsed ? Icons.menu : Icons.chevron_left, size: 20),
+                ),
+              ),
+            ),
+          ),
           if (subTitle != null)
             Positioned(
-              left: 14,
+              left: 52,
               top: 0,
               bottom: 0,
               child: Row(

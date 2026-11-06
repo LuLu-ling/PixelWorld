@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../app_info.dart';
 import '../app_scope.dart';
+import '../core/changelog.dart';
 import '../core/news.dart';
 import '../core/site_api.dart';
 import '../core/updater.dart';
@@ -67,6 +68,108 @@ class _Hint extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 首页的更新日志提示条：显示当前版本的更新日志（随发布包打包的 release-notes/v<版本>.md），
+/// 可以展开全文；关闭后同一个版本不再显示，换版本后重新出现
+class ChangelogHint extends StatefulWidget {
+  const ChangelogHint({super.key});
+
+  @override
+  State<ChangelogHint> createState() => _ChangelogHintState();
+}
+
+class _ChangelogHintState extends State<ChangelogHint> {
+  // 每次启动只读一次资源，切换页面不会重复读取
+  final _future = loadCurrentChangelog();
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final cfg = AppScope.of(context).config;
+    // 主色相必须为蓝色，与首页其他提示条一致
+    final fg = scheme.onSecondaryContainer;
+    return FutureBuilder<String?>(
+      future: _future,
+      builder: (context, snap) {
+        final log = snap.data;
+        final version = currentChangelogVersion;
+        if (log == null || cfg.dismissedChangelog == version) return const SizedBox.shrink();
+        final summary = changelogSummary(log);
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Material(
+            color: scheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.new_releases_outlined, color: fg, size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '更新日志 · v$version${AppInfo.channel == 'nightly' ? '（Nightly）' : ''}',
+                              style: theme.textTheme.titleSmall?.copyWith(color: fg, fontWeight: FontWeight.bold),
+                            ),
+                            if (!_expanded && summary.isNotEmpty)
+                              Text(
+                                summary,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(color: fg),
+                              ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => setState(() => _expanded = !_expanded),
+                        child: Text(_expanded ? '收起' : '展开'),
+                      ),
+                      IconButton(
+                        tooltip: '关闭',
+                        onPressed: () => cfg.update({'dismissedChangelog': version}),
+                        icon: Icon(Icons.close, size: 20, color: fg),
+                      ),
+                    ],
+                  ),
+                  if (_expanded)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8, bottom: 4),
+                      child: MarkdownBody(
+                        data: log,
+                        onTapLink: (_, href, _) {
+                          final uri = href == null ? null : Uri.tryParse(href);
+                          if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
+                            launchUrl(uri, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                          p: theme.textTheme.bodyMedium?.copyWith(color: fg),
+                          a: theme.textTheme.bodyMedium?.copyWith(color: fg, decoration: TextDecoration.underline),
+                          code: theme.textTheme.bodyMedium?.copyWith(color: fg, fontFamily: 'monospace'),
+                          listBullet: theme.textTheme.bodyMedium?.copyWith(color: fg),
+                          h2: theme.textTheme.titleSmall?.copyWith(color: fg, fontWeight: FontWeight.bold),
+                          h3: theme.textTheme.titleSmall?.copyWith(color: fg),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

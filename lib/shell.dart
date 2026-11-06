@@ -6,10 +6,14 @@ import 'package:window_manager/window_manager.dart';
 import 'app_info.dart';
 import 'app_scope.dart';
 import 'core/crash.dart';
-import 'core/task.dart';
 import 'platform.dart';
+import 'widgets/accounts_dialog.dart';
+import 'widgets/app_logo.dart';
+import 'widgets/device_status.dart';
+import 'widgets/storage_location.dart';
 import 'widgets/task_steps.dart';
 import 'widgets/update_dialog.dart';
+import 'widgets/window_buttons.dart';
 import 'pages/ai_page.dart';
 import 'pages/diagnose_page.dart';
 import 'pages/download_page.dart';
@@ -20,31 +24,19 @@ import 'pages/settings_page.dart';
 import 'pages/tasks_page.dart';
 import 'pages/tools_page.dart';
 import 'pages/versions_page.dart';
-import 'widgets/device_status.dart';
-import 'widgets/app_logo.dart';
-import 'widgets/storage_location.dart';
-import 'widgets/window_buttons.dart';
 
 enum MainPage { home, download, settings, tools, ai }
 
-/// 从主页面进入的子页面：标题栏显示返回按钮和标题，代替主导航
+/// 从主页面进入的子页面：顶部显示返回按钮和标题
 enum SubPage { versions, log, instance, tasks, diagnose }
 
 const _subTitles = {
   SubPage.versions: '版本选择',
   SubPage.log: '游戏日志',
   SubPage.instance: '版本设置',
-  SubPage.tasks: '任务',
+  SubPage.tasks: '任务历史',
   SubPage.diagnose: '错误分析',
 };
-
-const _nav = [
-  (page: MainPage.home, icon: Icons.rocket_launch_outlined, active: Icons.rocket_launch, label: '启动'),
-  (page: MainPage.download, icon: Icons.download_outlined, active: Icons.download, label: '下载'),
-  (page: MainPage.settings, icon: Icons.settings_outlined, active: Icons.settings, label: '设置'),
-  (page: MainPage.tools, icon: Icons.construction_outlined, active: Icons.construction, label: '工具'),
-  (page: MainPage.ai, icon: Icons.auto_awesome_outlined, active: Icons.auto_awesome, label: 'AI'),
-];
 
 /// 页面切换，供各页面打开子页面或返回
 class ShellNav extends InheritedWidget {
@@ -62,7 +54,7 @@ class ShellNav extends InheritedWidget {
   bool updateShouldNotify(ShellNav old) => false;
 }
 
-/// 主窗口：标题栏里放主导航（与 PCL 相同的布局），下面是当前页面。
+/// 主窗口：左侧是品牌与页面导航，右侧是内容区。
 class Shell extends StatefulWidget {
   const Shell({super.key});
 
@@ -106,39 +98,56 @@ class _ShellState extends State<Shell> {
     super.dispose();
   }
 
+  void _goMain(MainPage page) => setState(() {
+    _sub = null;
+    _page = page;
+  });
+
+  void _openSub(SubPage page) => setState(() => _sub = page);
+
   @override
   Widget build(BuildContext context) {
     return ShellNav(
-      open: (s) => setState(() => _sub = s),
+      open: _openSub,
       back: () => setState(() => _sub = null),
-      goMain: (p) => setState(() {
-        _sub = null;
-        _page = p;
-      }),
+      goMain: _goMain,
       child: Scaffold(
         body: Stack(
           key: _navKey,
           children: [
-            Column(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _TitleBar(
+                _Sidebar(
                   page: _page,
-                  subTitle: _sub == SubPage.instance ? '版本设置 - ${AppScope.of(context).instanceId}' : _subTitles[_sub],
-                  onSelect: (p) => setState(() => _page = p),
-                  onBack: () => setState(() => _sub = null),
+                  sub: _sub,
+                  onMain: _goMain,
+                  onSub: _openSub,
                 ),
                 Expanded(
-                  child: switch (_sub) {
-                    SubPage.versions => const VersionsPage(),
-                    SubPage.log => const LogPage(),
-                    SubPage.instance => const InstancePage(),
-                    SubPage.tasks => const TasksPage(),
-                    SubPage.diagnose => const DiagnosePage(),
-                    null => IndexedStack(
-                      index: _page.index,
-                      children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage(), AiPage()],
-                    ),
-                  },
+                  child: Column(
+                    children: [
+                      _TopBar(
+                        subTitle: _sub == SubPage.instance
+                            ? '版本设置 - ${AppScope.of(context).instanceId}'
+                            : _subTitles[_sub],
+                        onBack: () => setState(() => _sub = null),
+                      ),
+                      Expanded(
+                        child: switch (_sub) {
+                          SubPage.versions => const VersionsPage(),
+                          SubPage.log => const LogPage(),
+                          SubPage.instance => const InstancePage(),
+                          SubPage.tasks => const TasksPage(),
+                          SubPage.diagnose => const DiagnosePage(),
+                          null => IndexedStack(
+                            index: _page.index,
+                            children: const [HomePage(), DownloadPage(), SettingsPage(), ToolsPage(), AiPage()],
+                          ),
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -150,12 +159,252 @@ class _ShellState extends State<Shell> {
   }
 }
 
-class _TitleBar extends StatelessWidget {
-  const _TitleBar({required this.page, required this.subTitle, required this.onSelect, required this.onBack});
+/// 左侧品牌、账户和主导航
+class _Sidebar extends StatelessWidget {
+  const _Sidebar({required this.page, required this.sub, required this.onMain, required this.onSub});
 
   final MainPage page;
+  final SubPage? sub;
+  final ValueChanged<MainPage> onMain;
+  final ValueChanged<SubPage> onSub;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final state = AppScope.of(context);
+    final account = state.selectedAccount;
+    final width = isDesktop ? 236.0 : 210.0;
+    final topInset = isDesktop && nativeWindowButtons ? macTrafficLightsWidth : 0.0;
+
+    Widget brand = Padding(
+      padding: EdgeInsets.fromLTRB(18 + topInset, 20, 16, 16),
+      child: Row(
+        children: [
+          const AppLogo(size: 38),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  AppInfo.brandName,
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: .2),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (isDesktop) brand = DragToMoveArea(child: brand);
+
+    return Container(
+      width: width,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        border: Border(right: BorderSide(color: scheme.outlineVariant.withValues(alpha: .45))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          brand,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: Material(
+              color: scheme.surfaceContainerHighest.withValues(alpha: .45),
+              borderRadius: BorderRadius.circular(14),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => showAccountsDialog(context),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 17,
+                        backgroundColor: scheme.primaryContainer,
+                        foregroundColor: scheme.onPrimaryContainer,
+                        child: Text(
+                          account == null ? '+' : account.name.characters.first.toUpperCase(),
+                          style: theme.textTheme.labelLarge,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              account?.name ?? '添加账户',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelLarge,
+                            ),
+                            Text(
+                              account == null ? '账户' : (account.type.name == 'microsoft' ? '微软账户' : '离线账户'),
+                              maxLines: 1,
+                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.unfold_more, size: 16, color: scheme.onSurfaceVariant),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                _SideItem(
+                  icon: Icons.rocket_launch_outlined,
+                  activeIcon: Icons.rocket_launch,
+                  label: '启动',
+                  selected: sub == null && page == MainPage.home,
+                  onTap: () => onMain(MainPage.home),
+                ),
+                _SideItem(
+                  icon: Icons.download_outlined,
+                  activeIcon: Icons.download,
+                  label: '下载',
+                  selected: sub == null && page == MainPage.download,
+                  onTap: () => onMain(MainPage.download),
+                ),
+                _SideItem(
+                  icon: Icons.construction_outlined,
+                  activeIcon: Icons.construction,
+                  label: '工具',
+                  selected: sub == null && page == MainPage.tools,
+                  onTap: () => onMain(MainPage.tools),
+                ),
+                _SideItem(
+                  icon: Icons.settings_outlined,
+                  activeIcon: Icons.settings,
+                  label: '设置',
+                  selected: sub == null && page == MainPage.settings,
+                  onTap: () => onMain(MainPage.settings),
+                ),
+                _SideItem(
+                  icon: Icons.auto_awesome_outlined,
+                  activeIcon: Icons.auto_awesome,
+                  label: 'AI 助手',
+                  selected: sub == null && page == MainPage.ai,
+                  onTap: () => onMain(MainPage.ai),
+                ),
+                _SideItem(
+                  icon: Icons.history_outlined,
+                  activeIcon: Icons.history,
+                  label: '任务历史',
+                  selected: sub == SubPage.tasks,
+                  onTap: () => onSub(SubPage.tasks),
+                  badge: state.runningTasks.length,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(width: 7, height: 7, decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle)),
+                    const SizedBox(width: 7),
+                    Text('服务正常', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${AppInfo.brandName} v${AppInfo.version}',
+                  style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant.withValues(alpha: .7)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SideItem extends StatelessWidget {
+  const _SideItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.badge = 0,
+  });
+
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final int badge;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fg = selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Material(
+        color: selected ? scheme.primaryContainer.withValues(alpha: .72) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            height: 44,
+            child: Row(
+              children: [
+                const SizedBox(width: 14),
+                Icon(selected ? activeIcon : icon, size: 21, color: fg),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: selected ? scheme.onPrimaryContainer : scheme.onSurface,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (badge > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(color: scheme.primary, borderRadius: BorderRadius.circular(99)),
+                      child: Text('$badge', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onPrimary)),
+                    ),
+                  )
+                else
+                  const SizedBox(width: 14),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 内容区顶部的拖动条、子页面返回按钮和窗口按钮
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.subTitle, required this.onBack});
+
   final String? subTitle;
-  final ValueChanged<MainPage> onSelect;
   final VoidCallback onBack;
 
   @override
@@ -165,118 +414,26 @@ class _TitleBar extends StatelessWidget {
       height: 56,
       child: Stack(
         children: [
-          // 空白处可拖动窗口，双击最大化
           if (isDesktop) Positioned.fill(child: DragToMoveArea(child: const SizedBox.expand())),
-          Positioned(
-            left: (nativeWindowButtons ? macTrafficLightsWidth : 0) + (subTitle == null ? 20 : 8),
-            top: 0,
-            bottom: 0,
-            child: subTitle == null
-                ? IgnorePointer(
-                    child: Row(
-                      children: [
-                        const AppLogo(size: 20),
-                        const SizedBox(width: 10),
-                        Text(AppInfo.name, style: theme.textTheme.titleMedium),
-                      ],
-                    ),
-                  )
-                : Row(
-                    children: [
-                      IconButton(tooltip: '返回', onPressed: onBack, icon: const Icon(Icons.arrow_back)),
-                      const SizedBox(width: 4),
-                      Text(subTitle!, style: theme.textTheme.titleMedium),
-                    ],
-                  ),
-          ),
-          if (subTitle == null)
-            Center(
+          if (subTitle != null)
+            Positioned(
+              left: 14,
+              top: 0,
+              bottom: 0,
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  for (final item in _nav)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: _NavPill(
-                        icon: page == item.page ? item.active : item.icon,
-                        label: item.label,
-                        selected: page == item.page,
-                        onTap: () => onSelect(item.page),
-                      ),
-                    ),
+                  IconButton(
+                    tooltip: '返回',
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back, size: 20),
+                  ),
+                  const SizedBox(width: 2),
+                  Text(subTitle!, style: theme.textTheme.titleSmall),
                 ],
               ),
             ),
-          // 窗口按钮左侧：任务入口
-          // 手机上没有窗口按钮，任务入口放在最右侧
-          // Windows 上与自绘窗口按钮顶端对齐；macOS 与手机上在标题栏中垂直居中
-          if (isDesktop && !nativeWindowButtons)
-            const Positioned(right: 46 * 3 + 4, top: 4, child: _TasksButton())
-          else
-            const Positioned(right: 8, top: 0, bottom: 0, child: Center(child: _TasksButton())),
-          // 手机上全屏显示，电量与网络放在任务入口左侧
-          if (!isDesktop) const Positioned(right: 64, top: 0, bottom: 0, child: Center(child: DeviceStatus())),
+          if (!isDesktop) const Positioned(right: 58, top: 0, bottom: 0, child: Center(child: DeviceStatus())),
           if (isDesktop && !nativeWindowButtons) const Positioned(right: 0, top: 0, child: WindowButtons()),
-        ],
-      ),
-    );
-  }
-}
-
-/// 与 MD3 导航项相同的药丸形指示器
-class _NavPill extends StatelessWidget {
-  const _NavPill({required this.icon, required this.label, required this.selected, required this.onTap});
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final fg = selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant;
-    return Material(
-      color: selected ? scheme.secondaryContainer : Colors.transparent,
-      shape: const StadiumBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Icon(icon, size: 20, color: fg),
-              const SizedBox(width: 8),
-              Text(label, style: Theme.of(context).textTheme.labelLarge?.copyWith(color: fg)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 标题栏的任务入口；有任务进行时显示进度环
-class _TasksButton extends StatelessWidget {
-  const _TasksButton();
-
-  @override
-  Widget build(BuildContext context) {
-    final state = AppScope.of(context);
-    final running = state.runningTasks;
-    final failed = state.tasks.any((t) => t.state == TaskState.failed);
-    final scheme = Theme.of(context).colorScheme;
-    return IconButton(
-      tooltip: running.isEmpty ? '任务' : '${running.length} 个任务进行中',
-      onPressed: () => ShellNav.of(context).open(SubPage.tasks),
-      icon: Stack(
-        alignment: Alignment.center,
-        children: [
-          if (running.isNotEmpty)
-            const SizedBox.square(dimension: 28, child: CircularProgressIndicator(strokeWidth: 2)),
-          Icon(Icons.download_outlined, size: 20, color: failed ? scheme.error : null),
         ],
       ),
     );

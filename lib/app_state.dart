@@ -10,7 +10,7 @@ import 'core/accounts.dart';
 import 'core/ai/ai_chat.dart';
 import 'core/ai/ai_context.dart';
 import 'core/ai/ai_tools.dart';
-import 'core/cat_ini.dart';
+import 'compat/pcl/paths.dart';
 import 'core/config.dart';
 import 'core/android_runtime.dart';
 import 'core/version.dart' show VersionJson, needsAppleSiliconGlfw;
@@ -161,7 +161,7 @@ class AppState extends ChangeNotifier {
       versions = await installedVersions(paths);
       // 当前选择的版本不存在时，按 PCL.ini 记录的上次版本或第一个版本选择
       if (selectedVersion == null && versions.isNotEmpty) {
-        final last = readCatIni(p.join(config.gameDir, 'PCL.ini'))['Version'];
+        final last = readPclSelectedVersion(config.gameDir);
         final pick = versions.where((v) => v.id == last).firstOrNull ?? versions.first;
         await config.update({'selectedVersion': pick.id});
       }
@@ -174,14 +174,14 @@ class AppState extends ChangeNotifier {
   Future<void> selectVersion(String id) async {
     await config.update({'selectedVersion': id});
     // 记住当前文件夹选择的版本，PCL-CE 也会读取
-    await writeCatIni(p.join(config.gameDir, 'PCL.ini'), 'Version', id).catchError((_) {});
+    await writePclSelectedVersion(config.gameDir, id).catchError((_) {});
   }
 
   /// 切换游戏文件夹，并读取该文件夹在 PCL.ini 中记录的上次选择的版本
   Future<void> selectFolder(String path) async {
     path = p.normalize(p.absolute(path));
     await Directory(p.join(path, 'versions')).create(recursive: true);
-    final last = readCatIni(p.join(path, 'PCL.ini'))['Version'] ?? '';
+    final last = readPclSelectedVersion(path) ?? '';
     await config.update({
       'gameDir': path,
       'selectedVersion': last.isNotEmpty && Directory(p.join(path, 'versions', last)).existsSync() ? last : '',
@@ -490,7 +490,7 @@ class AppState extends ChangeNotifier {
       t.setStage('准备启动');
       await prepareOptions(cfg, gameDir, v.releaseTime).catchError((_) {});
       if (android != null) await disableForgeSplash(gameDir).catchError((_) {});
-      await writeCatIni(p.join(g.root, 'PCL.ini'), 'Version', id).catchError((_) {});
+      await writePclSelectedVersion(g.root, id).catchError((_) {});
       if (android != null) {
         t.beginStep('启动游戏');
         _launcherLog('Java: ${java.path}（安卓版 Java ${java.major}）');

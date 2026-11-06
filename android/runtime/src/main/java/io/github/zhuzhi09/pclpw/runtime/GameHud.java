@@ -7,6 +7,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -53,6 +55,8 @@ final class GameHud {
     private static final int OK = 0xFF7ADFA0;
     private static final int WARN = 0xFFFFC46B;
     private static final int BAD = 0xFFFF8A80;
+    private static final long FADE_DELAY_MS = 5000;
+    private static final float FADED_ALPHA = 0.22f;
 
     private enum Mode { NONE, MENU, INFO, AI }
 
@@ -79,6 +83,8 @@ final class GameHud {
     private TextView fpsHint;
     private SparklineView graph;
     private TextView memValue;
+    private TextView systemValue;
+    private TextView swapValue;
     private TextView cpuValue;
     private TextView tempLabel;
     private TextView tempValue;
@@ -102,6 +108,8 @@ final class GameHud {
     private boolean aiBusy;
     private View gameFocus;
     private Runnable onVisibilityChanged;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable fadeRunnable = this::fadeBall;
 
     GameHud(Activity activity, FrameLayout parent, String instance, String renderer, String logFile,
             boolean aiEnabled, boolean attachLog) {
@@ -147,18 +155,13 @@ final class GameHud {
 
     private TextView buildBall() {
         TextView v = new TextView(activity);
-        v.setText("✦");
-        v.setTextSize(20);
-        v.setTextColor(Color.WHITE);
+        v.setText("");
         v.setGravity(Gravity.CENTER);
         v.setIncludeFontPadding(false);
-        v.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
-        GradientDrawable bg = oval(BLUE);
-        bg.setStroke(dp(1), 0x66FFFFFF);
-        v.setBackground(bg);
-        v.setElevation(dp(8));
+        v.setBackground(ring(0x33000000, 0xFFFFFFFF, 2));
+        v.setElevation(dp(6));
         v.setContentDescription("游戏助手，点击打开菜单");
-        v.setLayoutParams(new LinearLayout.LayoutParams(dp(48), dp(48)));
+        v.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
         installDrag(v, true);
         return v;
     }
@@ -222,14 +225,15 @@ final class GameHud {
 
         card.addView(divider());
 
-        LinearLayout metricsRow1 = new LinearLayout(activity);
-        metricsRow1.setOrientation(LinearLayout.HORIZONTAL);
-        memValue = metricCell(metricsRow1, "内存");
-        cpuValue = metricCell(metricsRow1, "CPU");
-        card.addView(metricsRow1);
+        memValue = memoryRow(card, "Java 已用 / 上限");
+        systemValue = memoryRow(card, "系统已用 / 总内存");
+        swapValue = memoryRow(card, "交换已用 / 总交换");
 
-        LinearLayout metricsRow2 = new LinearLayout(activity);
-        metricsRow2.setOrientation(LinearLayout.HORIZONTAL);
+        card.addView(divider());
+
+        LinearLayout metricsRow = new LinearLayout(activity);
+        metricsRow.setOrientation(LinearLayout.HORIZONTAL);
+        cpuValue = metricCell(metricsRow, "CPU");
         LinearLayout tempCell = new LinearLayout(activity);
         tempCell.setOrientation(LinearLayout.VERTICAL);
         tempCell.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
@@ -237,9 +241,9 @@ final class GameHud {
         tempCell.addView(tempLabel);
         tempValue = label("--", 15, TEXT, true, false);
         tempCell.addView(tempValue);
-        metricsRow2.addView(tempCell);
-        timeValue = metricCell(metricsRow2, "时长");
-        card.addView(metricsRow2);
+        metricsRow.addView(tempCell);
+        timeValue = metricCell(metricsRow, "运行时长");
+        card.addView(metricsRow);
 
         detailValue = label("", 10, MUTED, true, false);
         LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(
@@ -393,6 +397,22 @@ final class GameHud {
         return value;
     }
 
+    /** Adds a full-width label/value pair and returns the value view. */
+    private TextView memoryRow(LinearLayout parent, String title) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(3), 0, dp(3));
+        row.addView(label(title, 10, MUTED, false, false),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        TextView value = label("--", 12, TEXT, true, false);
+        value.setGravity(Gravity.END);
+        row.addView(value, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        parent.addView(row);
+        return value;
+    }
+
     private View divider() {
         View line = new View(activity);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
@@ -435,6 +455,23 @@ final class GameHud {
 
     // ---------- lifecycle ----------
 
+    /** Shows the ball again and restarts the five-second idle timer. */
+    private void wake() {
+        handler.removeCallbacks(fadeRunnable);
+        ball.animate().cancel();
+        ball.setAlpha(1f);
+    }
+
+    private void scheduleFade() {
+        handler.removeCallbacks(fadeRunnable);
+        if (visible && mode == Mode.NONE) handler.postDelayed(fadeRunnable, FADE_DELAY_MS);
+    }
+
+    private void fadeBall() {
+        if (!visible || mode != Mode.NONE) return;
+        ball.animate().alpha(FADED_ALPHA).setDuration(600).start();
+    }
+
     void attach() {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
@@ -448,7 +485,11 @@ final class GameHud {
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         parent.addView(root);
 
-        if (visible) startSampling();
+        if (visible) {
+            startSampling();
+            wake();
+            scheduleFade();
+        }
         root.post(() -> {
             FrameLayout.LayoutParams fixed = (FrameLayout.LayoutParams) root.getLayoutParams();
             fixed.topMargin = topInset(fixed.topMargin);
@@ -475,15 +516,21 @@ final class GameHud {
         stopSampling();
         aiClient.cancel();
         hideKeyboard();
+        handler.removeCallbacks(fadeRunnable);
     }
 
     void onResume() {
-        if (visible) startSampling();
+        if (visible) {
+            startSampling();
+            wake();
+            scheduleFade();
+        }
     }
 
     void dispose() {
         stopSampling();
         aiClient.cancel();
+        handler.removeCallbacks(fadeRunnable);
         parent.removeView(root);
         parent.removeView(scrim);
     }
@@ -523,7 +570,10 @@ final class GameHud {
             root.setVisibility(View.VISIBLE);
             root.animate().alpha(1f).setDuration(140).start();
             startSampling();
+            wake();
+            scheduleFade();
         } else {
+            handler.removeCallbacks(fadeRunnable);
             stopSampling();
             root.animate().alpha(0f).setDuration(120).withEndAction(() -> {
                 if (!visible) root.setVisibility(View.GONE);
@@ -536,6 +586,7 @@ final class GameHud {
 
     private void setMode(Mode next) {
         if (next == Mode.AI && !aiEnabled) return;
+        wake();
         if (mode == next) next = Mode.NONE;
         final boolean leavingAi = mode == Mode.AI;
         mode = next;
@@ -556,6 +607,8 @@ final class GameHud {
             hideKeyboard();
         }
         if (next == Mode.NONE) aiClient.cancel();
+        if (next == Mode.NONE) scheduleFade();
+        else handler.removeCallbacks(fadeRunnable);
         root.post(this::keepOnScreen);
     }
 
@@ -585,8 +638,10 @@ final class GameHud {
         graph.setVisibility(s.fpsAvailable ? View.VISIBLE : View.GONE);
         if (s.fpsAvailable) graph.add((float) s.fps);
 
-        memValue.setText(String.format(Locale.ROOT, "%.1f / %.1f GB",
-                s.heapUsed / 1073741824.0, s.heapMax / 1073741824.0));
+        memValue.setText(gbPair(s.heapUsed, s.heapMax));
+        systemValue.setText(gbPair(s.systemUsed, s.systemTotal));
+        swapValue.setText(s.swapTotal > 0 ? gbPair(s.swapUsed, s.swapTotal) : "无");
+
         cpuValue.setText(String.format(Locale.ROOT, "%.0f%%", s.cpuPercent));
         cpuValue.setTextColor(s.cpuPercent > 80 ? WARN : TEXT);
 
@@ -596,9 +651,12 @@ final class GameHud {
         tempValue.setTextColor(!hasTemp ? MUTED : s.temperature >= 45 ? BAD : s.temperature >= 40 ? WARN : OK);
 
         timeValue.setText(duration(s.uptimeMs));
-        String pss = s.pss > 0 ? String.format(Locale.ROOT, "PSS %.1f GB", s.pss / 1073741824.0) : "";
-        String battery = s.batteryPercent > 0 ? s.batteryPercent + "% 电量" : "";
-        detailValue.setText(pss.isEmpty() ? battery : battery.isEmpty() ? pss : pss + " · " + battery);
+        detailValue.setText(s.batteryPercent > 0 ? "电池 " + s.batteryPercent + "%" : "");
+    }
+
+    private static String gbPair(long used, long total) {
+        if (total <= 0) return "--";
+        return String.format(Locale.ROOT, "%.1f / %.1f GB", used / 1073741824.0, total / 1073741824.0);
     }
 
     private static String duration(long ms) {
@@ -690,7 +748,8 @@ final class GameHud {
             if (s.fpsAvailable) b.append("帧率：").append(String.format(Locale.ROOT, "%.0f FPS", s.fps)).append('\n');
             b.append("堆内存：").append(String.format(Locale.ROOT, "%.1f / %.1f GB",
                     s.heapUsed / 1073741824.0, s.heapMax / 1073741824.0)).append('\n');
-            b.append("进程内存：").append(String.format(Locale.ROOT, "%.1f GB", s.pss / 1073741824.0)).append('\n');
+            b.append("系统内存：").append(gbPair(s.systemUsed, s.systemTotal)).append('\n');
+            if (s.swapTotal > 0) b.append("交换空间：").append(gbPair(s.swapUsed, s.swapTotal)).append('\n');
             b.append("CPU：").append(String.format(Locale.ROOT, "%.0f%%", s.cpuPercent)).append('\n');
             if (s.temperature > 0) {
                 b.append(s.batteryTemperature ? "电池温度：" : "温度：")
@@ -764,6 +823,7 @@ final class GameHud {
             public boolean onTouch(View v, MotionEvent e) {
                 switch (e.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
+                        wake();
                         downX = e.getRawX();
                         downY = e.getRawY();
                         startLeft = root.getLeft();
@@ -793,9 +853,11 @@ final class GameHud {
                         } else {
                             snapToEdge();
                         }
+                        scheduleFade();
                         return true;
                     case MotionEvent.ACTION_CANCEL:
                         if (moved) snapToEdge();
+                        scheduleFade();
                         return true;
                 }
                 return false;
@@ -872,6 +934,14 @@ final class GameHud {
         GradientDrawable d = new GradientDrawable();
         d.setShape(GradientDrawable.OVAL);
         d.setColor(color);
+        return d;
+    }
+
+    private GradientDrawable ring(int fillColor, int strokeColor, int strokeDp) {
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(fillColor);
+        d.setStroke(dp(strokeDp), strokeColor);
         return d;
     }
 

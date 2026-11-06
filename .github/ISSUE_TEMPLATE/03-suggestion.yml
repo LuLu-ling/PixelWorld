@@ -24,6 +24,30 @@ body:
           required: true
 
   - type: dropdown
+    id: ai-usage
+    attributes:
+      label: AI 使用情况
+      description: 使用生成式 AI 写这个 Issue 不是违规，但需要说明，并自行核对内容。
+      options:
+        - 未使用
+        - 仅用于翻译或润色
+        - 用于分析、起草或整理，已人工核对
+    validations:
+      required: true
+
+  - type: textarea
+    id: ai-details
+    attributes:
+      label: AI 工具与核对方式
+      description: 使用了 AI 时填写工具、模型和用途；未使用填「无」。
+      placeholder: |
+        工具与模型：
+        用途：
+        核对方式：
+    validations:
+      required: true
+
+  - type: dropdown
     id: category
     attributes:
       label: 建议类型

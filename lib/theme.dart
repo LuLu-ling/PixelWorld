@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
 
-/// Pixel World 的绿色主题。绿色只是品牌色，不再受 PCL 主题蓝的限制。
-const Color themeSeed = Color(0xFF2F6B4F);
+/// Pixel World 的默认品牌色。用户可以在个性化里改成任意颜色，配色仍按 MD3 生成。
+const Color defaultThemeSeed = Color(0xFF2F6B4F);
+const Color themeSeed = defaultThemeSeed;
 
 /// 主色保留原色的饱和度；第二、第三色和中性色都用同一色相，
 /// 避免 MD3 默认把第三色偏移成别的色系。错误色仍是红色。
-DynamicScheme _greenScheme(bool dark) {
-  final source = Hct.fromInt(themeSeed.toARGB32());
+DynamicScheme _md3Scheme(bool dark, Color seed) {
+  final source = Hct.fromInt(seed.toARGB32());
   final hue = source.hue;
   final chroma = source.chroma;
   return DynamicScheme(
@@ -24,10 +25,10 @@ DynamicScheme _greenScheme(bool dark) {
 
 double _max(double a, double b) => a > b ? a : b;
 
-ColorScheme greenColorScheme(Brightness brightness) {
-  final s = _greenScheme(brightness == Brightness.dark);
+ColorScheme md3ColorScheme(Brightness brightness, {Color seed = defaultThemeSeed}) {
+  final s = _md3Scheme(brightness == Brightness.dark, seed);
   Color c(DynamicColor d) => Color(d.getArgb(s));
-  final scheme = ColorScheme(
+  return ColorScheme(
     brightness: brightness,
     primary: c(MaterialDynamicColors.primary),
     onPrimary: c(MaterialDynamicColors.onPrimary),
@@ -76,29 +77,10 @@ ColorScheme greenColorScheme(Brightness brightness) {
     inversePrimary: c(MaterialDynamicColors.inversePrimary),
     surfaceTint: c(MaterialDynamicColors.surfaceTint),
   );
-  // 首页使用米白/浅绿的底色，而不是默认的中性灰。
-  if (brightness == Brightness.light) {
-    return scheme.copyWith(
-      surface: const Color(0xFFF7F9F1),
-      surfaceContainerLowest: const Color(0xFFFFFFFF),
-      surfaceContainerLow: const Color(0xFFF2F5EB),
-      surfaceContainer: const Color(0xFFEDF2E6),
-      surfaceContainerHigh: const Color(0xFFE6EDDF),
-      surfaceContainerHighest: const Color(0xFFDFE8D7),
-    );
-  }
-  return scheme.copyWith(
-    surface: const Color(0xFF101612),
-    surfaceContainerLowest: const Color(0xFF0A0F0C),
-    surfaceContainerLow: const Color(0xFF161D18),
-    surfaceContainer: const Color(0xFF1B241E),
-    surfaceContainerHigh: const Color(0xFF222D26),
-    surfaceContainerHighest: const Color(0xFF2A372F),
-  );
 }
 
-ThemeData buildTheme(Brightness brightness) {
-  final scheme = greenColorScheme(brightness);
+ThemeData buildTheme(Brightness brightness, {Color seed = defaultThemeSeed}) {
+  final scheme = md3ColorScheme(brightness, seed: seed);
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,

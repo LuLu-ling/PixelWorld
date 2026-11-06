@@ -62,6 +62,8 @@ class LauncherConfig extends ChangeNotifier {
     'downloadSource': Platform.localeName.startsWith('zh') ? 'bmclapi' : 'official',
     'concurrency': 16,
     'themeMode': 'system',
+    // 主题色种子，按 MD3 生成整套浅色/深色配色
+    'themeColor': 0xFF2F6B4F,
     'selectedVersion': '',
     'selectedAccount': '',
     'msClientId': '',
@@ -169,6 +171,7 @@ class LauncherConfig extends ChangeNotifier {
   String get downloadSource => _get('downloadSource');
   int get concurrency => (_data['concurrency'] as num).toInt();
   String get themeMode => _get('themeMode');
+  int get themeColor => (_data['themeColor'] as num?)?.toInt() ?? 0xFF2F6B4F;
   String get selectedVersion => _get('selectedVersion');
   String get selectedAccount => _get('selectedAccount');
   String get msClientId => _get('msClientId');

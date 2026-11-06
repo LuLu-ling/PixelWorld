@@ -11,127 +11,55 @@ const _presetColors = <int>[
   0xFF6B5B3E,
 ];
 
-/// 选择主题色种子。返回 ARGB int；取消返回 null。
-Future<int?> showThemeColorDialog(BuildContext context, int current) {
-  return showDialog<int>(
-    context: context,
-    builder: (context) => _ThemeColorDialog(current: current),
-  );
-}
-
-class _ThemeColorDialog extends StatefulWidget {
-  const _ThemeColorDialog({required this.current});
+/// 个性化页里直接显示的主题色选择器：预设 + 自定义。
+class ThemeColorPicker extends StatelessWidget {
+  const ThemeColorPicker({super.key, required this.current, required this.onChanged});
 
   final int current;
+  final ValueChanged<int> onChanged;
 
-  @override
-  State<_ThemeColorDialog> createState() => _ThemeColorDialogState();
-}
-
-class _ThemeColorDialogState extends State<_ThemeColorDialog> {
-  late int _argb;
-
-  @override
-  void initState() {
-    super.initState();
-    _argb = widget.current;
-  }
-
-  Color get _color => Color(_argb);
-
-  String get _hex => '#${_argb.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
-
-  bool get _isPreset => _presetColors.contains(_argb);
-
-  Future<void> _openCustom() async {
+  Future<void> _openCustom(BuildContext context) async {
     final color = await showDialog<int>(
       context: context,
-      builder: (context) => _CustomColorDialog(initial: _argb),
+      builder: (context) => _CustomColorDialog(initial: current),
     );
-    if (color != null) setState(() => _argb = color);
+    if (color != null) onChanged(color);
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return AlertDialog(
-      title: const Text('主题色'),
-      content: SizedBox(
-        width: 380,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: _color,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: scheme.outlineVariant),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_hex, style: theme.textTheme.titleMedium?.copyWith(fontFamily: 'monospace')),
-                      Text(
-                        '按 Material Design 3 生成整套配色',
-                        style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (final argb in _presetColors)
+          _ColorDot(
+            selected: current == argb,
+            onTap: () => onChanged(argb),
+            child: Container(color: Color(argb)),
+          ),
+        _ColorDot(
+          selected: !_presetColors.contains(current),
+          onTap: () => _openCustom(context),
+          child: Container(
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: SweepGradient(
+                colors: [
+                  Color(0xFFFF4D4D),
+                  Color(0xFFFFD24D),
+                  Color(0xFF4DFF88),
+                  Color(0xFF4DD2FF),
+                  Color(0xFF6B4DFF),
+                  Color(0xFFFF4DC4),
+                  Color(0xFFFF4D4D),
+                ],
+              ),
             ),
-            const SizedBox(height: 20),
-            Text('预设', style: theme.textTheme.labelLarge),
-            const SizedBox(height: 9),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                for (final argb in _presetColors)
-                  _ColorDot(
-                    selected: _argb == argb,
-                    onTap: () => setState(() => _argb = argb),
-                    child: Container(color: Color(argb)),
-                  ),
-                _ColorDot(
-                  selected: !_isPreset,
-                  onTap: _openCustom,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: SweepGradient(
-                        colors: [
-                          Color(0xFFFF4D4D),
-                          Color(0xFFFFD24D),
-                          Color(0xFF4DFF88),
-                          Color(0xFF4DD2FF),
-                          Color(0xFF6B4DFF),
-                          Color(0xFFFF4DC4),
-                          Color(0xFFFF4D4D),
-                        ],
-                      ),
-                    ),
-                    child: const Icon(Icons.add, size: 18, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-          ],
+            child: const Icon(Icons.add, size: 18, color: Colors.white),
+          ),
         ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-        FilledButton(onPressed: () => Navigator.pop(context, _argb), child: const Text('使用')),
       ],
     );
   }

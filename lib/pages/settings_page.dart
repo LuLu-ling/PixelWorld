@@ -83,6 +83,7 @@ class _AppearanceSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cfg = AppScope.of(context).config;
     return ListView(
       padding: const EdgeInsets.all(28),
       children: [
@@ -100,26 +101,23 @@ class _AppearanceSection extends StatelessWidget {
                   ButtonSegment(value: 'light', label: Text('浅色'), icon: Icon(Icons.light_mode_outlined)),
                   ButtonSegment(value: 'dark', label: Text('深色'), icon: Icon(Icons.dark_mode_outlined)),
                 ],
-                selected: {AppScope.of(context).config.themeMode},
-                onSelectionChanged: (s) => AppScope.read(context).config.update({'themeMode': s.first}),
+                selected: {cfg.themeMode},
+                onSelectionChanged: (s) => cfg.update({'themeMode': s.first}),
               ),
             ),
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              leading: CircleAvatar(
-                radius: 13,
-                backgroundColor: Color(AppScope.of(context).config.themeColor),
-              ),
+              leading: CircleAvatar(radius: 13, backgroundColor: Color(cfg.themeColor)),
               title: const Text('主题色'),
               subtitle: const Text('按 Material Design 3 从主题色生成整套浅色与深色配色'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () async {
-                final current = AppScope.read(context).config.themeColor;
-                final color = await showThemeColorDialog(context, current);
-                if (color != null && context.mounted) {
-                  await AppScope.read(context).config.update({'themeColor': color});
-                }
-              },
+              trailing: const Icon(Icons.palette_outlined),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+              child: ThemeColorPicker(
+                current: cfg.themeColor,
+                onChanged: (color) => cfg.update({'themeColor': color}),
+              ),
             ),
           ],
         ),

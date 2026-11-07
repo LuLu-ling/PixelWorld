@@ -150,20 +150,73 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
-            libgtk-3-dev liblzma-dev libx11-dev libxi-dev
+            libgtk-3-dev liblzma-dev libx11-dev libxi-dev rpm
       - name: Build
         run: |
+          set -euo pipefail
           flutter pub get
           flutter build linux --release --dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL"
           version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
           stage="$RUNNER_TEMP/PCL.PW"
+          bundle=build/linux/x64/release/bundle
+          rm -rf "$stage" "$RUNNER_TEMP"/pclpw-* "$RUNNER_TEMP"/PCL.PW.AppDir
           mkdir -p "$stage" dist
-          cp -R build/linux/x64/release/bundle/. "$stage/"
+          cp -R "$bundle/." "$stage/"
+          icon="$stage/data/flutter_assets/assets/icon/icon.png"
+
+          desktop="$RUNNER_TEMP/io.github.zhuzhi09.pcl_pw.desktop"
+          cp packaging/linux/io.github.zhuzhi09.pcl_pw.desktop "$desktop"
+
           tar -C "$RUNNER_TEMP" -czf "dist/PCL.PW-$version-linux-x64.tar.gz" PCL.PW
+
+          # Debian / Ubuntu
+          pkg="$RUNNER_TEMP/pkgroot"
+          rm -rf "$pkg"
+          mkdir -p "$pkg/opt/PCL.PW" "$pkg/usr/bin" \
+            "$pkg/usr/share/applications" \
+            "$pkg/usr/share/icons/hicolor/256x256/apps" "$pkg/DEBIAN"
+          cp -a "$stage/." "$pkg/opt/PCL.PW/"
+          ln -s /opt/PCL.PW/pcl_pw "$pkg/usr/bin/pcl-pw"
+          install -m644 "$desktop" "$pkg/usr/share/applications/io.github.zhuzhi09.pcl_pw.desktop"
+          install -m644 "$icon" "$pkg/usr/share/icons/hicolor/256x256/apps/io.github.zhuzhi09.pcl_pw.png"
+          sed "s/@VERSION@/$version/" packaging/linux/control > "$pkg/DEBIAN/control"
+          dpkg-deb --build --root-owner-group "$pkg" "dist/PCL.PW-$version-linux-amd64.deb"
+
+          # Fedora / openSUSE / RHEL
+          rpmtop="$RUNNER_TEMP/rpmbuild"
+          rm -rf "$rpmtop"
+          mkdir -p "$rpmtop"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          spec="$rpmtop/SPECS/pcl-pw.spec"
+          sed -e "s|@VERSION@|$version|g" \
+            -e "s|@STAGE@|$stage|g" \
+            -e "s|@DESKTOP@|$desktop|g" \
+            -e "s|@ICON@|$icon|g" \
+            packaging/linux/pcl-pw.spec > "$spec"
+          rpmbuild -bb --define "_topdir $rpmtop" "$spec"
+          cp "$rpmtop/RPMS/x86_64/pcl-pw-$version-1.x86_64.rpm" "dist/PCL.PW-$version-linux-x86_64.rpm"
+
+          # AppImage
+          appdir="$RUNNER_TEMP/PCL.PW.AppDir"
+          mkdir -p "$appdir/usr/bin"
+          cp -a "$stage/." "$appdir/usr/bin/"
+          sed 's/^Exec=.*/Exec=pcl_pw/' "$desktop" > "$appdir/io.github.zhuzhi09.pcl_pw.desktop"
+          cp "$icon" "$appdir/io.github.zhuzhi09.pcl_pw.png"
+          ln -sf io.github.zhuzhi09.pcl_pw.png "$appdir/.DirIcon"
+          cp packaging/linux/AppRun "$appdir/AppRun"
+          chmod +x "$appdir/AppRun"
+          curl -fL --retry 3 -o "$RUNNER_TEMP/appimagetool" \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x "$RUNNER_TEMP/appimagetool"
+          ARCH=x86_64 "$RUNNER_TEMP/appimagetool" --appimage-extract-and-run \
+            "$appdir" "dist/PCL.PW-$version-linux-x86_64.AppImage"
       - uses: actions/upload-artifact@v4
         with:
           name: linux
-          path: dist/*-linux-x64.tar.gz
+          path: |
+            dist/*-linux-x64.tar.gz
+            dist/*-linux-amd64.deb
+            dist/*-linux-x86_64.rpm
+            dist/*-linux-x86_64.AppImage
 
   publish:
     needs: [windows, android, macos, linux]
@@ -186,7 +239,7 @@ jobs:
           about="本软件是第三方基于 PCL 二次创作的产物，与 PCL 及其作者无关，请勿就本软件的问题打扰 PCL 作者。"
           downloads=$'- Windows：安装包（`*-setup.exe`）或便携版（`*-portable.zip`）\n- 安卓：`*-android-arm64.apk`，需要 Android 8.0 及以上、64 位 ARM 处理器\n- macOS：`*-macos.dmg`，需要 macOS 12 及以上，Apple 芯片与 Intel 通用。没有经过 Apple 公证，首次打开时如果提示无法验证开发者，请到「系统设置 → 隐私与安全性」中点「仍要打开」'
           if [ "$LINUX_RESULT" = "success" ]; then
-            downloads+=$'\n- Linux（测试版）：`*-linux-x64.tar.gz`，需要 Ubuntu 24.04 及以上（glibc 2.39+），解压后运行 `PCL.PW/pcl_pw`'
+            downloads+=$'\n- Linux（测试版）：需要 Ubuntu 24.04 及以上（glibc 2.39+）\n  - `*-linux-amd64.deb`：Debian/Ubuntu 安装包\n  - `*-linux-x86_64.rpm`：Fedora/openSUSE/RHEL 安装包\n  - `*-linux-x86_64.AppImage`：下载后 `chmod +x` 直接运行\n  - `*-linux-x64.tar.gz`：解压后运行 `PCL.PW/pcl_pw`'
           fi
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             tag="$GITHUB_REF_NAME"

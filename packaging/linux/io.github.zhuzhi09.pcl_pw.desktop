@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PCL.PW
+Comment=Minecraft Java Edition Launcher
+Exec=pcl-pw
+Icon=io.github.zhuzhi09.pcl_pw
+Terminal=false
+Categories=Game;
+StartupWMClass=io.github.zhuzhi09.pcl_pw

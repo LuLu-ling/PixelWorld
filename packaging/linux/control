@@ -1,0 +1,9 @@
+Package: pcl-pw
+Version: @VERSION@
+Section: games
+Priority: optional
+Architecture: amd64
+Maintainer: PCL.PW <paper_zhu@163.com>
+Depends: libgtk-3-0t64 | libgtk-3-0, libx11-6, libxi6, liblzma5, libstdc++6, libgl1, libegl1
+Description: Pixel World Launcher
+ Minecraft Java Edition launcher built with Flutter.

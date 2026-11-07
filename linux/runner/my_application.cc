@@ -14,6 +14,35 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
+// The bundle keeps the launcher icon next to the executable.
+static gchar* app_icon_path() {
+  g_autofree gchar* exe = g_file_read_link("/proc/self/exe", nullptr);
+  if (exe == nullptr) return nullptr;
+  g_autofree gchar* dir = g_path_get_dirname(exe);
+  gchar* path = g_build_filename(dir, "data", "flutter_assets", "assets", "icon", "icon.png", nullptr);
+  if (g_file_test(path, G_FILE_TEST_IS_REGULAR)) return path;
+  g_free(path);
+  return nullptr;
+}
+
+// KDE's native title bar is around 30 px high; GTK's default header bar is
+// noticeably taller. Keep the client-side title bar close to the system one.
+static void install_compact_headerbar_style() {
+  static gboolean installed = FALSE;
+  if (installed) return;
+  installed = TRUE;
+  GtkCssProvider* provider = gtk_css_provider_new();
+  gtk_css_provider_load_from_data(
+      provider,
+      "headerbar { min-height: 30px; padding: 0 6px; }\n"
+      "headerbar button { min-height: 22px; min-width: 22px; padding: 0; margin: 0 2px; }\n",
+      -1, nullptr);
+  gtk_style_context_add_provider_for_screen(
+      gdk_screen_get_default(), GTK_STYLE_PROVIDER(provider),
+      GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+  g_object_unref(provider);
+}
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
@@ -24,6 +53,11 @@ static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
+  g_autofree gchar* icon_path = app_icon_path();
+  if (icon_path != nullptr) {
+    gtk_window_set_icon_from_file(window, icon_path, nullptr);
+    gtk_window_set_default_icon_from_file(icon_path, nullptr);
+  }
 
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu
@@ -43,10 +77,18 @@ static void my_application_activate(GApplication* application) {
   }
 #endif
   if (use_header_bar) {
+    install_compact_headerbar_style();
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
+    gtk_widget_set_size_request(GTK_WIDGET(header_bar), -1, 32);
     gtk_header_bar_set_title(header_bar, "PCL.PW");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
+    if (icon_path != nullptr) {
+      GtkWidget* icon = gtk_image_new_from_file(icon_path);
+      gtk_widget_set_size_request(icon, 18, 18);
+      gtk_widget_show(icon);
+      gtk_header_bar_pack_start(header_bar, icon);
+    }
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
     gtk_window_set_title(window, "PCL.PW");

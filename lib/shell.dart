@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
@@ -122,57 +123,55 @@ class _ShellState extends State<Shell> {
     final subTitle = _sub == SubPage.instance ? '版本设置 - ${AppScope.of(context).instanceId}' : _subTitles[_sub];
 
     final sidebarWidth = isDesktop ? 236.0 : 210.0;
-    return ShellNav(
-      open: _openSub,
-      back: () => setState(() => _sub = null),
-      goMain: _goMain,
-      child: Scaffold(
-        body: Stack(
-          key: _navKey,
-          children: [
-            Positioned.fill(child: ColoredBox(color: Theme.of(context).colorScheme.surface)),
-            Column(
-              children: [
-                _TopBar(subTitle: subTitle, onBack: () => setState(() => _sub = null)),
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TweenAnimationBuilder<double>(
-                        tween: Tween<double>(begin: sidebarWidth, end: _sidebarCollapsed ? 64 : sidebarWidth),
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOutCubic,
-                        child: _Sidebar(
-                          page: _page,
-                          sub: _sub,
-                          collapsed: _sidebarCollapsed,
-                          onToggleSidebar: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
-                          onMain: _goMain,
-                          onSub: _openSub,
-                        ),
-                        builder: (context, width, child) => SizedBox(
-                          width: width,
-                          child: ClipRect(
-                            child: OverflowBox(
-                              alignment: Alignment.centerLeft,
-                              minWidth: _sidebarCollapsed ? 64 : sidebarWidth,
-                              maxWidth: _sidebarCollapsed ? 64 : sidebarWidth,
-                              child: SizedBox(width: _sidebarCollapsed ? 64 : sidebarWidth, child: child),
-                            ),
+    Widget shell = Scaffold(
+      body: Stack(
+        key: _navKey,
+        children: [
+          Positioned.fill(child: ColoredBox(color: Theme.of(context).colorScheme.surface)),
+          Column(
+            children: [
+              _TopBar(subTitle: subTitle, onBack: () => setState(() => _sub = null)),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: sidebarWidth, end: _sidebarCollapsed ? 64 : sidebarWidth),
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      child: _Sidebar(
+                        page: _page,
+                        sub: _sub,
+                        collapsed: _sidebarCollapsed,
+                        onToggleSidebar: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+                        onMain: _goMain,
+                        onSub: _openSub,
+                      ),
+                      builder: (context, width, child) => SizedBox(
+                        width: width,
+                        child: ClipRect(
+                          child: OverflowBox(
+                            alignment: Alignment.centerLeft,
+                            minWidth: _sidebarCollapsed ? 64 : sidebarWidth,
+                            maxWidth: _sidebarCollapsed ? 64 : sidebarWidth,
+                            child: SizedBox(width: _sidebarCollapsed ? 64 : sidebarWidth, child: child),
                           ),
                         ),
                       ),
-                      Expanded(child: pageView),
-                    ],
-                  ),
+                    ),
+                    Expanded(child: pageView),
+                  ],
                 ),
-              ],
-            ),
-            const Positioned(right: 20, bottom: 20, child: _InstallProgress()),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const Positioned(right: 20, bottom: 20, child: _InstallProgress()),
+        ],
       ),
     );
+    // Linux 桌面隐藏了原生标题栏，需要自己提供窗口边缘的缩放区域
+    if (Platform.isLinux) shell = DragToResizeArea(resizeEdgeSize: 6, child: shell);
+    return ShellNav(open: _openSub, back: () => setState(() => _sub = null), goMain: _goMain, child: shell);
   }
 }
 

@@ -29,24 +29,14 @@ Future<void> main(List<String> args) async {
   if (isDesktop) {
     final window = WindowManager.instance.getCurrent()!;
     window.title = AppInfo.name;
-    window.titleBarStyle = TitleBarStyle.hidden;
+    // Linux 使用桌面原生标题栏与窗口按钮，避免自绘无边框在 Wayland 下的输入区域错位
+    window.titleBarStyle = Platform.isLinux ? TitleBarStyle.normal : TitleBarStyle.hidden;
     window.isWindowControlButtonsVisible = nativeWindowButtons;
     window.setSize(const Size(1100, 700).toNative(), false);
     window.minimumSize = const Size(900, 560).toNative();
     window.center();
     window.show();
     window.focus();
-    if (Platform.isLinux) {
-      // Linux 的 GTK 客户端装饰会留一圈阴影/标题栏内边距，浮动窗口时点击坐标
-      // 会和画面错位；贴靠或最大化时装饰消失，所以按钮又能点。
-      // 界面自己画标题栏和缩放边缘，直接去掉原生装饰。
-      window.setFrameless(true);
-      window.hasShadow = false;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        window.setFrameless(true);
-        window.hasShadow = false;
-      });
-    }
   } else {
     // 手机上使用横屏，布局与桌面端相同；隐藏系统状态栏与导航栏，电量和网络显示在标题栏
     await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
@@ -12,7 +13,7 @@ import '../shell.dart';
 import '../widgets/launch_dialogs.dart';
 import 'home_feed.dart';
 
-/// 启动页：绿色主视觉、当前实例和最近游玩。
+/// 启动页：跟随主题色的主视觉、当前实例和最近游玩。
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -163,6 +164,7 @@ class _HeroCard extends StatelessWidget {
     final heroBottom = _tint(brand, .18);
     final accentBg = _tint(brand, .86, .55);
     final accentFg = _tint(brand, .22, .78);
+    final light = theme.brightness == Brightness.light;
     return Container(
       height: 238,
       clipBehavior: Clip.antiAlias,
@@ -173,7 +175,36 @@ class _HeroCard extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          Positioned.fill(child: CustomPaint(painter: _VoxelLandscapePainter(brand))),
+          Positioned.fill(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final radius = constraints.maxHeight * .09;
+                final center = Offset(constraints.maxWidth * .82, constraints.maxHeight * .24);
+                return Stack(
+                  children: [
+                    Positioned.fill(child: CustomPaint(painter: _VoxelLandscapePainter(brand, light))),
+                    Positioned(
+                      left: center.dx - radius,
+                      top: center.dy - radius,
+                      width: radius * 2,
+                      height: radius * 2,
+                      child: Tooltip(
+                        message: light ? '切换到深色模式' : '切换到浅色模式',
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => state.config.update({'themeMode': light ? 'dark' : 'light'}),
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 22, 28, 22),
             child: Column(
@@ -593,9 +624,10 @@ class _EmptyWorlds extends StatelessWidget {
 
 /// 首页主视觉的方块风景，不依赖 Minecraft 官方素材。
 class _VoxelLandscapePainter extends CustomPainter {
-  _VoxelLandscapePainter(this.primary);
+  _VoxelLandscapePainter(this.primary, this.isLight);
 
   final Color primary;
+  final bool isLight;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -604,8 +636,28 @@ class _VoxelLandscapePainter extends CustomPainter {
     final right = w * .58;
     final bottom = h;
 
-    final sun = Paint()..color = _tint(primary, .9, .45).withValues(alpha: .92);
-    canvas.drawCircle(Offset(w * .82, h * .24), h * .09, sun);
+    final center = Offset(w * .82, h * .24);
+    final radius = h * .09;
+    final celestial = Paint()..color = _tint(primary, .9, .45).withValues(alpha: .92);
+    if (isLight) {
+      // 浅色模式：太阳
+      canvas.drawCircle(center, radius, celestial);
+      final ray = Paint()
+        ..color = celestial.color.withValues(alpha: .45)
+        ..strokeWidth = 1.5
+        ..strokeCap = StrokeCap.round;
+      for (var i = 0; i < 8; i++) {
+        final angle = i * math.pi / 4;
+        final dir = Offset(math.cos(angle), math.sin(angle));
+        canvas.drawLine(center + dir * radius * 1.35, center + dir * radius * 1.65, ray);
+      }
+    } else {
+      // 深色模式：月牙
+      final moon = Path()..addOval(Rect.fromCircle(center: center, radius: radius));
+      final cut = Path()
+        ..addOval(Rect.fromCircle(center: center + Offset(radius * .42, -radius * .18), radius: radius * .92));
+      canvas.drawPath(Path.combine(PathOperation.difference, moon, cut), celestial);
+    }
 
     final cloud = Paint()..color = Colors.white.withValues(alpha: .2);
     canvas.drawRRect(
@@ -681,5 +733,6 @@ class _VoxelLandscapePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _VoxelLandscapePainter oldDelegate) => oldDelegate.primary != primary;
+  bool shouldRepaint(covariant _VoxelLandscapePainter oldDelegate) =>
+      oldDelegate.primary != primary || oldDelegate.isLight != isLight;
 }

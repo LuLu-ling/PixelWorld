@@ -131,39 +131,36 @@ class _ShellState extends State<Shell> {
           key: _navKey,
           children: [
             Positioned.fill(child: ColoredBox(color: Theme.of(context).colorScheme.surface)),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            Column(
               children: [
-                TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: sidebarWidth, end: _sidebarCollapsed ? 0 : sidebarWidth),
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  child: _Sidebar(
-                    page: _page,
-                    sub: _sub,
-                    onMain: _goMain,
-                    onSub: _openSub,
-                  ),
-                  builder: (context, width, child) => SizedBox(
-                    width: width,
-                    child: ClipRect(
-                      child: OverflowBox(
-                        alignment: Alignment.centerLeft,
-                        minWidth: sidebarWidth,
-                        maxWidth: sidebarWidth,
-                        child: SizedBox(width: sidebarWidth, child: child),
-                      ),
-                    ),
-                  ),
-                ),
+                _TopBar(subTitle: subTitle, onBack: () => setState(() => _sub = null)),
                 Expanded(
-                  child: Column(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _TopBar(
-                        subTitle: subTitle,
-                        collapsed: _sidebarCollapsed,
-                        onToggleSidebar: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
-                        onBack: () => setState(() => _sub = null),
+                      TweenAnimationBuilder<double>(
+                        tween: Tween<double>(begin: sidebarWidth, end: _sidebarCollapsed ? 64 : sidebarWidth),
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
+                        child: _Sidebar(
+                          page: _page,
+                          sub: _sub,
+                          collapsed: _sidebarCollapsed,
+                          onToggleSidebar: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+                          onMain: _goMain,
+                          onSub: _openSub,
+                        ),
+                        builder: (context, width, child) => SizedBox(
+                          width: width,
+                          child: ClipRect(
+                            child: OverflowBox(
+                              alignment: Alignment.centerLeft,
+                              minWidth: _sidebarCollapsed ? 64 : sidebarWidth,
+                              maxWidth: _sidebarCollapsed ? 64 : sidebarWidth,
+                              child: SizedBox(width: _sidebarCollapsed ? 64 : sidebarWidth, child: child),
+                            ),
+                          ),
+                        ),
                       ),
                       Expanded(child: pageView),
                     ],
@@ -181,10 +178,19 @@ class _ShellState extends State<Shell> {
 
 /// 左侧品牌、账户和主导航
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.page, required this.sub, required this.onMain, required this.onSub});
+  const _Sidebar({
+    required this.page,
+    required this.sub,
+    required this.collapsed,
+    required this.onToggleSidebar,
+    required this.onMain,
+    required this.onSub,
+  });
 
   final MainPage page;
   final SubPage? sub;
+  final bool collapsed;
+  final VoidCallback onToggleSidebar;
   final ValueChanged<MainPage> onMain;
   final ValueChanged<SubPage> onSub;
 
@@ -194,32 +200,7 @@ class _Sidebar extends StatelessWidget {
     final scheme = theme.colorScheme;
     final state = AppScope.of(context);
     final account = state.selectedAccount;
-    final width = isDesktop ? 236.0 : 210.0;
-    final topInset = isDesktop && nativeWindowButtons ? macTrafficLightsWidth : 0.0;
-
-    Widget brand = Padding(
-      padding: EdgeInsets.fromLTRB(18 + topInset, 20, 16, 16),
-      child: Row(
-        children: [
-          const AppLogo(size: 38),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  AppInfo.brandName,
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: .2),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-    if (isDesktop) brand = DragToMoveArea(child: brand);
+    final width = collapsed ? 64.0 : (isDesktop ? 236.0 : 210.0);
 
     return Container(
       width: width,
@@ -230,20 +211,18 @@ class _Sidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          brand,
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-            child: Material(
-              color: scheme.surfaceContainerHighest.withValues(alpha: .45),
-              borderRadius: BorderRadius.circular(14),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: () => showAccountsDialog(context),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
+          if (collapsed)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+              child: Tooltip(
+                message: account?.name ?? '添加账户',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => showAccountsDialog(context),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 7),
+                    child: Center(
+                      child: CircleAvatar(
                         radius: 17,
                         backgroundColor: scheme.primaryContainer,
                         foregroundColor: scheme.onPrimaryContainer,
@@ -252,40 +231,68 @@ class _Sidebar extends StatelessWidget {
                           style: theme.textTheme.labelLarge,
                         ),
                       ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              account?.name ?? '添加账户',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelLarge,
-                            ),
-                            Text(
-                              account == null ? '账户' : (account.type.name == 'microsoft' ? '微软账户' : '离线账户'),
-                              maxLines: 1,
-                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
-                            ),
-                          ],
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Material(
+                color: scheme.surfaceContainerHighest.withValues(alpha: .45),
+                borderRadius: BorderRadius.circular(14),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => showAccountsDialog(context),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 17,
+                          backgroundColor: scheme.primaryContainer,
+                          foregroundColor: scheme.onPrimaryContainer,
+                          child: Text(
+                            account == null ? '+' : account.name.characters.first.toUpperCase(),
+                            style: theme.textTheme.labelLarge,
+                          ),
                         ),
-                      ),
-                      Icon(Icons.unfold_more, size: 16, color: scheme.onSurfaceVariant),
-                    ],
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                account?.name ?? '添加账户',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelLarge,
+                              ),
+                              Text(
+                                account == null ? '账户' : (account.type.name == 'microsoft' ? '微软账户' : '离线账户'),
+                                maxLines: 1,
+                                style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.unfold_more, size: 16, color: scheme.onSurfaceVariant),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: EdgeInsets.symmetric(horizontal: collapsed ? 8 : 12),
               children: [
                 _SideItem(
                   icon: Icons.rocket_launch_outlined,
                   activeIcon: Icons.rocket_launch,
                   label: '启动',
+                  collapsed: collapsed,
                   selected: sub == null && page == MainPage.home,
                   onTap: () => onMain(MainPage.home),
                 ),
@@ -293,6 +300,7 @@ class _Sidebar extends StatelessWidget {
                   icon: Icons.download_outlined,
                   activeIcon: Icons.download,
                   label: '下载',
+                  collapsed: collapsed,
                   selected: sub == null && page == MainPage.download,
                   onTap: () => onMain(MainPage.download),
                 ),
@@ -300,6 +308,7 @@ class _Sidebar extends StatelessWidget {
                   icon: Icons.construction_outlined,
                   activeIcon: Icons.construction,
                   label: '工具',
+                  collapsed: collapsed,
                   selected: sub == null && page == MainPage.tools,
                   onTap: () => onMain(MainPage.tools),
                 ),
@@ -307,6 +316,7 @@ class _Sidebar extends StatelessWidget {
                   icon: Icons.settings_outlined,
                   activeIcon: Icons.settings,
                   label: '设置',
+                  collapsed: collapsed,
                   selected: sub == null && page == MainPage.settings,
                   onTap: () => onMain(MainPage.settings),
                 ),
@@ -314,6 +324,7 @@ class _Sidebar extends StatelessWidget {
                   icon: Icons.auto_awesome_outlined,
                   activeIcon: Icons.auto_awesome,
                   label: 'AI 助手',
+                  collapsed: collapsed,
                   selected: sub == null && page == MainPage.ai,
                   onTap: () => onMain(MainPage.ai),
                 ),
@@ -321,6 +332,7 @@ class _Sidebar extends StatelessWidget {
                   icon: Icons.history_outlined,
                   activeIcon: Icons.history,
                   label: '任务历史',
+                  collapsed: collapsed,
                   selected: sub == SubPage.tasks,
                   onTap: () => onSub(SubPage.tasks),
                   badge: state.runningTasks.length,
@@ -329,12 +341,24 @@ class _Sidebar extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
-            child: Text(
-              '${AppInfo.brandName} v${AppInfo.version}',
-              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant.withValues(alpha: .7)),
+            padding: EdgeInsets.fromLTRB(collapsed ? 8 : 12, 4, collapsed ? 8 : 12, 0),
+            child: _SideItem(
+              icon: collapsed ? Icons.chevron_right : Icons.chevron_left,
+              activeIcon: collapsed ? Icons.chevron_right : Icons.chevron_left,
+              label: collapsed ? '展开侧栏' : '收起侧栏',
+              collapsed: collapsed,
+              selected: false,
+              onTap: onToggleSidebar,
             ),
           ),
+          if (!collapsed)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+              child: Text(
+                '${AppInfo.brandName} v${AppInfo.version}',
+                style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant.withValues(alpha: .7)),
+              ),
+            ),
         ],
       ),
     );
@@ -348,6 +372,7 @@ class _SideItem extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    required this.collapsed,
     this.badge = 0,
   });
 
@@ -356,6 +381,7 @@ class _SideItem extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final bool collapsed;
   final int badge;
 
   @override
@@ -363,6 +389,48 @@ class _SideItem extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final fg = selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+    if (collapsed) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 3),
+        child: Tooltip(
+          message: label,
+          child: Material(
+            color: selected ? scheme.primaryContainer.withValues(alpha: .72) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: SizedBox(
+                height: 44,
+                child: Center(
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(selected ? activeIcon : icon, size: 21, color: fg),
+                      if (badge > 0)
+                        Positioned(
+                          right: -5,
+                          top: -5,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
+                            child: Text(
+                              '$badge',
+                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onPrimary, fontSize: 8),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 3),
       child: Material(
@@ -407,61 +475,70 @@ class _SideItem extends StatelessWidget {
   }
 }
 
-/// 内容区顶部的拖动条、子页面返回按钮和窗口按钮
+/// 横跨整个窗口的顶栏：品牌、子页面返回按钮、窗口按钮
 class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.subTitle,
-    required this.collapsed,
-    required this.onToggleSidebar,
-    required this.onBack,
-  });
+  const _TopBar({required this.subTitle, required this.onBack});
 
   final String? subTitle;
-  final bool collapsed;
-  final VoidCallback onToggleSidebar;
   final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SizedBox(
+    final scheme = theme.colorScheme;
+    // macOS 的红绿灯在窗口左上角，品牌从它们右边开始
+    final leftInset = !isDesktop
+        ? 12.0
+        : nativeWindowButtons
+        ? macTrafficLightsWidth + 8
+        : 16.0;
+    final rightInset = !isDesktop
+        ? 96.0
+        : nativeWindowButtons
+        ? 8.0
+        : 138.0;
+
+    Widget brand = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const AppLogo(size: 30),
+        const SizedBox(width: 10),
+        Text(
+          AppInfo.brandName,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: .2),
+        ),
+      ],
+    );
+    if (isDesktop) brand = DragToMoveArea(child: brand);
+
+    return Container(
       height: 56,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .35))),
+      ),
       child: Stack(
         children: [
           if (isDesktop) Positioned.fill(child: DragToMoveArea(child: const SizedBox.expand())),
           Positioned(
-            left: 6,
+            left: leftInset,
+            right: rightInset,
             top: 0,
             bottom: 0,
-            child: Center(
-              child: SizedBox.square(
-                dimension: 40,
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  tooltip: collapsed ? '展开侧栏' : '收起侧栏',
-                  onPressed: onToggleSidebar,
-                  icon: Icon(collapsed ? Icons.menu : Icons.chevron_left, size: 20),
-                ),
-              ),
+            child: Row(
+              children: [
+                brand,
+                if (subTitle != null) ...[
+                  const SizedBox(width: 12),
+                  IconButton(tooltip: '返回', onPressed: onBack, icon: const Icon(Icons.arrow_back, size: 20)),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: Text(subTitle!, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (subTitle != null)
-            Positioned(
-              left: 52,
-              top: 0,
-              bottom: 0,
-              child: Row(
-                children: [
-                  IconButton(
-                    tooltip: '返回',
-                    onPressed: onBack,
-                    icon: const Icon(Icons.arrow_back, size: 20),
-                  ),
-                  const SizedBox(width: 2),
-                  Text(subTitle!, style: theme.textTheme.titleSmall),
-                ],
-              ),
-            ),
           if (!isDesktop) const Positioned(right: 8, top: 0, bottom: 0, child: Center(child: DeviceStatus())),
           if (isDesktop && !nativeWindowButtons) const Positioned(right: 0, top: 0, child: WindowButtons()),
         ],

@@ -509,9 +509,8 @@ class _TopBar extends StatelessWidget {
         ),
       ],
     );
-    if (isDesktop) brand = DragToMoveArea(child: brand);
 
-    return Container(
+    Widget bar = Container(
       height: 56,
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
@@ -519,7 +518,6 @@ class _TopBar extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          if (isDesktop) Positioned.fill(child: DragToMoveArea(child: const SizedBox.expand())),
           Positioned(
             left: leftInset,
             right: rightInset,
@@ -544,6 +542,9 @@ class _TopBar extends StatelessWidget {
         ],
       ),
     );
+    // 整条顶栏都可以拖动窗口，不只是品牌那一小块
+    if (isDesktop) bar = DragToMoveArea(child: bar);
+    return bar;
   }
 }
 

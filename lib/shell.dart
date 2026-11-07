@@ -169,8 +169,7 @@ class _ShellState extends State<Shell> {
         ],
       ),
     );
-    // Linux 桌面隐藏了原生标题栏，需要自己提供窗口边缘的缩放区域
-    if (Platform.isLinux) shell = DragToResizeArea(resizeEdgeSize: 6, child: shell);
+    // Linux 使用桌面原生标题栏，窗口按钮和缩放都由系统负责
     return ShellNav(open: _openSub, back: () => setState(() => _sub = null), goMain: _goMain, child: shell);
   }
 }
@@ -483,12 +482,15 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Linux 使用桌面原生标题栏，品牌和窗口按钮都在系统标题栏里；
+    // 只有进入子页面时才需要一条返回工具栏。
+    if (Platform.isLinux && subTitle == null) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     // macOS 的红绿灯在窗口左上角，品牌从它们右边开始
     final leftInset = !isDesktop
         ? 12.0
-        : nativeWindowButtons
+        : Platform.isMacOS
         ? macTrafficLightsWidth + 8
         : 16.0;
 
@@ -510,9 +512,9 @@ class _TopBar extends StatelessWidget {
         padding: EdgeInsets.only(left: leftInset, right: nativeWindowButtons ? 8 : 12),
         child: Row(
           children: [
-            brand,
+            if (!Platform.isLinux) brand,
             if (subTitle != null) ...[
-              const SizedBox(width: 12),
+              if (!Platform.isLinux) const SizedBox(width: 12),
               IconButton(tooltip: '返回', onPressed: onBack, icon: const Icon(Icons.arrow_back, size: 20)),
               const SizedBox(width: 2),
               Expanded(
@@ -524,7 +526,7 @@ class _TopBar extends StatelessWidget {
       ),
     );
     // 只有品牌和空白区域负责拖动；窗口按钮放在拖动区域外面，避免点击被拖动手势吃掉
-    if (isDesktop) left = DragToMoveArea(child: left);
+    if (isDesktop && !Platform.isLinux) left = DragToMoveArea(child: left);
 
     return Container(
       height: 56,

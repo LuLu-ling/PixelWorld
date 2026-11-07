@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 /// 桌面端：有窗口管理、文件管理器，可以启动游戏
 bool get isDesktop => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
-/// macOS 使用系统原生的窗口按钮（红绿灯），其他桌面平台使用启动器自己绘制的按钮
-bool get nativeWindowButtons => Platform.isMacOS;
+/// 使用系统原生窗口按钮：macOS 的红绿灯，Linux 使用桌面标题栏
+bool get nativeWindowButtons => Platform.isMacOS || Platform.isLinux;
 
 /// macOS 红绿灯按钮占用的标题栏左侧宽度
 const macTrafficLightsWidth = 72.0;

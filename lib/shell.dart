@@ -131,43 +131,36 @@ class _ShellState extends State<Shell> {
           key: _navKey,
           children: [
             Positioned.fill(child: ColoredBox(color: Theme.of(context).colorScheme.surface)),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            Column(
               children: [
-                TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: sidebarWidth, end: _sidebarCollapsed ? 64 : sidebarWidth),
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  child: _Sidebar(
-                    page: _page,
-                    sub: _sub,
-                    collapsed: _sidebarCollapsed,
-                    onMain: _goMain,
-                    onSub: _openSub,
-                  ),
-                  builder: (context, width, child) => SizedBox(
-                    width: width,
-                    child: ClipRect(
-                      child: OverflowBox(
-                        alignment: Alignment.centerLeft,
-                        minWidth: _sidebarCollapsed ? 64 : sidebarWidth,
-                        maxWidth: _sidebarCollapsed ? 64 : sidebarWidth,
-                        child: SizedBox(
-                          width: _sidebarCollapsed ? 64 : sidebarWidth,
-                          child: child,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                _TopBar(subTitle: subTitle, onBack: () => setState(() => _sub = null)),
                 Expanded(
-                  child: Column(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _TopBar(
-                        subTitle: subTitle,
-                        collapsed: _sidebarCollapsed,
-                        onToggleSidebar: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
-                        onBack: () => setState(() => _sub = null),
+                      TweenAnimationBuilder<double>(
+                        tween: Tween<double>(begin: sidebarWidth, end: _sidebarCollapsed ? 64 : sidebarWidth),
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
+                        child: _Sidebar(
+                          page: _page,
+                          sub: _sub,
+                          collapsed: _sidebarCollapsed,
+                          onToggleSidebar: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+                          onMain: _goMain,
+                          onSub: _openSub,
+                        ),
+                        builder: (context, width, child) => SizedBox(
+                          width: width,
+                          child: ClipRect(
+                            child: OverflowBox(
+                              alignment: Alignment.centerLeft,
+                              minWidth: _sidebarCollapsed ? 64 : sidebarWidth,
+                              maxWidth: _sidebarCollapsed ? 64 : sidebarWidth,
+                              child: SizedBox(width: _sidebarCollapsed ? 64 : sidebarWidth, child: child),
+                            ),
+                          ),
+                        ),
                       ),
                       Expanded(child: pageView),
                     ],
@@ -189,6 +182,7 @@ class _Sidebar extends StatelessWidget {
     required this.page,
     required this.sub,
     required this.collapsed,
+    required this.onToggleSidebar,
     required this.onMain,
     required this.onSub,
   });
@@ -196,6 +190,7 @@ class _Sidebar extends StatelessWidget {
   final MainPage page;
   final SubPage? sub;
   final bool collapsed;
+  final VoidCallback onToggleSidebar;
   final ValueChanged<MainPage> onMain;
   final ValueChanged<SubPage> onSub;
 
@@ -206,29 +201,6 @@ class _Sidebar extends StatelessWidget {
     final state = AppScope.of(context);
     final account = state.selectedAccount;
     final width = collapsed ? 64.0 : (isDesktop ? 236.0 : 210.0);
-    final topInset = isDesktop && nativeWindowButtons ? macTrafficLightsWidth : 0.0;
-
-    Widget brand = Padding(
-      padding: collapsed
-          ? const EdgeInsets.symmetric(vertical: 20)
-          : EdgeInsets.fromLTRB(18 + topInset, 20, 16, 16),
-      child: collapsed
-          ? const Center(child: AppLogo(size: 36))
-          : Row(
-              children: [
-                const AppLogo(size: 38),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Text(
-                    AppInfo.brandName,
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: .2),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-    );
-    if (isDesktop) brand = DragToMoveArea(child: brand);
 
     return Container(
       width: width,
@@ -239,10 +211,9 @@ class _Sidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          brand,
           if (collapsed)
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+              padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
               child: Tooltip(
                 message: account?.name ?? '添加账户',
                 child: InkWell(
@@ -267,7 +238,7 @@ class _Sidebar extends StatelessWidget {
             )
           else
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               child: Material(
                 color: scheme.surfaceContainerHighest.withValues(alpha: .45),
                 borderRadius: BorderRadius.circular(14),
@@ -321,7 +292,7 @@ class _Sidebar extends StatelessWidget {
                   icon: Icons.rocket_launch_outlined,
                   activeIcon: Icons.rocket_launch,
                   label: '启动',
-                    collapsed: collapsed,
+                  collapsed: collapsed,
                   selected: sub == null && page == MainPage.home,
                   onTap: () => onMain(MainPage.home),
                 ),
@@ -329,7 +300,7 @@ class _Sidebar extends StatelessWidget {
                   icon: Icons.download_outlined,
                   activeIcon: Icons.download,
                   label: '下载',
-                    collapsed: collapsed,
+                  collapsed: collapsed,
                   selected: sub == null && page == MainPage.download,
                   onTap: () => onMain(MainPage.download),
                 ),
@@ -337,7 +308,7 @@ class _Sidebar extends StatelessWidget {
                   icon: Icons.construction_outlined,
                   activeIcon: Icons.construction,
                   label: '工具',
-                    collapsed: collapsed,
+                  collapsed: collapsed,
                   selected: sub == null && page == MainPage.tools,
                   onTap: () => onMain(MainPage.tools),
                 ),
@@ -345,7 +316,7 @@ class _Sidebar extends StatelessWidget {
                   icon: Icons.settings_outlined,
                   activeIcon: Icons.settings,
                   label: '设置',
-                    collapsed: collapsed,
+                  collapsed: collapsed,
                   selected: sub == null && page == MainPage.settings,
                   onTap: () => onMain(MainPage.settings),
                 ),
@@ -353,7 +324,7 @@ class _Sidebar extends StatelessWidget {
                   icon: Icons.auto_awesome_outlined,
                   activeIcon: Icons.auto_awesome,
                   label: 'AI 助手',
-                    collapsed: collapsed,
+                  collapsed: collapsed,
                   selected: sub == null && page == MainPage.ai,
                   onTap: () => onMain(MainPage.ai),
                 ),
@@ -361,12 +332,23 @@ class _Sidebar extends StatelessWidget {
                   icon: Icons.history_outlined,
                   activeIcon: Icons.history,
                   label: '任务历史',
-                    collapsed: collapsed,
+                  collapsed: collapsed,
                   selected: sub == SubPage.tasks,
                   onTap: () => onSub(SubPage.tasks),
                   badge: state.runningTasks.length,
                 ),
               ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(collapsed ? 8 : 12, 4, collapsed ? 8 : 12, 0),
+            child: _SideItem(
+              icon: collapsed ? Icons.chevron_right : Icons.chevron_left,
+              activeIcon: collapsed ? Icons.chevron_right : Icons.chevron_left,
+              label: collapsed ? '展开侧栏' : '收起侧栏',
+              collapsed: collapsed,
+              selected: false,
+              onTap: onToggleSidebar,
             ),
           ),
           if (!collapsed)
@@ -493,61 +475,70 @@ class _SideItem extends StatelessWidget {
   }
 }
 
-/// 内容区顶部的拖动条、子页面返回按钮和窗口按钮
+/// 横跨整个窗口的顶栏：品牌、子页面返回按钮、窗口按钮
 class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.subTitle,
-    required this.collapsed,
-    required this.onToggleSidebar,
-    required this.onBack,
-  });
+  const _TopBar({required this.subTitle, required this.onBack});
 
   final String? subTitle;
-  final bool collapsed;
-  final VoidCallback onToggleSidebar;
   final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SizedBox(
+    final scheme = theme.colorScheme;
+    // macOS 的红绿灯在窗口左上角，品牌从它们右边开始
+    final leftInset = !isDesktop
+        ? 12.0
+        : nativeWindowButtons
+        ? macTrafficLightsWidth + 8
+        : 16.0;
+    final rightInset = !isDesktop
+        ? 96.0
+        : nativeWindowButtons
+        ? 8.0
+        : 138.0;
+
+    Widget brand = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const AppLogo(size: 30),
+        const SizedBox(width: 10),
+        Text(
+          AppInfo.brandName,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: .2),
+        ),
+      ],
+    );
+    if (isDesktop) brand = DragToMoveArea(child: brand);
+
+    return Container(
       height: 56,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .35))),
+      ),
       child: Stack(
         children: [
           if (isDesktop) Positioned.fill(child: DragToMoveArea(child: const SizedBox.expand())),
           Positioned(
-            left: 6,
+            left: leftInset,
+            right: rightInset,
             top: 0,
             bottom: 0,
-            child: Center(
-              child: SizedBox.square(
-                dimension: 40,
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  tooltip: collapsed ? '展开侧栏' : '收起侧栏',
-                  onPressed: onToggleSidebar,
-                  icon: Icon(collapsed ? Icons.menu : Icons.chevron_left, size: 20),
-                ),
-              ),
+            child: Row(
+              children: [
+                brand,
+                if (subTitle != null) ...[
+                  const SizedBox(width: 12),
+                  IconButton(tooltip: '返回', onPressed: onBack, icon: const Icon(Icons.arrow_back, size: 20)),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: Text(subTitle!, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (subTitle != null)
-            Positioned(
-              left: 52,
-              top: 0,
-              bottom: 0,
-              child: Row(
-                children: [
-                  IconButton(
-                    tooltip: '返回',
-                    onPressed: onBack,
-                    icon: const Icon(Icons.arrow_back, size: 20),
-                  ),
-                  const SizedBox(width: 2),
-                  Text(subTitle!, style: theme.textTheme.titleSmall),
-                ],
-              ),
-            ),
           if (!isDesktop) const Positioned(right: 8, top: 0, bottom: 0, child: Center(child: DeviceStatus())),
           if (isDesktop && !nativeWindowButtons) const Positioned(right: 0, top: 0, child: WindowButtons()),
         ],

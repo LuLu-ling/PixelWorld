@@ -491,11 +491,6 @@ class _TopBar extends StatelessWidget {
         : nativeWindowButtons
         ? macTrafficLightsWidth + 8
         : 16.0;
-    final rightInset = !isDesktop
-        ? 96.0
-        : nativeWindowButtons
-        ? 8.0
-        : 138.0;
 
     Widget brand = Row(
       mainAxisSize: MainAxisSize.min,
@@ -509,41 +504,46 @@ class _TopBar extends StatelessWidget {
       ],
     );
 
-    Widget bar = Container(
+    Widget left = SizedBox(
+      height: 56,
+      child: Padding(
+        padding: EdgeInsets.only(left: leftInset, right: nativeWindowButtons ? 8 : 12),
+        child: Row(
+          children: [
+            brand,
+            if (subTitle != null) ...[
+              const SizedBox(width: 12),
+              IconButton(tooltip: '返回', onPressed: onBack, icon: const Icon(Icons.arrow_back, size: 20)),
+              const SizedBox(width: 2),
+              Expanded(
+                child: Text(subTitle!, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+    // 只有品牌和空白区域负责拖动；窗口按钮放在拖动区域外面，避免点击被拖动手势吃掉
+    if (isDesktop) left = DragToMoveArea(child: left);
+
+    return Container(
       height: 56,
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
         border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .35))),
       ),
-      child: Stack(
+      child: Row(
         children: [
-          Positioned(
-            left: leftInset,
-            right: rightInset,
-            top: 0,
-            bottom: 0,
-            child: Row(
-              children: [
-                brand,
-                if (subTitle != null) ...[
-                  const SizedBox(width: 12),
-                  IconButton(tooltip: '返回', onPressed: onBack, icon: const Icon(Icons.arrow_back, size: 20)),
-                  const SizedBox(width: 2),
-                  Expanded(
-                    child: Text(subTitle!, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
-                  ),
-                ],
-              ],
+          Expanded(child: left),
+          if (!isDesktop)
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Center(child: DeviceStatus()),
             ),
-          ),
-          if (!isDesktop) const Positioned(right: 8, top: 0, bottom: 0, child: Center(child: DeviceStatus())),
-          if (isDesktop && !nativeWindowButtons) const Positioned(right: 0, top: 0, child: WindowButtons()),
+          if (isDesktop && !nativeWindowButtons) const WindowButtons(),
         ],
       ),
     );
-    // 整条顶栏都可以拖动窗口，不只是品牌那一小块
-    if (isDesktop) bar = DragToMoveArea(child: bar);
-    return bar;
   }
 }
 

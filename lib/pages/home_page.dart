@@ -105,10 +105,7 @@ class HomePage extends StatelessWidget {
             const SizedBox(width: 8),
             Text('快速回到你的世界', style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
             const Spacer(),
-            TextButton(
-              onPressed: () => ShellNav.of(context).open(SubPage.versions),
-              child: const Text('获取更多'),
-            ),
+            TextButton(onPressed: () => ShellNav.of(context).open(SubPage.versions), child: const Text('获取更多')),
           ],
         ),
         const SizedBox(height: 10),
@@ -159,23 +156,24 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    const forest = Color(0xFF2F6B4F);
-    const forestDeep = Color(0xFF1D4A35);
+    final scheme = theme.colorScheme;
+    // 主视觉跟随主题色：用主题色生成一组暗色渐变和浅色强调色
+    final brand = scheme.primary;
+    final heroTop = _tint(brand, .32);
+    final heroBottom = _tint(brand, .18);
+    final accentBg = _tint(brand, .86, .55);
+    final accentFg = _tint(brand, .22, .78);
     return Container(
       height: 238,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [forest, forestDeep],
-        ),
-        boxShadow: [BoxShadow(color: forest.withValues(alpha: .22), blurRadius: 24, offset: const Offset(0, 10))],
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [heroTop, heroBottom]),
+        boxShadow: [BoxShadow(color: brand.withValues(alpha: .22), blurRadius: 24, offset: const Offset(0, 10))],
       ),
       child: Stack(
         children: [
-          Positioned.fill(child: CustomPaint(painter: _VoxelLandscapePainter())),
+          Positioned.fill(child: CustomPaint(painter: _VoxelLandscapePainter(brand))),
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 22, 28, 22),
             child: Column(
@@ -184,10 +182,10 @@ class _HeroCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    _Pill(label: '当前实例', light: true),
+                    const _Pill(label: '当前实例'),
                     if (version != null) ...[
                       const SizedBox(width: 7),
-                      _Pill(label: '已同步', light: false, icon: Icons.check),
+                      _Pill(label: '已同步', icon: Icons.check, background: accentBg, foreground: accentFg),
                     ],
                   ],
                 ),
@@ -208,11 +206,17 @@ class _HeroCard extends StatelessWidget {
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    _HeroLaunchButton(state: state, version: version, onLaunch: onLaunch),
+                    _HeroLaunchButton(
+                      state: state,
+                      version: version,
+                      onLaunch: onLaunch,
+                      accentBg: accentBg,
+                      accentFg: accentFg,
+                    ),
                     const SizedBox(width: 10),
                     PopupMenuButton<String>(
                       tooltip: '更多',
-                      color: const Color(0xFF244C39),
+                      color: scheme.surfaceContainerHigh,
                       iconColor: Colors.white,
                       onSelected: (value) {
                         if (value == 'versions') onVersions();
@@ -246,12 +250,29 @@ class _HeroCard extends StatelessWidget {
   }
 }
 
+/// 把主题色变成指定明度的同色系颜色；浅色主题下也能保证主视觉足够深
+Color _tint(Color base, double lightness, [double maxSaturation = .9]) {
+  final hsl = HSLColor.fromColor(base);
+  return hsl
+      .withLightness(lightness.clamp(0.0, 1.0))
+      .withSaturation(hsl.saturation.clamp(0.0, maxSaturation))
+      .toColor();
+}
+
 class _HeroLaunchButton extends StatelessWidget {
-  const _HeroLaunchButton({required this.state, required this.version, required this.onLaunch});
+  const _HeroLaunchButton({
+    required this.state,
+    required this.version,
+    required this.onLaunch,
+    required this.accentBg,
+    required this.accentFg,
+  });
 
   final AppState state;
   final InstanceInfo? version;
   final VoidCallback onLaunch;
+  final Color accentBg;
+  final Color accentFg;
 
   @override
   Widget build(BuildContext context) {
@@ -266,7 +287,10 @@ class _HeroLaunchButton extends StatelessWidget {
             width: 210,
             height: 46,
             padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(14)),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .14),
+              borderRadius: BorderRadius.circular(14),
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -290,7 +314,7 @@ class _HeroLaunchButton extends StatelessWidget {
                   value: t.fraction,
                   minHeight: 3,
                   borderRadius: BorderRadius.circular(4),
-                  color: const Color(0xFFD9F2D4),
+                  color: accentBg,
                   backgroundColor: Colors.white.withValues(alpha: .18),
                 ),
               ],
@@ -307,8 +331,8 @@ class _HeroLaunchButton extends StatelessWidget {
           FilledButton.icon(
             onPressed: state.resumeGame,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFE4F4DF),
-              foregroundColor: const Color(0xFF1D3D2B),
+              backgroundColor: accentBg,
+              foregroundColor: accentFg,
               shape: shape,
               minimumSize: const Size(150, 46),
             ),
@@ -332,8 +356,8 @@ class _HeroLaunchButton extends StatelessWidget {
     return FilledButton.icon(
       onPressed: running ? state.killGame : (version == null ? null : onLaunch),
       style: FilledButton.styleFrom(
-        backgroundColor: running ? theme.colorScheme.error : const Color(0xFFE4F4DF),
-        foregroundColor: running ? theme.colorScheme.onError : const Color(0xFF1D3D2B),
+        backgroundColor: running ? theme.colorScheme.error : accentBg,
+        foregroundColor: running ? theme.colorScheme.onError : accentFg,
         disabledBackgroundColor: Colors.white.withValues(alpha: .2),
         disabledForegroundColor: Colors.white.withValues(alpha: .6),
         shape: shape,
@@ -347,34 +371,27 @@ class _HeroLaunchButton extends StatelessWidget {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.light, this.icon});
+  const _Pill({required this.label, this.icon, this.background, this.foreground});
 
   final String label;
-  final bool light;
   final IconData? icon;
+  final Color? background;
+  final Color? foreground;
 
   @override
   Widget build(BuildContext context) {
+    final bg = background ?? Colors.white.withValues(alpha: .2);
+    final fg = foreground ?? Colors.white;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: light ? Colors.white.withValues(alpha: .2) : const Color(0xFFBFE3B4).withValues(alpha: .95),
-        borderRadius: BorderRadius.circular(99),
-      ),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(99)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null) ...[
-            Icon(icon, size: 12, color: const Color(0xFF234A33)),
-            const SizedBox(width: 3),
-          ],
+          if (icon != null) ...[Icon(icon, size: 12, color: fg), const SizedBox(width: 3)],
           Text(
             label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: light ? Colors.white : const Color(0xFF234A33),
-            ),
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg),
           ),
         ],
       ),
@@ -422,11 +439,7 @@ class _RecentWorldsSectionState extends State<_RecentWorldsSection> {
           return const SizedBox(height: 92);
         }
         if (worlds.isEmpty) return const _EmptyWorlds();
-        return _WorldGrid(
-          worlds: worlds,
-          onSelect: widget.onSelectVersion,
-          onPlay: widget.onPlay,
-        );
+        return _WorldGrid(worlds: worlds, onSelect: widget.onSelectVersion, onPlay: widget.onPlay);
       },
     );
   }
@@ -580,6 +593,10 @@ class _EmptyWorlds extends StatelessWidget {
 
 /// 首页主视觉的方块风景，不依赖 Minecraft 官方素材。
 class _VoxelLandscapePainter extends CustomPainter {
+  _VoxelLandscapePainter(this.primary);
+
+  final Color primary;
+
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
@@ -587,17 +604,26 @@ class _VoxelLandscapePainter extends CustomPainter {
     final right = w * .58;
     final bottom = h;
 
-    final sun = Paint()..color = const Color(0xFFFFE59A).withValues(alpha: .9);
+    final sun = Paint()..color = _tint(primary, .9, .45).withValues(alpha: .92);
     canvas.drawCircle(Offset(w * .82, h * .24), h * .09, sun);
 
     final cloud = Paint()..color = Colors.white.withValues(alpha: .2);
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * .67, h * .16, w * .1, h * .045), const Radius.circular(8)), cloud);
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * .72, h * .27, w * .07, h * .035), const Radius.circular(8)), cloud);
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * .9, h * .14, w * .06, h * .03), const Radius.circular(8)), cloud);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(w * .67, h * .16, w * .1, h * .045), const Radius.circular(8)),
+      cloud,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(w * .72, h * .27, w * .07, h * .035), const Radius.circular(8)),
+      cloud,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(w * .9, h * .14, w * .06, h * .03), const Radius.circular(8)),
+      cloud,
+    );
 
-    final backHill = Paint()..color = const Color(0xFF4F8266).withValues(alpha: .55);
-    final hill = Paint()..color = const Color(0xFF3E7258).withValues(alpha: .7);
-    final front = Paint()..color = const Color(0xFF2B5B45);
+    final backHill = Paint()..color = _tint(primary, .45, .7).withValues(alpha: .55);
+    final hill = Paint()..color = _tint(primary, .36, .75).withValues(alpha: .7);
+    final front = Paint()..color = _tint(primary, .24, .8);
     final path = Path()
       ..moveTo(right, bottom)
       ..lineTo(right, h * .56)
@@ -630,11 +656,11 @@ class _VoxelLandscapePainter extends CustomPainter {
       ..close();
     canvas.drawPath(ground, front);
 
-    // 前景的方块树和草方块
-    final trunk = Paint()..color = const Color(0xFF6C4B2F);
-    final leaves = Paint()..color = const Color(0xFF4B8A5A);
-    final grass = Paint()..color = const Color(0xFF5D9B63);
-    final soil = Paint()..color = const Color(0xFF795A3C);
+    // 前景的方块树和草方块，颜色跟着主题色走
+    final trunk = Paint()..color = Color.lerp(_tint(primary, .30, .4), const Color(0xFF6C4B2F), .3)!;
+    final leaves = Paint()..color = _tint(primary, .46, .7);
+    final grass = Paint()..color = _tint(primary, .42, .75);
+    final soil = Paint()..color = Color.lerp(_tint(primary, .28, .45), const Color(0xFF795A3C), .25)!;
 
     canvas.drawRect(Rect.fromLTWH(w * .77, h * .72, w * .018, h * .14), trunk);
     canvas.drawRect(Rect.fromLTWH(w * .742, h * .62, w * .074, h * .11), leaves);
@@ -655,5 +681,5 @@ class _VoxelLandscapePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _VoxelLandscapePainter oldDelegate) => oldDelegate.primary != primary;
 }

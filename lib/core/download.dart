@@ -270,7 +270,9 @@ class Downloader {
     final errors = <Object>[];
     final allDone = Completer<void>();
     void finish(_Job job) {
+      if (job.finished) return;
       job.finished = true;
+      job.done.complete();
       onProgress(++done, total);
       if (onBytes != null && totalBytes > 0) {
         doneBytes += job.item.size ?? 0;
@@ -283,7 +285,10 @@ class Downloader {
       job.running++;
       job.startedAt ??= DateTime.now();
       try {
-        await downloadFile(job.item, cancelled: () => job.finished);
+        // 同一文件可能已经由补位连接完成；完成后立即释放 worker 去下载下一个文件，
+        // 不再等这条卡住的连接自然超时。
+        final download = downloadFile(job.item, cancelled: () => job.finished);
+        await Future.any<void>([download, job.done.future]);
         if (!job.finished) finish(job);
       } catch (e) {
         job.error ??= e;
@@ -299,24 +304,26 @@ class Downloader {
 
     var cursor = 0;
     Future<void> worker() async {
-      while (true) {
-        if (cursor < jobs.length) {
-          await run(jobs[cursor++]);
-          continue;
+      while (cursor < jobs.length) {
+        await run(jobs[cursor++]);
+      }
+    }
+
+    // 独立于 worker 的补位连接：worker 可能都被慢文件占住，
+    // 由这个循环在后台给慢文件再开连接，避免结尾被一两个节点拖住。
+    Future<void> hedgeLoop() async {
+      const maxPerJob = 3;
+      while (!allDone.isCompleted) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        if (allDone.isCompleted) return;
+        final active = jobs
+            .where((j) => !j.finished && j.running > 0)
+            .where((j) => DateTime.now().difference(j.startedAt!).inMilliseconds >= 2000)
+            .toList();
+        for (final job in active) {
+          if (job.running >= maxPerJob) continue;
+          unawaited(run(job));
         }
-        if (jobs.every((j) => j.finished)) return;
-        // 队列已空：给下载了一段时间还没完成的文件再开一个连接，先完成的为准，
-        // 这样结尾不会被个别慢节点拖住
-        final now = DateTime.now();
-        final slow = jobs
-            .where((j) => !j.finished && !j.hedged && j.running > 0 && now.difference(j.startedAt!).inSeconds >= 3)
-            .firstOrNull;
-        if (slow == null) {
-          await Future<void>.delayed(const Duration(milliseconds: 500));
-          continue;
-        }
-        slow.hedged = true;
-        await run(slow);
       }
     }
 
@@ -324,6 +331,7 @@ class Downloader {
     for (var i = 0; i < max(1, min(concurrency, 64)); i++) {
       unawaited(worker());
     }
+    unawaited(hedgeLoop());
     await allDone.future;
     await VerifiedFiles.save();
     if (errors.isNotEmpty) throw Exception('${errors.length} 个文件下载失败，例如：${errors.first}');
@@ -335,9 +343,9 @@ class _Job {
   _Job(this.item);
 
   final DownloadItem item;
+  final done = Completer<void>();
   DateTime? startedAt;
   var running = 0;
-  var hedged = false;
   var finished = false;
   Object? error;
 }

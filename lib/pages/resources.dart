@@ -1,3 +1,4 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -29,6 +30,7 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
   String? _error;
   ResourceHit? _open;
   int _generation = 0;
+  bool _installingPack = false;
 
   @override
   void initState() {
@@ -53,13 +55,14 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
     });
     try {
       final loaders = current == null ? const <String>[] : modrinthLoaders(current.loader);
+      final fit = _fitCurrent && current != null && widget.type != ResourceType.modpack;
       final r = await Modrinth.search(
         type: widget.type,
         query: _query.text.trim(),
         sort: _sort,
         offset: more ? _hits.length : 0,
-        gameVersion: _fitCurrent && current != null ? current.gameVersion : null,
-        loader: _fitCurrent && widget.type == ResourceType.mod && loaders.isNotEmpty ? loaders.first : null,
+        gameVersion: fit ? current.gameVersion : null,
+        loader: fit && widget.type == ResourceType.mod ? loaders.firstOrNull : null,
       );
       if (gen != _generation || !mounted) return;
       setState(() {
@@ -70,6 +73,23 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
       if (gen == _generation && mounted) setState(() => _error = errorText(e));
     } finally {
       if (gen == _generation && mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _installFromFile() async {
+    final file = await openFile(
+      acceptedTypeGroups: const [XTypeGroup(label: 'Modrinth 整合包', extensions: ['mrpack'])],
+      confirmButtonText: '选择',
+    );
+    if (file == null || !mounted) return;
+    setState(() => _installingPack = true);
+    try {
+      final id = await AppScope.read(context).installModpackFile(file.path);
+      if (mounted) toast(context, '已安装整合包为 $id');
+    } catch (e) {
+      if (mounted) toast(context, '安装失败：${errorText(e)}');
+    } finally {
+      if (mounted) setState(() => _installingPack = false);
     }
   }
 
@@ -89,6 +109,16 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
           child: Row(
             children: [
               Text(widget.type.label, style: theme.textTheme.headlineSmall),
+              if (widget.type == ResourceType.modpack) ...[
+                const SizedBox(width: 12),
+                FilledButton.tonalIcon(
+                  onPressed: _installingPack ? null : _installFromFile,
+                  icon: _installingPack
+                      ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.add, size: 18),
+                  label: const Text('从文件安装'),
+                ),
+              ],
               const Spacer(),
               Text('数据来自 Modrinth', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
             ],
@@ -131,7 +161,7 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
             ],
           ),
         ),
-        if (current != null)
+        if (current != null && widget.type != ResourceType.modpack)
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 4),
             child: Align(
@@ -365,8 +395,9 @@ class _ResourceDetailState extends State<ResourceDetail> {
     return (r[0] as ResourceProject, r[1] as List<ResourceVersion>);
   }
 
-  /// 默认安装目标：当前版本；模组则优先选择装了加载器的版本
+  /// 默认安装目标：当前版本；模组则优先选择装了加载器的版本；整合包不需要目标版本
   String _defaultInstance() {
+    if (_type == ResourceType.modpack) return '';
     final state = AppScope.read(context);
     final selected = state.selectedVersion;
     if (_type != ResourceType.mod || (selected != null && modrinthLoaders(selected.loader).isNotEmpty)) {
@@ -393,6 +424,7 @@ class _ResourceDetailState extends State<ResourceDetail> {
   }
 
   bool _compatible(ResourceVersion v, InstanceInfo inst) {
+    if (_type == ResourceType.modpack) return true;
     if (!v.gameVersions.contains(inst.gameVersion)) return false;
     if (_type != ResourceType.mod) return true;
     final tags = modrinthLoaders(inst.loader);
@@ -400,8 +432,8 @@ class _ResourceDetailState extends State<ResourceDetail> {
   }
 
   String? _warning(InstanceInfo? inst) {
+    if (_type == ResourceType.modpack) return null;
     if (inst == null) return '还没有安装任何游戏版本';
-    if (_type == ResourceType.modpack) return '整合包安装将在后续版本提供';
     if (_type == ResourceType.mod && modrinthLoaders(inst.loader).isEmpty) return '${inst.id} 没有安装模组加载器，模组不会生效';
     if (_type == ResourceType.datapack && _worlds.isEmpty) return '${inst.id} 还没有存档，请先进入游戏创建一个世界';
     return null;
@@ -423,6 +455,18 @@ class _ResourceDetailState extends State<ResourceDetail> {
     }
   }
 
+  Future<void> _installPack(ResourceVersion v) async {
+    setState(() => _installing = v.id);
+    try {
+      final id = await AppScope.read(context).installModpack(v, name: widget.hit.title);
+      if (mounted) toast(context, '已安装整合包为 $id');
+    } catch (e) {
+      if (mounted) toast(context, '安装失败：${errorText(e)}');
+    } finally {
+      if (mounted) setState(() => _installing = '');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -436,7 +480,9 @@ class _ResourceDetailState extends State<ResourceDetail> {
       builder: (context, snap) {
         final project = snap.data?.$1;
         final all = snap.data?.$2 ?? const <ResourceVersion>[];
-        final shown = _showAll || inst == null ? all : all.where((v) => _compatible(v, inst)).toList();
+        final shown = _type == ResourceType.modpack || _showAll || inst == null
+            ? all
+            : all.where((v) => _compatible(v, inst)).toList();
         final warning = _warning(inst);
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 24, 24),
@@ -498,19 +544,22 @@ class _ResourceDetailState extends State<ResourceDetail> {
                     runSpacing: 12,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      DropdownMenu<String>(
-                        width: 320,
-                        label: const Text('安装到'),
-                        initialSelection: _instanceId.isEmpty ? null : _instanceId,
-                        inputDecorationTheme: const InputDecorationTheme(isDense: true, border: OutlineInputBorder()),
-                        dropdownMenuEntries: [
-                          for (final v in state.versions) DropdownMenuEntry(value: v.id, label: v.id),
-                        ],
-                        onSelected: (v) {
-                          setState(() => _instanceId = v ?? _instanceId);
-                          _loadWorlds();
-                        },
-                      ),
+                      if (_type != ResourceType.modpack)
+                        DropdownMenu<String>(
+                          width: 320,
+                          label: const Text('安装到'),
+                          initialSelection: _instanceId.isEmpty ? null : _instanceId,
+                          inputDecorationTheme: const InputDecorationTheme(isDense: true, border: OutlineInputBorder()),
+                          dropdownMenuEntries: [
+                            for (final v in state.versions) DropdownMenuEntry(value: v.id, label: v.id),
+                          ],
+                          onSelected: (v) {
+                            setState(() => _instanceId = v ?? _instanceId);
+                            _loadWorlds();
+                          },
+                        )
+                      else
+                        Chip(avatar: const Icon(Icons.inventory_2_outlined, size: 18), label: const Text('将安装为新的独立版本')),
                       if (_type == ResourceType.datapack && _worlds.isNotEmpty)
                         DropdownMenu<String>(
                           key: ValueKey(_instanceId),
@@ -558,11 +607,11 @@ class _ResourceDetailState extends State<ResourceDetail> {
                       trailing: _installing == v.id
                           ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
                           : FilledButton.tonal(
-                              onPressed:
-                                  inst == null ||
-                                      _installing.isNotEmpty ||
-                                      _type == ResourceType.modpack ||
-                                      (_type == ResourceType.datapack && _world == null)
+                              onPressed: _installing.isNotEmpty
+                                  ? null
+                                  : _type == ResourceType.modpack
+                                  ? () => _installPack(v)
+                                  : inst == null || (_type == ResourceType.datapack && _world == null)
                                   ? null
                                   : () => _install(v, inst),
                               child: const Text('安装'),

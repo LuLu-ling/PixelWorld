@@ -27,6 +27,7 @@ import 'core/mac_glfw.dart';
 import 'core/loaders.dart';
 import 'core/memory.dart';
 import 'core/microsoft.dart';
+import 'core/modpack.dart';
 import 'core/modrinth.dart';
 import 'core/paths.dart';
 import 'core/precheck.dart';
@@ -256,6 +257,38 @@ class AppState extends ChangeNotifier {
         '${r.missing.isEmpty ? '' : '，找不到兼容的前置：${r.missing.join('、')}'}',
       );
       return r;
+    });
+  }
+
+  /// 安装 Modrinth 整合包为新版本，完成后选中它
+  Future<String> installModpack(ResourceVersion version, {String? name}) async {
+    final t = TaskProgress(
+      '安装整合包 ${name ?? version.name}',
+      steps: const ['下载整合包', '安装游戏与加载器', '下载整合包文件', '解压整合包配置'],
+      retry: () => installModpack(version, name: name).catchError((_) => ''),
+    );
+    return track(t, () async {
+      final id = await installModpackFiles(paths, version, downloader, t, name: name);
+      await refreshVersions();
+      await selectVersion(id);
+      t.output('已安装为 $id');
+      return id;
+    });
+  }
+
+  /// 安装本地 .mrpack 整合包为新版本，完成后选中它
+  Future<String> installModpackFile(String path, {String? name}) async {
+    final t = TaskProgress(
+      '安装整合包 ${name ?? p.basenameWithoutExtension(path)}',
+      steps: const ['读取整合包', '安装游戏与加载器', '下载整合包文件', '解压整合包配置'],
+      retry: () => installModpackFile(path, name: name).catchError((_) => ''),
+    );
+    return track(t, () async {
+      final id = await installModpackArchive(paths, path, downloader, t, name: name);
+      await refreshVersions();
+      await selectVersion(id);
+      t.output('已安装为 $id');
+      return id;
     });
   }
 

@@ -36,6 +36,17 @@ Future<void> main(List<String> args) async {
     window.center();
     window.show();
     window.focus();
+    if (Platform.isLinux) {
+      // Linux 的 GTK 客户端装饰会留一圈阴影/标题栏内边距，浮动窗口时点击坐标
+      // 会和画面错位；贴靠或最大化时装饰消失，所以按钮又能点。
+      // 界面自己画标题栏和缩放边缘，直接去掉原生装饰。
+      window.setFrameless(true);
+      window.hasShadow = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        window.setFrameless(true);
+        window.hasShadow = false;
+      });
+    }
   } else {
     // 手机上使用横屏，布局与桌面端相同；隐藏系统状态栏与导航栏，电量和网络显示在标题栏
     await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);

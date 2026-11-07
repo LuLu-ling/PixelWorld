@@ -80,6 +80,7 @@ class _Button extends StatefulWidget {
 
 class _ButtonState extends State<_Button> {
   bool _hover = false;
+  Offset? _pressedAt;
 
   @override
   Widget build(BuildContext context) {
@@ -95,10 +96,19 @@ class _ButtonState extends State<_Button> {
       message: widget.tooltip,
       waitDuration: const Duration(milliseconds: 600),
       child: MouseRegion(
+        cursor: SystemMouseCursors.click,
         onEnter: (_) => setState(() => _hover = true),
         onExit: (_) => setState(() => _hover = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
+        // 用 Listener 而不是 GestureDetector：顶栏同时有拖动窗口的手势，
+        // 按钮放在拖动层外面也能保证点击一定到达这里
+        child: Listener(
+          onPointerDown: (e) => _pressedAt = e.position,
+          onPointerUp: (e) {
+            final start = _pressedAt;
+            _pressedAt = null;
+            if (start != null && (e.position - start).distance <= 6) widget.onTap();
+          },
+          onPointerCancel: (_) => _pressedAt = null,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             width: 46,

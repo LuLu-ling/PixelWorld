@@ -133,11 +133,12 @@ jobs:
           path: dist/*.dmg
 
   # Linux 版还在测试：只在 nightly 构建，正式标签不发布。
-  # 在较旧的 Ubuntu 22.04 上构建，兼容 glibc 2.35 及以上的发行版。
+  # cnativeapi 需要 glib 2.74+ 的 G_CONNECT_DEFAULT，使用 Ubuntu 24.04 构建，
+  # 兼容 glibc 2.39 及以上的发行版。
   linux:
     needs: check
     if: ${{ github.ref_type == 'branch' }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
@@ -185,7 +186,7 @@ jobs:
           about="本软件是第三方基于 PCL 二次创作的产物，与 PCL 及其作者无关，请勿就本软件的问题打扰 PCL 作者。"
           downloads=$'- Windows：安装包（`*-setup.exe`）或便携版（`*-portable.zip`）\n- 安卓：`*-android-arm64.apk`，需要 Android 8.0 及以上、64 位 ARM 处理器\n- macOS：`*-macos.dmg`，需要 macOS 12 及以上，Apple 芯片与 Intel 通用。没有经过 Apple 公证，首次打开时如果提示无法验证开发者，请到「系统设置 → 隐私与安全性」中点「仍要打开」'
           if [ "$LINUX_RESULT" = "success" ]; then
-            downloads+=$'\n- Linux（测试版）：`*-linux-x64.tar.gz`，需要 Ubuntu 22.04 及以上（glibc 2.35+），解压后运行 `PCL.PW/pcl_pw`'
+            downloads+=$'\n- Linux（测试版）：`*-linux-x64.tar.gz`，需要 Ubuntu 24.04 及以上（glibc 2.39+），解压后运行 `PCL.PW/pcl_pw`'
           fi
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             tag="$GITHUB_REF_NAME"

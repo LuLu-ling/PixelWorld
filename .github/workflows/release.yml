@@ -132,9 +132,41 @@ jobs:
           name: macos
           path: dist/*.dmg
 
+  # Linux 版还在测试：只在 nightly 构建，正式标签不发布。
+  # 在较旧的 Ubuntu 22.04 上构建，兼容 glibc 2.35 及以上的发行版。
+  linux:
+    needs: check
+    if: ${{ github.ref_type == 'branch' }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libx11-dev libxi-dev
+      - name: Build
+        run: |
+          flutter pub get
+          flutter build linux --release --dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL"
+          version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
+          stage="$RUNNER_TEMP/PCL.PW"
+          mkdir -p "$stage" dist
+          cp -R build/linux/x64/release/bundle/. "$stage/"
+          tar -C "$RUNNER_TEMP" -czf "dist/PCL.PW-$version-linux-x64.tar.gz" PCL.PW
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*-linux-x64.tar.gz
+
   publish:
-    needs: [windows, android, macos]
-    # macOS 构建失败时仍然发布 Windows 与安卓版
+    needs: [windows, android, macos, linux]
+    # macOS 或 Linux 构建失败时仍然发布 Windows 与安卓版
     if: ${{ !cancelled() && needs.windows.result == 'success' && needs.android.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
@@ -146,11 +178,15 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          LINUX_RESULT: ${{ needs.linux.result }}
         run: |
           version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
           sha=${GITHUB_SHA::7}
           about="本软件是第三方基于 PCL 二次创作的产物，与 PCL 及其作者无关，请勿就本软件的问题打扰 PCL 作者。"
           downloads=$'- Windows：安装包（`*-setup.exe`）或便携版（`*-portable.zip`）\n- 安卓：`*-android-arm64.apk`，需要 Android 8.0 及以上、64 位 ARM 处理器\n- macOS：`*-macos.dmg`，需要 macOS 12 及以上，Apple 芯片与 Intel 通用。没有经过 Apple 公证，首次打开时如果提示无法验证开发者，请到「系统设置 → 隐私与安全性」中点「仍要打开」'
+          if [ "$LINUX_RESULT" = "success" ]; then
+            downloads+=$'\n- Linux（测试版）：`*-linux-x64.tar.gz`，需要 Ubuntu 22.04 及以上（glibc 2.35+），解压后运行 `PCL.PW/pcl_pw`'
+          fi
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             tag="$GITHUB_REF_NAME"
             # 更新说明写在 release-notes/<标签>.md 中，没有时只写下载说明

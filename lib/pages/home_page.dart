@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 
 import '../app_scope.dart';
 import '../app_state.dart';
@@ -467,7 +469,7 @@ class _RecentWorldsSectionState extends State<_RecentWorldsSection> {
       builder: (context, snapshot) {
         final worlds = snapshot.data ?? const <RecentWorld>[];
         if (snapshot.connectionState == ConnectionState.waiting && worlds.isEmpty) {
-          return const SizedBox(height: 92);
+          return const SizedBox(height: _worldCardHeight);
         }
         if (worlds.isEmpty) return const _EmptyWorlds();
         return _WorldGrid(worlds: worlds, onSelect: widget.onSelectVersion, onPlay: widget.onPlay);
@@ -475,6 +477,10 @@ class _RecentWorldsSectionState extends State<_RecentWorldsSection> {
     );
   }
 }
+
+/// 最近游玩卡片使用固定尺寸：只占内容需要的大小，不随窗口宽度拉伸。
+const _worldCardWidth = 300.0;
+const _worldCardHeight = 64.0;
 
 class _WorldGrid extends StatelessWidget {
   const _WorldGrid({required this.worlds, required this.onSelect, required this.onPlay});
@@ -485,29 +491,24 @@ class _WorldGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final count = constraints.maxWidth >= 840 ? 3 : (constraints.maxWidth >= 540 ? 2 : 1);
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: worlds.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: count,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 3.0,
-          ),
-          itemBuilder: (context, index) {
-            final world = worlds[index];
-            return _WorldCard(
-              world: world,
-              onTap: world.versionId == null ? null : () => onSelect(world.versionId!),
-              onPlay: () => onPlay(world),
-            );
-          },
-        );
-      },
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          for (final world in worlds)
+            SizedBox(
+              width: _worldCardWidth,
+              height: _worldCardHeight,
+              child: _WorldCard(
+                world: world,
+                onTap: world.versionId == null ? null : () => onSelect(world.versionId!),
+                onPlay: () => onPlay(world),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -525,21 +526,15 @@ class _WorldCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     return Material(
       color: scheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+          padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(12)),
-                alignment: Alignment.center,
-                child: Icon(Icons.landscape_outlined, size: 25, color: scheme.onPrimaryContainer),
-              ),
+              _WorldIcon(world: world),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -565,11 +560,14 @@ class _WorldCard extends StatelessWidget {
               IconButton(
                 tooltip: '启动这个版本',
                 onPressed: onPlay,
-                icon: const Icon(Icons.play_arrow),
+                icon: const Icon(Icons.play_arrow, size: 20),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(width: 32, height: 32),
                 style: IconButton.styleFrom(
                   backgroundColor: scheme.primaryContainer.withValues(alpha: .65),
                   foregroundColor: scheme.onPrimaryContainer,
-                  minimumSize: const Size(36, 36),
+                  minimumSize: const Size(32, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
             ],
@@ -586,6 +584,39 @@ class _WorldCard extends StatelessWidget {
     if (d.inDays < 1) return '${d.inHours} 小时前';
     if (d.inDays < 7) return '${d.inDays} 天前';
     return '${time.month}/${time.day}';
+  }
+}
+
+/// 存档封面：Minecraft 会把世界截图保存为 `icon.png`，没有时回退到默认图标。
+class _WorldIcon extends StatelessWidget {
+  const _WorldIcon({required this.world});
+
+  final RecentWorld world;
+
+  static const _size = 40.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fallback = Container(
+      width: _size,
+      height: _size,
+      decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(10)),
+      alignment: Alignment.center,
+      child: Icon(Icons.landscape_outlined, size: 23, color: scheme.onPrimaryContainer),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Image.file(
+        File(p.join(world.path, 'icon.png')),
+        width: _size,
+        height: _size,
+        fit: BoxFit.cover,
+        // 存档更新后封面会变，用修改时间让旧的图片缓存失效
+        key: ValueKey('${world.path}\u0000${world.modified.millisecondsSinceEpoch}'),
+        errorBuilder: (_, _, _) => fallback,
+      ),
+    );
   }
 }
 

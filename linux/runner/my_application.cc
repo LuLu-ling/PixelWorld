@@ -54,6 +54,10 @@ static void my_application_activate(GApplication* application) {
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
   g_autofree gchar* icon_path = app_icon_path();
+  if (icon_path != nullptr) {
+    gtk_window_set_icon_from_file(window, icon_path, nullptr);
+    gtk_window_set_default_icon_from_file(icon_path, nullptr);
+  }
 
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu
@@ -86,6 +90,7 @@ static void my_application_activate(GApplication* application) {
         GtkWidget* icon = gtk_image_new_from_pixbuf(pixbuf);
         g_object_unref(pixbuf);
         gtk_header_bar_pack_start(header_bar, icon);
+        gtk_widget_show(icon);
       }
     }
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));

@@ -15,11 +15,60 @@ struct _MyApplication {
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
 static FlMethodChannel* g_window_channel = nullptr;
+static GtkCssProvider* g_headerbar_theme_provider = nullptr;
+
+static void apply_headerbar_theme(bool dark, int background, int foreground) {
+  GdkScreen* screen = gdk_screen_get_default();
+  if (screen == nullptr) return;
+  if (g_headerbar_theme_provider != nullptr) {
+    gtk_style_context_remove_provider_for_screen(screen, GTK_STYLE_PROVIDER(g_headerbar_theme_provider));
+    g_clear_object(&g_headerbar_theme_provider);
+  }
+  g_headerbar_theme_provider = gtk_css_provider_new();
+  g_autofree gchar* css = g_strdup_printf(
+      "headerbar { background-image: none; background-color: #%06x; color: #%06x; box-shadow: none; }\n"
+      "headerbar:backdrop { background-color: #%06x; }\n"
+      "headerbar label { color: #%06x; }\n"
+      "headerbar button { color: #%06x; }\n",
+      background & 0xFFFFFF, foreground & 0xFFFFFF, background & 0xFFFFFF,
+      foreground & 0xFFFFFF, foreground & 0xFFFFFF);
+  gtk_css_provider_load_from_data(g_headerbar_theme_provider, css, -1, nullptr);
+  gtk_style_context_add_provider_for_screen(
+      screen, GTK_STYLE_PROVIDER(g_headerbar_theme_provider),
+      GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+  GtkSettings* settings = gtk_settings_get_default();
+  if (settings != nullptr) {
+    g_object_set(settings, "gtk-application-prefer-dark-theme", dark ? TRUE : FALSE, nullptr);
+  }
+}
 
 static void window_method_call_cb(FlMethodChannel* channel,
                                   FlMethodCall* method_call,
                                   gpointer user_data) {
   const gchar* method = fl_method_call_get_name(method_call);
+  if (g_strcmp0(method, "setTheme") == 0) {
+    FlValue* args = fl_method_call_get_args(method_call);
+    bool dark = false;
+    int background = 0;
+    int foreground = 0;
+    if (args != nullptr && fl_value_get_type(args) == FL_VALUE_TYPE_MAP) {
+      FlValue* value = fl_value_lookup_string(args, "dark");
+      if (value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_BOOL) {
+        dark = fl_value_get_bool(value);
+      }
+      value = fl_value_lookup_string(args, "background");
+      if (value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_INT) {
+        background = fl_value_get_int(value);
+      }
+      value = fl_value_lookup_string(args, "foreground");
+      if (value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_INT) {
+        foreground = fl_value_get_int(value);
+      }
+    }
+    if (background != 0 && foreground != 0) apply_headerbar_theme(dark, background, foreground);
+    fl_method_call_respond_success(method_call, nullptr, nullptr);
+    return;
+  }
   if (g_strcmp0(method, "setDarkMode") == 0) {
     FlValue* args = fl_method_call_get_args(method_call);
     bool dark = args != nullptr && fl_value_get_type(args) == FL_VALUE_TYPE_BOOL &&
@@ -191,6 +240,13 @@ static void my_application_shutdown(GApplication* application) {
 // Implements GObject::dispose.
 static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
+  if (g_headerbar_theme_provider != nullptr) {
+    GdkScreen* screen = gdk_screen_get_default();
+    if (screen != nullptr) {
+      gtk_style_context_remove_provider_for_screen(screen, GTK_STYLE_PROVIDER(g_headerbar_theme_provider));
+    }
+    g_clear_object(&g_headerbar_theme_provider);
+  }
   g_clear_object(&g_window_channel);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);

@@ -23,6 +23,10 @@ Future<void> main(List<String> args) async {
   if (installer != null) return runInstaller(installer, args);
 
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterError.onError = (details) {
+    stderr.writeln('PCLPW FLUTTER ERROR: ${details.exceptionAsString()}\n${details.stack}');
+    FlutterError.presentError(details);
+  };
   final state = await AppState.create();
   // 安卓：游戏进程通过本机回环端口向启动器里的 AI 提问
   if (Platform.isAndroid) unawaited(HudBridge.start(state.config));

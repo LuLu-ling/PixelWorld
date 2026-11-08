@@ -157,7 +157,7 @@ abstract final class AndroidRuntime {
     }
     read();
     final exit = await lastExit() ?? code ?? (started ? 0 : -1);
-    if (!started) onLog('\n[PCL.PW] 游戏进程没有启动，或启动后立即退出了。\n');
+    if (!started) onLog('\n[Pixel World] 游戏进程没有启动，或启动后立即退出了。\n');
     // 异常退出时附上系统日志，原生库加载失败等问题只会出现在这里
     if (exit != 0 || offset == 0) {
       onLog('\n---------- 系统日志（logcat） ----------\n${await systemLog()}\n');
@@ -242,7 +242,7 @@ abstract final class AndroidRuntime {
       read();
       final running = await _channel.invokeMethod<bool>('jarRunning') ?? false;
       // 很快退出的进程可能在两次查询之间就结束了，日志里有运行时写的第一行就说明它启动过
-      if (running || out.toString().contains('PCL.PW runtime:')) started = true;
+      if (running || out.toString().contains('Pixel World runtime:')) started = true;
       if (!running && (started || DateTime.now().isAfter(deadline))) break;
     }
     read();
@@ -251,8 +251,8 @@ abstract final class AndroidRuntime {
       onLine?.call(pending);
     }
     final s = await _channel.invokeMethod<String>('jarExit');
-    // 运行时启动 JVM 前会写一行「PCL.PW runtime:」；没有这一行说明进程在那之前就崩溃了
-    final jvmStarted = out.toString().contains('PCL.PW runtime:');
+    // 运行时启动 JVM 前会写一行「Pixel World runtime:」；没有这一行说明进程在那之前就崩溃了
+    final jvmStarted = out.toString().contains('Pixel World runtime:');
     var code = (s == null ? null : int.tryParse(s.split(' ').first)) ?? reported ?? (started && jvmStarted ? 0 : -1);
     // 安卓上拿不到 System.exit 的退出代码；Java 启动器自己报的错按失败处理
     if (code == 0 &&
@@ -263,9 +263,9 @@ abstract final class AndroidRuntime {
       code = 1;
     }
     if (!started) {
-      out.writeln('[PCL.PW] jar 运行进程没有启动');
+      out.writeln('[Pixel World] jar 运行进程没有启动');
     } else if (!jvmStarted) {
-      out.writeln('[PCL.PW] jar 运行进程在启动 Java 前退出了');
+      out.writeln('[Pixel World] jar 运行进程在启动 Java 前退出了');
       final log = await systemLog();
       final lines = log.split('\n').where((l) => l.contains(':jar') || l.contains('AndroidRuntime')).toList();
       out.writeln((lines.length > 30 ? lines.sublist(lines.length - 30) : lines).join('\n'));

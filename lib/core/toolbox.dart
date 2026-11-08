@@ -10,7 +10,7 @@ import '../app_info.dart';
 import 'task.dart';
 
 final _client = HttpClient()
-  ..userAgent = '${AppInfo.name}/${AppInfo.version} (github.com/zhuzhi-09/PCL.PW)'
+  ..userAgent = '${AppInfo.name}/${AppInfo.version} (github.com/zhuzhi-09/PixelWorld)'
   ..connectionTimeout = const Duration(seconds: 15);
 
 Future<(int, Uint8List)> _get(String url, {String? userAgent}) async {

@@ -356,7 +356,7 @@ public final class GameRuntime {
         if (RENDERER_LIB.equals(rc.gl) && !JREUtils.dlopen(RENDERER_LIB) && !JREUtils.dlopen(nativeDir + "/" + RENDERER_LIB)) {
             throw new IOException("Cannot load the renderer " + RENDERER_LIB);
         }
-        Logger.appendToLog("PCL.PW runtime: renderer " + renderer + (ffp ? " + SFPEW" : "")
+        Logger.appendToLog("Pixel World runtime: renderer " + renderer + (ffp ? " + SFPEW" : "")
                 + (turnip && ZINK.equals(renderer) ? " + Turnip" : ""));
 
         List<String> argv = new ArrayList<>();
@@ -406,7 +406,7 @@ public final class GameRuntime {
         }
         if (hudAgent.isFile()) argv.add("-javaagent:" + hudAgent.getAbsolutePath());
         argv.addAll(withWindowSize(args, width, height));
-        Logger.appendToLog("PCL.PW runtime: " + String.join(" ", redact(argv)));
+        Logger.appendToLog("Pixel World runtime: " + String.join(" ", redact(argv)));
 
         loadJavaLibraries(jreHome, jvmDir, nativeDir);
         JREUtils.setupExitMethod(app);
@@ -477,7 +477,7 @@ public final class GameRuntime {
                 "-XX:ActiveProcessorCount=" + java.lang.Runtime.getRuntime().availableProcessors()
         ));
         argv.addAll(args);
-        Logger.appendToLog("PCL.PW runtime: " + String.join(" ", argv));
+        Logger.appendToLog("Pixel World runtime: " + String.join(" ", argv));
 
         loadJavaLibraries(jreHome, jvmDir, nativeDir);
         JREUtils.setupExitMethod(app);

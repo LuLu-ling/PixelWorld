@@ -100,16 +100,16 @@ Future<void> ensureLauncherProfiles(String root) async {
   await f.writeAsString(
     const JsonEncoder.withIndent('  ').convert({
       'profiles': {
-        'PCL.PW': {
+        'Pixel World': {
           'icon': 'Grass',
-          'name': 'PCL.PW',
+          'name': 'Pixel World',
           'lastVersionId': 'latest-release',
           'type': 'latest-release',
           'lastUsed': now,
           'created': now,
         },
       },
-      'selectedProfile': 'PCL.PW',
+      'selectedProfile': 'Pixel World',
       'clientToken': '23323323323323323323323323323333',
     }),
   );

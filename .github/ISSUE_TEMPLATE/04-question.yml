@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        先看看[使用文档](https://pcl.pw.zhuzhi.site/docs/)和[常见问题与排错](https://pcl.pw.zhuzhi.site/docs/troubleshooting.html)，很多问题那里已经有答案。
+        先看看[使用文档](https://pixelworld.zhuzhi.site/docs/)和[常见问题与排错](https://pixelworld.zhuzhi.site/docs/troubleshooting.html)，很多问题那里已经有答案。
         如果确认是 Bug，请改用「启动器 Bug」或「游戏崩溃」表单，这样能带上必要的日志字段。
 
   - type: checkboxes
@@ -14,7 +14,7 @@ body:
     attributes:
       label: 提交前确认
       options:
-        - label: 我已经看过使用文档，并搜索过 [Issues](https://github.com/zhuzhi-09/PCL.PW/issues?q=is%3Aissue+)。
+        - label: 我已经看过使用文档，并搜索过 [Issues](https://github.com/zhuzhi-09/PixelWorld/issues?q=is%3Aissue+)。
           required: true
         - label: 这不是一个可以稳定复现的 Bug；如果是 Bug，我会改用 Bug 表单。
           required: true

@@ -150,10 +150,10 @@ static void my_application_activate(GApplication* application) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
     gtk_widget_set_size_request(GTK_WIDGET(header_bar), -1, 32);
-    gtk_header_bar_set_title(header_bar, "PCL.PW");
+    gtk_header_bar_set_title(header_bar, "Pixel World");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     if (icon_path != nullptr) {
-      // GtkImage 直接加载 1024px 文件会把标题栏撑成整块图标，先缩放到 18px
+      // GtkImage 逶ｴ謗･蜉霓ｽ 1024px 譁・ｻｶ莨壽滑譬・｢俶乗酎謌先紛蝮怜崟譬・ｼ悟・郛ｩ謾ｾ蛻ｰ 18px
       GdkPixbuf* pixbuf = gdk_pixbuf_new_from_file_at_scale(icon_path, 18, 18, TRUE, nullptr);
       if (pixbuf != nullptr) {
         GtkWidget* icon = gtk_image_new_from_pixbuf(pixbuf);
@@ -164,7 +164,7 @@ static void my_application_activate(GApplication* application) {
     }
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "PCL.PW");
+    gtk_window_set_title(window, "Pixel World");
   }
 
   gtk_window_set_default_size(window, 1280, 720);

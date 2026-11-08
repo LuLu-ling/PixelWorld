@@ -154,7 +154,7 @@ class InstallResult {
 /// Modrinth API。Modrinth 要求 User-Agent 能识别出应用
 class Modrinth {
   static final _client = HttpClient()
-    ..userAgent = 'zhuzhi-09/PCL.PW/${AppInfo.version} (github.com/zhuzhi-09/PCL.PW)'
+    ..userAgent = 'zhuzhi-09/PixelWorld/${AppInfo.version} (github.com/zhuzhi-09/PixelWorld)'
     ..connectionTimeout = const Duration(seconds: 20);
 
   static Future<dynamic> _get(String path) async {

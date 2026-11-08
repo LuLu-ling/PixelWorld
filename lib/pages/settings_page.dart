@@ -177,10 +177,10 @@ class _AboutSection extends StatelessWidget {
                 foregroundColor: scheme.onPrimaryContainer,
                 child: const Icon(Icons.favorite),
               ),
-              title: const Text(AppInfo.pclAuthor),
-              subtitle: const Text('Plain Craft Launcher（PCL）的作者。PCL.PW 基于 PCL 二次创作'),
+              title: const Text(AppInfo.authorName),
+              subtitle: const Text('Pixel World 的开发者'),
               trailing: FilledButton.icon(
-                onPressed: () => _open(AppInfo.pclSponsorUrl),
+                onPressed: () => _open(AppInfo.sponsorUrl),
                 icon: const Icon(Icons.volunteer_activism_outlined),
                 label: const Text('赞助作者'),
               ),
@@ -194,12 +194,12 @@ class _AboutSection extends StatelessWidget {
               ),
               title: Text('${AppInfo.fullName} ${AppInfo.version}'),
               subtitle: const Text(
-                '本软件是第三方基于 PCL 独立进行二次创作的产物，属于 PCL 的衍生作品，界面布局参考 PCL 社区版（PCL-CE）。'
-                '本软件由第三方开发和维护，与 PCL 及其作者无关，也不代表 PCL 官方。'
+                'Pixel World 是第三方 Minecraft 启动器，本项目为轻度使用 PCL 仓储库，界面布局参考 PCL 社区版（PCL-CE）。'
+                'PCL 由龙腾猫跃开发，本软件与 PCL 及其作者无关，也不代表 PCL 官方。'
                 '请勿就本软件的问题打扰 PCL 作者。',
               ),
             ),
-            link(Icons.code, '源代码', 'PCL.PW 以 Apache-2.0 协议开源', AppInfo.repoUrl, action: '打开'),
+            link(Icons.code, '源代码', 'Pixel World 以 Apache-2.0 协议开源', AppInfo.repoUrl, action: '打开'),
             link(
               Icons.gavel_outlined,
               'PCL 存储库合理使用指南',

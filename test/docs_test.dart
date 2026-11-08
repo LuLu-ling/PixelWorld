@@ -48,6 +48,6 @@ void main() {
   test('文档页面列表覆盖官网的九页', () {
     expect(docPages.map((p) => p.id), containsAll(['index', 'install', 'ai', 'api', 'troubleshooting']));
     expect(docPages.map((p) => p.id).toSet(), hasLength(docPages.length));
-    expect(docPageUrl('ai'), 'https://pcl.pw.zhuzhi.site/docs/ai.html');
+    expect(docPageUrl('ai'), 'https://pixelworld.zhuzhi.site/docs/ai.html');
   });
 }

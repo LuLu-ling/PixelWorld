@@ -776,7 +776,7 @@ class AiToolbox {
           details: [
             '版本：${v.id}',
             '将恢复：${check.paths.join('、')}（${check.files} 个文件，${_size(check.bytes)}）',
-            if (!check.signed) '注意：这是旧版 PCL.PW 创建的备份，没有签名，无法确认内容未被修改过',
+            if (!check.signed) '注意：这是旧版 Pixel World 创建的备份，没有签名，无法确认内容未被修改过',
             '先解压到临时文件夹并校验，成功后才把当前的对应内容备份并移到回收站',
           ],
         );
@@ -1357,7 +1357,7 @@ class AiToolbox {
     zips.sort((a, b) => b.path.compareTo(a.path));
     return [
       for (final z in zips.take(50))
-        '- ${p.basename(z.path)}（${_size(z.lengthSync())}）：${(await readBackupPaths(z.path))?.join('、') ?? '不是 PCL.PW 创建的备份'}',
+        '- ${p.basename(z.path)}（${_size(z.lengthSync())}）：${(await readBackupPaths(z.path))?.join('、') ?? '不是 Pixel World 创建的备份'}',
     ].join('\n');
   }
 }

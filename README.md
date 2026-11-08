@@ -1,19 +1,11 @@
-# PCL.PW（PixelsWorld 修改版）
+# Pixel World
 
-PCL.PW 是一个跨平台的 Minecraft 启动器，属于 PCL 的衍生作品，界面布局参考 [PCL 社区版（PCL-CE）](https://www.pclc.cc)，视觉上遵循 Google 的 Material Design 3 设计语言，使用 Flutter 开发，目标平台为 Windows、macOS、Linux 与 Android。
+Pixel World 是一个跨平台的 Minecraft 启动器，本项目为轻度使用 PCL 仓储库，界面布局参考 [PCL 社区版（PCL-CE）](https://www.pclc.cc)，视觉上遵循 Google 的 Material Design 3 设计语言，使用 Flutter 开发，目标平台为 Windows、macOS、Linux 与 Android。
 
 > [!IMPORTANT]
-> **PCL.PW 是第三方基于 [Plain Craft Launcher（PCL）](https://github.com/Meloong-Git/PCL) 独立进行二次创作的产物**，由第三方开发和维护，与 PCL 及其作者龙腾猫跃无关，也不代表 PCL 官方。请勿就本软件的问题打扰 PCL 作者。
->
-> 如果 PCL 对你有帮助，欢迎[赞助 PCL 的作者龙腾猫跃](https://afdian.com/a/LTCat)。
+> **Pixel World 是第三方 Minecraft 启动器，本项目为轻度使用 [Plain Craft Launcher（PCL）](https://github.com/Meloong-Git/PCL) 仓储库**，由第三方开发和维护，与 PCL 及其作者龙腾猫跃无关，也不代表 PCL 官方。请勿就本软件的问题打扰 PCL 作者。
 
-本项目遵循 PCL 的[《PCL 存储库合理使用指南》](PCL-GUIDE.md)，包括：
-
-- 名称以 PCL 开头，并带有表明第三方修改的后缀；
-- 关于页的首位为龙腾猫跃的署名及赞助链接；
-- 源代码公开，并随项目继续使用该指南；
-- 启动游戏前提供正版购买劝导与赞助劝导；
-- 界面主色固定为 PCL 主题蓝，不提供更换主题色的功能。
+本项目遵循 PCL 的[《PCL 存储库合理使用指南》](PCL-GUIDE.md)，保留必要的 PCL 署名、兼容说明，并公开源代码。
 
 ## 状态
 
@@ -52,7 +44,7 @@ PCL.PW 是一个跨平台的 Minecraft 启动器，属于 PCL 的衍生作品，
 
 ## 下载
 
-在 [Releases](https://github.com/zhuzhi-09/PCL.PW/releases) 页面下载：
+在 [Releases](https://github.com/zhuzhi-09/PixelWorld/releases) 页面下载：
 
 - **正式版**：推送 `v*` 标签时自动构建发布。
 - **Nightly**：`main` 分支每次更新后自动构建，发布为名为 `nightly` 的预发布版本，包含最新改动，可能不稳定。
@@ -87,11 +79,12 @@ flutter build apk --release --target-platform android-arm64 --no-tree-shake-icon
 
 ## 许可证
 
-PCL.PW 自身的代码以 [Apache-2.0](LICENSE) 协议开源。PCL 的相关规则见 [PCL-GUIDE.md](PCL-GUIDE.md)。
+Pixel World 自身的代码以 [Apache-2.0](LICENSE) 协议开源。PCL 的相关规则见 [PCL-GUIDE.md](PCL-GUIDE.md)。
 
 Minecraft 是 Mojang Studios 的商标。本软件不是官方 Minecraft 产品，未经 Mojang 或 Microsoft 批准，也与其无关。
 
-## 赞助竹纸
+## 赞助作者
 
-你可以在爱发电赞助PCL.PW的开发者竹纸，链接详见https://afdian.com/a/Paper_Zhu
+你可以在爱发电赞助 Pixel World 的开发者竹纸：[afdian.com/a/Paper_Zhu](https://afdian.com/a/Paper_Zhu)。
+
 感谢爱发电提供平台支持！

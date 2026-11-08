@@ -11,7 +11,7 @@ import 'package:path/path.dart' as p;
 import 'safe_path.dart';
 
 // zip 中的 pclpw-backup.json 记录备份的路径；第 2 版起还记录每个文件的大小与 SHA-256，
-// 并用保存在启动器数据目录的密钥做 HMAC 签名，恢复时据此确认备份由本机的 PCL.PW 创建且未被修改。
+// 并用保存在启动器数据目录的密钥做 HMAC 签名，恢复时据此确认备份由本机的 Pixel World 创建且未被修改。
 
 const backupManifestName = 'pclpw-backup.json';
 
@@ -147,7 +147,7 @@ Future<BackupCheck> checkBackup(String zip, String dir, List<int> key) async {
     } catch (e) {
       throw BackupException('备份文件已损坏：$e');
     }
-    if (manifest == null) throw BackupException('这个备份不是由 PCL.PW 创建的，无法恢复');
+    if (manifest == null) throw BackupException('这个备份不是由 Pixel World 创建的，无法恢复');
     final rawPaths = manifest['paths'];
     if (rawPaths is! List || rawPaths.isEmpty) throw BackupException('备份清单无效');
     final paths = <String>[];

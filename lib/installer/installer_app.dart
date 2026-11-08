@@ -226,7 +226,7 @@ class _InstallerPageState extends State<_InstallerPage> {
           ),
           const Spacer(),
           Text(
-            '${AppInfo.name} 是第三方基于 PCL 独立进行二次创作的产物，不代表 PCL 官方。',
+            '${AppInfo.name} 是第三方 Minecraft 启动器，与 Mojang 或 Microsoft 无关。',
             style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 12),

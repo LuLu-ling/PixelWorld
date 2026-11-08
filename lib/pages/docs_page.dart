@@ -32,7 +32,7 @@ class _DocsPageState extends State<DocsPage> {
     if (href == null || href.isEmpty || href.startsWith('#')) return;
     if (href.startsWith('http://') || href.startsWith('https://')) return _open(href);
     // 指向官网首页等站外页面
-    if (href.startsWith('../')) return _open('https://pcl.pw.zhuzhi.site/${href.substring(3)}');
+    if (href.startsWith('../')) return _open('https://pixelworld.zhuzhi.site/${href.substring(3)}');
     final path = href.split('#').first;
     final name = path.split('/').last;
     if (name.endsWith('.html')) {
@@ -80,7 +80,7 @@ class _DocsPageState extends State<DocsPage> {
                       children: [
                         Text(page.title, style: theme.textTheme.titleMedium),
                         Text(
-                          '来自 pcl.pw.zhuzhi.site · 断网时显示最近一次缓存',
+                          '来自 pixelworld.zhuzhi.site · 断网时显示最近一次缓存',
                           style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                       ],

@@ -194,7 +194,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
                 File f = new File(path);
                 f.getParentFile().mkdirs();
                 try (java.io.FileWriter w = new java.io.FileWriter(f, true)) {
-                    w.write("\nPCL.PW runtime: uncaught exception in thread " + thread.getName() + "\n" + Log.getStackTraceString(e) + "\n");
+                    w.write("\nPixel World runtime: uncaught exception in thread " + thread.getName() + "\n" + Log.getStackTraceString(e) + "\n");
                 }
             } catch (Throwable ignored) {
             }
@@ -378,7 +378,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
                         extras.getBoolean(EXTRA_TURNIP, false));
             } catch (Throwable e) {
                 Log.e(TAG, "Launch failed", e);
-                Logger.appendToLog("PCL.PW runtime: launch failed: " + Log.getStackTraceString(e));
+                Logger.appendToLog("Pixel World runtime: launch failed: " + Log.getStackTraceString(e));
                 code = -1;
             }
             if (code != 0) GameRuntime.recordExit(this, code, false);

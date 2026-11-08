@@ -258,7 +258,7 @@ TransferManifest checkTransfer(String zip) {
   try {
     final archive = ZipDecoder().decodeStream(input);
     final m = archive.findFile(transferManifestName);
-    if (m == null) throw TransferException('收到的文件不是 PCL.PW 的传输包');
+    if (m == null) throw TransferException('收到的文件不是 Pixel World 的传输包');
     final Map<String, dynamic> json;
     try {
       json = jsonDecode(utf8.decode(m.readBytes() ?? const [])) as Map<String, dynamic>;
@@ -609,7 +609,7 @@ Future<String> transferHello(Uri base, String code) async {
     if (res.statusCode != 200) throw TransferException(body.isEmpty ? '连接失败（${res.statusCode}）' : body);
     return (jsonDecode(body) as Map<String, dynamic>)['name'] as String? ?? '对方设备';
   } on SocketException {
-    throw TransferException('连不上 ${base.host}:${base.port}。请确认两台设备在同一个局域网，对方正在接收，且防火墙允许 PCL.PW 联网');
+    throw TransferException('连不上 ${base.host}:${base.port}。请确认两台设备在同一个局域网，对方正在接收，且防火墙允许 Pixel World 联网');
   } finally {
     client.close(force: true);
   }

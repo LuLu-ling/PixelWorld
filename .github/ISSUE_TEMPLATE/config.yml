@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: 使用文档
-    url: https://pcl.pw.zhuzhi.site/docs/
+    url: https://pixelworld.zhuzhi.site/docs/
     about: 安装、第一次启动、Java、模组、安卓、AI 和常见排错的完整说明。
   - name: 下载最新版本
-    url: https://github.com/zhuzhi-09/PCL.PW/releases
+    url: https://github.com/zhuzhi-09/PixelWorld/releases
     about: 正式版与 Nightly 构建都在这里；提交问题前请先确认版本。

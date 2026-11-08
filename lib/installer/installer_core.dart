@@ -115,7 +115,7 @@ Future<void> _writeRegistry(String dir, int size) async {
   final values = [
     ('DisplayName', 'REG_SZ', AppInfo.fullName),
     ('DisplayVersion', 'REG_SZ', AppInfo.version),
-    ('Publisher', 'REG_SZ', 'PCL.PW'),
+    ('Publisher', 'REG_SZ', 'Pixel World'),
     ('DisplayIcon', 'REG_SZ', '$exe,0'),
     ('InstallLocation', 'REG_SZ', dir),
     ('UninstallString', 'REG_SZ', '"$exe" --pw-uninstall'),

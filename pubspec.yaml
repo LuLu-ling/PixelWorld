@@ -1,5 +1,5 @@
 name: pcl_pw
-description: "PCL.PW"
+description: "Pixel World"
 publish_to: 'none'
 
 # 版本名 + 构建号：构建号是安卓的 versionCode，每次发布都要增加

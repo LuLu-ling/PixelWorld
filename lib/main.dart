@@ -62,12 +62,19 @@ ThemeMode themeModeOf(String v) => switch (v) {
 };
 
 const _windowChannel = MethodChannel('pclpw/window');
-bool? _lastLinuxDark;
+int? _lastLinuxThemeKey;
 
-void _syncLinuxWindowTheme(bool dark) {
-  if (!Platform.isLinux || _lastLinuxDark == dark) return;
-  _lastLinuxDark = dark;
-  _windowChannel.invokeMethod<void>('setDarkMode', dark).catchError((_) {});
+void _syncLinuxWindowTheme(bool dark, Color background, Color foreground) {
+  final key = Object.hash(dark, background.toARGB32(), foreground.toARGB32());
+  if (!Platform.isLinux || _lastLinuxThemeKey == key) return;
+  _lastLinuxThemeKey = key;
+  _windowChannel
+      .invokeMethod<void>('setTheme', {
+        'dark': dark,
+        'background': background.toARGB32(),
+        'foreground': foreground.toARGB32(),
+      })
+      .catchError((_) {});
 }
 
 class PclPwApp extends StatelessWidget {
@@ -86,8 +93,12 @@ class PclPwApp extends StatelessWidget {
       home: const Shell(),
       builder: (context, child) {
         if (Platform.isLinux) {
-          final dark = Theme.of(context).brightness == Brightness.dark;
-          WidgetsBinding.instance.addPostFrameCallback((_) => _syncLinuxWindowTheme(dark));
+          final theme = Theme.of(context);
+          final scheme = theme.colorScheme;
+          final dark = theme.brightness == Brightness.dark;
+          final background = scheme.surfaceContainerLow;
+          final foreground = scheme.onSurface;
+          WidgetsBinding.instance.addPostFrameCallback((_) => _syncLinuxWindowTheme(dark, background, foreground));
         }
         return isDesktop ? child! : MobileScale(child: child!);
       },

@@ -84,10 +84,13 @@ static void my_application_activate(GApplication* application) {
     gtk_header_bar_set_title(header_bar, "PCL.PW");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     if (icon_path != nullptr) {
-      GtkWidget* icon = gtk_image_new_from_file(icon_path);
-      gtk_widget_set_size_request(icon, 18, 18);
-      gtk_widget_show(icon);
-      gtk_header_bar_pack_start(header_bar, icon);
+      // GtkImage 直接加载 1024px 文件会把标题栏撑成整块图标，先缩放到 18px
+      GdkPixbuf* pixbuf = gdk_pixbuf_new_from_file_at_scale(icon_path, 18, 18, TRUE, nullptr);
+      if (pixbuf != nullptr) {
+        GtkWidget* icon = gtk_image_new_from_pixbuf(pixbuf);
+        g_object_unref(pixbuf);
+        gtk_header_bar_pack_start(header_bar, icon);
+      }
     }
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {

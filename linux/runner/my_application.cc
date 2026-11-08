@@ -86,6 +86,7 @@ static void my_application_activate(GApplication* application) {
         GtkWidget* icon = gtk_image_new_from_pixbuf(pixbuf);
         g_object_unref(pixbuf);
         gtk_header_bar_pack_start(header_bar, icon);
+        gtk_widget_show(icon);
       }
     }
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));

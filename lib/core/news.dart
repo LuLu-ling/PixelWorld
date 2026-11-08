@@ -34,7 +34,7 @@ const _wiki = 'https://zh.minecraft.wiki';
 String _title(String id) => 'Java版$id';
 
 final _client = HttpClient()
-  ..userAgent = '${AppInfo.name}/${AppInfo.version} (github.com/zhuzhi-09/PCL.PW)'
+  ..userAgent = '${AppInfo.name}/${AppInfo.version} (github.com/zhuzhi-09/PixelWorld)'
   ..connectionTimeout = const Duration(seconds: 15);
 
 Future<Map<String, ({String summary, String? image})>> _wikiExtracts(List<String> titles) async {

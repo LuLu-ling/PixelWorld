@@ -70,7 +70,7 @@ void main() {
   });
 
   test('没有清单的 zip 被拒绝', () async {
-    expect(checkBackup(zipOf([ArchiveFile.string('mods/a.jar', 'x')]), game, key), rejects('不是由 PCL.PW 创建'));
+    expect(checkBackup(zipOf([ArchiveFile.string('mods/a.jar', 'x')]), game, key), rejects('不是由 Pixel World 创建'));
   });
 
   test('清单中的不安全路径被拒绝', () async {

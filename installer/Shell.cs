@@ -36,7 +36,7 @@ static class Program
         }
         else
         {
-            form.Title = "PCL.PW";
+            form.Title = "Pixel World";
             work = f => code = Install(f, args);
         }
 
@@ -285,7 +285,7 @@ sealed class LoadingForm : Form
         ClientSize = new Size(S(380), S(216));
         BackColor = surface;
         ShowInTaskbar = true;
-        Text = "PCL.PW";
+        Text = "Pixel World";
         DoubleBuffered = true;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
         titleFont = new Font("Microsoft YaHei UI", 12.5f, FontStyle.Regular);
@@ -364,7 +364,7 @@ sealed class LoadingForm : Form
 
     public void SetDone(string text)
     {
-        Title = "PCL.PW";
+        Title = "Pixel World";
         status = text;
         progress = 1;
         done = true;

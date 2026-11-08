@@ -373,7 +373,7 @@ class _LanTransferPageState extends State<LanTransferPage> {
                             ],
                           ),
                         if (_addresses.length > 1) Text('有多个地址时，通常用 192.168 开头的那个', style: muted),
-                        if (Platform.isWindows) Text('如果 Windows 防火墙弹出提示，请允许 PCL.PW 访问专用网络', style: muted),
+                        if (Platform.isWindows) Text('如果 Windows 防火墙弹出提示，请允许 Pixel World 访问专用网络', style: muted),
                         if (_recvProgress case (final total, final got)) ...[
                           const SizedBox(height: 12),
                           Text('正在接收 ${formatSize(got)} / ${formatSize(total)}'),

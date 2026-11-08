@@ -38,7 +38,7 @@ public final class ShaderNamesAgent implements ClassFileTransformer {
         try {
             System.loadLibrary("pojavexec");
         } catch (Throwable e) {
-            System.out.println("[PCL.PW] Cannot load pojavexec: " + e);
+            System.out.println("[Pixel World] Cannot load pojavexec: " + e);
         }
         inst.addTransformer(new ShaderNamesAgent());
     }
@@ -49,10 +49,10 @@ public final class ShaderNamesAgent implements ClassFileTransformer {
         if (className == null || !className.startsWith(PACKAGE)) return null;
         try {
             byte[] out = renameStrings(bytes);
-            if (out != null) System.out.println("[PCL.PW] Renamed shader uniform names in " + className);
+            if (out != null) System.out.println("[Pixel World] Renamed shader uniform names in " + className);
             return out;
         } catch (Throwable e) {
-            System.out.println("[PCL.PW] Cannot patch " + className + ": " + e);
+            System.out.println("[Pixel World] Cannot patch " + className + ": " + e);
             return null;
         }
     }

@@ -33,7 +33,7 @@ Future<void> askStorageOnFirstRun(BuildContext context) async {
       content: const SizedBox(
         width: 560,
         child: Text(
-          '放在手机存储（PCL.PW/.minecraft）：卸载或重装启动器后游戏、存档仍然保留，'
+          '放在手机存储（Pixel World/.minecraft）：卸载或重装启动器后游戏、存档仍然保留，'
           '也可以用其他应用管理这些文件。需要授予「所有文件访问权限」。\n\n'
           '放在应用内部：不需要权限，但卸载启动器时游戏、存档会一起被删除。\n\n'
           '之后可以在「设置 → 游戏管理」中更改。',

@@ -53,7 +53,7 @@ class LauncherConfig extends ChangeNotifier {
     'windowMode': 'default',
     'windowWidth': 854,
     'windowHeight': 480,
-    'versionType': 'PCL.PW',
+    'versionType': 'Pixel World',
     'preLaunchCommand': '',
     'preLaunchWait': true,
     'processPriority': 'normal',
@@ -116,6 +116,8 @@ class LauncherConfig extends ChangeNotifier {
       if (_file.existsSync()) {
         final saved = jsonDecode(_file.readAsStringSync());
         if (saved is Map<String, dynamic>) data.addAll(saved);
+        // 旧配置里的版本类型是旧品牌名，读取时迁移
+        if (data['versionType'] == 'PCL.PW') data['versionType'] = 'Pixel World';
       }
     } catch (_) {
       // 配置损坏时回落到默认值

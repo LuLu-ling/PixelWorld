@@ -175,10 +175,10 @@ public class CallbackBridge {
             sdlEnabled = true;
             // SDL needs the surface size for input; the surface itself is attached by GameActivity
             if (SDLActivity.getSDLSurface() != null) SDLActivity.getSDLSurface().nativeResize(windowWidth, windowHeight);
-            Logger.appendToLog("PCL.PW runtime: SDL enabled");
+            Logger.appendToLog("Pixel World runtime: SDL enabled");
             return true;
         } catch (Throwable e) {
-            Logger.appendToLog("PCL.PW runtime: cannot initialize SDL: " + e);
+            Logger.appendToLog("Pixel World runtime: cannot initialize SDL: " + e);
             return false;
         }
     }

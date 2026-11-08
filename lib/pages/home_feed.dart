@@ -21,8 +21,8 @@ class HomeHints extends StatelessWidget {
         _Hint(
           icon: Icons.info_outline,
           text:
-              '你正在使用 ${AppInfo.name} ${AppInfo.version} 测试版。这是第三方基于 PCL 二次创作的启动器，'
-              '功能还在完善中，遇到问题请到 GitHub 反馈，不要打扰 PCL 作者。',
+              '你正在使用 ${AppInfo.name} ${AppInfo.version} 测试版。这是第三方 Minecraft 启动器，'
+              '功能还在完善中，遇到问题请到 GitHub 反馈。',
           action: ('反馈问题', '${AppInfo.repoUrl}/issues'),
         ),
         const SizedBox(height: 8),

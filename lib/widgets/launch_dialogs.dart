@@ -73,9 +73,9 @@ class DialogLaunchPrompts implements LaunchPrompts {
         content: const SizedBox(
           width: 400,
           child: Text(
-            '${AppInfo.name} 基于 PCL 二次创作。如果觉得好用，'
-            '能否考虑赞助一下 PCL 的作者${AppInfo.pclAuthor}？\n\n'
-            'PCL 一直免费、没有广告，离不开大家的支持。',
+            '${AppInfo.name} 由 ${AppInfo.authorName} 维护。如果觉得好用，'
+            '能否考虑赞助一下作者？\n\n'
+            '本项目免费、没有广告，离不开大家的支持。',
           ),
         ),
         actions: [
@@ -84,6 +84,6 @@ class DialogLaunchPrompts implements LaunchPrompts {
         ],
       ),
     );
-    if (ok == true) await launchUrl(Uri.parse(AppInfo.pclSponsorUrl));
+    if (ok == true) await launchUrl(Uri.parse(AppInfo.sponsorUrl));
   }
 }

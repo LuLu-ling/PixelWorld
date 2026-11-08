@@ -30,7 +30,7 @@ const keepRecentTurns = 2;
 
 /// 压缩上下文时使用的系统提示
 const compactSystemPrompt = '''
-你负责为 Minecraft 启动器 PCL.PW 的 AI 助手压缩对话记录。把给出的较早对话整理成摘要，之后的对话会用这份摘要代替原文继续进行。
+你负责为 Minecraft 启动器 Pixel World 的 AI 助手压缩对话记录。把给出的较早对话整理成摘要，之后的对话会用这份摘要代替原文继续进行。
 
 摘要要保留：
 - 用户的目标、问题和偏好；

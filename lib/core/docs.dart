@@ -9,7 +9,7 @@ import 'package:path/path.dart' as p;
 import '../app_info.dart';
 import 'paths.dart';
 
-/// 文档页面；id 对应 `https://pcl.pw.zhuzhi.site/docs/<id>.html`
+/// 文档页面；id 对应 `https://pixelworld.zhuzhi.site/docs/<id>.html`
 const docPages = [
   (id: 'index', title: '总览'),
   (id: 'install', title: '下载与安装'),
@@ -22,10 +22,10 @@ const docPages = [
   (id: 'api', title: '启动器接口'),
 ];
 
-const docSite = 'https://pcl.pw.zhuzhi.site/docs';
+const docSite = 'https://pixelworld.zhuzhi.site/docs';
 
 /// 官网不可用时从 raw.githubusercontent 读取 site 分支的内容；GitHub 直连失败时再试镜像
-const _rawDocs = 'https://raw.githubusercontent.com/zhuzhi-09/PCL.PW/site/docs/docs';
+const _rawDocs = 'https://raw.githubusercontent.com/zhuzhi-09/PixelWorld/site/docs/docs';
 const _docSources = [docSite, _rawDocs, 'https://ghproxy.net/$_rawDocs', 'https://gh-proxy.com/$_rawDocs'];
 
 String docPageUrl(String id) => '$docSite/$id.html';

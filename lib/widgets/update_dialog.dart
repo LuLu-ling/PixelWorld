@@ -136,7 +136,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
             ],
             if (Platform.isMacOS && asset != null) ...[
               const SizedBox(height: 12),
-              Text('下载后会打开安装镜像，把 PCL.PW 拖进「应用程序」文件夹替换旧版本即可；游戏文件不受影响。', style: theme.textTheme.bodySmall),
+              Text('下载后会打开安装镜像，把 Pixel World 拖进「应用程序」文件夹替换旧版本即可；游戏文件不受影响。', style: theme.textTheme.bodySmall),
             ],
             if (Platform.isAndroid && asset != null) ...[
               const SizedBox(height: 12),

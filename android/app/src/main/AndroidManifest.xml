@@ -16,7 +16,7 @@
         android:fullBackupContent="false"
         android:allowNativeHeapPointerTagging="false"
         android:largeHeap="true"
-        android:label="PCL.PW"
+        android:label="Pixel World"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

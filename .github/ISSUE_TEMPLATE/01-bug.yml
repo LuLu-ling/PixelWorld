@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        提交前请先看看[使用文档](https://pcl.pw.zhuzhi.site/docs/)和[已有 Issues](https://github.com/zhuzhi-09/PCL.PW/issues?q=is%3Aissue+)，并确认用的是最新版本。
+        提交前请先看看[使用文档](https://pixelworld.zhuzhi.site/docs/)和[已有 Issues](https://github.com/zhuzhi-09/PixelWorld/issues?q=is%3Aissue+)，并确认用的是最新版本。
         请尽量把问题写清楚；缺少日志或复现步骤时，可能无法定位，Issue 会被直接关闭。
 
   - type: checkboxes
@@ -15,7 +15,7 @@ body:
       label: 提交前确认
       description: 请逐项确认；必需项没有勾选时，Issue 可能被直接关闭。
       options:
-        - label: 我已经搜索过 [Issues](https://github.com/zhuzhi-09/PCL.PW/issues?q=is%3Aissue+)，没有找到相同的问题。
+        - label: 我已经搜索过 [Issues](https://github.com/zhuzhi-09/PixelWorld/issues?q=is%3Aissue+)，没有找到相同的问题。
           required: true
         - label: 我使用的是最新版本（正式版或 Nightly），不是旧版本。
           required: true

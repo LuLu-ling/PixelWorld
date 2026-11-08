@@ -26,7 +26,7 @@ class _LogPageState extends State<LogPage> {
   Color _lineColor(String line, ColorScheme s) {
     if (RegExp(r'/(ERROR|FATAL)\]|Exception|^\s+at ').hasMatch(line)) return s.error;
     if (line.contains('/WARN]')) return s.tertiary;
-    if (line.startsWith('[PCL.PW]')) return s.primary;
+    if (line.startsWith('[Pixel World]') || line.startsWith('[PCL.PW]')) return s.primary;
     return s.onSurface;
   }
 

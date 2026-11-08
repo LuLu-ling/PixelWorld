@@ -48,7 +48,7 @@ public final class JarService extends Service {
             } catch (Throwable e) {
                 Log.e(TAG, "Run failed", e);
                 try {
-                    Logger.appendToLog("PCL.PW runtime: run failed: " + Log.getStackTraceString(e));
+                    Logger.appendToLog("Pixel World runtime: run failed: " + Log.getStackTraceString(e));
                 } catch (Throwable ignored) {
                     // The native logger is not available
                 }

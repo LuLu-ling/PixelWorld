@@ -118,7 +118,7 @@ jobs:
           flutter pub get
           flutter build macos --release --dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL"
           version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
-          app=build/macos/Build/Products/Release/PCL.PW.app
+          app="build/macos/Build/Products/Release/Pixel World.app"
           # 没有开发者证书：整个应用重新做一次临时签名，保证各个框架的签名一致
           codesign --force --deep --sign - "$app"
           # 安装镜像：PCL.PW.app 与「应用程序」文件夹的快捷方式，拖进去即可安装
@@ -126,7 +126,7 @@ jobs:
           mkdir -p "$stage" dist
           cp -R "$app" "$stage/"
           ln -s /Applications "$stage/Applications"
-          hdiutil create -volname "PCL.PW" -srcfolder "$stage" -ov -format UDZO "dist/PCL.PW-$version-macos.dmg"
+          hdiutil create -volname "Pixel World" -srcfolder "$stage" -ov -format UDZO "dist/PCL.PW-$version-macos.dmg"
       - uses: actions/upload-artifact@v4
         with:
           name: macos

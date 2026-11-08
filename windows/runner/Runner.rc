@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "PCL.PW" "\0"
-            VALUE "FileDescription", "PCL.PW" "\0"
+            VALUE "CompanyName", "Pixel World" "\0"
+            VALUE "FileDescription", "Pixel World" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "PCL.PW" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 PCL.PW contributors. Apache-2.0." "\0"
+            VALUE "InternalName", "pcl_pw" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Pixel World contributors. Apache-2.0." "\0"
             VALUE "OriginalFilename", "pcl_pw.exe" "\0"
-            VALUE "ProductName", "PCL.PW" "\0"
+            VALUE "ProductName", "Pixel World" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

@@ -14,6 +14,26 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
+static FlMethodChannel* g_window_channel = nullptr;
+
+static void window_method_call_cb(FlMethodChannel* channel,
+                                  FlMethodCall* method_call,
+                                  gpointer user_data) {
+  const gchar* method = fl_method_call_get_name(method_call);
+  if (g_strcmp0(method, "setDarkMode") == 0) {
+    FlValue* args = fl_method_call_get_args(method_call);
+    bool dark = args != nullptr && fl_value_get_type(args) == FL_VALUE_TYPE_BOOL &&
+                fl_value_get_bool(args);
+    GtkSettings* settings = gtk_settings_get_default();
+    if (settings != nullptr) {
+      g_object_set(settings, "gtk-application-prefer-dark-theme", dark ? TRUE : FALSE, nullptr);
+    }
+    fl_method_call_respond_success(method_call, nullptr, nullptr);
+    return;
+  }
+  fl_method_call_respond_not_implemented(method_call, nullptr);
+}
+
 // The bundle keeps the launcher icon next to the executable.
 static gchar* app_icon_path() {
   g_autofree gchar* exe = g_file_read_link("/proc/self/exe", nullptr);
@@ -121,6 +141,11 @@ static void my_application_activate(GApplication* application) {
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
+  FlBinaryMessenger* messenger = fl_engine_get_binary_messenger(fl_view_get_engine(view));
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  g_window_channel = fl_method_channel_new(messenger, "pclpw/window", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(g_window_channel, window_method_call_cb, nullptr, nullptr);
+
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
 
@@ -166,6 +191,7 @@ static void my_application_shutdown(GApplication* application) {
 // Implements GObject::dispose.
 static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
+  g_clear_object(&g_window_channel);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }

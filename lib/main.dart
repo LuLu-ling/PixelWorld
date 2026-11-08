@@ -62,6 +62,15 @@ ThemeMode themeModeOf(String v) => switch (v) {
   _ => ThemeMode.system,
 };
 
+const _windowChannel = MethodChannel('pclpw/window');
+bool? _lastLinuxDark;
+
+void _syncLinuxWindowTheme(bool dark) {
+  if (!Platform.isLinux || _lastLinuxDark == dark) return;
+  _lastLinuxDark = dark;
+  _windowChannel.invokeMethod<void>('setDarkMode', dark).catchError((_) {});
+}
+
 class PclPwApp extends StatelessWidget {
   const PclPwApp({super.key});
 
@@ -76,7 +85,13 @@ class PclPwApp extends StatelessWidget {
       darkTheme: buildTheme(Brightness.dark, seed: Color(state.config.themeColor)),
       themeMode: themeModeOf(state.config.themeMode),
       home: const Shell(),
-      builder: (context, child) => isDesktop ? child! : MobileScale(child: child!),
+      builder: (context, child) {
+        if (Platform.isLinux) {
+          final dark = Theme.of(context).brightness == Brightness.dark;
+          WidgetsBinding.instance.addPostFrameCallback((_) => _syncLinuxWindowTheme(dark));
+        }
+        return isDesktop ? child! : MobileScale(child: child!);
+      },
     );
   }
 }

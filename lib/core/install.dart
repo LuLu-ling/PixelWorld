@@ -62,7 +62,7 @@ Future<VersionJson> ensureVersionFiles(
   }
 
   task.setStage('下载游戏本体与依赖库');
-  await dl.downloadAll(items, task.progress);
+  await dl.downloadAll(items, task.progress, cancelled: () => task.cancelled);
 
   // 继承的版本使用自己文件夹里的游戏 jar 副本
   if (v.launchJar != v.rootJar) {
@@ -99,7 +99,7 @@ Future<VersionJson> ensureVersionFiles(
       );
     }).toList();
     task.setStage('下载资源文件');
-    await dl.downloadAll([for (final o in objects) o.item], task.progress);
+    await dl.downloadAll([for (final o in objects) o.item], task.progress, cancelled: () => task.cancelled);
 
     // 旧版本资源需要按原文件名展开
     final mapToResources = index['map_to_resources'] == true;
@@ -187,6 +187,7 @@ Future<String> saveVersionJson(GamePaths g, VersionJson json, Downloader dl, Tas
   json.id = id;
   json.raw.remove('_folder');
   await Directory(g.versionDir(id)).create(recursive: true);
+  task.registerCleanupPath(g.versionDir(id));
   await File(g.versionJson(id)).writeAsString(const JsonEncoder.withIndent('  ').convert(json.raw));
   // 新安装的版本还没有决定隔离，map_to_resources 的旧版资源放在版本文件夹下
   await ensureVersionFiles(g, id, dl, task, resourcesDir: () => p.join(g.versionDir(id), 'resources'));

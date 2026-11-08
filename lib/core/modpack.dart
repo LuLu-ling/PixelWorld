@@ -132,6 +132,7 @@ Future<String> _installArchive(
     }
 
     // 整合包内容放在版本自己的目录里，必须开启版本隔离
+    task.registerCleanupPath(g.versionDir(id));
     await writeInstanceRaw(g.versionDir(id), {'VersionArgumentIndieV2': true});
     final gameDir = g.versionDir(id);
     await Directory(gameDir).create(recursive: true);
@@ -176,7 +177,7 @@ Future<String> _installArchive(
     if (items.isEmpty) {
       task.progress(0, 0);
     } else {
-      await dl.downloadAll(items, task.progress);
+      await dl.downloadAll(items, task.progress, cancelled: () => task.cancelled);
     }
     if (skipped > 0) task.output('跳过 $skipped 个不需要的文件');
 

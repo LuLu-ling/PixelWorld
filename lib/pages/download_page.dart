@@ -5,6 +5,7 @@ import '../core/install.dart';
 import '../core/instance.dart';
 import '../core/loaders.dart';
 import '../core/modrinth.dart';
+import '../core/task.dart';
 import '../widgets/loader_icon.dart';
 import '../core/optifine_compat.dart';
 import '../widgets/side_nav.dart';
@@ -412,11 +413,16 @@ class _InstallDialogState extends State<InstallDialog> {
             SnackBar(content: Text('$id 安装完成'), behavior: SnackBarBehavior.floating, width: 420),
           ),
         )
-        .catchError(
-          (Object e) => messenger.showSnackBar(
-            SnackBar(content: Text('安装失败：${errorText(e)}'), behavior: SnackBarBehavior.floating, width: 420),
-          ),
-        );
+        .catchError((Object e) {
+          final cancelled = e is TaskCancelled;
+          return messenger.showSnackBar(
+            SnackBar(
+              content: Text(cancelled ? '任务已中断' : '安装失败：${errorText(e)}'),
+              behavior: SnackBarBehavior.floating,
+              width: 420,
+            ),
+          );
+        });
   }
 
   String get _defaultName => _choice == null && _optifine && _canOptiFine

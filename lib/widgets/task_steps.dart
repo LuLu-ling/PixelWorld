@@ -23,6 +23,7 @@ class TaskSteps extends StatelessWidget {
     Widget icon(TaskStepState s) => switch (s) {
       TaskStepState.done => Icon(Icons.check_circle, size: size, color: green),
       TaskStepState.failed => Icon(Icons.cancel, size: size, color: scheme.error),
+      TaskStepState.cancelled => Icon(Icons.stop_circle_outlined, size: size, color: scheme.tertiary),
       TaskStepState.pending => Icon(Icons.remove_circle_outline, size: size, color: scheme.outline),
       TaskStepState.running => SizedBox.square(
         dimension: size,
@@ -48,6 +49,7 @@ class TaskSteps extends StatelessWidget {
                   color: switch (task.steps[i].state) {
                     TaskStepState.pending => scheme.outline,
                     TaskStepState.failed => scheme.error,
+                    TaskStepState.cancelled => scheme.tertiary,
                     _ => scheme.onSurface,
                   },
                 ),

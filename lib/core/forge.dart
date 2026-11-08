@@ -100,16 +100,16 @@ Future<void> ensureLauncherProfiles(String root) async {
   await f.writeAsString(
     const JsonEncoder.withIndent('  ').convert({
       'profiles': {
-        'Pixel World': {
+        'PCL.PW': {
           'icon': 'Grass',
-          'name': 'Pixel World',
+          'name': 'PCL.PW',
           'lastVersionId': 'latest-release',
           'type': 'latest-release',
           'lastUsed': now,
           'created': now,
         },
       },
-      'selectedProfile': 'Pixel World',
+      'selectedProfile': 'PCL.PW',
       'clientToken': '23323323323323323323323323323333',
     }),
   );
@@ -212,6 +212,7 @@ Future<String> installForgeLike(
         : await renameVersion(g, id, wanted);
     // 独立的版本 JSON（例如 Cleanroom）没有记录原版版本号，补上 clientVersion（HMCL 也使用这个字段）
     final jsonFile = File(g.versionJson(finalId));
+    task.registerCleanupPath(g.versionDir(finalId));
     final raw = jsonDecode(await jsonFile.readAsString()) as Map<String, dynamic>;
     if (raw['inheritsFrom'] == null && raw['clientVersion'] == null) {
       raw['clientVersion'] = gameVersion;
@@ -261,7 +262,7 @@ Future<void> _preloadLibraries(
   if (items.isEmpty) return;
   task.setStage('下载 $label 安装器需要的依赖库');
   try {
-    await dl.downloadAll(items.values.toList(), task.progress);
+    await dl.downloadAll(items.values.toList(), task.progress, cancelled: () => task.cancelled);
   } catch (e) {
     task.output('部分依赖库没有下载成功，交给安装器重试：$e');
   }

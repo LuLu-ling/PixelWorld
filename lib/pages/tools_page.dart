@@ -314,7 +314,9 @@ class _CustomDownloadState extends State<_CustomDownload> {
     final name = _name.text.trim().isEmpty ? fileNameFromUrl(url) : _name.text.trim();
     final path = p.join(dir, name);
     final state = AppScope.read(context);
-    final t = TaskProgress('下载 $name', steps: const ['下载']);
+    final existed = File(path).existsSync();
+    final t = TaskProgress('下载 $name', steps: const ['下载'], canCancel: true);
+    if (!existed) t.registerCleanupPath(path);
     try {
       await state.track(t, () => downloadToFile(url, path, t));
       if (mounted) setState(() => _saved = path);

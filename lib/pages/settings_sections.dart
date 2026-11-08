@@ -748,7 +748,9 @@ class _AndroidJavaSectionState extends State<_AndroidJavaSection> {
 
   Future<void> _download(int major) async {
     final state = AppScope.read(context);
-    final t = TaskProgress('下载 Java $major（安卓版）', steps: const ['下载']);
+    final existed = androidJavaAt(androidJavaHome(major)) != null;
+    final t = TaskProgress('下载 Java $major（安卓版）', steps: const ['下载'], canCancel: true);
+    if (!existed) t.registerCleanupPath(androidJavaHome(major));
     setState(() => _busy.add(major));
     try {
       await state.track(t, () async {

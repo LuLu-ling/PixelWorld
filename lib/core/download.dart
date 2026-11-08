@@ -64,8 +64,10 @@ class Downloader {
 
   /// 低于这个速度视为分到了慢节点（字节/秒），断开重连
   static const _slowSpeed = 64 * 1024;
+  static const _chunkThreshold = 8 * 1024 * 1024;
+  static const _chunkCount = 4;
 
-  Future<List<int>> _get(String url, {int retries = 3, bool Function()? cancelled}) async {
+  Future<List<int>> _get(String url, {int retries = 3, bool Function()? cancelled, String? range}) async {
     // 镜像失败时回退到官方源；GitHub 地址再依次尝试 ghproxy 等镜像
     final candidates = <String>{mirror(url), if (mirror(url) != url) url, ...githubMirrorsFor(url)}.toList();
     Object? lastErr;
@@ -78,8 +80,10 @@ class Downloader {
         final checkSpeed = i < retries - 1;
         try {
           final req = await _client.getUrl(Uri.parse(target));
+          if (range != null) req.headers.set(HttpHeaders.rangeHeader, range);
           final res = await req.close().timeout(const Duration(seconds: 30));
-          if (res.statusCode == 200) {
+          final ok = range == null ? res.statusCode == 200 : res.statusCode == 206;
+          if (ok) {
             final b = BytesBuilder(copy: false);
             final sw = Stopwatch()..start();
             await for (final chunk in res.timeout(const Duration(seconds: 20))) {
@@ -93,9 +97,12 @@ class Downloader {
             return b.takeBytes();
           }
           await res.drain<void>();
+          if (range != null && res.statusCode == 200) throw const _RangeUnsupported();
           lastErr = HttpException('HTTP ${res.statusCode} $target');
           if (res.statusCode == 404) break;
         } on _Cancelled {
+          rethrow;
+        } on _RangeUnsupported {
           rethrow;
         } on HandshakeException catch (e) {
           lastErr = e;
@@ -149,6 +156,19 @@ class Downloader {
   /// 下载到临时文件，校验通过后再替换正式文件，中断或校验失败都不会留下看似完整的文件。
   /// [cancelled] 返回 true 时放弃下载（同一文件的另一个连接已经完成）
   Future<void> downloadFile(DownloadItem item, {bool Function()? cancelled}) async {
+    final size = item.size;
+    // 大文件拆成多个 Range 连接并行下载；服务器不支持 Range 时回退到单连接
+    if (size != null && size >= _chunkThreshold) {
+      try {
+        await _downloadChunked(item, size, cancelled);
+        return;
+      } on _RangeUnsupported {
+        // 回退
+      } catch (e) {
+        if (cancelled?.call() ?? false) rethrow;
+        // 分块失败时再用普通下载重试一次
+      }
+    }
     final data = await _get(item.url, cancelled: cancelled);
     final want = item.sha1?.toLowerCase();
     if (want != null && want.isNotEmpty && sha1.convert(data).toString() != want) {
@@ -174,6 +194,70 @@ class Downloader {
         VerifiedFiles.record(item.path, await f.stat(), want);
       } on FileSystemException {
         // 记录失败只会导致下次重新校验
+      }
+    }
+  }
+
+  /// 大文件分块并行下载。所有分块下载完后再合并、校验，失败时不会留下完整文件。
+  Future<void> _downloadChunked(DownloadItem item, int size, bool Function()? cancelled) async {
+    if (cancelled?.call() ?? false) throw const _Cancelled();
+    final f = File(item.path);
+    await f.parent.create(recursive: true);
+    final base = '${item.path}.$pid.${_tmpSeq++}';
+    final chunks = <File>[];
+    File? merged;
+    try {
+      final chunkSize = (size + _chunkCount - 1) ~/ _chunkCount;
+      final futures = <Future<void>>[];
+      for (var i = 0; i < _chunkCount; i++) {
+        final start = i * chunkSize;
+        if (start >= size) break;
+        final end = min(start + chunkSize, size) - 1;
+        final part = File('$base.$i.part');
+        chunks.add(part);
+        futures.add(() async {
+          final bytes = await _get(item.url, range: 'bytes=$start-$end', cancelled: cancelled);
+          if (bytes.length != end - start + 1) throw Exception('分块大小不符：${part.path}');
+          await part.writeAsBytes(bytes, flush: true);
+        }());
+      }
+      await Future.wait(futures);
+      if (cancelled?.call() ?? false) throw const _Cancelled();
+      merged = File('$base.tmp');
+      final sink = merged.openWrite();
+      try {
+        for (final part in chunks) {
+          await sink.addStream(part.openRead());
+        }
+      } finally {
+        await sink.close();
+      }
+      if (await merged.length() != size) throw Exception('分块合并后大小不符：${item.path}');
+      final want = item.sha1?.toLowerCase();
+      if (want != null && want.isNotEmpty) {
+        final actual = (await sha1.bind(merged.openRead()).first).toString();
+        if (actual != want) throw Exception('校验失败（SHA-1 不匹配）：${item.path}');
+      }
+      if (cancelled?.call() ?? false) throw const _Cancelled();
+      await merged.rename(item.path);
+      merged = null;
+      if (want != null && want.isNotEmpty) {
+        try {
+          VerifiedFiles.record(item.path, await f.stat(), want);
+        } on FileSystemException {
+          // 记录失败只会导致下次重新校验
+        }
+      }
+    } finally {
+      for (final part in chunks) {
+        try {
+          await part.delete();
+        } catch (_) {}
+      }
+      if (merged != null) {
+        try {
+          await merged.delete();
+        } catch (_) {}
       }
     }
   }
@@ -243,6 +327,7 @@ class Downloader {
     List<DownloadItem> items,
     void Function(int done, int total) onProgress, {
     void Function(int done, int total)? onBytes,
+    bool Function()? cancelled,
   }) async {
     final unique = {for (final i in items) i.path: i}.values.toList();
     final jobs = <_Job>[];
@@ -285,9 +370,10 @@ class Downloader {
       job.running++;
       job.startedAt ??= DateTime.now();
       try {
+        if (cancelled?.call() ?? false) throw const _Cancelled();
         // 同一文件可能已经由补位连接完成；完成后立即释放 worker 去下载下一个文件，
         // 不再等这条卡住的连接自然超时。
-        final download = downloadFile(job.item, cancelled: () => job.finished);
+        final download = downloadFile(job.item, cancelled: () => job.finished || (cancelled?.call() ?? false));
         await Future.any<void>([download, job.done.future]);
         if (!job.finished) finish(job);
       } catch (e) {
@@ -352,6 +438,10 @@ class _Job {
 
 class _Cancelled implements Exception {
   const _Cancelled();
+}
+
+class _RangeUnsupported implements Exception {
+  const _RangeUnsupported();
 }
 
 /// 已经按 SHA-1 校验过的文件：路径 → 大小、修改时间与 SHA-1。

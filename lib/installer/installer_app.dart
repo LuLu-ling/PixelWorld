@@ -64,7 +64,7 @@ class _InstallerPage extends StatefulWidget {
 class _InstallerPageState extends State<_InstallerPage> {
   late String _dir = widget.mode == InstallerMode.uninstall
       ? sourceDir
-      : p.normalize(p.absolute(argValue(widget.args, 'pw-dir') ?? defaultInstallDir));
+      : p.normalize(p.absolute(argValue(widget.args, 'pw-dir') ?? findInstalledDir() ?? defaultInstallDir));
   bool _desktop = true;
   bool _startMenu = true;
   bool _removeData = false;

@@ -31,6 +31,52 @@ String get defaultInstallDir => p.join(_env, 'Programs', AppInfo.name);
 /// 程序当前所在目录（安装时为外壳解压出的临时目录）
 String get sourceDir => p.dirname(Platform.resolvedExecutable);
 
+/// 目录里是否已经有本启动器的安装（有安装清单或主程序）
+bool isInstallDir(String dir) {
+  if (dir.isEmpty) return false;
+  final d = p.normalize(p.absolute(dir));
+  return File(p.join(d, _manifestName)).existsSync() || File(p.join(d, exeName)).existsSync();
+}
+
+/// 旧版本使用过的程序目录名
+const _legacyInstallNames = ['Pixel World', 'PCL.PW', 'PixelsWorld Launcher'];
+
+String? _registryInstallDir() {
+  try {
+    final r = Process.runSync('reg.exe', ['query', _regKey, '/v', 'InstallLocation']);
+    if (r.exitCode != 0) return null;
+    final m = RegExp(r'InstallLocation\s+REG_SZ\s+(.+)').firstMatch('${r.stdout}');
+    return m?.group(1)?.trim();
+  } catch (_) {
+    return null;
+  }
+}
+
+/// 查找已经安装的位置：安装程序默认升级原目录，而不是在别处再装一份。
+/// 依次检查卸载信息里的 InstallLocation、旧品牌的默认目录和 Programs 下的其他子目录。
+String? findInstalledDir() {
+  final reg = _registryInstallDir();
+  if (reg != null && isInstallDir(reg)) return p.normalize(p.absolute(reg));
+
+  final programs = p.join(_env, 'Programs');
+  for (final name in _legacyInstallNames) {
+    final dir = p.join(programs, name);
+    if (isInstallDir(dir)) return p.normalize(dir);
+  }
+
+  try {
+    final dir = Directory(programs);
+    if (dir.existsSync()) {
+      for (final e in dir.listSync()) {
+        if (e is Directory && isInstallDir(e.path)) return p.normalize(e.path);
+      }
+    }
+  } catch (_) {
+    // 没有权限时忽略，继续使用默认目录
+  }
+  return null;
+}
+
 /// 启动器的用户数据目录（设置、账户、默认游戏文件夹）
 String get userDataDir => p.join(Platform.environment['APPDATA'] ?? '', AppInfo.name);
 

@@ -84,21 +84,40 @@ class AppState extends ChangeNotifier {
 
   List<TaskProgress> get runningTasks => tasks.where((t) => t.state == TaskState.running).toList();
 
-  /// 登记并执行一个任务，结束时记录成功或失败
+  /// 登记并执行一个任务，结束时记录成功、失败或中断
   Future<T> track<T>(TaskProgress t, Future<T> Function() body) async {
     tasks.insert(0, t);
     notifyListeners();
     try {
       final r = await body();
+      if (t.cancelled) throw const TaskCancelled();
       t.complete();
       return r;
+    } on TaskCancelled {
+      await _cleanupCancelled(t);
+      rethrow;
     } catch (e) {
+      if (t.cancelled) {
+        await _cleanupCancelled(t);
+        throw const TaskCancelled();
+      }
       t.fail(e);
       rethrow;
     } finally {
       notifyListeners();
     }
   }
+
+  /// 删除中断任务新建的文件和目录，然后标记任务已中断
+  Future<void> _cleanupCancelled(TaskProgress t) async {
+    if (t.cleanupDone) return;
+    final removed = await t.cleanupFiles();
+    if (removed > 0) t.output('已清理 $removed 个由本次任务创建的文件或目录');
+    t.markCancelled();
+  }
+
+  /// 请求中断任务
+  void cancelTask(TaskProgress t) => t.cancel();
 
   void clearFinishedTasks() {
     tasks.removeWhere((t) => t.state != TaskState.running);
@@ -238,6 +257,7 @@ class AppState extends ChangeNotifier {
     final t = TaskProgress(
       '安装 ${version.fileName}',
       steps: [if (type == ResourceType.mod) '解析前置', '下载文件'],
+      canCancel: true,
       retry: () => installResource(version, type, instance, world: world).catchError((_) => InstallResult([], [], [])),
     );
     return track(t, () async {
@@ -265,6 +285,7 @@ class AppState extends ChangeNotifier {
     final t = TaskProgress(
       '安装整合包 ${name ?? version.name}',
       steps: const ['下载整合包', '安装游戏与加载器', '下载整合包文件', '解压整合包配置'],
+      canCancel: true,
       retry: () => installModpack(version, name: name).catchError((_) => ''),
     );
     return track(t, () async {
@@ -281,6 +302,7 @@ class AppState extends ChangeNotifier {
     final t = TaskProgress(
       '安装整合包 ${name ?? p.basenameWithoutExtension(path)}',
       steps: const ['读取整合包', '安装游戏与加载器', '下载整合包文件', '解压整合包配置'],
+      canCancel: true,
       retry: () => installModpackFile(path, name: name).catchError((_) => ''),
     );
     return track(t, () async {
@@ -300,6 +322,7 @@ class AppState extends ChangeNotifier {
         downloadStep(loaderComponent(LoaderKind.optifine, instance.gameVersion, version)),
         installStep(loaderComponent(LoaderKind.optifine, instance.gameVersion, version)),
       ],
+      canCancel: true,
     );
     return track(t, () async {
       final dir = await gameDirOf(instance, persist: true);
@@ -341,6 +364,7 @@ class AppState extends ChangeNotifier {
           installStep(loaderComponent(LoaderKind.optifine, gameVersion, optifine)),
         ],
       ],
+      canCancel: true,
       retry: () => installVersion(
         gameVersion,
         loader: loader,

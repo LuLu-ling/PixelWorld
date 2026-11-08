@@ -108,9 +108,10 @@ class _TaskCardState extends State<_TaskCard> {
       builder: (context, _) {
         final t = widget.task;
         final (icon, color, label) = switch (t.state) {
-          TaskState.running => (Icons.downloading, scheme.primary, '进行中'),
+          TaskState.running => (Icons.downloading, scheme.primary, t.cancelled ? '正在中断' : '进行中'),
           TaskState.success => (Icons.check_circle, scheme.primary, '已完成'),
           TaskState.failed => (Icons.error, scheme.error, '失败'),
+          TaskState.cancelled => (Icons.stop_circle_outlined, scheme.tertiary, '已中断'),
         };
         return Card.filled(
           color: scheme.surfaceContainerLow,
@@ -137,6 +138,12 @@ class _TaskCardState extends State<_TaskCard> {
                             '$label · ${_duration(t.elapsed)}',
                             style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
                           ),
+                          if (t.state == TaskState.running && t.canCancel)
+                            TextButton.icon(
+                              onPressed: t.cancelled ? null : () => AppScope.read(context).cancelTask(t),
+                              icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                              label: Text(t.cancelled ? '中断中…' : '中断'),
+                            ),
                           if (t.state == TaskState.failed && t.retry != null)
                             TextButton(onPressed: t.retry, child: const Text('重试')),
                           if (t.state != TaskState.running)

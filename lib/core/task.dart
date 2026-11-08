@@ -1,8 +1,18 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 
-enum TaskState { running, success, failed }
+enum TaskState { running, success, failed, cancelled }
 
-enum TaskStepState { pending, running, done, failed }
+enum TaskStepState { pending, running, done, failed, cancelled }
+
+/// 任务被用户中断
+class TaskCancelled implements Exception {
+  const TaskCancelled();
+
+  @override
+  String toString() => '任务已中断';
+}
 
 class TaskStep {
   TaskStep(this.label);
@@ -13,15 +23,42 @@ class TaskStep {
 
 /// 一个后台任务（安装、下载、启动）的进度与日志，界面监听它显示阶段与进度条
 class TaskProgress extends ChangeNotifier {
-  TaskProgress(this.title, {this.retry, List<String> steps = const []}) : steps = [for (final s in steps) TaskStep(s)];
+  TaskProgress(this.title, {this.retry, this.canCancel = false, List<String> steps = const []})
+    : steps = [for (final s in steps) TaskStep(s)];
 
   final String title;
 
   /// 任务的步骤，例如「下载」「安装」；按顺序进行
   final List<TaskStep> steps;
 
+  /// 是否允许用户中断。启动游戏这类任务应该用结束游戏，而不是中断任务
+  final bool canCancel;
+
+  bool _cancelled = false;
+
+  /// 用户是否已请求中断
+  bool get cancelled => _cancelled;
+
+  /// 中断后需要删除的文件或目录（只登记本次任务新建的内容）
+  final Set<String> cleanupPaths = {};
+
+  /// 清理回调是否已经执行，避免重复删除
+  bool cleanupDone = false;
+
+  /// 登记一个本次任务创建的文件或目录，中断时统一删除
+  void registerCleanupPath(String path) => cleanupPaths.add(path);
+
+  /// 请求中断；实际停止由任务主体在检查点发现
+  void cancel() {
+    if (!canCancel || state != TaskState.running || _cancelled) return;
+    _cancelled = true;
+    _append('正在中断任务…');
+    notifyListeners();
+  }
+
   /// 进入名为 [label] 的步骤；计划中没有这一步时追加到末尾
   void beginStep(String label) {
+    if (_cancelled) throw const TaskCancelled();
     var i = steps.indexWhere((s) => s.label == label);
     if (i < 0) {
       steps.add(TaskStep(label));
@@ -84,6 +121,7 @@ class TaskProgress extends ChangeNotifier {
   }
 
   void setStage(String s) {
+    if (_cancelled) throw const TaskCancelled();
     stage = s;
     detail = '';
     done = 0;
@@ -95,6 +133,7 @@ class TaskProgress extends ChangeNotifier {
 
   /// 切换阶段但保留当前进度（例如下载完成后进入解压）
   void setStageKeepProgress(String s) {
+    if (_cancelled) throw const TaskCancelled();
     stage = s;
     _append(s);
     notifyListeners();
@@ -151,6 +190,42 @@ class TaskProgress extends ChangeNotifier {
     endedAt = DateTime.now();
     error = '$e'.replaceFirst(RegExp(r'^Exception: ?'), '');
     _append('失败：$error');
+    notifyListeners();
+  }
+
+  /// 删除任务新建的文件和目录，返回删除的数量
+  Future<int> cleanupFiles() async {
+    if (cleanupDone) return 0;
+    cleanupDone = true;
+    var removed = 0;
+    for (final path in cleanupPaths) {
+      try {
+        final type = await FileSystemEntity.type(path);
+        if (type == FileSystemEntityType.notFound) continue;
+        if (type == FileSystemEntityType.directory) {
+          await Directory(path).delete(recursive: true);
+        } else {
+          await File(path).delete();
+        }
+        removed++;
+      } catch (_) {
+        // 清理失败不影响中断本身
+      }
+    }
+    return removed;
+  }
+
+  /// 中断完成：未完成的步骤标记为已中断
+  void markCancelled() {
+    for (final s in steps) {
+      if (s.state == TaskStepState.running || s.state == TaskStepState.pending) {
+        s.state = TaskStepState.cancelled;
+      }
+    }
+    state = TaskState.cancelled;
+    endedAt = DateTime.now();
+    error = null;
+    _append('已中断');
     notifyListeners();
   }
 }

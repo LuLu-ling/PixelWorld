@@ -154,7 +154,7 @@ class InstallResult {
 /// Modrinth API。Modrinth 要求 User-Agent 能识别出应用
 class Modrinth {
   static final _client = HttpClient()
-    ..userAgent = 'zhuzhi-09/PixelWorld/${AppInfo.version} (github.com/zhuzhi-09/PixelWorld)'
+    ..userAgent = 'zhuzhi-09/PCL.PW/${AppInfo.version} (github.com/zhuzhi-09/PCL.PW)'
     ..connectionTimeout = const Duration(seconds: 20);
 
   static Future<dynamic> _get(String path) async {
@@ -317,11 +317,12 @@ class Modrinth {
         continue;
       }
       items.add(DownloadItem(url: v.fileUrl, path: p.join(dir, v.fileName), sha1: v.fileSha1, size: v.fileSize));
+      task.registerCleanupPath(p.join(dir, v.fileName));
       installed.add(v.fileName);
     }
     task.beginStep('下载文件');
     task.setStage('下载文件');
-    await dl.downloadAll(items, task.progress);
+    await dl.downloadAll(items, task.progress, cancelled: () => task.cancelled);
     return InstallResult(installed, skipped, missing);
   }
 }

@@ -6,6 +6,7 @@ import '../app_scope.dart';
 import '../core/instance.dart';
 import '../core/instance_files.dart';
 import '../core/modrinth.dart';
+import '../core/task.dart';
 import '../widgets/format.dart';
 
 /// 社区资源（Modrinth）：搜索列表，点击进入详情
@@ -78,7 +79,9 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
 
   Future<void> _installFromFile() async {
     final file = await openFile(
-      acceptedTypeGroups: const [XTypeGroup(label: 'Modrinth 整合包', extensions: ['mrpack'])],
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'Modrinth 整合包', extensions: ['mrpack']),
+      ],
       confirmButtonText: '选择',
     );
     if (file == null || !mounted) return;
@@ -87,7 +90,7 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
       final id = await AppScope.read(context).installModpackFile(file.path);
       if (mounted) toast(context, '已安装整合包为 $id');
     } catch (e) {
-      if (mounted) toast(context, '安装失败：${errorText(e)}');
+      if (mounted) toast(context, e is TaskCancelled ? '任务已中断' : '安装失败：${errorText(e)}');
     } finally {
       if (mounted) setState(() => _installingPack = false);
     }
@@ -449,7 +452,7 @@ class _ResourceDetailState extends State<ResourceDetail> {
       if (r.missing.isNotEmpty) parts.add('找不到兼容的前置：${r.missing.join('、')}');
       toast(context, parts.join('，'));
     } catch (e) {
-      if (mounted) toast(context, '安装失败：${errorText(e)}');
+      if (mounted) toast(context, e is TaskCancelled ? '任务已中断' : '安装失败：${errorText(e)}');
     } finally {
       if (mounted) setState(() => _installing = '');
     }
@@ -461,7 +464,7 @@ class _ResourceDetailState extends State<ResourceDetail> {
       final id = await AppScope.read(context).installModpack(v, name: widget.hit.title);
       if (mounted) toast(context, '已安装整合包为 $id');
     } catch (e) {
-      if (mounted) toast(context, '安装失败：${errorText(e)}');
+      if (mounted) toast(context, e is TaskCancelled ? '任务已中断' : '安装失败：${errorText(e)}');
     } finally {
       if (mounted) setState(() => _installing = '');
     }

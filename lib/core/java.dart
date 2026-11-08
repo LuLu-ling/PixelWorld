@@ -185,6 +185,7 @@ Future<String?> _installRuntime(String component, Downloader dl, TaskProgress ta
       final speed = secs > 0 ? done / secs : 0.0;
       task.setDetail('${_mb(done)} / ${_mb(total)}${speed > 0 ? ' · 平均 ${_mb(speed)}/s' : ''}');
     },
+    cancelled: () => task.cancelled,
   );
 
   if (!Platform.isWindows) {
@@ -282,12 +283,26 @@ String? javaTooNewWarning(VersionJson v, int javaMajor) {
   return null;
 }
 
+/// 按安装器/游戏需要的 Java 大版本选择 Mojang 运行时组件
+String _runtimeComponentFor(VersionJson v, int major) {
+  final declared = v.javaComponent;
+  if (declared != null && declared.isNotEmpty && (major <= 8 || declared != 'jre-legacy')) {
+    return declared;
+  }
+  if (major <= 8) return 'jre-legacy';
+  if (major <= 16) return 'java-runtime-alpha';
+  if (major <= 20) return 'java-runtime-gamma';
+  if (major <= 24) return 'java-runtime-delta';
+  return 'java-runtime-epsilon';
+}
+
 /// 为指定版本选择合适的 Java，必要时自动下载。
 /// 优先级与 PCL-CE 一致：实例指定 > 全局指定 > 自动选择。
 Future<JavaInfo> ensureJava(VersionJson v, JavaPref pref, String globalJava, Downloader dl, TaskProgress task) async {
   // 安卓上的 Java 不能作为独立进程运行，要经游戏运行时（见 java_run.dart 的 runJava）
   if (Platform.isAndroid) throw UnsupportedError('安卓上请使用 ensureAndroidJava');
   final major = v.javaMajor ?? 8;
+  final component = _runtimeComponentFor(v, major);
   // 用户指定的 Java 不自动替换；路径失效或版本过低时给出明确提示
   Future<JavaInfo> chosen(String path, String where) async {
     if (!File(path).existsSync()) {
@@ -310,8 +325,6 @@ Future<JavaInfo> ensureJava(VersionJson v, JavaPref pref, String globalJava, Dow
     default:
   }
 
-  final component = v.javaComponent ?? 'jre-legacy';
-
   final managed = _managedJavaPath(component);
   if (File(p.join(Paths.runtimeDir, component, '.installed')).existsSync() && File(managed).existsSync()) {
     return _describe(managed);
@@ -333,7 +346,11 @@ Future<JavaInfo> ensureJava(VersionJson v, JavaPref pref, String globalJava, Dow
       return null;
     });
   }
-  if (downloaded != null) return _describe(downloaded);
+  if (downloaded != null) {
+    final info = await _describe(downloaded);
+    if (info.major >= major) return info;
+    downloadError = '自动下载的 Java ${info.major} 低于需要的 Java $major';
+  }
 
   // 无法下载时，退而求其次使用更新的 Java
   final newer = javas.where((j) => j.major > major).toList()..sort((a, b) => a.major.compareTo(b.major));

@@ -1,0 +1,22 @@
+pkgname=pcl-pw
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc="Minecraft Java Edition launcher built with Flutter"
+arch=('x86_64')
+url="https://github.com/zhuzhi-09/PCL.PW"
+license=('Apache-2.0')
+depends=('gtk3' 'libx11' 'libxi' 'xz' 'gcc-libs' 'libstdc++' 'libglvnd' 'mesa')
+options=('!strip' '!debug' 'emptydirs')
+
+package() {
+  install -d "$pkgdir/opt/PCL.PW"
+  cp -a "@STAGE@/." "$pkgdir/opt/PCL.PW/"
+
+  install -d "$pkgdir/usr/bin"
+  ln -s /opt/PCL.PW/pcl_pw "$pkgdir/usr/bin/pcl-pw"
+
+  install -Dm644 "@DESKTOP@" \
+    "$pkgdir/usr/share/applications/io.github.zhuzhi09.pcl_pw.desktop"
+  install -Dm644 "@ICON@" \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/io.github.zhuzhi09.pcl_pw.png"
+}

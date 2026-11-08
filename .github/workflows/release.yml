@@ -150,7 +150,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
-            libgtk-3-dev liblzma-dev libx11-dev libxi-dev rpm
+            libgtk-3-dev liblzma-dev libx11-dev libxi-dev rpm \
+            makepkg pacman-package-manager zstd libarchive-tools
       - name: Build
         run: |
           set -euo pipefail
@@ -195,6 +196,21 @@ jobs:
           rpmbuild -bb --define "_topdir $rpmtop" "$spec"
           cp "$rpmtop/RPMS/x86_64/pcl-pw-$version-1.x86_64.rpm" "dist/PCL.PW-$version-linux-x86_64.rpm"
 
+          # Arch / CachyOS / Manjaro
+          archbuild="$RUNNER_TEMP/archbuild"
+          rm -rf "$archbuild"
+          mkdir -p "$archbuild"
+          sed -e "s|@VERSION@|$version|g" \
+            -e "s|@STAGE@|$stage|g" \
+            -e "s|@DESKTOP@|$desktop|g" \
+            -e "s|@ICON@|$icon|g" \
+            packaging/linux/PKGBUILD > "$archbuild/PKGBUILD"
+          sed "s|^PKGEXT=.*|PKGEXT='.pkg.tar.zst'|" /etc/makepkg.conf > "$RUNNER_TEMP/makepkg.conf"
+          (cd "$archbuild" && PACKAGER="PCL.PW <paper_zhu@163.com>" \
+            makepkg --config "$RUNNER_TEMP/makepkg.conf" --nodeps --noconfirm)
+          cp "$archbuild/pcl-pw-$version-1-x86_64.pkg.tar.zst" \
+            "dist/PCL.PW-$version-linux-x86_64.pkg.tar.zst"
+
           # AppImage
           appdir="$RUNNER_TEMP/PCL.PW.AppDir"
           mkdir -p "$appdir/usr/bin"
@@ -216,6 +232,7 @@ jobs:
             dist/*-linux-x64.tar.gz
             dist/*-linux-amd64.deb
             dist/*-linux-x86_64.rpm
+            dist/*-linux-x86_64.pkg.tar.zst
             dist/*-linux-x86_64.AppImage
 
   publish:
@@ -239,7 +256,7 @@ jobs:
           about="本软件是第三方基于 PCL 二次创作的产物，与 PCL 及其作者无关，请勿就本软件的问题打扰 PCL 作者。"
           downloads=$'- Windows：安装包（`*-setup.exe`）或便携版（`*-portable.zip`）\n- 安卓：`*-android-arm64.apk`，需要 Android 8.0 及以上、64 位 ARM 处理器\n- macOS：`*-macos.dmg`，需要 macOS 12 及以上，Apple 芯片与 Intel 通用。没有经过 Apple 公证，首次打开时如果提示无法验证开发者，请到「系统设置 → 隐私与安全性」中点「仍要打开」'
           if [ "$LINUX_RESULT" = "success" ]; then
-            downloads+=$'\n- Linux（测试版）：需要 Ubuntu 24.04 及以上（glibc 2.39+）\n  - `*-linux-amd64.deb`：Debian/Ubuntu 安装包\n  - `*-linux-x86_64.rpm`：Fedora/openSUSE/RHEL 安装包\n  - `*-linux-x86_64.AppImage`：下载后 `chmod +x` 直接运行\n  - `*-linux-x64.tar.gz`：解压后运行 `PCL.PW/pcl_pw`'
+            downloads+=$'\n- Linux（测试版）：需要 Ubuntu 24.04 及以上（glibc 2.39+）\n  - `*-linux-amd64.deb`：Debian/Ubuntu 安装包\n  - `*-linux-x86_64.rpm`：Fedora/openSUSE/RHEL 安装包\n  - `*-linux-x86_64.pkg.tar.zst`：Arch / CachyOS / Manjaro 安装包，`sudo pacman -U 文件名`\n  - `*-linux-x86_64.AppImage`：下载后 `chmod +x` 直接运行\n  - `*-linux-x64.tar.gz`：解压后运行 `PCL.PW/pcl_pw`'
           fi
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             tag="$GITHUB_REF_NAME"

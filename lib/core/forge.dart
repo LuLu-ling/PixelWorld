@@ -184,11 +184,17 @@ Future<String> installForgeLike(
       final innerJava = innerJson?['javaVersion'] as Map<String, dynamic>?;
       expectedId = innerJson?['id'] as String?;
       preexisting = expectedId != null && File(g.versionJson(expectedId)).existsSync();
-      await _preloadLibraries(g, [innerJson, profile], dl, task, label);
+      // 安装器自己的下载器只连官方源、不重试，慢网络下常常卡在连接超时。
+      // 先把依赖库、处理器依赖和 Mojang 映射全部下好，再让安装器离线运行。
+      final offline =
+          kind != LoaderKind.cleanroom &&
+          _installerSupportsOffline(zip) &&
+          await _prepareInstallerFiles(g, gameVersion, kind, profile, [innerJson, profile], dl, task, label);
+      if (offline) await _patchInstallerProfile(installer.path);
       // Cleanroom 的新版安装器有自己的命令行格式
       final args = kind == LoaderKind.cleanroom
           ? ['client', '--version', version, '-d', g.root, '--no-gui', '-y']
-          : ['--installClient', g.root];
+          : ['--installClient', g.root, if (offline) '--offline'];
       id = await _runInstaller(
         g,
         gameVersion,
@@ -199,6 +205,7 @@ Future<String> installForgeLike(
         javaVersion: innerJava,
         args: args,
         expectedId: expectedId,
+        offline: offline,
       );
     }
     // NeoForge 1.20.1 的安装器生成的版本名形如 1.20.1-forge-47.1.106，容易与 Forge 混淆
@@ -226,17 +233,25 @@ Future<String> installForgeLike(
   }
 }
 
-/// 先用启动器的下载器下好安装器要用的库（镜像、重试、多线程）。
-/// 安装器自带的下载器只用官方源、逐个下载、失败不重试，在手机网络下容易因为一个库失败而整体失败；
-/// 文件已存在且校验通过时安装器会跳过下载。这里失败不中止安装，安装器会自己再试一次。
-Future<void> _preloadLibraries(
+/// 先用启动器的下载器下好安装器要用的文件（镜像、重试、多线程）。
+/// 全部就绪时返回 true，之后可以让安装器带 --offline 运行；否则交给安装器自己联网重试。
+Future<bool> _prepareInstallerFiles(
   GamePaths g,
+  String gameVersion,
+  LoaderKind kind,
+  Map<String, dynamic> profile,
   List<Map<String, dynamic>?> jsons,
   Downloader dl,
   TaskProgress task,
   String label,
 ) async {
   final items = <String, DownloadItem>{};
+  void add(DownloadItem item) {
+    final old = items[item.path];
+    // 已有带校验值的条目就不要被后来的无校验条目覆盖
+    if (old == null || (old.sha1 == null && item.sha1 != null)) items[item.path] = item;
+  }
+
   for (final j in jsons) {
     for (final lib in (j?['libraries'] as List? ?? const []).whereType<Map<String, dynamic>>()) {
       if (!rulesAllow(lib['rules'] as List?)) continue;
@@ -256,16 +271,106 @@ Future<void> _preloadLibraries(
       }
       // 没有下载地址的是安装器自带或在本地生成的文件
       if (url == null || url.isEmpty || path == null) continue;
-      items[path] = DownloadItem(url: url, path: p.join(g.libraries, path), sha1: sha1, size: size);
+      add(DownloadItem(url: url, path: p.join(g.libraries, path), sha1: sha1, size: size));
     }
   }
-  if (items.isEmpty) return;
-  task.setStage('下载 $label 安装器需要的依赖库');
+
+  final processors = (profile['processors'] as List? ?? const []).whereType<Map>().toList();
+  // 处理器自己的 jar 与 classpath 有时不在 libraries 列表里
+  final mavenRoot = kind == LoaderKind.neoforge
+      ? 'https://maven.neoforged.net/releases'
+      : 'https://maven.minecraftforge.net';
+  for (final pr in processors) {
+    final coords = <String>[
+      if (pr['jar'] is String) pr['jar'] as String,
+      ...(pr['classpath'] as List? ?? const []).whereType<String>(),
+    ];
+    for (final coord in coords) {
+      final path = mavenPath(coord);
+      add(DownloadItem(url: '$mavenRoot/$path', path: p.join(g.libraries, path)));
+    }
+  }
+
+  final vanilla = await resolveVersion(g, gameVersion);
+  // 原版 jar 是安装器的输入，缺失时不能离线
+  final vanillaJar = File(g.versionJar(vanilla.rootJar));
+  if (!vanillaJar.existsSync()) return false;
+
+  if (processors.any(_isMojmapsProcessor)) {
+    // 这个处理器不认 --offline，会直连 launchermeta.mojang.com 下载映射
+    final coord = _artifactCoord(_dataValue(profile, 'MOJMAPS', 'client'));
+    final mappings = (vanilla.raw['downloads'] as Map?)?['client_mappings'] as Map?;
+    if (coord == null || mappings == null || mappings['url'] == null) {
+      task.output('$label 安装器需要联网下载 Mojang 映射，无法完全离线安装');
+      return false;
+    }
+    add(
+      DownloadItem(
+        url: '${mappings['url']}',
+        path: p.join(g.libraries, mavenPath(coord)),
+        sha1: mappings['sha1'] as String?,
+        size: (mappings['size'] as num?)?.toInt(),
+      ),
+    );
+  }
+
+  if (items.isEmpty) return true;
+  task.setStage('下载 $label 安装器需要的文件');
   try {
     await dl.downloadAll(items.values.toList(), task.progress, cancelled: () => task.cancelled);
   } catch (e) {
-    task.output('部分依赖库没有下载成功，交给安装器重试：$e');
+    task.output('部分文件没有下载成功，交给安装器重试：$e');
   }
+  for (final item in items.values) {
+    if (!await Downloader.isComplete(item)) return false;
+  }
+  return true;
+}
+
+/// 安装器的 install_profile.json 中读取某个数据项（形如 `[group:artifact:version:classifier@ext]`）
+String? _dataValue(Map<String, dynamic> profile, String key, String side) {
+  final v = (profile['data'] as Map?)?[key];
+  if (v is Map) return v[side]?.toString();
+  return v?.toString();
+}
+
+String? _artifactCoord(String? value) {
+  final s = value?.trim();
+  if (s == null || s.length < 3 || !s.startsWith('[') || !s.endsWith(']')) return null;
+  return s.substring(1, s.length - 1);
+}
+
+bool _isMojmapsProcessor(Map pr) =>
+    (pr['args'] as List? ?? const []).any((a) => '$a'.toUpperCase().contains('DOWNLOAD_MOJMAPS'));
+
+/// 安装器是否支持 --offline（Forge 安装器 2.0 起）
+bool _installerSupportsOffline(Archive zip) {
+  final cls = zip.files.where((f) => f.name.endsWith('SimpleInstaller.class')).firstOrNull;
+  if (cls == null) return false;
+  return utf8.decode(cls.content as List<int>, allowMalformed: true).contains('attempt any network calls');
+}
+
+/// 去掉负责下载 Mojang 映射的处理器：文件已由启动器下好，而这个处理器不认 --offline。
+Future<void> _patchInstallerProfile(String installer) async {
+  final file = File(installer);
+  final archive = ZipDecoder().decodeBytes(await file.readAsBytes());
+  final entry = archive.findFile('install_profile.json');
+  if (entry == null) return;
+  final profile = jsonDecode(utf8.decode(entry.content as List<int>)) as Map<String, dynamic>;
+  final processors = (profile['processors'] as List? ?? const []).whereType<Map>().toList();
+  final kept = [
+    for (final pr in processors)
+      if (!_isMojmapsProcessor(pr)) pr,
+  ];
+  if (kept.length == processors.length) return;
+  profile['processors'] = kept;
+
+  final out = Archive();
+  final patched = utf8.encode(jsonEncode(profile));
+  for (final f in archive.files) {
+    out.addFile(f.name == 'install_profile.json' ? ArchiveFile.bytes(f.name, patched) : f);
+  }
+  await file.writeAsBytes(ZipEncoder().encode(out), flush: true);
 }
 
 /// 新版安装器：命令行安装到当前游戏文件夹，返回新增的版本名
@@ -279,6 +384,7 @@ Future<String> _runInstaller(
   Map<String, dynamic>? javaVersion,
   List<String> args = const [],
   String? expectedId,
+  bool offline = false,
 }) async {
   await ensureLauncherProfiles(g.root);
   // 安装器的处理器需要与该版本相同或更新的 Java
@@ -288,7 +394,7 @@ Future<String> _runInstaller(
       ? VersionJson({'id': gameVersion, 'javaVersion': javaVersion})
       : vanilla;
 
-  task.setStage('运行 $label 安装器（下载依赖并处理文件，可能需要几分钟）');
+  task.setStage(offline ? '运行 $label 安装器（处理文件，可能需要几分钟）' : '运行 $label 安装器（下载依赖并处理文件，可能需要几分钟）');
   final before = _versionIds(g);
   final r = await runJava(
     javaFor,

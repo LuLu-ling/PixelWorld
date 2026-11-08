@@ -62,18 +62,35 @@ Future<void> main() async {
   // Flutter 的可执行文件名不能带点，发布时改名
   await File(p.join(stage.path, 'pcl_pw.exe')).rename(p.join(stage.path, 'PCL.PW.exe'));
 
+  // 给外壳补上版本信息与图标：没有这些元数据的匿名 .NET 程序更容易被杀毒软件误判
+  final fileVersion = [...version.split('.'), '0', '0'].take(4).join('.');
+  final assemblyInfo = File(p.join(dist.path, 'AssemblyInfo.cs'));
+  await assemblyInfo.writeAsString('''
+using System.Reflection;
+[assembly: AssemblyTitle("Pixel World 安装程序")]
+[assembly: AssemblyDescription("Pixel World 启动器安装与卸载程序")]
+[assembly: AssemblyProduct("Pixel World")]
+[assembly: AssemblyCompany("Pixel World")]
+[assembly: AssemblyCopyright("Copyright (C) 2026 Pixel World contributors. Apache-2.0.")]
+[assembly: AssemblyFileVersion("$fileVersion")]
+[assembly: AssemblyInformationalVersion("$version")]
+[assembly: AssemblyVersion("$fileVersion")]
+''');
+
   Future<void> compile(String output, [List<String> extra = const []]) => run(csc, [
     '/nologo',
     '/optimize+',
     '/target:winexe',
     '/codepage:65001',
     '/win32manifest:${p.join(root, 'installer', 'shell.manifest')}',
+    '/win32icon:${p.join(root, 'windows', 'runner', 'resources', 'app_icon.ico')}',
     '/r:System.IO.Compression.dll',
     '/r:System.Windows.Forms.dll',
     '/r:System.Drawing.dll',
     '/r:System.Core.dll',
     '/out:$output',
     ...extra,
+    assemblyInfo.path,
     p.join(root, 'installer', 'Shell.cs'),
     p.join(root, 'installer', 'Theme.cs'),
   ]);

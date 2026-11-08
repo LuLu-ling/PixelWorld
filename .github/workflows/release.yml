@@ -243,9 +243,14 @@ jobs:
           fi
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             tag="$GITHUB_REF_NAME"
-            # 更新说明写在 release-notes/<标签>.md 中，没有时只写下载说明
+            # 更新说明写在 release-notes/<标签>.md 中；没有时显示该标签对应提交的说明
             if [ -f "release-notes/$tag.md" ]; then
-              notes=$(printf '%s\n\n## 下载\n\n%s\n\n%s\n' "$(cat "release-notes/$tag.md")" "$downloads" "$about")
+              changelog=$(cat "release-notes/$tag.md")
+            else
+              changelog=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .commit.message | sed '/^Co-authored-by:/d')
+            fi
+            if [ -n "$changelog" ]; then
+              notes=$(printf '%s\n\n## 下载\n\n%s\n\n%s\n' "$changelog" "$downloads" "$about")
             else
               notes=$(printf '%s\n\n%s\n' "$downloads" "$about")
             fi
@@ -256,7 +261,17 @@ jobs:
           else
             # 文件名标明 nightly 与提交号，避免和正式版混淆
             for f in dist/PCL.PW-"$version"-*; do mv "$f" "${f/PCL.PW-$version-/PCL.PW-nightly-$sha-}"; done
-            notes=$(printf '自动构建的测试版，来自 main 分支的 %s，可能不稳定。\n\n%s\n\n%s\n' "$GITHUB_SHA" "$downloads" "$about")
+            # 更新日志：和上一次 nightly 比较；没有可比的对象时显示本次提交的说明
+            prev=$(gh release view nightly --json targetCommitish --jq .targetCommitish 2>/dev/null || true)
+            changes=""
+            if [ -n "$prev" ] && [ "$prev" != "$GITHUB_SHA" ]; then
+              changes=$(gh api "repos/$GITHUB_REPOSITORY/compare/$prev...$GITHUB_SHA" \
+                --jq '.commits[:50][] | select(.commit.message | startswith("Merge") | not) | "- `\(.sha[0:7])` \(.commit.message | split("\n")[0])"' 2>/dev/null || true)
+            fi
+            if [ -z "$changes" ]; then
+              changes=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq .commit.message | sed '/^Co-authored-by:/d')
+            fi
+            notes=$(printf '自动构建的测试版，来自 main 分支的 %s，可能不稳定。\n\n## 更新日志\n\n%s\n\n%s\n\n%s\n' "$GITHUB_SHA" "$changes" "$downloads" "$about")
             gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
             gh release create nightly --prerelease --target "$GITHUB_SHA" \
               --title "PCL.PW Nightly ($sha)" --notes "$notes" dist/*

@@ -450,7 +450,7 @@ class AppState extends ChangeNotifier {
       final dl = downloader;
       if (acc.type == AccountType.microsoft) {
         t.setStage('验证账户');
-        final refreshed = await refreshIfNeeded(acc, cfg.msClientId);
+        final refreshed = await refreshIfNeeded(acc, cfg.effectiveMsClientId);
         if (!identical(refreshed, acc)) acc = await accounts.upsert(refreshed);
       }
       t.setStage('分析版本');

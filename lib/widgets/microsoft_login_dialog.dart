@@ -25,7 +25,7 @@ class _MicrosoftLoginDialogState extends State<_MicrosoftLoginDialog> {
   void initState() {
     super.initState();
     final state = AppScope.read(context);
-    _login = MicrosoftLogin(state.config.msClientId);
+    _login = MicrosoftLogin(state.config.effectiveMsClientId);
     state
         .loginMicrosoft(_login, (c) {
           if (mounted) setState(() => _code = c);

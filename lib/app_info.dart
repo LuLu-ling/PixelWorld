@@ -10,6 +10,9 @@ abstract final class AppInfo {
   /// 构建信息，由 CI 通过 --dart-define 写入；本地构建为空
   static const commit = String.fromEnvironment('PCLPW_COMMIT');
 
+  /// 微软登录默认的 Client ID，由 CI 通过 --dart-define 注入；本地构建为空
+  static const msClientId = String.fromEnvironment('PCLPW_MS_CLIENT_ID');
+
   /// 这个构建所属的更新通道：stable、preview 或 nightly
   static const channel = String.fromEnvironment('PCLPW_CHANNEL', defaultValue: 'stable');
 

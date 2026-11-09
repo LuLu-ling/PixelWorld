@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import '../app_info.dart';
 import 'paths.dart';
 
 /// 默认 JVM 参数
@@ -177,6 +178,12 @@ class LauncherConfig extends ChangeNotifier {
   String get selectedVersion => _get('selectedVersion');
   String get selectedAccount => _get('selectedAccount');
   String get msClientId => _get('msClientId');
+
+  /// 用户没有填写时使用 CI 注入的默认 Client ID
+  String get effectiveMsClientId {
+    final custom = msClientId.trim();
+    return custom.isEmpty ? AppInfo.msClientId : custom;
+  }
   String get afterLaunch => _get('afterLaunch');
   int get launchCount => (_data['launchCount'] as num).toInt();
   bool get hintBuy => _get('hintBuy');

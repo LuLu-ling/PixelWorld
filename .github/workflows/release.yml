@@ -22,6 +22,7 @@ env:
   # 写进程序里的构建信息，供启动器的更新功能判断通道与版本
   PCLPW_COMMIT: ${{ github.sha }}
   PCLPW_CHANNEL: ${{ github.ref_type != 'tag' && 'nightly' || contains(github.ref_name, '-') && 'preview' || 'stable' }}
+  PCLPW_MS_CLIENT_ID: ${{ vars.PCLPW_MS_CLIENT_ID }}
 
 jobs:
   # 静态分析与自动化测试，失败时不构建、不发布。
@@ -94,7 +95,7 @@ jobs:
           PCLPW_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           flutter pub get
-          flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons             --dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL"
+          flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons             --dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL" --dart-define=PCLPW_MS_CLIENT_ID="$PCLPW_MS_CLIENT_ID"
           version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk "dist/PCL.PW-$version-android-arm64.apk"
@@ -116,7 +117,7 @@ jobs:
       - name: Build
         run: |
           flutter pub get
-          flutter build macos --release --dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL"
+          flutter build macos --release --dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL" --dart-define=PCLPW_MS_CLIENT_ID="$PCLPW_MS_CLIENT_ID"
           version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
           app="build/macos/Build/Products/Release/Pixel World.app"
           # 没有开发者证书：整个应用重新做一次临时签名，保证各个框架的签名一致
@@ -155,7 +156,7 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get
-          flutter build linux --release --dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL"
+          flutter build linux --release --dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL" --dart-define=PCLPW_MS_CLIENT_ID="$PCLPW_MS_CLIENT_ID"
           version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
           stage="$RUNNER_TEMP/PCL.PW"
           bundle=build/linux/x64/release/bundle

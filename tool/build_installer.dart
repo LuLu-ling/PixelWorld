@@ -49,7 +49,7 @@ Future<void> main() async {
   // 当前 Flutter 版本裁剪图标字体时会漏掉部分图标
   // 更新功能用到的构建信息（CI 中设置，见 .github/workflows/release.yml）
   final defines = [
-    for (final k in ['PCLPW_COMMIT', 'PCLPW_CHANNEL'])
+    for (final k in ['PCLPW_COMMIT', 'PCLPW_CHANNEL', 'PCLPW_MS_CLIENT_ID'])
       if ((Platform.environment[k] ?? '').isNotEmpty) '--dart-define=$k=${Platform.environment[k]}',
   ];
   await run('flutter', ['build', 'windows', '--release', '--no-tree-shake-icons', ...defines], cwd: root);

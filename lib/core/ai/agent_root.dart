@@ -80,7 +80,9 @@ Future<List<AgentRoot>> agentRoots(AppState state) async {
 /// 给新添加的文件夹起一个 id：文件夹名里的字母数字，重复时加序号
 String newRootId(String path, Iterable<String> taken) {
   final used = {...taken, 'workspace', 'game', 'downloads'};
-  var base = p.basename(p.normalize(path)).toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+  // 文件夹名：两种斜杠都认，不依赖当前系统的路径规则
+  final name = path.split(RegExp(r'[\\/]')).lastWhere((s) => s.isNotEmpty, orElse: () => path);
+  var base = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
   base = base.replaceAll(RegExp(r'^-+|-+$'), '');
   if (base.isEmpty || !rootIdPattern.hasMatch(base)) base = 'folder';
   if (base.length > 24) base = base.substring(0, 24).replaceAll(RegExp(r'-+$'), '');

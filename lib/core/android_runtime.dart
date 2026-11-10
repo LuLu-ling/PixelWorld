@@ -282,21 +282,21 @@ abstract final class AndroidRuntime {
 /// 已选的会按「自动」处理
 const androidRenderers = {
   'auto': '自动',
-  'mobileglues': 'MobileGlues（推荐）',
+  'mobileglues': 'MobileGlues',
   'zink': 'Zink（OpenGL 转 Vulkan）',
-  'krypton': 'Krypton Wrapper（GL4ES 改进版）',
+  'krypton': 'Krypton Wrapper（推荐）',
   'system_gles': '系统 GLES 驱动（仅限支持 GLES 的模组）',
 };
 
 /// 各渲染器的说明，显示在设置里
 const androidRendererHints = {
-  'auto': '按显卡自动选择，目前几乎所有设备都会用 MobileGlues',
-  'mobileglues': 'OpenGL 转 OpenGL ES，速度快，支持所有版本（旧版本自动加 SFPEW 模拟固定管线）',
+  'auto': '默认用 Krypton Wrapper；26.x 版本改用 MobileGlues，显卡不支持 OpenGL ES 3 时用 Zink',
+  'mobileglues': 'OpenGL 转 OpenGL ES，支持所有版本，包括 26.x（旧版本自动加 SFPEW 模拟固定管线）',
   'zink':
       'Mesa Zink：完整的 OpenGL 4.6，需要 Vulkan 1.1。骁龙（Adreno）上自动改用自带的开源驱动 Turnip，'
       '适合 MobileGlues 画面出错时使用',
   'krypton':
-      'NG-GL4ES：OpenGL 转 OpenGL ES，速度快，自带固定管线支持，适合 1.16.5 及更早的版本，也能运行 Sodium。'
+      'NG-GL4ES：OpenGL 转 OpenGL ES，效率高，新旧版本都能用，能运行 Sodium 和部分光影。'
       '26.3 快照起的版本暂不可用',
   'system_gles': '直接使用系统 GLES 驱动，不做转译。原版 Minecraft 无法以此运行',
 };
@@ -340,13 +340,16 @@ Future<AndroidGpu> androidGpu() async =>
     _gpu ??= AndroidGpu((await AndroidRuntime._channel.invokeMapMethod<String, dynamic>('gpu')) ?? const {});
 
 /// 把设置中的渲染器（可能是 auto）换成实际使用的渲染器，并给出理由
-({String renderer, String reason}) resolveAndroidRenderer(String pref, AndroidGpu gpu) {
+///
+/// [sdl]：这个版本用 SDL3 创建窗口（26.x）。Krypton Wrapper 在 26.3 快照起会崩溃，这类版本用 MobileGlues
+({String renderer, String reason}) resolveAndroidRenderer(String pref, AndroidGpu gpu, {bool sdl = false}) {
   if (pref != 'auto' && androidRenderers.containsKey(pref)) return (renderer: pref, reason: '设置指定');
-  // MobileGlues 需要 OpenGL ES 3；更老的驱动只能走 Vulkan
+  // Krypton Wrapper 和 MobileGlues 都需要 OpenGL ES 3；更老的驱动只能走 Vulkan
   if (gpu.glesMajor > 0 && gpu.glesMajor < 3 && gpu.hasVulkan11) {
     return (renderer: 'zink', reason: '显卡不支持 OpenGL ES 3');
   }
-  return (renderer: 'mobileglues', reason: '自动选择');
+  if (sdl) return (renderer: 'mobileglues', reason: '26.x 版本，Krypton Wrapper 暂不支持');
+  return (renderer: 'krypton', reason: '自动选择');
 }
 
 /// 安卓版 OpenJDK（AngelAuraMC 构建，GPLv2 + Classpath Exception）

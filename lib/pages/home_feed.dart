@@ -11,10 +11,14 @@ import '../core/updater.dart';
 
 /// 首页提示：正在使用的版本与免费声明（参照 PCL-CE 首页的提示）
 class HomeHints extends StatelessWidget {
-  const HomeHints({super.key});
+  const HomeHints({super.key, this.compact = false});
+
+  /// 桌面：合成一张低调的小卡片；「测试版」那句可以关掉，免费声明一直保留
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    if (compact) return const _CompactHints();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -33,6 +37,75 @@ class HomeHints extends StatelessWidget {
           warning: true,
         ),
       ],
+    );
+  }
+}
+
+class _CompactHints extends StatelessWidget {
+  const _CompactHints();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final cfg = AppScope.of(context).config;
+    final showBeta = cfg.dismissedBetaHint != AppInfo.version;
+    final style = theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, height: 1.5);
+    Widget link(String label, String url) => TextButton(
+      onPressed: () => launchUrl(Uri.parse(url)),
+      style: TextButton.styleFrom(
+        minimumSize: const Size(0, 30),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        visualDensity: VisualDensity.compact,
+      ),
+      child: Text(label),
+    );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 6, 6),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Icon(Icons.info_outline, size: 17, color: scheme.onSurfaceVariant),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  [
+                    if (showBeta) '${AppInfo.name} ${AppInfo.version} 测试版，功能还在完善中，遇到问题请到 GitHub 反馈。',
+                    '本软件完全免费、开源。如果你是付费获得的，请向卖家申请退款，并从 GitHub 获取正版。',
+                  ].join('\n'),
+                  style: style,
+                ),
+              ),
+              if (showBeta)
+                IconButton(
+                  tooltip: '关闭测试版提示（免费声明会保留）',
+                  onPressed: () => cfg.update({'dismissedBetaHint': AppInfo.version}),
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 16,
+                  icon: Icon(Icons.close, color: scheme.onSurfaceVariant),
+                ),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (showBeta) link('反馈问题', '${AppInfo.repoUrl}/issues'),
+              link('获取正版', '${AppInfo.repoUrl}/releases'),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

@@ -15,7 +15,8 @@ const macTrafficLightsWidth = 72.0;
 /// 「自动」界面缩放：手机按大约 1000 × 440 的尺寸排版（大屏不放大），电脑上为 100%。
 /// [size] 为没有缩放时的可用尺寸（逻辑像素）
 double autoUiScale(Size size) {
-  if (isDesktop) return 1;
+  // 桌面：窗口较小时整体缩到 0.9 倍，内容不至于挤在一起
+  if (isDesktop) return size.width < 1200 || size.height < 760 ? .9 : 1;
   final s = min(size.width / 1000, size.height / 440);
   return s.clamp(.75, 1.0);
 }

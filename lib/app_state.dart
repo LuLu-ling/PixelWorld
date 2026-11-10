@@ -557,7 +557,11 @@ class AppState extends ChangeNotifier {
         _launcherLog('渲染比例: ${(cfg.renderScale * 100).round()}%');
         // 版本设置优先，其次全局设置；「自动」按显卡选择
         final gpu = await androidGpu().catchError((_) => AndroidGpu(const {}));
-        final renderer = resolveAndroidRenderer(inst.renderer.isNotEmpty ? inst.renderer : cfg.androidRenderer, gpu);
+        final renderer = resolveAndroidRenderer(
+          inst.renderer.isNotEmpty ? inst.renderer : cfg.androidRenderer,
+          gpu,
+          sdl: sdl,
+        );
         // SFPEW 只用在 MobileGlues 上，Zink 本身就支持固定管线
         final sfpew = ffp && renderer.renderer == 'mobileglues';
         // Zink 搭配高通自带的 Vulkan 驱动时画面不刷新，骁龙上改用自带的 Turnip

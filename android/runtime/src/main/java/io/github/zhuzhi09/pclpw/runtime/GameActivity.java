@@ -650,6 +650,30 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         return b;
     }
 
+    /**
+     * A button that holds a mouse button while pressed. Touching the game view only clicks the
+     * right button (tap) or holds the left one (long press), so eating, drawing a bow or raising a
+     * shield need this "use" button.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private Button mouseButton(String label, int button, int size) {
+        Button b = button(label, size);
+        b.setOnTouchListener((v, e) -> {
+            int a = e.getActionMasked();
+            if (a == MotionEvent.ACTION_DOWN) {
+                v.setPressed(true);
+                v.setAlpha(0.55f);
+                CallbackBridge.sendMouseButton(button, true);
+            } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
+                v.setPressed(false);
+                v.setAlpha(1f);
+                CallbackBridge.sendMouseButton(button, false);
+            }
+            return true;
+        });
+        return b;
+    }
+
     /** A button that toggles a key (sneak) */
     private Button toggleButton(String label, int key, int size) {
         Button b = button(label, size);
@@ -691,6 +715,8 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
         actions.addView(row1);
         LinearLayout row2 = new LinearLayout(this);
         row2.setGravity(Gravity.BOTTOM);
+        // Hold to use the held item: eat, drink, draw a bow, raise a shield
+        row2.addView(mouseButton("使用", LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_RIGHT, s));
         row2.addView(toggleButton("潜行", LwjglGlfwKeycode.GLFW_KEY_LEFT_SHIFT, s));
         row2.addView(keyButton("跳跃", LwjglGlfwKeycode.GLFW_KEY_SPACE, s + 24));
         actions.addView(row2);

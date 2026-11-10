@@ -58,7 +58,6 @@ final class HudMetrics {
     private Callback callback;
     private boolean running;
     private boolean fpsAvailable;
-    private long frames;
     private long lastFrames;
     private long lastSampleAt;
     private long lastCpuTicks = -1;
@@ -91,14 +90,17 @@ final class HudMetrics {
         javaStatsFile = new File(activity.getFilesDir(), "hud-java-stats");
     }
 
-    /** True when frames can be counted (the Zink renderer draws through a TextureView). */
-    void setFpsAvailable(boolean available) {
-        fpsAvailable = available;
-    }
-
-    /** Called for every frame the renderer hands to the screen. */
-    void frame() {
-        frames++;
+    /**
+     * Frames presented so far, counted in the native bridge on every GLFW buffer swap (all GL
+     * renderers). Stays 0 when the game swaps elsewhere (SDL on 26.x): the overlay then says it
+     * cannot read the frame rate. The native library loads with the game, so it may be missing.
+     */
+    private static long frameCount() {
+        try {
+            return net.kdt.pojavlaunch.utils.JREUtils.getFrameCount();
+        } catch (Throwable notLoaded) {
+            return 0;
+        }
     }
 
     void start(Callback callback) {
@@ -106,7 +108,7 @@ final class HudMetrics {
         if (running) return;
         running = true;
         lastSampleAt = 0;
-        lastFrames = frames;
+        lastFrames = frameCount();
         lastCpuTicks = -1;
         handler.post(tick);
     }
@@ -122,6 +124,8 @@ final class HudMetrics {
         long previous = lastSampleAt;
         Sample s = new Sample();
 
+        long frames = frameCount();
+        if (frames > 0) fpsAvailable = true;
         if (previous > 0 && fpsAvailable) {
             long elapsed = now - previous;
             long counted = frames - lastFrames;

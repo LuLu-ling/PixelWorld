@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <dlfcn.h>
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -240,8 +241,18 @@ EXTERNAL_API void pojavSetWindowHint(int hint, int value) {
     }
 }
 
+// Pixel World: frames presented through GLFW, read by the overlay to show the frame rate.
+// One relaxed atomic add per frame; no GL call, so it never stalls the pipeline.
+static _Atomic uint64_t g_frame_count = 0;
+
 EXTERNAL_API void pojavSwapBuffers() {
     br_swap_buffers();
+    atomic_fetch_add_explicit(&g_frame_count, 1, memory_order_relaxed);
+}
+
+JNIEXPORT jlong JNICALL
+Java_net_kdt_pojavlaunch_utils_JREUtils_getFrameCount(ABI_COMPAT JNIEnv *env, ABI_COMPAT jclass clazz) {
+    return (jlong) atomic_load_explicit(&g_frame_count, memory_order_relaxed);
 }
 
 

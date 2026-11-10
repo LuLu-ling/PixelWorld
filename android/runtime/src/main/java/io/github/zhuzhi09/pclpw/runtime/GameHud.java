@@ -127,9 +127,6 @@ final class GameHud {
         // Older versions stored pixels under "top"; the dp value has its own key
         this.topDp = prefs.getInt("topDp", 72);
         this.metrics = new HudMetrics(activity);
-        // Frame counting is only possible when the renderer draws through a TextureView (Zink);
-        // SurfaceView renderers do not tell the app when a frame is presented.
-        metrics.setFpsAvailable("zink".equals(this.renderer));
 
         ball = buildBall();
         compactView = buildCompact();
@@ -452,7 +449,7 @@ final class GameHud {
         if (mode != Mode.NONE) positionPanel(mode == Mode.MENU ? menu : infoPanel);
     }
 
-    /** Below the camera cutout, centered. */
+    /** Top left, clear of the camera cutout: the center is where touch-control mods put buttons. */
     private void placeCompact() {
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) compactView.getLayoutParams();
         if (lp == null) return;
@@ -548,10 +545,6 @@ final class GameHud {
         parent.removeView(menu);
         parent.removeView(infoPanel);
         parent.removeView(scrim);
-    }
-
-    void onFrame() {
-        metrics.frame();
     }
 
     boolean isVisible() {

@@ -19,6 +19,7 @@ import '../platform.dart';
 import '../shell.dart';
 import '../widgets/cover_palette.dart';
 import '../widgets/launch_dialogs.dart';
+import 'download_page.dart';
 import 'home_feed.dart';
 
 /// 启动页：左边是当前版本（背景取自存档封面的颜色），右边是公告和常用操作，下面是最近游玩。
@@ -105,7 +106,7 @@ class _HomePageState extends State<HomePage> {
           padding: const EdgeInsets.fromLTRB(14, 0, 16, 16),
           children: [
             SizedBox(
-              height: 186,
+              height: 176,
               child: AlignedSplit(
                 left: _HeroCard(
                   state: state,
@@ -118,22 +119,27 @@ class _HomePageState extends State<HomePage> {
                   onFolder: version == null ? null : _openFolder,
                 ),
                 right: _SidePanel(
-                  onInstallMods: () => ShellNav.of(context).goMain(MainPage.download),
+                  onInstallMods: () {
+                    downloadTabRequest.value = 'mods';
+                    ShellNav.of(context).goMain(MainPage.download);
+                  },
                   onManageMods: version == null ? null : _openInstance,
                   onFolder: version == null ? null : _openFolder,
                   onLog: () => ShellNav.of(context).open(SubPage.log),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text('最近游玩', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                const Spacer(),
-                TextButton(onPressed: version == null ? null : _openInstance, child: const Text('全部存档 ›')),
-              ],
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 36,
+              child: Row(
+                children: [
+                  Text('最近游玩', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                  const Spacer(),
+                  TextButton(onPressed: version == null ? null : _openInstance, child: const Text('全部存档 ›')),
+                ],
+              ),
             ),
-            const SizedBox(height: 4),
             if (snap.connectionState == ConnectionState.waiting && worlds.isEmpty)
               const SizedBox(height: _WorldCard.height)
             else if (worlds.isEmpty)
@@ -487,6 +493,7 @@ class _SidePanel extends StatelessWidget {
               children: [
                 Expanded(
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(child: _QuickButton(icon: Icons.download_outlined, label: '装模组', onTap: onInstallMods)),
                       const SizedBox(width: 6),
@@ -497,6 +504,7 @@ class _SidePanel extends StatelessWidget {
                 const SizedBox(height: 6),
                 Expanded(
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(child: _QuickButton(icon: Icons.folder_outlined, label: '版本文件夹', onTap: onFolder)),
                       const SizedBox(width: 6),
@@ -637,7 +645,7 @@ class _WorldCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback onPlay;
 
-  static const height = 128.0;
+  static const height = 124.0;
   static const width = 196.0;
 
   @override
@@ -659,7 +667,7 @@ class _WorldCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    height: 72,
+                    height: 68,
                     child: CoverBackground(
                       iconPath: icon,
                       child: Center(child: CoverThumb(iconPath: icon, size: 54, radius: 9, modified: world.modified)),
@@ -689,7 +697,7 @@ class _WorldCard extends StatelessWidget {
               ),
               Positioned(
                 right: 8,
-                top: 50,
+                top: 46,
                 child: IconButton.filled(
                   tooltip: '进入这个存档的版本',
                   onPressed: onPlay,

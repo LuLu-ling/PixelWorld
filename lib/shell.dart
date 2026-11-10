@@ -144,7 +144,13 @@ class _ShellState extends State<Shell> {
           children: [
             _Rail(page: _page, sub: _sub, onMain: _goMain),
             Expanded(
-              child: Column(
+              child: MediaQuery.removePadding(
+                context: context,
+                removeLeft: true,
+                removeTop: true,
+                removeRight: true,
+                removeBottom: true,
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _TopBar(
@@ -156,6 +162,7 @@ class _ShellState extends State<Shell> {
                   ),
                   Expanded(child: pageView),
                 ],
+              ),
               ),
             ),
           ],
@@ -434,8 +441,8 @@ class _TasksPill extends StatelessWidget {
     final scheme = theme.colorScheme;
     final running = AppScope.of(context).runningTasks;
     final task = running.firstOrNull;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 200, maxWidth: 300),
+    return SizedBox(
+      width: 236,
       child: _BarChip(
         onTap: () => ShellNav.of(context).open(SubPage.tasks),
         color: task == null ? null : scheme.primaryContainer,

@@ -8,48 +8,27 @@ import '../core/modrinth.dart';
 import '../core/task.dart';
 import '../widgets/loader_icon.dart';
 import '../core/optifine_compat.dart';
+import '../widgets/shell_layout.dart';
 import '../widgets/side_nav.dart';
 import 'resources.dart';
 
-enum _Section {
-  minecraft,
-  forge,
-  neoforge,
-  cleanroom,
-  optifine,
-  labymod,
-  fabric,
-  quilt,
-  legacyfabric,
-  liteloader,
-  mods,
-  modpacks,
-  resourcePacks,
-  shaders,
-  datapacks,
-  favorites,
-}
+enum _Tab { versions, mods, modpacks, resourcePacks, shaders, datapacks, favorites }
 
 const _resources = {
-  _Section.mods: ResourceType.mod,
-  _Section.modpacks: ResourceType.modpack,
-  _Section.resourcePacks: ResourceType.resourcepack,
-  _Section.shaders: ResourceType.shader,
-  _Section.datapacks: ResourceType.datapack,
+  _Tab.mods: ResourceType.mod,
+  _Tab.modpacks: ResourceType.modpack,
+  _Tab.resourcePacks: ResourceType.resourcepack,
+  _Tab.shaders: ResourceType.shader,
+  _Tab.datapacks: ResourceType.datapack,
 };
 
-const _presets = {
-  _Section.forge: LoaderKind.forge,
-  _Section.neoforge: LoaderKind.neoforge,
-  _Section.cleanroom: LoaderKind.cleanroom,
-  _Section.optifine: LoaderKind.optifine,
-  _Section.labymod: LoaderKind.labymod,
-  _Section.fabric: LoaderKind.fabric,
-  _Section.quilt: LoaderKind.quilt,
-  _Section.legacyfabric: LoaderKind.legacyfabric,
-  _Section.liteloader: LoaderKind.liteloader,
-};
+/// 其他页面要求下载页切到某个分类（例如首页「装模组」）：'mods'、'versions' 等
+final downloadTabRequest = ValueNotifier<String?>(null);
 
+enum _Filter { release, snapshot, old, fool }
+
+/// 下载：顶部分类标签；「游戏版本」左边是版本列表，右边是选中版本的安装面板。
+/// 加载器不再单独成页，在安装面板里选择。
 class DownloadPage extends StatefulWidget {
   const DownloadPage({super.key});
 
@@ -58,71 +37,94 @@ class DownloadPage extends StatefulWidget {
 }
 
 class _DownloadPageState extends State<DownloadPage> {
-  _Section _section = _Section.minecraft;
+  _Tab _tab = _Tab.versions;
+  _Filter _filter = _Filter.release;
 
-  static const _groups = [
-    SideNavGroup(null, [
-      SideNavItem(_Section.minecraft, 'Minecraft', Icons.view_in_ar_outlined, loader: Loader.vanilla),
-    ]),
-    SideNavGroup('加载器', [
-      SideNavItem(_Section.forge, 'Forge', Icons.extension_outlined, loader: Loader.forge),
-      SideNavItem(_Section.neoforge, 'NeoForge', Icons.extension_outlined, loader: Loader.neoforge),
-      SideNavItem(_Section.cleanroom, 'Cleanroom', Icons.extension_outlined, loader: Loader.cleanroom),
-      SideNavItem(_Section.optifine, 'OptiFine', Icons.extension_outlined, loader: Loader.optifine),
-      SideNavItem(_Section.labymod, 'LabyMod', Icons.extension_outlined, loader: Loader.labymod),
-      SideNavItem(_Section.fabric, 'Fabric', Icons.extension_outlined, loader: Loader.fabric),
-      SideNavItem(_Section.quilt, 'Quilt', Icons.grid_view_outlined, loader: Loader.quilt),
-      SideNavItem(_Section.legacyfabric, 'Legacy Fabric', Icons.history_outlined, loader: Loader.legacyfabric),
-      SideNavItem(_Section.liteloader, 'LiteLoader', Icons.light_mode_outlined, loader: Loader.liteloader),
-    ]),
-    SideNavGroup('社区资源', [
-      SideNavItem(_Section.mods, '模组', Icons.extension_outlined),
-      SideNavItem(_Section.modpacks, '整合包', Icons.inventory_2_outlined),
-      SideNavItem(_Section.resourcePacks, '资源包', Icons.layers_outlined),
-      SideNavItem(_Section.shaders, '光影包', Icons.wb_sunny_outlined),
-      SideNavItem(_Section.datapacks, '数据包', Icons.data_object),
-    ]),
-    SideNavGroup(null, [SideNavItem(_Section.favorites, '收藏夹', Icons.favorite_border)]),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    downloadTabRequest.addListener(_onRequest);
+    _onRequest();
+  }
+
+  @override
+  void dispose() {
+    downloadTabRequest.removeListener(_onRequest);
+    super.dispose();
+  }
+
+  void _onRequest() {
+    final name = downloadTabRequest.value;
+    if (name == null) return;
+    final tab = _Tab.values.where((t) => t.name == name).firstOrNull;
+    downloadTabRequest.value = null;
+    if (tab != null && mounted) setState(() => _tab = tab);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final preset = _presets[_section];
-    final resource = _resources[_section];
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SideNav(groups: _groups, value: _section, onChanged: (s) => setState(() => _section = s)),
-        Expanded(
-          child: ContentPanel(
-            child: switch (_section) {
-              _Section.favorites => const FavoritesList(),
-              _ when resource != null => ResourceBrowser(key: ValueKey(_section), type: resource),
-              _ => _MinecraftList(key: ValueKey(_section), preset: preset),
+    final resource = _resources[_tab];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PageTabs<_Tab>(
+            tabs: const [
+              (_Tab.versions, '游戏版本'),
+              (_Tab.mods, '模组'),
+              (_Tab.modpacks, '整合包'),
+              (_Tab.resourcePacks, '资源包'),
+              (_Tab.shaders, '光影'),
+              (_Tab.datapacks, '数据包'),
+              (_Tab.favorites, '收藏'),
+            ],
+            value: _tab,
+            onChanged: (t) => setState(() => _tab = t),
+            trailing: _tab != _Tab.versions
+                ? null
+                : Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: SegmentPicker<_Filter>(
+                      options: const [
+                        (_Filter.release, '正式版'),
+                        (_Filter.snapshot, '快照'),
+                        (_Filter.old, '远古版'),
+                        (_Filter.fool, '愚人节'),
+                      ],
+                      value: _filter,
+                      onChanged: (f) => setState(() => _filter = f),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: switch (_tab) {
+              _Tab.versions => _VersionsView(filter: _filter),
+              _Tab.favorites => const FavoritesList(),
+              _ => ResourceBrowser(key: ValueKey(_tab), type: resource!),
             },
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-enum _Filter { release, snapshot, old, fool }
+/// 游戏版本：左边紧凑列表（每行 48 高），右边安装面板
+class _VersionsView extends StatefulWidget {
+  const _VersionsView({required this.filter});
 
-/// Minecraft 版本列表。从加载器入口进入时只显示正式版，点击后预选该加载器
-class _MinecraftList extends StatefulWidget {
-  const _MinecraftList({super.key, this.preset});
-
-  final LoaderKind? preset;
+  final _Filter filter;
 
   @override
-  State<_MinecraftList> createState() => _MinecraftListState();
+  State<_VersionsView> createState() => _VersionsViewState();
 }
 
-class _MinecraftListState extends State<_MinecraftList> {
+class _VersionsViewState extends State<_VersionsView> {
   late Future<({List<RemoteVersion> list, String latestRelease, String latestSnapshot})> _future;
-  _Filter _filter = _Filter.release;
   String _query = '';
+  RemoteVersion? _selected;
 
   @override
   void initState() {
@@ -130,7 +132,7 @@ class _MinecraftListState extends State<_MinecraftList> {
     _future = remoteVersions(AppScope.read(context).downloader);
   }
 
-  bool _match(RemoteVersion v) => switch (_filter) {
+  bool _match(RemoteVersion v) => switch (widget.filter) {
     _Filter.release => v.type == 'release',
     _Filter.snapshot => v.type == 'snapshot' && !v.fool,
     _Filter.old => v.type.startsWith('old_'),
@@ -141,6 +143,7 @@ class _MinecraftListState extends State<_MinecraftList> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final installed = {for (final v in AppScope.of(context).versions) v.gameVersion};
     return FutureBuilder(
       future: _future,
       builder: (context, snap) {
@@ -162,130 +165,122 @@ class _MinecraftListState extends State<_MinecraftList> {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         final data = snap.data!;
         final q = _query.trim().toLowerCase();
-        final list = data.list
-            .where((v) => widget.preset != null ? v.type == 'release' : _match(v))
-            .where((v) => q.isEmpty || v.id.toLowerCase().contains(q))
-            .toList();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.preset == null ? 'Minecraft' : '安装 ${widget.preset!.label}',
-                      style: theme.textTheme.headlineSmall,
-                    ),
+        final list = data.list.where(_match).where((v) => q.isEmpty || v.id.toLowerCase().contains(q)).toList();
+        final selected = list.contains(_selected) ? _selected : list.firstOrNull;
+        return AlignedSplit(
+          left: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 40,
+                child: TextField(
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    hintText: '搜索版本号',
+                    isDense: true,
+                    filled: true,
+                    fillColor: scheme.surfaceContainerLow,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                   ),
-                  SizedBox(
-                    width: 240,
-                    child: TextField(
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        hintText: '搜索版本',
-                        isDense: true,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(28))),
-                      ),
-                      onChanged: (v) => setState(() => _query = v),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (widget.preset == null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
-                child: Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final (f, label) in const [
-                      (_Filter.release, '正式版'),
-                      (_Filter.snapshot, '快照'),
-                      (_Filter.old, '远古版'),
-                      (_Filter.fool, '愚人节'),
-                    ])
-                      ChoiceChip(
-                        label: Text(label),
-                        selected: _filter == f,
-                        onSelected: (_) => setState(() => _filter = f),
-                      ),
-                  ],
-                ),
-              )
-            else
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-                child: Text(
-                  '选择要安装 ${widget.preset!.label} 的 Minecraft 版本',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                  onChanged: (v) => setState(() => _query = v),
                 ),
               ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-                itemCount: list.length,
-                itemBuilder: (context, i) {
-                  final v = list[i];
-                  final latest = v.id == data.latestRelease || v.id == data.latestSnapshot;
-                  return Card.filled(
-                    color: scheme.surfaceContainerLow,
-                    margin: const EdgeInsets.only(bottom: 6),
-                    child: ListTile(
-                      leading: Icon(
-                        v.type == 'release' ? Icons.view_in_ar_outlined : Icons.science_outlined,
-                        color: scheme.primary,
-                      ),
-                      title: Row(
-                        children: [
-                          Text(v.id),
-                          if (latest) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: scheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(8),
+              const SizedBox(height: 6),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(12)),
+                  clipBehavior: Clip.antiAlias,
+                  child: list.isEmpty
+                      ? Center(child: Text('没有符合条件的版本', style: TextStyle(color: scheme.onSurfaceVariant)))
+                      : ListView.separated(
+                          itemCount: list.length,
+                          separatorBuilder: (_, _) => Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: .3)),
+                          itemBuilder: (context, i) {
+                            final v = list[i];
+                            final on = v == selected;
+                            final latest = v.id == data.latestRelease || v.id == data.latestSnapshot;
+                            return Material(
+                              color: on ? scheme.surfaceContainerHigh : Colors.transparent,
+                              child: InkWell(
+                                onTap: () => setState(() => _selected = v),
+                                child: Container(
+                                  height: 48,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                                  decoration: BoxDecoration(
+                                    border: Border(left: BorderSide(color: on ? scheme.primary : Colors.transparent, width: 3)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Text(v.id, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                                      const SizedBox(width: 8),
+                                      if (latest) _Tag('最新', filled: true),
+                                      if (installed.contains(v.id)) ...[const SizedBox(width: 6), const _Tag('已安装')],
+                                      const Spacer(),
+                                      Text(
+                                        v.releaseTime.split('T').first,
+                                        style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                              child: Text(
-                                '最新',
-                                style: theme.textTheme.labelSmall?.copyWith(color: scheme.onPrimaryContainer),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      subtitle: Text('发布于 ${v.releaseTime.split('T').first}'),
-                      trailing: const Icon(Icons.download_outlined),
-                      onTap: () => showDialog<void>(
-                        context: context,
-                        builder: (_) => InstallDialog(version: v, preset: widget.preset),
-                      ),
-                    ),
-                  );
-                },
+                            );
+                          },
+                        ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          right: Container(
+            decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(14)),
+            child: selected == null
+                ? Center(child: Text('选择左边的版本', style: TextStyle(color: scheme.onSurfaceVariant)))
+                : InstallPanel(key: ValueKey(selected.id), version: selected),
+          ),
         );
       },
     );
   }
 }
 
-/// 安装 Minecraft：可选择加载器和版本名称
-class InstallDialog extends StatefulWidget {
-  const InstallDialog({super.key, required this.version, this.preset});
+class _Tag extends StatelessWidget {
+  const _Tag(this.text, {this.filled = false});
+
+  final String text;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+      decoration: BoxDecoration(
+        color: filled ? scheme.primaryContainer : Colors.transparent,
+        border: filled ? null : Border.all(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        text,
+        style: theme.textTheme.labelSmall?.copyWith(color: filled ? scheme.onPrimaryContainer : scheme.onSurfaceVariant),
+      ),
+    );
+  }
+}
+
+/// 安装 Minecraft：选择加载器（不兼容的灰掉并写明原因）、加载器版本、OptiFine 和版本名称
+class InstallPanel extends StatefulWidget {
+  const InstallPanel({super.key, required this.version, this.preset});
 
   final RemoteVersion version;
   final LoaderKind? preset;
 
   @override
-  State<InstallDialog> createState() => _InstallDialogState();
+  State<InstallPanel> createState() => _InstallPanelState();
 }
 
-class _InstallDialogState extends State<InstallDialog> {
+class _InstallPanelState extends State<InstallPanel> {
   static const _descriptions = {
     null: '纯净的 Minecraft',
     LoaderKind.forge: '历史最久、模组最多的加载器',
@@ -391,7 +386,9 @@ class _InstallDialogState extends State<InstallDialog> {
     final messenger = ScaffoldMessenger.of(context);
     final name = _name.text.trim();
     final withOptiFine = _optifine && _canOptiFine && _optifineVersion.isNotEmpty;
-    Navigator.pop(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('已开始安装，进度见顶栏的后台任务'), behavior: SnackBarBehavior.floating, width: 420),
+    );
     // 只选 OptiFine 时安装为独立版本；有主加载器时 OptiFine 作为模组
     final future = _choice == null && withOptiFine
         ? state.installVersion(
@@ -429,6 +426,16 @@ class _InstallDialogState extends State<InstallDialog> {
       ? defaultVersionName(LoaderKind.optifine, widget.version.id, _optifineVersion)
       : defaultVersionName(_choice, widget.version.id, _loaderVersion);
 
+  /// 加载器选项格子下面的一行小字：加载中 / 不支持 / 默认版本或说明
+  String _hint(LoaderKind? k) {
+    if (_loading(k)) return '正在获取…';
+    if (!_available(k)) return '不支持 ${widget.version.id}';
+    if (k == null) return '不加装';
+    final list = _lists[k] ?? const <LoaderVersion>[];
+    final def = (list.where((l) => l.stable).firstOrNull ?? list.firstOrNull)?.label;
+    return def ?? _descriptions[k]!;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -437,42 +444,71 @@ class _InstallDialogState extends State<InstallDialog> {
     final ofList = _optifineList;
     final ofSelected = ofList.where((v) => v.version == _optifineVersion).firstOrNull;
     final ofLoading = _loading(LoaderKind.optifine);
-    return AlertDialog(
-      title: Text('安装 Minecraft ${widget.version.id}'),
-      content: SizedBox(
-        width: 560,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    final canInstall = !(_loading(_choice) || (_choice != null && _loaderVersion.isEmpty));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
             children: [
-              for (final k in _mainOptions)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Material(
-                    color: _choice == k ? scheme.secondaryContainer : scheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(16),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      dense: true,
-                      enabled: _loading(k) || _available(k),
-                      leading: LoaderIcon(loaderOfKind(k)),
-                      title: Text(k?.label ?? '原版'),
-                      subtitle: Text(!_loading(k) && !_available(k) ? '该版本不可用' : _descriptions[k]!),
-                      trailing: _loading(k)
-                          ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : (_choice == k ? Icon(Icons.check_circle, color: scheme.primary) : null),
-                      onTap: !_loading(k) && _available(k)
-                          ? () => setState(() {
-                              _choice = k;
-                              _pickDefault();
-                            })
-                          : null,
-                    ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text('安装 ${widget.version.id}', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(width: 8),
+                  Text(
+                    widget.version.releaseTime.split('T').first,
+                    style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 42,
+                child: TextField(
+                  controller: _name,
+                  decoration: InputDecoration(
+                    labelText: '名称',
+                    hintText: _defaultName,
+                    floatingLabelBehavior: FloatingLabelBehavior.always,
+                    isDense: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
+              ),
               const SizedBox(height: 10),
+              LayoutBuilder(
+                builder: (context, c) {
+                  final cols = c.maxWidth > 420 ? 3 : 2;
+                  final w = (c.maxWidth - 6 * (cols - 1)) / cols;
+                  return Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final k in _mainOptions)
+                        SizedBox(
+                          width: w,
+                          child: _LoaderTile(
+                            loader: loaderOfKind(k),
+                            label: k?.label ?? '原版',
+                            hint: _hint(k),
+                            selected: _choice == k,
+                            loading: _loading(k),
+                            enabled: !_loading(k) && _available(k),
+                            onTap: () => setState(() {
+                              _choice = k;
+                              _pickDefault();
+                            }),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
               if (_choice != null && current.isNotEmpty) ...[
+                const SizedBox(height: 10),
                 DropdownMenu<String>(
                   // 选择 OptiFine 后 Forge 版本可能被自动切换，需要重建下拉框
                   key: ValueKey('$_choice-$_loaderVersion'),
@@ -486,12 +522,12 @@ class _InstallDialogState extends State<InstallDialog> {
                   ],
                   onSelected: (v) => setState(() => _loaderVersion = v ?? _loaderVersion),
                 ),
-                const SizedBox(height: 10),
               ],
-              // OptiFine 附加项
+              const SizedBox(height: 8),
+              // OptiFine 附加项：整行可点
               Material(
-                color: _optifine && _canOptiFine ? scheme.secondaryContainer : scheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(16),
+                color: _optifine && _canOptiFine ? scheme.secondaryContainer : scheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(10),
                 clipBehavior: Clip.antiAlias,
                 child: CheckboxListTile(
                   dense: true,
@@ -541,27 +577,103 @@ class _InstallDialogState extends State<InstallDialog> {
                   }),
                 ),
               ],
-              const SizedBox(height: 14),
-              TextField(
-                controller: _name,
-                decoration: InputDecoration(
-                  labelText: '版本名称（可选）',
-                  hintText: _defaultName,
-                  helperText: '留空则使用默认名称',
-                  border: const OutlineInputBorder(),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '安装为 ${_name.text.trim().isEmpty ? _defaultName : _name.text.trim()}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
                 ),
+              ),
+              const SizedBox(width: 10),
+              FilledButton(
+                onPressed: canInstall ? _install : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(110, 44),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('安装'),
               ),
             ],
           ),
         ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-        FilledButton(
-          onPressed: _loading(_choice) || (_choice != null && _loaderVersion.isEmpty) ? null : _install,
-          child: const Text('开始安装'),
-        ),
       ],
+    );
+  }
+}
+
+/// 加载器选项：至少 52 高，整格可点；不可用的灰掉并写明原因
+class _LoaderTile extends StatelessWidget {
+  const _LoaderTile({
+    required this.loader,
+    required this.label,
+    required this.hint,
+    required this.selected,
+    required this.loading,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final Loader loader;
+  final String label;
+  final String hint;
+  final bool selected;
+  final bool loading;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Opacity(
+      opacity: enabled || loading ? 1 : .45,
+      child: Material(
+        color: selected ? scheme.primaryContainer.withValues(alpha: .35) : scheme.surfaceContainer,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: selected ? scheme.primary : Colors.transparent, width: 1.5),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 54),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Row(
+                children: [
+                  LoaderIcon(loader, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+                        Text(
+                          hint,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (loading) const SizedBox.square(dimension: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -94,6 +94,12 @@ ThemeData buildTheme(Brightness brightness, {Color seed = defaultThemeSeed}) {
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
     ),
+    // 手机横屏高度只有约 400：对话框标题小一号、上下边距收窄，内容区才放得下
+    dialogTheme: DialogThemeData(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+      titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: scheme.onSurface),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

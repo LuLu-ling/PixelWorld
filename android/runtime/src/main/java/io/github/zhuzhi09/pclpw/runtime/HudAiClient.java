@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.os.Handler;
 import android.os.Looper;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -16,163 +15,155 @@ import java.io.OutputStreamWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Talks to the launcher's AI bridge over a loopback socket. The launcher owns the model
- * configuration and the AI client; the game process only sends the question and shows the
- * streamed answer, so there is no second copy of the prompt or the API key here.
+ * Connection to the launcher's AI bridge (lib/core/hud_bridge.dart) over a loopback socket.
+ *
+ * <p>The launcher owns the model settings, the API key and the conversation history; the game
+ * process only sends requests and shows what comes back. One connection carries several requests;
+ * every reply carries the id of its request and is delivered to that request's callback on the
+ * main thread.
  */
 final class HudAiClient {
 
-    interface Listener {
-        void onStart();
+    interface Callback {
+        /** Called on the main thread for every reply to the request. */
+        void onMessage(JSONObject message);
+    }
 
-        void onDelta(String text);
-
-        void onDone();
-
-        void onError(String message);
+    /** Reply types after which a request is finished. */
+    private static boolean isFinal(String type) {
+        switch (type) {
+            case "list":
+            case "load":
+            case "ok":
+            case "done":
+            case "error":
+                return true;
+            default:
+                return false;
+        }
     }
 
     private final Activity activity;
     private final Handler main = new Handler(Looper.getMainLooper());
+    private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "PCLPW-HudAI");
+        t.setDaemon(true);
+        return t;
+    });
+    private final Map<Integer, Callback> callbacks = new ConcurrentHashMap<>();
+    private final AtomicInteger nextId = new AtomicInteger(1);
 
     private Socket socket;
-    private Thread thread;
-    private volatile boolean cancelled;
+    private BufferedWriter out;
+    private volatile boolean closed;
 
     HudAiClient(Activity activity) {
         this.activity = activity;
     }
 
-    /** history entries are {role, content} pairs. */
-    void ask(String question, String context, List<String[]> history, Listener listener) {
-        cancel();
-        cancelled = false;
-        thread = new Thread(() -> run(question, context, history, listener), "PCLPW-HudAI");
-        thread.setDaemon(true);
-        thread.start();
+    /** Sends a request; {@code callback} may be null when no reply is needed. */
+    int request(JSONObject request, Callback callback) {
+        final int id = nextId.getAndIncrement();
+        try {
+            request.put("id", id);
+        } catch (Throwable ignored) {
+        }
+        if (callback != null) callbacks.put(id, callback);
+        closed = false;
+        io.execute(() -> {
+            try {
+                ensureConnected();
+                out.write(request.toString());
+                out.write('\n');
+                out.flush();
+            } catch (Throwable e) {
+                disconnect();
+                fail(id, friendlyError(e));
+            }
+        });
+        return id;
     }
 
-    void cancel() {
-        cancelled = true;
+    /** Stops delivering replies and closes the connection. Answers still finish in the launcher. */
+    void close() {
+        closed = true;
+        callbacks.clear();
+        io.execute(this::disconnect);
+    }
+
+    // ---------- connection (io thread) ----------
+
+    private void ensureConnected() throws Exception {
+        if (socket != null && !socket.isClosed()) return;
+        JSONObject bridge = readBridge();
+        if (bridge == null) throw new IllegalStateException("启动器没有在运行，无法使用 AI。先回到启动器再试。");
+        int port = bridge.optInt("port");
+        String token = bridge.optString("token");
+        if (port <= 0 || token.isEmpty()) throw new IllegalStateException("AI 连接还没有准备好，请回到启动器再试。");
+
+        Socket s = new Socket();
+        s.connect(new InetSocketAddress("127.0.0.1", port), 3000);
+        s.setTcpNoDelay(true);
+        BufferedWriter w = new BufferedWriter(new OutputStreamWriter(s.getOutputStream(), StandardCharsets.UTF_8));
+        w.write(new JSONObject().put("type", "hello").put("token", token).toString());
+        w.write('\n');
+        w.flush();
+        socket = s;
+        out = w;
+
+        Thread reader = new Thread(() -> read(s), "PCLPW-HudAI-read");
+        reader.setDaemon(true);
+        reader.start();
+    }
+
+    private void read(Socket s) {
+        try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8));
+            String line;
+            while ((line = in.readLine()) != null) {
+                final JSONObject msg;
+                try {
+                    msg = new JSONObject(line);
+                } catch (Throwable ignored) {
+                    continue;
+                }
+                final int id = msg.optInt("id");
+                // Loading a conversation that is still being answered: the answer follows on the same id
+                JSONObject loaded = msg.optJSONObject("session");
+                boolean streams = "load".equals(msg.optString("type")) && loaded != null && loaded.optBoolean("busy");
+                final Callback cb = isFinal(msg.optString("type")) && !streams ? callbacks.remove(id) : callbacks.get(id);
+                if (cb != null) post(() -> cb.onMessage(msg));
+            }
+        } catch (Throwable ignored) {
+            // socket closed
+        }
+        io.execute(() -> {
+            if (socket == s) disconnect();
+        });
+        // Everything still waiting lost its answer
+        if (!closed) {
+            List<Integer> ids = new ArrayList<>(callbacks.keySet());
+            for (int id : ids) fail(id, "和启动器的连接断开了。回答会在启动器里继续完成，可以稍后在这里重新打开这个对话。");
+        }
+    }
+
+    private void disconnect() {
         Socket s = socket;
         socket = null;
+        out = null;
         if (s != null) {
             try {
                 s.close();
             } catch (Throwable ignored) {
-            }
-        }
-        Thread t = thread;
-        thread = null;
-        if (t != null) t.interrupt();
-    }
-
-    private void run(String question, String context, List<String[]> history, Listener listener) {
-        try {
-            JSONObject bridge = readBridge();
-            if (bridge == null) {
-                fail(listener, "启动器没有在运行，无法使用 AI。先回到启动器再试。");
-                return;
-            }
-            int port = bridge.optInt("port");
-            String token = bridge.optString("token");
-            if (port <= 0 || token.isEmpty()) {
-                fail(listener, "AI 连接还没有准备好，请回到启动器再试。");
-                return;
-            }
-
-            Socket s = new Socket();
-            socket = s;
-            s.connect(new InetSocketAddress("127.0.0.1", port), 3000);
-            s.setSoTimeout(120000);
-            s.setTcpNoDelay(true);
-
-            BufferedWriter out = new BufferedWriter(
-                    new OutputStreamWriter(s.getOutputStream(), StandardCharsets.UTF_8));
-            JSONObject hello = new JSONObject();
-            hello.put("type", "hello");
-            hello.put("token", token);
-            out.write(hello.toString());
-            out.write('\n');
-
-            JSONObject req = new JSONObject();
-            req.put("type", "ask");
-            req.put("id", 1);
-            req.put("text", question);
-            req.put("context", context == null ? "" : context);
-            JSONArray h = new JSONArray();
-            for (String[] turn : history) {
-                h.put(new JSONObject().put("role", turn[0]).put("content", turn[1]));
-            }
-            req.put("history", h);
-            out.write(req.toString());
-            out.write('\n');
-            out.flush();
-
-            BufferedReader in = new BufferedReader(
-                    new InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8));
-            boolean started = false;
-            boolean finished = false;
-            String line;
-            while (!cancelled && (line = in.readLine()) != null) {
-                JSONObject res;
-                try {
-                    res = new JSONObject(line);
-                } catch (Throwable ignored) {
-                    continue;
-                }
-                String type = res.optString("type");
-                switch (type) {
-                    case "start":
-                        started = true;
-                        post(() -> {
-                            if (!cancelled) listener.onStart();
-                        });
-                        break;
-                    case "delta": {
-                        String text = res.optString("text");
-                        if (!text.isEmpty()) {
-                            post(() -> {
-                                if (!cancelled) listener.onDelta(text);
-                            });
-                        }
-                        break;
-                    }
-                    case "done":
-                        finished = true;
-                        post(() -> {
-                            if (!cancelled) listener.onDone();
-                        });
-                        break;
-                    case "error": {
-                        finished = true;
-                        String message = res.optString("message", "AI 请求失败");
-                        fail(listener, message);
-                        break;
-                    }
-                    default:
-                        break;
-                }
-                if (finished) break;
-            }
-            if (!cancelled && !finished) {
-                fail(listener, started ? "AI 回答中断了，请重试。" : "AI 没有响应，请稍后再试。");
-            }
-        } catch (Throwable e) {
-            if (!cancelled) {
-                fail(listener, friendlyError(e));
-            }
-        } finally {
-            Socket s = socket;
-            socket = null;
-            if (s != null) {
-                try {
-                    s.close();
-                } catch (Throwable ignored) {
-                }
             }
         }
     }
@@ -193,21 +184,28 @@ final class HudAiClient {
     }
 
     private static String friendlyError(Throwable e) {
-        String name = e.getClass().getSimpleName();
+        if (e instanceof IllegalStateException && e.getMessage() != null) return e.getMessage();
         if (e instanceof java.net.ConnectException || e instanceof java.net.SocketTimeoutException
                 || e instanceof java.net.NoRouteToHostException) {
             return "连不上启动器的 AI 服务。先回到启动器，再切回游戏试试。";
         }
-        return "AI 请求失败：" + name;
+        return "AI 请求失败：" + e.getClass().getSimpleName();
     }
 
-    private void fail(Listener listener, String message) {
-        post(() -> {
-            if (!cancelled) listener.onError(message);
-        });
+    private void fail(int id, String message) {
+        final Callback cb = callbacks.remove(id);
+        if (cb == null || closed) return;
+        final JSONObject msg = new JSONObject();
+        try {
+            msg.put("type", "error").put("id", id).put("message", message);
+        } catch (Throwable ignored) {
+        }
+        post(() -> cb.onMessage(msg));
     }
 
     private void post(Runnable r) {
-        main.post(r);
+        main.post(() -> {
+            if (!closed) r.run();
+        });
     }
 }

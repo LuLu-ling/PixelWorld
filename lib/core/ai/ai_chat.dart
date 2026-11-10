@@ -329,19 +329,47 @@ class ChatStore extends ChangeNotifier {
   }
 
   /// 发送消息；session 为 null 时新建会话。返回消息所在的会话
-  ChatSession send(ChatSession? session, String text, AiSettings ai, {String? title}) {
+  ///
+  /// [systemExtra] 追加在系统提示后面（只用于这次请求，不保存）；[interactive] 为 false 时
+  /// 没有人能在启动器里确认操作（例如问题来自游戏内），需要确认的操作直接拒绝。
+  /// [focus] 为 false 时不切换启动器里当前打开的会话。
+  ChatSession send(
+    ChatSession? session,
+    String text,
+    AiSettings ai, {
+    String? title,
+    String? systemExtra,
+    bool interactive = true,
+    bool focus = true,
+  }) {
     final now = DateTime.now();
     final s =
         session ?? ChatSession(id: newId(), title: title ?? titleFrom(text), created: now, updated: now, messages: []);
     if (session == null) sessions.insert(0, s);
     s.messages.add(ChatMessage('user', text));
-    currentId = s.id;
-    unawaited(_sendFlow(s, ai));
+    if (focus) currentId = s.id;
+    unawaited(_sendFlow(s, ai, systemExtra: systemExtra, interactive: interactive));
     return s;
   }
 
+  /// 导入其他地方保存的对话（例如旧版游戏内助手的记录）；id 已存在的跳过。返回导入的数量
+  Future<int> importSessions(Iterable<ChatSession> list) async {
+    var count = 0;
+    for (final s in list) {
+      if (s.messages.isEmpty || byId(s.id) != null) continue;
+      sessions.add(s);
+      await _save(s);
+      count++;
+    }
+    if (count > 0) {
+      sessions.sort((a, b) => b.updated.compareTo(a.updated));
+      notifyListeners();
+    }
+    return count;
+  }
+
   /// 上下文超过阈值（不超过上下文长度的 75%）时先压缩，再请求回答
-  Future<void> _sendFlow(ChatSession s, AiSettings ai) async {
+  Future<void> _sendFlow(ChatSession s, AiSettings ai, {String? systemExtra, bool interactive = true}) async {
     final at = compactAt();
     if (at > 0 && canCompact(s)) {
       final c = contextOf(s, ai);
@@ -354,7 +382,7 @@ class ChatStore extends ChangeNotifier {
         if ((_gen[s.id] ?? 0) != gen) return;
       }
     }
-    await _run(s, ai);
+    await _run(s, ai, systemExtra: systemExtra, interactive: interactive);
   }
 
   /// 重新生成：去掉最后一条文字回答（如果有），再次请求
@@ -388,7 +416,8 @@ class ChatStore extends ChangeNotifier {
     return out;
   }
 
-  Future<void> _run(ChatSession s, AiSettings ai) async {
+  Future<void> _run(ChatSession s, AiSettings ai, {String? systemExtra, bool interactive = true}) async {
+    final system = systemExtra == null ? assistantSystemPrompt : '$assistantSystemPrompt\n\n$systemExtra';
     final gen = _gen[s.id] ?? 0;
     bool stopped() => (_gen[s.id] ?? 0) != gen;
     _errors.remove(s.id);
@@ -403,7 +432,7 @@ class ChatStore extends ChangeNotifier {
         notifyListeners();
         AiTurnEnd? end;
         final watch = Stopwatch()..start();
-        await for (final e in aiStream(ai, assistantSystemPrompt, _history(s), tools: tools)) {
+        await for (final e in aiStream(ai, system, _history(s), tools: tools)) {
           if (stopped()) return;
           switch (e) {
             case AiText(:final text):
@@ -442,7 +471,7 @@ class ChatStore extends ChangeNotifier {
         // 依次处理工具调用；只读操作直接执行，其余等用户确认
         for (final call in calls) {
           if (stopped()) return;
-          final result = await _handle(s, call, stopped);
+          final result = await _handle(s, call, stopped, interactive: interactive);
           if (stopped()) return;
           s.messages.add(result);
           unawaited(_save(s));
@@ -467,7 +496,12 @@ class ChatStore extends ChangeNotifier {
     }
   }
 
-  Future<ChatMessage> _handle(ChatSession s, AiToolCall call, bool Function() stopped) async {
+  Future<ChatMessage> _handle(
+    ChatSession s,
+    AiToolCall call,
+    bool Function() stopped, {
+    bool interactive = true,
+  }) async {
     final def = toolbox?.find(call.name);
     final pending = _pending[call.id] = PendingTool(s.id, call, def);
     notifyListeners();
@@ -494,6 +528,15 @@ class ChatStore extends ChangeNotifier {
         ToolKind.write => !(_allowed[s.id]?.contains(call.name) ?? false),
         ToolKind.danger => true,
       };
+      if (needsApproval && !interactive) {
+        return result(
+          ToolStatus.denied,
+          '这条消息来自游戏内，没有人能在启动器里确认这个操作，所以没有执行。'
+          '请告诉用户回到启动器的「AI」页，在同一个对话里继续完成这一步。',
+          title: plan.title,
+          details: plan.details,
+        );
+      }
       if (needsApproval) {
         pending._decision = Completer<bool>();
         notifyListeners();

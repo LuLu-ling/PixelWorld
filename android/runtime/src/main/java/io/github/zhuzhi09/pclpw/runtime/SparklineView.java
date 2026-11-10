@@ -11,8 +11,8 @@ import android.view.View;
 /** A small filled line chart for the frame-rate history in the HUD. */
 final class SparklineView extends View {
 
-    private static final int ACCENT = 0xFF7FB4FF;
-    private static final int GRID = 0x1FFFFFFF;
+    private static final int ACCENT = 0xFF4A4A4A;
+    private static final int GRID = 0x1F000000;
 
     private final float[] values = new float[60];
     private int count;
@@ -82,7 +82,7 @@ final class SparklineView extends View {
         path.lineTo(w - pad, h - pad);
         path.lineTo(pad, h - pad);
         path.close();
-        fill.setShader(new LinearGradient(0, pad, 0, h - pad, 0x557FB4FF, 0x007FB4FF, Shader.TileMode.CLAMP));
+        fill.setShader(new LinearGradient(0, pad, 0, h - pad, 0x224A4A4A, 0x004A4A4A, Shader.TileMode.CLAMP));
         canvas.drawPath(path, fill);
     }
 }

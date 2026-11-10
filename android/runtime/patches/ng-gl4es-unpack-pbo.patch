@@ -1,0 +1,42 @@
+diff --git a/src/gl/texture.c b/src/gl/texture.c
+index 3fc443f..93f20f5 100644
+--- a/src/gl/texture.c
++++ b/src/gl/texture.c
+@@ -5,6 +5,7 @@
+ #include "../glx/streaming.h"
+ #include "GL/glext.h"
+ #include "array.h"
++#include "buffers.h"
+ #include "blit.h"
+ #include "decompress.h"
+ #include "debug.h"
+@@ -1434,7 +1435,13 @@ void APIENTRY_GL4ES gl4es_glTexImage2D(GLenum target, GLint level, GLint interna
+ 
+     GLvoid* datab = (GLvoid*)data;
+ 
+-    if (glstate->vao->unpack) datab = (char*)datab + (uintptr_t)glstate->vao->unpack->data;
++    if (glstate->vao->unpack) {
++        datab = (char*)datab + (uintptr_t)glstate->vao->unpack->data;
++        // The pixels are now a client pointer into the emulated buffer: the real PBO that
++        // glBufferData/glUnmapBuffer left bound would make the driver read them as an offset
++        // (GL_INVALID_OPERATION or garbage, e.g. Xaero's minimap). It is rebound when needed.
++        bindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
++    }
+ 
+     GLvoid* pixels = (GLvoid*)datab;
+     border = 0; // TODO: something?
+@@ -2129,7 +2136,13 @@ void old_glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffse
+         type = GL_UNSIGNED_BYTE;
+ 
+     GLvoid* datab = (GLvoid*)data;
+-    if (glstate->vao->unpack) datab = (char*)datab + (uintptr_t)glstate->vao->unpack->data;
++    if (glstate->vao->unpack) {
++        datab = (char*)datab + (uintptr_t)glstate->vao->unpack->data;
++        // The pixels are now a client pointer into the emulated buffer: the real PBO that
++        // glBufferData/glUnmapBuffer left bound would make the driver read them as an offset
++        // (GL_INVALID_OPERATION or garbage, e.g. Xaero's minimap). It is rebound when needed.
++        bindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
++    }
+     GLvoid* pixels = (GLvoid*)datab;
+ 
+     const GLuint itarget = what_target(target);

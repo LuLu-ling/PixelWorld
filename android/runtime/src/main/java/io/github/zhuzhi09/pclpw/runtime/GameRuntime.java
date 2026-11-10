@@ -349,6 +349,11 @@ public final class GameRuntime {
         env.put("AWTSTUB_HEIGHT", String.valueOf(height));
         env.put("DALVIK_APPLICATION", Tools.jObjectToString(activity.getApplication()));
         env.put("DALVIK_JAVAVM", String.valueOf(Tools.getJavaVMPointer()));
+        // TouchController reads its proxy socket with System.getenv when the mod loads
+        if (TouchControllerBridge.socketName != null) {
+            env.put("TOUCH_CONTROLLER_PROXY_SOCKET", TouchControllerBridge.socketName);
+            Logger.appendToLog("Pixel World runtime: TouchController proxy on @" + TouchControllerBridge.socketName);
+        }
         for (Map.Entry<String, String> e : env.entrySet()) {
             Os.setenv(e.getKey(), e.getValue(), true);
         }

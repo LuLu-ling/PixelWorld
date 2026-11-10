@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_scope.dart';
+import 'app_state.dart';
 import 'core/crash.dart';
 import 'platform.dart';
 import 'widgets/accounts_dialog.dart';
@@ -460,8 +461,11 @@ class _TasksPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final running = AppScope.of(context).runningTasks;
+    final state = AppScope.of(context);
+    final running = state.runningTasks;
     final task = running.firstOrNull;
+    // 没有后台任务但游戏在运行时显示运行中的实例数（点击仍进入任务页）
+    final games = state.gameState == GameState.running ? 1 : 0;
     return SizedBox(
       width: width,
       child: _BarChip(
@@ -470,11 +474,11 @@ class _TasksPill extends StatelessWidget {
         child: task == null
             ? Row(
                 children: [
-                  Icon(Icons.check, size: 16, color: scheme.onSurfaceVariant),
+                  Icon(games > 0 ? Icons.sports_esports_outlined : Icons.check, size: 16, color: scheme.onSurfaceVariant),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '当前无后台任务',
+                      games > 0 ? '$games 个游戏实例运行中' : '当前无后台任务',
                       style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   ),

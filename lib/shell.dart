@@ -151,18 +151,18 @@ class _ShellState extends State<Shell> {
                 removeRight: true,
                 removeBottom: true,
                 child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _TopBar(
-                    page: _page,
-                    sub: _sub,
-                    onBack: () => setState(() => _sub = null),
-                    rootKey: _rootKey,
-                    splitX: _splitX,
-                  ),
-                  Expanded(child: pageView),
-                ],
-              ),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _TopBar(
+                      page: _page,
+                      sub: _sub,
+                      onBack: () => setState(() => _sub = null),
+                      rootKey: _rootKey,
+                      splitX: _splitX,
+                    ),
+                    Expanded(child: pageView),
+                  ],
+                ),
               ),
             ),
           ],
@@ -314,11 +314,21 @@ class _TopBarState extends State<_TopBar> {
   @override
   Widget build(BuildContext context) {
     SchedulerBinding.instance.addPostFrameCallback((_) => _measure());
+    return LayoutBuilder(
+      builder: (context, c) {
+        // 按可用宽度分三档：宽 ≥ 900 全部显示；中等去掉问候语后的小字、账户只显示头像；窄再收起「公告」
+        final compact = c.maxWidth < 900;
+        final tight = c.maxWidth < 760;
+        return _bar(context, compact: compact, tight: tight);
+      },
+    );
+  }
+
+  Widget _bar(BuildContext context, {required bool compact, required bool tight}) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final state = AppScope.of(context);
     final sub = widget.sub;
-
     Widget title;
     if (sub != null) {
       final text = sub == SubPage.instance ? '版本详情' : _subTitles[sub]!;
@@ -327,7 +337,11 @@ class _TopBarState extends State<_TopBar> {
           IconButton(tooltip: '返回', onPressed: widget.onBack, icon: const Icon(Icons.arrow_back, size: 20)),
           const SizedBox(width: 2),
           Flexible(
-            child: Text(text, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            child: Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       );
@@ -335,11 +349,15 @@ class _TopBarState extends State<_TopBar> {
       title = Text.rich(
         TextSpan(
           children: [
-            TextSpan(text: greeting(state.selectedAccount?.name), style: const TextStyle(fontWeight: FontWeight.w700)),
             TextSpan(
-              text: '  准备好冒险了吗？',
-              style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              text: greeting(state.selectedAccount?.name),
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
+            if (!compact)
+              TextSpan(
+                text: '  准备好冒险了吗？',
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              ),
           ],
         ),
         maxLines: 1,
@@ -364,21 +382,22 @@ class _TopBarState extends State<_TopBar> {
           children: [
             Expanded(child: titleArea),
             const SizedBox(width: 8),
-            _TasksPill(key: _tasksKey),
-            const SizedBox(width: 6),
+            _TasksPill(key: _tasksKey, width: tight ? 168 : (compact ? 200 : 236)),
+            const SizedBox(width: 4),
             IconButton(
               tooltip: '版本选择',
               onPressed: () => ShellNav.of(context).open(SubPage.versions),
               icon: const Icon(Icons.search, size: 21),
             ),
-            IconButton(
-              tooltip: '公告',
-              onPressed: () => showNoticesDialog(context),
-              icon: const Icon(Icons.notifications_none_outlined, size: 21),
-            ),
+            if (!tight)
+              IconButton(
+                tooltip: '公告',
+                onPressed: () => showNoticesDialog(context),
+                icon: const Icon(Icons.notifications_none_outlined, size: 21),
+              ),
             if (!isDesktop) ...[const SizedBox(width: 4), const _BarChip(child: DeviceStatus())],
             const SizedBox(width: 6),
-            const _AccountChip(),
+            _AccountChip(avatarOnly: compact),
             if (isDesktop && !nativeWindowButtons) ...[const SizedBox(width: 8), const WindowButtons()],
           ],
         ),
@@ -433,7 +452,9 @@ class _BarChip extends StatelessWidget {
 
 /// 后台任务：没有任务时显示「当前无后台任务」；有任务时显示第一个任务和进度。点击进入任务页。
 class _TasksPill extends StatelessWidget {
-  const _TasksPill({super.key});
+  const _TasksPill({super.key, required this.width});
+
+  final double width;
 
   @override
   Widget build(BuildContext context) {
@@ -442,7 +463,7 @@ class _TasksPill extends StatelessWidget {
     final running = AppScope.of(context).runningTasks;
     final task = running.firstOrNull;
     return SizedBox(
-      width: 236,
+      width: width,
       child: _BarChip(
         onTap: () => ShellNav.of(context).open(SubPage.tasks),
         color: task == null ? null : scheme.primaryContainer,
@@ -452,7 +473,10 @@ class _TasksPill extends StatelessWidget {
                   Icon(Icons.check, size: 16, color: scheme.onSurfaceVariant),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text('当前无后台任务', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                    child: Text(
+                      '当前无后台任务',
+                      style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
                   ),
                   Icon(Icons.chevron_right, size: 16, color: scheme.onSurfaceVariant),
                 ],
@@ -496,7 +520,10 @@ class _TasksPill extends StatelessWidget {
 
 /// 账户：头像首字母 + 名称 · 类型，点击切换账户
 class _AccountChip extends StatelessWidget {
-  const _AccountChip();
+  const _AccountChip({this.avatarOnly = false});
+
+  /// 窄屏只显示头像，名称放在提示里
+  final bool avatarOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -504,9 +531,9 @@ class _AccountChip extends StatelessWidget {
     final scheme = theme.colorScheme;
     final account = AppScope.of(context).selectedAccount;
     final kind = account == null ? '' : (account.type.name == 'microsoft' ? ' · 正版' : ' · 离线');
-    return _BarChip(
+    final chip = _BarChip(
       onTap: () => showAccountsDialog(context),
-      padding: const EdgeInsets.only(left: 7, right: 12),
+      padding: EdgeInsets.only(left: 7, right: avatarOnly ? 7 : 12),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -517,21 +544,26 @@ class _AccountChip extends StatelessWidget {
             decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(6)),
             child: Text(
               account == null ? '+' : account.name.characters.first.toUpperCase(),
-              style: theme.textTheme.labelMedium?.copyWith(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w700),
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: scheme.onPrimaryContainer,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-          const SizedBox(width: 7),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 140),
-            child: Text(
-              account == null ? '添加账户' : '${account.name}$kind',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelMedium,
+          if (!avatarOnly) const SizedBox(width: 7),
+          if (!avatarOnly)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 140),
+              child: Text(
+                account == null ? '添加账户' : '${account.name}$kind',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelMedium,
+              ),
             ),
-          ),
         ],
       ),
     );
+    return Tooltip(message: account == null ? '添加账户' : '${account.name}$kind', child: chip);
   }
 }

@@ -43,6 +43,8 @@ android {
 
 dependencies {
     implementation("androidx.annotation:annotation:1.9.1")
+    // TouchController 的启动器端代理（LGPL-3.0）：把触摸转发给游戏里的 TouchController 模组
+    implementation("top.fifthlight.touchcontroller:proxy-client-android:0.0.8")
     implementation("io.github.hexhacking:xdl:2.4.0")
     implementation("org.apache.commons:commons-compress:1.27.1")
     implementation("org.tukaani:xz:1.10")

@@ -575,6 +575,9 @@ class AppState extends ChangeNotifier {
         if (renderer.renderer == 'zink' && !gpu.hasVulkan11) {
           _launcherLog('警告：这台设备没有声明 Vulkan 1.1，所选渲染器可能无法启动');
         }
+        // 装了 TouchController 模组：游戏内的触摸交给它（基岩版风格的触控），我们的虚拟按键不再显示
+        final touchController = hasTouchController(gameDir);
+        if (touchController) _launcherLog('检测到 TouchController 模组：使用它的触控方式');
         if (renderer.renderer == 'krypton' && sdl) {
           _launcherLog('警告：Krypton Wrapper 在 26.3 快照及之后的版本上会崩溃，出现问题请换用 MobileGlues');
         }
@@ -592,6 +595,7 @@ class AppState extends ChangeNotifier {
           hud: cfg.gameHud,
           hudAi: cfg.gameHudAi,
           hudAiLog: cfg.gameHudAiLog,
+          touchController: touchController,
         );
         await config.update({'launchCount': count});
         gameState = GameState.running;

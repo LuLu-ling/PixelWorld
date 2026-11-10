@@ -75,6 +75,7 @@ abstract final class AndroidRuntime {
     bool hud = true,
     bool hudAi = true,
     bool hudAiLog = true,
+    bool touchController = false,
   }) async {
     await File(logFile).parent.create(recursive: true);
     if (File(logFile).existsSync()) await File(logFile).delete();
@@ -94,6 +95,7 @@ abstract final class AndroidRuntime {
       'hud': hud,
       'hudAi': hudAi,
       'hudAiLog': hudAiLog,
+      'touchController': touchController,
     });
   }
 
@@ -342,6 +344,20 @@ Future<AndroidGpu> androidGpu() async =>
 /// 把设置中的渲染器（可能是 auto）换成实际使用的渲染器，并给出理由
 ///
 /// [sdl]：这个版本用 SDL3 创建窗口（26.x）。Krypton Wrapper 在 26.3 快照起会崩溃，这类版本用 MobileGlues
+/// 版本的 mods 文件夹里是否有启用的 TouchController 模组（基岩版风格的触控）
+bool hasTouchController(String gameDir) {
+  try {
+    final dir = Directory(p.join(gameDir, 'mods'));
+    if (!dir.existsSync()) return false;
+    return dir.listSync().any((e) {
+      final name = p.basename(e.path).toLowerCase();
+      return e is File && name.contains('touchcontroller') && name.endsWith('.jar');
+    });
+  } catch (_) {
+    return false;
+  }
+}
+
 ({String renderer, String reason}) resolveAndroidRenderer(String pref, AndroidGpu gpu, {bool sdl = false}) {
   if (pref != 'auto' && androidRenderers.containsKey(pref)) return (renderer: pref, reason: '设置指定');
   // Krypton Wrapper 和 MobileGlues 都需要 OpenGL ES 3；更老的驱动只能走 Vulkan

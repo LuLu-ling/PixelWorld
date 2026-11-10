@@ -77,6 +77,9 @@ struct pojav_environ_s {
     ADD_CALLBACK_WWIN(Scroll);
 
 #undef ADD_CALLBACK_WWIN
+    // Pixel World: frames presented through GLFW. Lives here because the game JVM and the app
+    // load separate copies of this library (different linker namespaces); this struct is shared.
+    _Atomic uint64_t frameCount;
 };
 extern struct pojav_environ_s *pojav_environ;
 

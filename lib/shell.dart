@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_scope.dart';
+import 'core/instance_files.dart';
 import 'app_state.dart';
 import 'core/crash.dart';
 import 'platform.dart';
@@ -210,6 +211,15 @@ class _Rail extends StatelessWidget {
           item(MainPage.home, Icons.rocket_launch_outlined, Icons.rocket_launch, '启动'),
           item(MainPage.download, Icons.download_outlined, Icons.download, '下载'),
           item(MainPage.tools, Icons.construction_outlined, Icons.construction, '工具'),
+          // 手机上的内置文件管理器（电脑上打开文件夹用系统的资源管理器）
+          if (!isDesktop)
+            _RailItem(
+              icon: Icons.folder_outlined,
+              activeIcon: Icons.folder,
+              label: '文件',
+              selected: false,
+              onTap: () => openInFileManager(AppScope.read(context).config.gameDir),
+            ),
           item(MainPage.settings, Icons.settings_outlined, Icons.settings, '设置'),
           item(MainPage.ai, Icons.chat_bubble_outline, Icons.chat_bubble, 'AI'),
         ],

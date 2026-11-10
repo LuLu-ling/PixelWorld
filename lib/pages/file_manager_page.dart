@@ -18,17 +18,90 @@ Future<String?> pickFolder(BuildContext context, {String? start, String confirm 
   return Navigator.of(context).push<String>(FileManagerPage.route(start ?? AppScope.read(context).config.gameDir, pick: true, confirm: confirm));
 }
 
+/// 手机上的下载目录（找不到时用存储根目录）
+String get mobileDownloadDir {
+  final d = p.join(AndroidStorage.root, 'Download');
+  return Directory(d).existsSync() ? d : AndroidStorage.root;
+}
+
+/// 选择一个文件：桌面端用系统对话框，手机上用内置的文件管理器。
+/// [extensions] 不带点，例如 `['mrpack']`；为空时不限制。选图片仍然用系统相册（各页面自己处理）。
+Future<String?> pickFile(
+  BuildContext context, {
+  String? start,
+  List<String>? extensions,
+  String label = '文件',
+  String confirm = '选择',
+}) async {
+  if (isDesktop) {
+    final f = await openFile(
+      acceptedTypeGroups: [if (extensions != null && extensions.isNotEmpty) XTypeGroup(label: label, extensions: extensions)],
+      confirmButtonText: confirm,
+    );
+    return f?.path;
+  }
+  return Navigator.of(context).push<String>(
+    MaterialPageRoute(
+      builder: (_) => FileManagerPage(
+        start: start ?? mobileDownloadDir,
+        mode: FilePickMode.file,
+        extensions: extensions,
+        confirm: confirm,
+        label: label,
+      ),
+    ),
+  );
+}
+
+/// 选择保存位置：桌面端用系统对话框，手机上用内置的文件管理器（选文件夹并填写文件名）
+Future<String?> pickSavePath(BuildContext context, String name, {String? start, List<String>? extensions, String label = '文件'}) async {
+  if (isDesktop) {
+    final loc = await getSaveLocation(
+      suggestedName: name,
+      confirmButtonText: '保存',
+      acceptedTypeGroups: [if (extensions != null && extensions.isNotEmpty) XTypeGroup(label: label, extensions: extensions)],
+    );
+    return loc?.path;
+  }
+  return Navigator.of(context).push<String>(
+    MaterialPageRoute(
+      builder: (_) => FileManagerPage(start: start ?? mobileDownloadDir, mode: FilePickMode.save, saveName: name, label: label),
+    ),
+  );
+}
+
+/// 文件管理器的用途：浏览管理，或者为其他功能选择文件夹、文件、保存位置
+enum FilePickMode { none, folder, file, save }
+
 final _textFile = RegExp(r'\.(txt|log|json|json5|toml|properties|cfg|conf|ini|yml|yaml|mcmeta|snbt|md|csv|xml)$', caseSensitive: false);
 final _imageFile = RegExp(r'\.(png|jpe?g|webp|gif|bmp)$', caseSensitive: false);
 
 /// 手机上的内置文件管理器：浏览、新建、重命名、复制 / 剪切 / 粘贴、删除到回收站、从手机导入文件。
 /// [pick] 为 true 时用来选择文件夹，返回选中的路径。
 class FileManagerPage extends StatefulWidget {
-  const FileManagerPage({super.key, required this.start, this.pick = false, this.confirm = '选择'});
+  const FileManagerPage({
+    super.key,
+    required this.start,
+    bool pick = false,
+    FilePickMode? mode,
+    this.confirm = '选择',
+    this.extensions,
+    this.saveName,
+    this.label = '文件',
+  }) : mode = mode ?? (pick ? FilePickMode.folder : FilePickMode.none);
 
   final String start;
-  final bool pick;
+  final FilePickMode mode;
   final String confirm;
+
+  /// 选择文件时只能选这些扩展名（不带点）；为空时不限制
+  final List<String>? extensions;
+
+  /// 选择保存位置时预填的文件名
+  final String? saveName;
+  final String label;
+
+  bool get pick => mode != FilePickMode.none;
 
   static Route<String> route(String start, {bool pick = false, String confirm = '选择'}) =>
       MaterialPageRoute(builder: (_) => FileManagerPage(start: start, pick: pick, confirm: confirm));
@@ -51,6 +124,43 @@ class _FileManagerPageState extends State<FileManagerPage> {
   bool _needAccess = false;
   String? _busy;
   late ScrollController _scroll = ScrollController();
+  late final _saveName = TextEditingController(text: widget.saveName ?? '');
+
+  /// 选择文件时，这个文件能不能选
+  bool _selectable(String name) {
+    final ext = widget.extensions;
+    if (ext == null || ext.isEmpty) return true;
+    final lower = name.toLowerCase();
+    return ext.any((e) => lower.endsWith('.${e.toLowerCase()}'));
+  }
+
+  Future<void> _confirmSave() async {
+    final name = _saveName.text.trim();
+    if (name.isEmpty || name.contains('/') || name.contains(r'\')) {
+      toast(context, '请填写有效的文件名');
+      return;
+    }
+    final target = p.join(_dir, name);
+    if (FileSystemEntity.isDirectorySync(target)) {
+      toast(context, '已经有同名的文件夹');
+      return;
+    }
+    if (File(target).existsSync()) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('替换已有的文件？'),
+          content: Text('这个文件夹里已经有「$name」，保存后会替换它。'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('替换')),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    Navigator.pop(context, target);
+  }
 
   @override
   void initState() {
@@ -68,6 +178,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
   @override
   void dispose() {
     _scroll.dispose();
+    _saveName.dispose();
     super.dispose();
   }
 
@@ -311,7 +422,12 @@ class _FileManagerPageState extends State<FileManagerPage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.pick ? '选择文件夹' : '文件管理'),
+          title: Text(switch (widget.mode) {
+            FilePickMode.folder => '选择文件夹',
+            FilePickMode.file => '选择${widget.label}',
+            FilePickMode.save => '保存${widget.label}',
+            FilePickMode.none => '文件管理',
+          }),
           actions: [
             IconButton(tooltip: '上一级', onPressed: _up, icon: const Icon(Icons.arrow_upward)),
             IconButton(tooltip: '新建文件夹', onPressed: _newFolder, icon: const Icon(Icons.create_new_folder_outlined)),
@@ -371,7 +487,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
                 ),
               ),
             Expanded(child: _body(theme)),
-            if (widget.pick)
+            if (widget.mode == FilePickMode.folder)
               Material(
                 color: scheme.surfaceContainer,
                 child: Padding(
@@ -385,6 +501,47 @@ class _FileManagerPageState extends State<FileManagerPage> {
                         onPressed: _error == null ? () => Navigator.pop(context, _dir) : null,
                         child: Text('${widget.confirm}这个文件夹'),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+            if (widget.mode == FilePickMode.file)
+              Material(
+                color: scheme.surfaceContainer,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 16, 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.extensions == null || widget.extensions!.isEmpty
+                              ? '点一个文件来${widget.confirm}'
+                              : '点一个 ${widget.extensions!.map((e) => '.$e').join(' / ')} 文件来${widget.confirm}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+                    ],
+                  ),
+                ),
+              ),
+            if (widget.mode == FilePickMode.save)
+              Material(
+                color: scheme.surfaceContainer,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _saveName,
+                          decoration: const InputDecoration(labelText: '文件名', isDense: true, border: OutlineInputBorder()),
+                          onSubmitted: (_) => _confirmSave(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+                      FilledButton(onPressed: _error == null ? _confirmSave : null, child: const Text('保存到这里')),
                     ],
                   ),
                 ),
@@ -442,7 +599,11 @@ class _FileManagerPageState extends State<FileManagerPage> {
           if (stat != null) formatDate(stat.modified),
           if (stat != null && !isDir) formatSize(stat.size),
         ].join(' · ');
+        // 选择文件时：不符合的文件变灰、不能点；保存时点文件等于用它的名字
+        final pickingFile = widget.mode == FilePickMode.file;
+        final enabled = isDir || !pickingFile || _selectable(name);
         return ListTile(
+          enabled: enabled,
           selected: _highlight != null && p.equals(e.path, _highlight!),
           selectedTileColor: scheme.secondaryContainer,
           leading: Icon(
@@ -457,8 +618,13 @@ class _FileManagerPageState extends State<FileManagerPage> {
           ),
           title: Text(name, overflow: TextOverflow.ellipsis),
           subtitle: Text(info),
-          onTap: () => isDir ? _open(e.path) : _openFile(e as File),
-          trailing: PopupMenuButton<String>(
+          onTap: () {
+            if (isDir) return _open(e.path);
+            if (pickingFile) return Navigator.pop(context, e.path);
+            if (widget.mode == FilePickMode.save) return setState(() => _saveName.text = name);
+            _openFile(e as File);
+          },
+          trailing: widget.pick ? null : PopupMenuButton<String>(
             tooltip: '更多操作',
             onSelected: (v) => switch (v) {
               'copy' => setState(() => _clipboard = (paths: [e.path], cut: false)),

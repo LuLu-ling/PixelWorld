@@ -108,6 +108,11 @@ void main() {
     expect(cfg['javaPath'], p.join(dataDir, 'runtime', 'jre', 'java.exe'));
     expect(cfg['gameDir'], p.join(dataDir, '.minecraft'));
 
+    // 再启动一次、那个文件夹仍被占用：这一轮什么都没移动，但新位置已经是主目录，不能退回旧目录
+    used = await migrateWindowsLayout(legacy: [legacy], configDir: configDir, dataDir: dataDir);
+    expect(used, dataDir);
+    expect(Directory(p.join(dataDir, 'runtime')).existsSync(), isTrue);
+
     await lock.close();
     used = await migrateWindowsLayout(legacy: [legacy], configDir: configDir, dataDir: dataDir);
     expect(used, dataDir);

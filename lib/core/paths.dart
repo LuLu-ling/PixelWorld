@@ -145,8 +145,9 @@ Future<String> migrateWindowsLayout({required List<String> legacy, required Stri
           stuck.add(name);
         }
       }
-      // 一项都移不动：继续用旧目录，配置里的路径也没改，保持一致
-      if (moved == 0 && stuck.isNotEmpty) return old;
+      // 一项都移不动、新位置也还是空的（例如不在同一个盘）：继续用旧目录，配置里的路径也没改，保持一致。
+      // 之前已经移过一部分时，新位置才是主目录，只剩被占用的项留在原处
+      if (moved == 0 && stuck.isNotEmpty && !_hasContent(dataDir)) return old;
       // 指向旧目录的路径都改到新位置（包括还没创建的，例如默认游戏目录），只有还留在原处的不改
       rewriteConfigPaths(config, old, dataDir, keep: stuck);
     }

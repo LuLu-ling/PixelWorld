@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>桌面主页效果图</title>
+<style>
+  :root {
+    /* 取自你现在的暖色主题（MD 取色），方便和截图直接对比 */
+    --bg: #1c1613; --rail: #161110; --surface: #271f1b; --surface-2: #30261f; --surface-3: #3a2e26;
+    --primary: #ffb68e; --on-primary: #4d2207; --primary-c: #ffdbc9; --on-primary-c: #3a1a06;
+    --accent: #c86a33; --text: #f0e0d7; --muted: #b29d91; --faint: #7d6b61; --line: rgba(255,255,255,.07);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: #0c0b0a; color: var(--text);
+    font-family: system-ui, "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+  .page { display: flex; flex-direction: column; align-items: center; padding: 10px 16px 24px; gap: 10px; }
+  .tabs { display: flex; gap: 4px; background: #1d1a18; padding: 4px; border-radius: 12px; flex-wrap: wrap; justify-content: center; }
+  .tabs button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 9px; cursor: pointer; }
+  .tabs button.on { background: #5a3a26; color: #ffdbc9; }
+  .note { color: var(--faint); font-size: 13px; text-align: center; max-width: 960px; line-height: 1.7; }
+  .note b { color: var(--muted); font-weight: 600; }
+
+  /* 窗口框：按真实逻辑像素画，再整体缩放到浏览器里 */
+  .win { position: relative; border-radius: 10px; overflow: hidden; background: var(--bg);
+    box-shadow: 0 0 0 1px #3a3330, 0 24px 70px rgba(0,0,0,.65); transform-origin: top center; flex: none; }
+  .win img.shot { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+  .hidden { display: none !important; }
+
+  /* app 本体；小窗口时整体 0.9 倍（方案 D：桌面自动缩放） */
+  .app { display: flex; width: 100%; height: 100%; }
+  .win.small .app { transform: scale(.9); transform-origin: top left; width: calc(100% / .9); height: calc(100% / .9); }
+
+  .rail { width: 76px; flex: none; background: var(--rail); display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 4px; }
+  .rail .logo { width: 30px; height: 30px; border-radius: 9px; margin-bottom: 10px; }
+  .nav { width: 60px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0; color: var(--muted); font-size: 11px; cursor: default; }
+  .nav .ic { width: 52px; height: 30px; border-radius: 15px; display: grid; place-items: center; }
+  .nav.on { color: var(--text); font-weight: 600; }
+  .nav.on .ic { background: var(--accent); color: #fff; }
+  .nav:not(.on):hover .ic { background: rgba(255,255,255,.06); }
+  svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+  /* 顶栏：右侧窗口按钮前有分隔，账户在窄窗口只显示头像（方案 B） */
+  .top { height: 54px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 0 0 20px; -webkit-app-region: drag; }
+  .hello { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+  .hello b { font-size: 17px; }
+  .hello span { color: var(--muted); font-size: 13px; }
+  .win.small .hello span { display: none; }
+  .tasks { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; margin-left: 10px; border-radius: 17px; background: var(--surface); color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .tasks .dot { width: 7px; height: 7px; border-radius: 50%; background: #6f8f6a; }
+  .grow { flex: 1; }
+  .ibtn { width: 34px; height: 34px; border-radius: 17px; display: grid; place-items: center; color: var(--muted); }
+  .ibtn:hover { background: rgba(255,255,255,.06); color: var(--text); }
+  .acct { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px 0 4px; border-radius: 17px; background: var(--surface); font-size: 13px; white-space: nowrap; }
+  .acct .av { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+  .acct small { color: var(--muted); }
+  .win.small .acct { padding: 0 4px; }
+  .win.small .acct .name { display: none; }
+  .sep { width: 1px; height: 20px; background: var(--line); margin: 0 2px 0 6px; }
+  .wbtns { display: flex; height: 100%; }
+  .wbtns div { width: 46px; display: grid; place-items: center; color: var(--muted); }
+  .wbtns div:hover { background: rgba(255,255,255,.06); }
+  .wbtns div:last-child:hover { background: #c42b1c; color: #fff; }
+  .wbtns svg { width: 14px; height: 14px; stroke-width: 1.4; }
+
+  /* 内容：左主右辅两栏 */
+  .content { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--side, 296px); gap: 16px; padding: 4px 20px 18px; }
+  .win.large .content { --side: 340px; gap: 20px; padding: 8px 28px 24px; }
+  .col { min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+
+  /* 主卡片：图标收小、放在标题旁（方案 E） */
+  .hero { position: relative; flex: none; display: flex; flex-direction: column; border-radius: 20px; padding: 16px 20px 18px; overflow: hidden;
+    background: linear-gradient(115deg, #3b2c22 0%, #4a3122 55%, #6b3d1d 100%); }
+  .hero::after { content: ""; position: absolute; inset: 0; background: radial-gradient(120% 140% at 100% 100%, rgba(255,150,80,.18), transparent 60%); pointer-events: none; }
+  .hero .row1 { display: flex; align-items: center; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border-radius: 8px; background: rgba(0,0,0,.25); font-size: 12.5px; color: var(--text); }
+  .chip.ghost { background: rgba(255,255,255,.07); color: var(--muted); }
+  .hero .title { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .vicon { width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,.1); display: grid; place-items: center; flex: none; }
+  .vicon svg { width: 24px; height: 24px; color: var(--primary); }
+  .hero h1 { margin: 0; font-size: 26px; letter-spacing: .3px; }
+  .hero .sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .hero .meta { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+  .hero .acts { display: flex; gap: 10px; margin-top: 14px; position: relative; z-index: 1; }
+  .btn { height: 42px; display: inline-flex; align-items: center; gap: 8px; padding: 0 18px; border-radius: 12px; font-size: 14px; font-weight: 600; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.18); color: var(--text); }
+  .btn.primary { background: var(--primary-c); color: var(--on-primary-c); border-color: transparent; padding: 0 26px; }
+  .btn.sq { width: 42px; padding: 0; justify-content: center; }
+  .win.large .hero { padding: 24px 26px; }
+  .win.large .hero h1 { font-size: 30px; }
+
+  /* 区块标题 */
+  .sec { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .sec h2 { margin: 0; font-size: 14.5px; }
+  .sec h2 small { color: var(--faint); font-weight: 400; margin-left: 6px; font-size: 12px; }
+  .sec a { color: var(--primary); font-size: 13px; text-decoration: none; }
+
+  /* 存档卡片：封面铺满、渐变压字、悬停才出现启动按钮；按宽度算张数，不出现半张（方案 C） */
+  .wsec { flex: none; display: flex; flex-direction: column; }
+  .worlds { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); grid-template-rows: 128px; grid-auto-rows: 0; row-gap: 0; column-gap: 12px; overflow: hidden; }
+  .win.large .worlds { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); grid-template-rows: 150px; column-gap: 14px; }
+  .wc { position: relative; border-radius: 14px; overflow: hidden; background: var(--surface); }
+  .wc img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; transition: transform .25s; }
+  .wc::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,.78) 100%); }
+  .wc .t { position: absolute; left: 12px; right: 12px; bottom: 10px; z-index: 1; }
+  .wc .t b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wc .t span { font-size: 12px; color: rgba(255,255,255,.72); }
+  .wc .play { position: absolute; right: 10px; top: 10px; z-index: 1; width: 36px; height: 36px; border-radius: 50%; background: var(--primary-c); color: var(--on-primary-c); display: grid; place-items: center; opacity: 0; transform: scale(.85); transition: .18s; }
+  .wc .play svg { width: 18px; height: 18px; }
+  .wc:hover img { transform: scale(1.04); }
+  .wc:hover .play { opacity: 1; transform: none; }
+  .wc:first-child .play { opacity: 1; transform: none; } /* 第一张常驻，示意悬停效果 */
+
+  /* 版本动态：紧凑列表，占满左栏剩余高度 */
+  .news { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .nlist { flex: 1; min-height: 0; overflow: hidden; border-radius: 16px; background: var(--surface); }
+  .ni { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+  .ni:last-child { border-bottom: 0; }
+  .ni .th { width: 64px; height: 36px; border-radius: 8px; flex: none; background: linear-gradient(135deg, #3d5a3a, #2a3b2a); display: grid; place-items: center; font-size: 10px; font-weight: 800; color: #d7e8c9; letter-spacing: .5px; }
+  .ni .tag { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: var(--surface-3); color: var(--primary); flex: none; }
+  .ni .tag.rel { background: #2f4a2e; color: #b7e3a8; }
+  .ni b { font-size: 13.5px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ni span { color: var(--faint); font-size: 12px; flex: none; }
+
+  /* 右栏 */
+  .card { border-radius: 18px; background: var(--surface); padding: 14px 16px; flex: none; }
+  .notice { background: linear-gradient(135deg, #a9541f, #c86a33); color: #fff; }
+  .notice .h { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 14px; }
+  .notice .h a { color: rgba(255,255,255,.85); font-size: 12px; font-weight: 400; text-decoration: none; }
+  .notice p { margin: 8px 0 0; font-size: 13px; line-height: 1.6; color: rgba(255,255,255,.88); }
+  .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: none; }
+  .qb { height: 50px; border-radius: 14px; background: var(--surface); display: flex; align-items: center; gap: 10px; padding: 0 14px; font-size: 14px; }
+  .qb svg { color: var(--primary); width: 19px; height: 19px; }
+  .qb:hover { background: var(--surface-2); }
+  .win.large .qb { height: 56px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { border-radius: 14px; background: var(--surface); padding: 10px 14px; }
+  .stat b { display: block; font-size: 18px; }
+  .stat span { color: var(--faint); font-size: 12px; }
+
+  /* 提示合成一条细条（方案 A）：低饱和底色、单行小字；测试版那半句可关 */
+  .vinfo .vh { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+  .vinfo .vh a { color: var(--primary); font-size: 12px; font-weight: 400; text-decoration: none; }
+  .kv { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-top: 1px solid var(--line); }
+  .kv span { color: var(--muted); }
+  .hint { margin-top: auto; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); padding: 10px 12px 10px 14px; font-size: 12px; line-height: 1.65; color: var(--muted); display: flex; gap: 10px; align-items: flex-start; }
+  .hint svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--faint); }
+  .hint a { color: var(--primary); text-decoration: none; }
+  .hint .x { margin-left: auto; color: var(--faint); cursor: pointer; flex: none; }
+  .hint .x svg { margin: 0; }
+
+  /* ===== 第二版：第一屏铺满窗口，其余往下滚 ===== */
+  .content { display: block; overflow-y: auto; padding: 0 20px; scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: #4a3b32 transparent; }
+  .win.large .content { padding: 0 28px; }
+  .fold { height: 100%; min-height: 430px; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 4px 0 6px; }
+  .row-top { flex: 1 1 0; min-height: 176px; max-height: 300px; display: grid; grid-template-columns: minmax(0, 1fr) var(--side, 296px); gap: 14px; }
+  .win.large .row-top { --side: 360px; gap: 18px; max-height: 340px; }
+  .win.large .wsec { max-height: 300px; }
+  .row-top .hero { height: 100%; justify-content: center; }
+  .row-top .hero .title { margin-top: 14px; }
+  .side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .side .notice { flex: 1; }
+  .wsec { flex: 1 1 0; min-height: 150px; max-height: 260px; display: flex; flex-direction: column; }
+  .worlds { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr) !important; }
+  .more-hint { flex: none; align-self: center; display: flex; align-items: center; gap: 4px; color: var(--faint); font-size: 12px; cursor: pointer; padding: 2px 10px; border-radius: 10px; }
+  .more-hint:hover { color: var(--muted); background: rgba(255,255,255,.04); }
+  .more-hint svg { width: 14px; height: 14px; }
+  .more { display: grid; grid-template-columns: minmax(0, 1fr) var(--side, 296px); gap: 14px; padding: 18px 0 22px; border-top: 1px solid var(--line); }
+  .win.large .more { --side: 360px; gap: 18px; }
+  .mcol { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .more .nlist { overflow: visible; }
+  .more .hint { margin-top: 0; }
+  .vinfo .kv:first-child { border-top: 0; }
+
+  /* ===== 最近游玩：紧凑横条，小封面清晰显示 ===== */
+  .wsec { flex: none !important; min-height: 0 !important; max-height: none !important; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); grid-auto-rows: 64px; gap: 10px; max-height: calc(64px * 2 + 10px); overflow: hidden; }
+  .win.large .tiles { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); grid-auto-rows: 72px; max-height: calc(72px * 2 + 10px); }
+  .tile { position: relative; display: flex; align-items: center; gap: 12px; padding: 0 10px 0 10px; border-radius: 14px; overflow: hidden;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--c) 38%, var(--surface)) 0%, var(--surface) 55%); }
+  .tile:hover { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 52%, var(--surface)) 0%, var(--surface-2) 60%); }
+  .tile img { width: 44px; height: 44px; border-radius: 9px; image-rendering: pixelated; flex: none; box-shadow: 0 0 0 1px rgba(255,255,255,.08); }
+  .win.large .tile img { width: 52px; height: 52px; }
+  .tile .tx { flex: 1; min-width: 0; }
+  .tile .tx b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .tx span { font-size: 12px; color: var(--muted); }
+  .tplay { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; color: var(--primary); background: rgba(255,255,255,.06); transition: .15s; }
+  .tplay svg { width: 16px; height: 16px; }
+  .tile:hover .tplay { background: var(--primary-c); color: var(--on-primary-c); }
+  /* 第一屏：主卡片那一行吃掉剩余高度（有上限），整体居中 */
+  .row-top { flex: 1 1 auto !important; }
+
+  /* ===== 去掉鲜艳色块：公告用中性底色，主卡片降低饱和度 ===== */
+  .notice { background: var(--surface) !important; color: var(--text) !important; border: 1px solid var(--line); }
+  .notice .nt { display: inline-flex; align-items: center; gap: 8px; }
+  .notice .nt svg { width: 17px; height: 17px; color: var(--primary); }
+  .notice .h a { color: var(--primary) !important; }
+  .notice p { color: var(--muted) !important; }
+  .hero { background: linear-gradient(115deg, #2b221d 0%, #33281f 60%, #3d2d22 100%) !important; border: 1px solid var(--line); }
+  .hero::after { background: radial-gradient(120% 140% at 100% 100%, rgba(255,160,100,.07), transparent 60%) !important; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="tabs">
+    <button data-v="small" class="on">新：1087×667（你现在的窗口）</button>
+    <button data-v="large">新：1440×900</button>
+    <button data-v="now">现在的样子</button>
+  </div>
+  <div class="note" id="note"></div>
+
+  <div class="win" id="win">
+    <img class="shot hidden" id="shot" src="desktop-now.png" alt="现在的桌面主页">
+    <div class="app" id="app">
+      <div class="rail">
+        <img class="logo" src="logo.png" alt="">
+        <div class="nav on"><div class="ic"><svg viewBox="0 0 24 24"><path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2"/><path d="M9 12a13 13 0 0 1 11-9c0 4-2 8-9 11"/><path d="M9 12l3 3"/><path d="M9 12H5l2-4h5"/><path d="M12 15v4l4-2v-5"/></svg></div>启动</div>
+        <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></div>下载</div>
+        <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M14.5 6.5a4 4 0 0 0-5 5L4 17l3 3 5.5-5.5a4 4 0 0 0 5-5l-2.5 2.5-2.5-.5-.5-2.5z"/></svg></div>工具</div>
+        <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></svg></div>设置</div>
+        <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></div>AI</div>
+      </div>
+
+      <div class="main">
+        <div class="top">
+          <div class="hello"><b>晚上好，zhuzhi</b><span>准备好冒险了吗？</span></div>
+          <div class="tasks"><i class="dot"></i>当前无后台任务</div>
+          <div class="grow"></div>
+          <div class="ibtn"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></div>
+          <div class="ibtn"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></div>
+          <div class="acct"><div class="av">Z</div><span class="name">zhuzhi <small>· 离线</small></span></div>
+          <div class="sep"></div>
+          <div class="wbtns">
+            <div><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></div>
+            <div><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></div>
+            <div><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+          </div>
+        </div>
+
+        <div class="content" id="scroller">
+          <!-- 第一屏：正好铺满窗口，只放最常用的 -->
+          <section class="fold">
+            <div class="row-top">
+              <div class="hero">
+                <div class="row1"><span class="chip">切换版本 ▾</span></div>
+                <div class="title">
+                  <div class="vicon"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 16L16 8M8 11l3-3M13 16l3-3"/></svg></div>
+                  <div><h1>1.21.1 Fabric</h1><div class="sub">fabric-loader-0.20.1-1.21.1</div></div>
+                </div>
+                <div class="meta">2 个模组 · 2 天前玩过</div>
+                <div class="acts">
+                  <div class="btn primary"><svg viewBox="0 0 24 24"><path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2"/><path d="M9 12a13 13 0 0 1 11-9c0 4-2 8-9 11"/><path d="M9 12l3 3"/></svg>开始游戏</div>
+                  <div class="btn"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>版本设置</div>
+                  <div class="btn sq"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18" cy="12" r="1"/></svg></div>
+                </div>
+              </div>
+              <div class="side">
+                <div class="card notice">
+                  <div class="h"><span class="nt"><svg viewBox="0 0 24 24"><path d="M4 10v4h3l6 4V6L7 10z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg>启动器公告</span><a href="#">查看 ›</a></div>
+                  <p>暂无公告</p>
+                </div>
+                <div class="quick">
+                  <div class="qb"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>装模组</div>
+                  <div class="qb"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>管理模组</div>
+                  <div class="qb"><svg viewBox="0 0 24 24"><path d="M3 7l2-2h5l2 2h9v12H3z"/></svg>文件夹</div>
+                  <div class="qb"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>查看日志</div>
+                </div>
+              </div>
+            </div>
+            <div class="wsec">
+              <div class="sec"><h2>最近游玩</h2><a href="#">全部存档 ›</a></div>
+              <div class="tiles">
+                <div class="tile" style="--c:#3f5a35"><img src="w1.png" alt=""><div class="tx"><b>新的世界</b><span>1.21.1 Fabric · 2 天前</span></div><div class="tplay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></div></div>
+                <div class="tile" style="--c:#35553a"><img src="w2.png" alt=""><div class="tx"><b>新的世界</b><span>1.20.1 Fabric · 4 天前</span></div><div class="tplay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></div></div>
+                <div class="tile" style="--c:#4a6a8a"><img src="w3.png" alt=""><div class="tx"><b>新的世界 (4)</b><span>1.21.4 Fabric · 2月22日</span></div><div class="tplay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></div></div>
+                <div class="tile" style="--c:#6e6a62"><img src="w4.png" alt=""><div class="tx"><b>新的世界</b><span>1.20.1 Fabric · 12月</span></div><div class="tplay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></div></div>
+                <div class="tile" style="--c:#35553a"><img src="w2.png" alt=""><div class="tx"><b>空岛生存</b><span>1.20.1 Fabric · 12月</span></div><div class="tplay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></div></div>
+                <div class="tile" style="--c:#3f5a35"><img src="w1.png" alt=""><div class="tx"><b>红石实验</b><span>1.21.1 Fabric · 11月</span></div><div class="tplay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></div></div>
+              </div>
+            </div>
+            <div class="more-hint" id="morehint">向下滚动查看更多<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+          </section>
+
+          <!-- 往下滚：其余内容 -->
+          <section class="more" id="more">
+            <div class="mcol">
+              <div class="sec"><h2>Minecraft 版本动态<small>来自 Minecraft Wiki</small></h2><a href="#">全部 ›</a></div>
+              <div class="nlist">
+                <div class="ni"><div class="th">26.4</div><span class="tag">快照</span><b>26.4-snapshot-7</b><span>11-03</span></div>
+                <div class="ni"><div class="th">26.4</div><span class="tag">快照</span><b>26.4-snapshot-6</b><span>10-27</span></div>
+                <div class="ni"><div class="th">26.3</div><span class="tag rel">正式版</span><b>Java 版 26.3</b><span>10-14</span></div>
+                <div class="ni"><div class="th">26.3</div><span class="tag">预览</span><b>26.3-rc-2</b><span>10-09</span></div>
+                <div class="ni"><div class="th">26.3</div><span class="tag">预览</span><b>26.3-pre-4</b><span>10-02</span></div>
+                <div class="ni"><div class="th">26.3</div><span class="tag">预览</span><b>26.3-pre-3</b><span>09-25</span></div>
+              </div>
+            </div>
+            <div class="mcol">
+              <div class="sec"><h2>当前版本</h2><a href="#">版本设置 ›</a></div>
+              <div class="card vinfo">
+                <div class="kv"><span>加载器</span><b>Fabric 0.20.1</b></div>
+                <div class="kv"><span>Java</span><b>21（自动）</b></div>
+                <div class="kv"><span>内存</span><b>4 GB</b></div>
+                <div class="kv"><span>模组</span><b>2 个已启用</b></div>
+              </div>
+              <div class="stats">
+                <div class="stat"><b>12</b><span>已安装版本</span></div>
+                <div class="stat"><b>38 小时</b><span>本周游玩</span></div>
+              </div>
+              <div class="hint">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+                <div>Pixel World 0.3.3 测试版，遇到问题请 <a href="#">反馈</a>。<br>本软件完全免费、开源；如果你是付费获得的，请申请退款并从 <a href="#">GitHub 获取正版</a>。</div>
+                <div class="x" title="关闭测试版提示（防受骗提示会保留）"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const SIZES = { small: [1087, 667], large: [1440, 900], now: [1087, 667] };
+  const NOTES = {
+    small: '<b>你现在的窗口尺寸。</b>第一屏正好铺满窗口：主卡片、公告和快捷按钮、最近游玩（紧凑横条，小封面按接近原尺寸显示，不再放大发糊）。各块高度随窗口伸缩，但有上下限，不会拉出大片空白。往下滚（或点下面的“向下滚动查看更多”）才是版本动态、当前版本信息、统计和提示。小窗口自动缩到 0.9 倍。',
+    large: '<b>大窗口。</b>同一套排版：第一屏照样只放常用的，卡片随高度长大到上限为止，最近游玩的横条按宽度排成更多列，最多两行。在窗口里滚动鼠标滚轮就能看到下面的内容。',
+    now: '<b>现在的样子</b>，你发来的截图，方便对比。',
+  };
+  const win = document.getElementById('win'), app = document.getElementById('app'), shot = document.getElementById('shot');
+  let view = 'small';
+  function show(v) {
+    view = v;
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+    document.getElementById('note').innerHTML = NOTES[v];
+    win.classList.toggle('small', v === 'small');
+    win.classList.toggle('large', v === 'large');
+    app.classList.toggle('hidden', v === 'now');
+    shot.classList.toggle('hidden', v !== 'now');
+    fit();
+    const sc = document.getElementById('scroller');
+    if (sc) { sc.style.scrollBehavior = 'auto'; sc.scrollTop = 0; sc.style.scrollBehavior = ''; }
+  }
+  function fit() {
+    const [w, h] = SIZES[view];
+    win.style.width = w + 'px'; win.style.height = h + 'px';
+    const top = win.getBoundingClientRect().top + window.scrollY;
+    const s = Math.min(1.4, (window.innerWidth - 32) / w, Math.max(.3, (window.innerHeight - top - 24) / h));
+    win.style.transform = 'scale(' + s + ')';
+    win.style.marginBottom = (h * s - h) + 'px';
+    win.style.marginLeft = win.style.marginRight = ((w * s - w) / 2) + 'px';
+  }
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => show(b.dataset.v)));
+  document.getElementById('morehint').addEventListener('click', () => document.getElementById('more').scrollIntoView({ behavior: 'smooth' }));
+  window.addEventListener('resize', fit);
+  show('small');
+</script>
+</body>
+</html>

@@ -109,6 +109,8 @@ class LauncherConfig extends ChangeNotifier {
     'dismissedNotices': <String>[],
     // 已关闭的更新日志版本，关闭后同一个版本不再显示（换版本后重新出现）
     'dismissedChangelog': '',
+    // 桌面首页提示卡里「测试版」那一句关闭时的版本
+    'dismissedBetaHint': '',
   };
 
   static File get _file => File(p.join(Paths.appData, 'config.json'));
@@ -147,6 +149,7 @@ class LauncherConfig extends ChangeNotifier {
   String get updateSkipped => _get('updateSkipped');
   List<String> get dismissedNotices => [for (final x in (_data['dismissedNotices'] as List? ?? const [])) '$x'];
   String get dismissedChangelog => _get('dismissedChangelog');
+  String get dismissedBetaHint => _get('dismissedBetaHint');
   bool get storageAsked => _get('storageAsked');
   /// 界面缩放，0 为自动
   double get uiScale => ((_data['uiScale'] as num?) ?? 0).toDouble();

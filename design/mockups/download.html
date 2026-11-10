@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>下载页效果图</title>
+<style>
+  :root {
+    --bg: #141815; --rail: #101311; --surface: #1c221e; --surface-2: #232a25; --surface-3: #2a332d;
+    --primary: #8fd6a4; --on-primary: #0b3a1c; --primary-c: #2c5a3a; --on-primary-c: #c8f0d2;
+    --text: #e3e8e3; --muted: #a3ada5; --faint: #6f7a72; --line: rgba(255,255,255,.07);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0c0d0c; color: var(--text);
+    font-family: system-ui, "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+  .page { min-height: 100%; display: flex; flex-direction: column; align-items: center; padding: 10px 16px 16px; gap: 10px; }
+  .tabs-top { display: flex; gap: 6px; background: #1b1e1c; padding: 4px; border-radius: 999px; }
+  .tabs-top button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; padding: 7px 16px; border-radius: 999px; cursor: pointer; }
+  .tabs-top button.on { background: var(--primary-c); color: var(--on-primary-c); }
+  .note { color: var(--faint); font-size: 12px; text-align: center; max-width: 900px; line-height: 1.6; }
+
+  .phone { width: 914px; height: 411px; border-radius: 26px; overflow: hidden; position: relative;
+    background: var(--bg); box-shadow: 0 0 0 8px #222, 0 20px 60px rgba(0,0,0,.6); transform-origin: top center; }
+  .phone img.shot { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cutout { position: absolute; left: 14px; top: 50%; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; background: #000; z-index: 9; }
+  svg { display: block; }
+  .hidden { display: none !important; }
+  .phone ::-webkit-scrollbar { width: 3px; }
+  .phone ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 2px; }
+  .phone ::-webkit-scrollbar-button { display: none; }
+
+  .app { display: flex; height: 100%; }
+  .rail { width: 112px; flex: none; background: var(--rail); display: flex; flex-direction: column; align-items: center;
+    padding: 10px 0 10px 40px; gap: 1px; }
+  .rail .logo { width: 32px; height: 32px; border-radius: 10px; margin-bottom: 6px; }
+  .nav { width: 60px; min-height: 52px; justify-content: center; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px 0; color: var(--muted); font-size: 10px; }
+  .nav .ic { width: 54px; height: 30px; border-radius: 15px; display: grid; place-items: center; }
+  .nav.on { color: var(--text); }
+  .nav.on .ic { background: var(--primary-c); color: var(--on-primary-c); }
+
+  .main { flex: 1; min-width: 0; padding: 10px 16px 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .top { display: flex; align-items: center; gap: 8px; height: 38px; flex: none; }
+  .top .hi { flex: 1; font-size: 15px; font-weight: 650; }
+  .icon-btn { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+  .tasks { display: flex; align-items: center; gap: 8px; height: 36px; min-width: 200px; padding: 0 10px 0 12px;
+    border-radius: 8px; background: var(--surface); color: var(--muted); font-size: 12px; }
+  .tasks .label { flex: 1; }
+  .status { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 8px; background: var(--surface); font-size: 12px; color: var(--muted); }
+  .chip-acc { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px 0 7px; border-radius: 8px; background: var(--surface); font-size: 12px; }
+  .avatar { width: 22px; height: 22px; border-radius: 6px; background: #2e5b3d; display: grid; place-items: center; font-size: 11px; color: var(--on-primary-c); }
+
+  /* 下载页的分类标签 */
+  .cats { display: flex; align-items: center; gap: 2px; flex: none; border-bottom: 1px solid var(--line); }
+  .cat { height: 40px; display: flex; align-items: center; padding: 0 14px; font-size: 13.5px; color: var(--muted); position: relative; cursor: pointer; }
+  .cat.on { color: var(--text); font-weight: 600; }
+  .cat.on::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--primary); }
+  .cats .grow { flex: 1; }
+  .seg { display: flex; gap: 2px; padding: 3px; background: var(--surface); border-radius: 9px; margin-bottom: 3px; }
+  .seg span { font-size: 12px; height: 28px; display: flex; align-items: center; padding: 0 11px; border-radius: 6px; color: var(--muted); }
+  .seg span.on { background: var(--surface-3); color: var(--text); }
+
+  .split { flex: 1; min-height: 0; display: flex; gap: 10px; }
+  .left { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .search { display: flex; align-items: center; gap: 8px; height: 40px; font-size: 13px; padding: 0 10px; border-radius: 8px; background: var(--surface); color: var(--faint); font-size: 12px; flex: none; }
+  .list { flex: 1; min-height: 0; overflow-y: auto; border-radius: 12px; background: var(--surface); }
+  .vr { display: flex; align-items: center; gap: 10px; height: 48px; flex: none; padding: 0 14px; font-size: 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .vr .v { font-weight: 600; min-width: 64px; }
+  .vr .d { color: var(--faint); font-size: 12px; margin-left: auto; }
+  .tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--surface-3); color: var(--muted); }
+  .tag.new { background: var(--primary-c); color: var(--on-primary-c); }
+  .tag.inst { background: transparent; border: 1px solid var(--line); }
+  .vr.on { background: var(--surface-3); box-shadow: inset 3px 0 0 var(--primary); }
+
+  .right { flex: 1 1 0; min-width: 0; border-radius: 14px; background: var(--surface); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+  .right h3 { margin: 0; font-size: 15px; display: flex; align-items: baseline; gap: 8px; }
+  .right h3 small { font-size: 11px; color: var(--faint); font-weight: 400; }
+  .field { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .field .in { flex: 1; height: 38px; font-size: 13px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--line); display: flex; align-items: center; padding: 0 9px; color: var(--text); }
+  .loaders { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .ld { border-radius: 10px; background: var(--surface-2); min-height: 52px; display: flex; flex-direction: column; justify-content: center; padding: 0 10px; border: 1px solid transparent; cursor: pointer; }
+  .ld .n { font-size: 13px; font-weight: 600; }
+  .ld .x { font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ld.on { border-color: var(--primary); background: rgba(143,214,164,.08); }
+  .ld.off { opacity: .45; cursor: default; }
+  .extra { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; min-height: 36px; }
+  .check { width: 18px; height: 18px; border-radius: 4px; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-size: 10px; font-weight: 800; }
+  .foot { margin-top: auto; display: flex; align-items: center; gap: 8px; }
+  .foot .size { font-size: 11px; color: var(--faint); flex: 1; }
+  .btn-p { height: 44px; padding: 0 30px; border-radius: 10px; border: 0; background: var(--primary); color: var(--on-primary); font: inherit; font-size: 13.5px; font-weight: 700; }
+
+  /* 模组 */
+  .filters { display: flex; gap: 6px; flex: none; }
+  .fchip { display: flex; align-items: center; gap: 4px; height: 40px; padding: 0 12px; border-radius: 7px; background: var(--surface); font-size: 11.5px; color: var(--muted); }
+  .fchip b { color: var(--text); font-weight: 600; }
+  .mods { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-content: start; }
+  .mod { display: flex; gap: 12px; align-items: center; min-height: 64px; padding: 8px 12px; cursor: pointer; border-radius: 10px; background: var(--surface); }
+  .mod .mi { width: 42px; height: 42px; border-radius: 8px; flex: none; display: grid; place-items: center; font-weight: 800; font-size: 14px; color: #fff; }
+  .mod .mt { flex: 1; min-width: 0; }
+  .mod .t { font-size: 13.5px; font-weight: 600; display: flex; gap: 6px; align-items: center; }
+  .mod .s { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mod .dl { font-size: 10px; color: var(--faint); }
+  .mod .ib { height: 36px; padding: 0 16px; border-radius: 7px; border: 0; background: var(--primary-c); color: var(--on-primary-c); font: inherit; font-size: 12px; }
+  .mod .ib.done { background: transparent; border: 1px solid var(--line); color: var(--faint); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="tabs-top">
+    <button class="on" data-v="ver">游戏版本</button>
+    <button data-v="mod">模组</button>
+    <button data-v="old">现在</button>
+  </div>
+
+  <div class="phone" id="phone">
+    <div class="cutout"></div>
+    <div class="app" id="app">
+      <aside class="rail">
+        <img class="logo" src="logo.png" alt="">
+        <div class="nav" data-href="index.html"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>启动</div>
+        <div class="nav on" data-href="download.html"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg></div>下载</div>
+        <div class="nav" data-href="tools.html"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 7l3-3 3 3-3 3M4 20l9-9M7 4l3 3-3 3-3-3z"/></svg></div>工具</div>
+        <div class="nav" data-href="settings.html"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></div>设置</div>
+        <div class="nav" data-href="ai.html"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H9l-5 4z"/></svg></div>AI</div>
+      </aside>
+
+      <main class="main">
+        <div class="top">
+          <div class="hi">下载</div>
+          <div class="tasks" id="tasks"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span class="label">当前无后台任务</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></div>
+          <div class="icon-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div>
+          <div class="icon-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 16V11a6 6 0 1112 0v5l2 2H4zM10 21h4"/></svg></div>
+          <div class="status"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 9a15 15 0 0120 0M5 12.5a10 10 0 0114 0M8.5 16a5 5 0 017 0"/></svg>80%</div>
+          <div class="chip-acc"><div class="avatar">Z</div>zhuzhi · 离线</div>
+        </div>
+
+        <div class="cats">
+          <div class="cat on" data-c="ver">游戏版本</div>
+          <div class="cat" data-c="mod">模组</div>
+          <div class="cat">整合包</div>
+          <div class="cat">资源包</div>
+          <div class="cat">光影</div>
+          <div class="grow"></div>
+          <div class="seg" id="verseg"><span class="on">正式版</span><span>快照</span><span>远古版</span><span>愚人节</span></div>
+        </div>
+
+        <!-- 游戏版本：左边紧凑列表，右边选中版本的安装面板 -->
+        <div class="split" id="pane-ver">
+          <div class="left">
+            <div class="list">
+              <div class="vr on"><span class="v">26.3</span><span class="tag new">最新</span><span class="d">2026-09-15</span></div>
+              <div class="vr"><span class="v">26.2</span><span class="d">2026-06-16</span></div>
+              <div class="vr"><span class="v">26.1.2</span><span class="d">2026-04-09</span></div>
+              <div class="vr"><span class="v">26.1.1</span><span class="d">2026-04-01</span></div>
+              <div class="vr"><span class="v">1.21.10</span><span class="d">2025-10-07</span></div>
+              <div class="vr"><span class="v">1.21.4</span><span class="tag inst">已安装</span><span class="d">2024-12-03</span></div>
+              <div class="vr"><span class="v">1.20.1</span><span class="tag inst">已安装</span><span class="d">2023-06-12</span></div>
+              <div class="vr"><span class="v">1.16.5</span><span class="tag inst">已安装</span><span class="d">2021-01-15</span></div>
+              <div class="vr"><span class="v">1.12.2</span><span class="d">2017-09-18</span></div>
+            </div>
+          </div>
+          <div class="right">
+            <h3>安装 26.3<small>正式版 · 2026-09-15</small></h3>
+            <div class="field">名称<div class="in">26.3-Fabric</div></div>
+            <div class="loaders">
+              <div class="ld"><div class="n">原版</div><div class="x">不加装</div></div>
+              <div class="ld on"><div class="n">Fabric</div><div class="x">0.20.1 · 推荐</div></div>
+              <div class="ld"><div class="n">NeoForge</div><div class="x">26.3.0-beta</div></div>
+              <div class="ld"><div class="n">Quilt</div><div class="x">0.29.2</div></div>
+              <div class="ld off"><div class="n">Forge</div><div class="x">暂不支持 26.3</div></div>
+              <div class="ld off"><div class="n">OptiFine</div><div class="x">暂不支持 26.3</div></div>
+            </div>
+            <div class="extra"><span class="check">✓</span>同时安装 Fabric API</div>
+            <div class="foot"><span class="size">约 48 MB · 安装到 PCL.PW/.minecraft</span><button class="btn-p">安装</button></div>
+          </div>
+        </div>
+
+        <!-- 模组：默认按当前版本筛选 -->
+        <div class="split hidden" id="pane-mod" style="flex-direction:column;gap:6px">
+          <div style="display:flex;gap:6px;flex:none">
+            <div class="search" style="flex:1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>搜索 Modrinth 和 CurseForge 上的模组</div>
+            <div class="fchip">安装到 <b>1.21.4 Fabric</b> ▾</div>
+            <div class="fchip">排序 <b>相关度</b> ▾</div>
+          </div>
+          <div class="mods">
+            <div class="mod"><div class="mi" style="background:#3a7a5a">S</div><div class="mt"><div class="t">Sodium</div><div class="s">现代渲染引擎，大幅提升帧率</div><div class="dl">1.2 亿次下载</div></div><button class="ib done">已安装</button></div>
+            <div class="mod"><div class="mi" style="background:#7a4f9a">I</div><div class="mt"><div class="t">Iris Shaders</div><div class="s">在 Sodium 上运行光影包</div><div class="dl">6200 万次下载</div></div><button class="ib">安装</button></div>
+            <div class="mod"><div class="mi" style="background:#9a6a2a">L</div><div class="mt"><div class="t">Lithium</div><div class="s">优化游戏逻辑与服务端性能</div><div class="dl">4100 万次下载</div></div><button class="ib">安装</button></div>
+            <div class="mod"><div class="mi" style="background:#2a6a9a">M</div><div class="mt"><div class="t">Mod Menu</div><div class="s">在游戏里查看和配置模组</div><div class="dl">5800 万次下载</div></div><button class="ib">安装</button></div>
+            <div class="mod"><div class="mi" style="background:#9a3a4a">E</div><div class="mt"><div class="t">EMI</div><div class="s">物品与合成表查看</div><div class="dl">1500 万次下载</div></div><button class="ib">安装</button></div>
+            <div class="mod"><div class="mi" style="background:#4a5a6a">F</div><div class="mt"><div class="t">FerriteCore</div><div class="s">降低内存占用</div><div class="dl">3900 万次下载</div></div><button class="ib">安装</button></div>
+            <div class="mod"><div class="mi" style="background:#5a7a2a">C</div><div class="mt"><div class="t">Continuity</div><div class="s">连接纹理</div><div class="dl">900 万次下载</div></div><button class="ib">安装</button></div>
+            <div class="mod"><div class="mi" style="background:#2a7a7a">J</div><div class="mt"><div class="t">JourneyMap</div><div class="s">实时地图与路径点</div><div class="dl">2600 万次下载</div></div><button class="ib">安装</button></div>
+          </div>
+        </div>
+      </main>
+    </div>
+    <img class="shot hidden" id="old" src="dl-now.png" alt="现在的下载页">
+  </div>
+
+  <div class="note">按手机横屏（约 914×411）绘制。版本、模组、下载量为示意数据；加载器的可用性按选中的 Minecraft 版本实时计算，不兼容的直接灰掉并写明原因。</div>
+</div>
+<script>
+  const phone = document.getElementById("phone");
+  function fit() {
+    const s = Math.min(1.6, (window.innerWidth - 40) / 914, (window.innerHeight - 90) / 411);
+    phone.style.transform = "scale(" + s + ")";
+    phone.style.marginBottom = (411 * s - 411) + "px";
+  }
+  window.addEventListener("resize", fit); fit();
+  // 左右分界线对齐顶栏「后台任务」右边缘，与首页一致
+  function alignSplit() {
+    const t = document.getElementById("tasks"), left = document.querySelector("#pane-ver .left");
+    const s = phone.getBoundingClientRect().width / 914;
+    left.style.flex = "0 0 " + Math.round((t.getBoundingClientRect().right - left.getBoundingClientRect().left) / s) + "px";
+  }
+  window.addEventListener("load", alignSplit); window.addEventListener("resize", alignSplit); alignSplit();
+  function show(v) {
+    document.querySelectorAll(".tabs-top button").forEach((x) => x.classList.toggle("on", x.dataset.v === v));
+    document.querySelectorAll(".cat[data-c]").forEach((x) => x.classList.toggle("on", x.dataset.c === v));
+    document.getElementById("app").classList.toggle("hidden", v === "old");
+    document.getElementById("old").classList.toggle("hidden", v !== "old");
+    document.getElementById("pane-ver").classList.toggle("hidden", v !== "ver");
+    document.getElementById("pane-mod").classList.toggle("hidden", v !== "mod");
+    document.getElementById("verseg").classList.toggle("hidden", v !== "ver");
+  }
+  document.querySelectorAll(".tabs-top button").forEach((b) => b.addEventListener("click", () => show(b.dataset.v)));
+  document.querySelectorAll(".cat[data-c]").forEach((c) => c.addEventListener("click", () => show(c.dataset.c)));
+  document.querySelectorAll(".vr").forEach((r) => r.addEventListener("click", () => {
+    document.querySelectorAll(".vr").forEach((x) => x.classList.toggle("on", x === r));
+    document.querySelector(".right h3").firstChild.textContent = "安装 " + r.querySelector(".v").textContent;
+  }));
+  document.querySelectorAll(".ld:not(.off)").forEach((l) => l.addEventListener("click", () => {
+    document.querySelectorAll(".ld").forEach((x) => x.classList.toggle("on", x === l));
+  }));
+</script>
+<script src="nav.js"></script>
+</body>
+</html>

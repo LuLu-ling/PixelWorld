@@ -174,9 +174,31 @@ class _ChangelogHintState extends State<ChangelogHint> {
   }
 }
 
+/// 顶栏「公告」按钮：当前版本的更新日志提示和启动器公告
+Future<void> showNoticesDialog(BuildContext context) => showDialog<void>(
+  context: context,
+  builder: (ctx) => AlertDialog(
+    title: const Text('公告'),
+    content: const SizedBox(
+      width: 560,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [ChangelogHint(), HomeNotices(showEmpty: true)],
+        ),
+      ),
+    ),
+    actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('关闭'))],
+  ),
+);
+
 /// 首页公告：来自自有静态接口（notices.json），失败或没有公告时不显示任何内容
 class HomeNotices extends StatefulWidget {
-  const HomeNotices({super.key});
+  const HomeNotices({super.key, this.showEmpty = false});
+
+  /// 没有公告时显示一行「暂无公告」（用在公告对话框里）
+  final bool showEmpty;
 
   @override
   State<HomeNotices> createState() => _HomeNoticesState();
@@ -205,9 +227,18 @@ class _HomeNoticesState extends State<HomeNotices> {
             ))
               n,
         ];
-        if (shown.isEmpty) return const SizedBox.shrink();
+        if (shown.isEmpty) {
+          if (!widget.showEmpty) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              snap.connectionState == ConnectionState.waiting ? '正在获取公告…' : '暂无公告',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          );
+        }
         return Padding(
-          padding: const EdgeInsets.only(top: 16),
+          padding: EdgeInsets.only(top: widget.showEmpty ? 0 : 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

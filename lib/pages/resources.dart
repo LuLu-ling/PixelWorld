@@ -107,78 +107,84 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-          child: Row(
-            children: [
-              Text(widget.type.label, style: theme.textTheme.headlineSmall),
-              if (widget.type == ResourceType.modpack) ...[
-                const SizedBox(width: 12),
-                FilledButton.tonalIcon(
-                  onPressed: _installingPack ? null : _installFromFile,
-                  icon: _installingPack
-                      ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.add, size: 18),
-                  label: const Text('从文件安装'),
-                ),
-              ],
-              const Spacer(),
-              Text('数据来自 Modrinth', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+        // 一行：搜索、适配当前版本、排序、（整合包）从文件安装。分类名已经在顶部标签里
+        SizedBox(
+          height: 40,
           child: Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: _query,
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    hintText: '搜索${widget.type.label}',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    hintText: '在 Modrinth 搜索${widget.type.label}',
                     isDense: true,
-                    border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(28))),
+                    filled: true,
+                    fillColor: scheme.surfaceContainerLow,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                   ),
                   onSubmitted: (_) => _search(),
                 ),
               ),
-              const SizedBox(width: 12),
-              DropdownMenu<String>(
-                width: 150,
-                initialSelection: _sort,
-                label: const Text('排序'),
-                inputDecorationTheme: const InputDecorationTheme(isDense: true, border: OutlineInputBorder()),
-                dropdownMenuEntries: const [
-                  DropdownMenuEntry(value: 'relevance', label: '相关性'),
-                  DropdownMenuEntry(value: 'downloads', label: '下载量'),
-                  DropdownMenuEntry(value: 'follows', label: '关注数'),
-                  DropdownMenuEntry(value: 'newest', label: '最新发布'),
-                  DropdownMenuEntry(value: 'updated', label: '最近更新'),
-                ],
+              if (current != null && widget.type != ResourceType.modpack) ...[
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: Text('适配 ${current.id}', overflow: TextOverflow.ellipsis),
+                  selected: _fitCurrent,
+                  onSelected: (v) {
+                    _fitCurrent = v;
+                    _search();
+                  },
+                ),
+              ],
+              const SizedBox(width: 8),
+              PopupMenuButton<String>(
+                tooltip: '排序',
+                initialValue: _sort,
                 onSelected: (v) {
-                  _sort = v ?? _sort;
+                  _sort = v;
                   _search();
                 },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'relevance', child: Text('相关性')),
+                  PopupMenuItem(value: 'downloads', child: Text('下载量')),
+                  PopupMenuItem(value: 'follows', child: Text('关注数')),
+                  PopupMenuItem(value: 'newest', child: Text('最新发布')),
+                  PopupMenuItem(value: 'updated', child: Text('最近更新')),
+                ],
+                child: Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(10)),
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '排序 ${const {'relevance': '相关性', 'downloads': '下载量', 'follows': '关注数', 'newest': '最新发布', 'updated': '最近更新'}[_sort]}',
+                        style: theme.textTheme.labelLarge,
+                      ),
+                      const Icon(Icons.arrow_drop_down, size: 20),
+                    ],
+                  ),
+                ),
               ),
+              if (widget.type == ResourceType.modpack) ...[
+                const SizedBox(width: 8),
+                FilledButton.tonalIcon(
+                  onPressed: _installingPack ? null : _installFromFile,
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+                  icon: _installingPack
+                      ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.add, size: 18),
+                  label: const Text('从文件安装'),
+                ),
+              ],
             ],
           ),
         ),
-        if (current != null && widget.type != ResourceType.modpack)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: FilterChip(
-                label: Text('适配当前版本：${current.id}'),
-                selected: _fitCurrent,
-                onSelected: (v) {
-                  _fitCurrent = v;
-                  _search();
-                },
-              ),
-            ),
-          ),
+        const SizedBox(height: 6),
         Expanded(
           child: _error != null && _hits.isEmpty
               ? Center(
@@ -198,7 +204,7 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
                   child: Text('没有找到结果', style: TextStyle(color: scheme.onSurfaceVariant)),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                  padding: const EdgeInsets.only(bottom: 12),
                   itemCount: _hits.length + (_hits.length < _total ? 1 : 0),
                   itemBuilder: (context, i) {
                     if (i == _hits.length) {

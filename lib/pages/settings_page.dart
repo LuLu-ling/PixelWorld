@@ -51,7 +51,7 @@ class _SettingsPageState extends State<SettingsPage> {
               _Section.manage => const GameStorageSection(),
               _Section.appearance => const _AppearanceSection(),
               _Section.ai => ListView(
-                padding: const EdgeInsets.all(28),
+                padding: const EdgeInsets.fromLTRB(6, 2, 16, 16),
                 children: const [
                   SettingsGroup(
                     title: 'AI 排障',
@@ -85,7 +85,7 @@ class _AppearanceSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final cfg = AppScope.of(context).config;
     return ListView(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.fromLTRB(6, 2, 16, 16),
       children: [
         SettingsGroup(
           title: '个性化',
@@ -165,7 +165,7 @@ class _AboutSection extends StatelessWidget {
       trailing: TextButton(onPressed: () => _open(url), child: Text(action)),
     );
     return ListView(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.fromLTRB(6, 2, 16, 16),
       children: [
         SettingsGroup(
           title: '关于',

@@ -313,7 +313,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback, Ca
 
             @Override
             public void onSurfaceTextureUpdated(android.graphics.SurfaceTexture texture) {
-                if (hud != null) hud.onFrame();
+                // Frames are counted in the native bridge for every renderer (HudMetrics)
             }
         });
         return view;

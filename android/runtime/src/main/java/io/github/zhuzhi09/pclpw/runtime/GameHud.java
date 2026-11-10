@@ -81,6 +81,7 @@ final class GameHud {
     private TextView systemValue;
     private TextView swapValue;
     private TextView cpuValue;
+    private TextView gpuValue;
     private TextView tempLabel;
     private TextView tempValue;
     private TextView timeValue;
@@ -90,6 +91,8 @@ final class GameHud {
     private final TextView compactView;
     private TextView compactItem;
     private boolean compact;
+    /** Where the compact bar sits along the top edge: 0 = left, 1 = right (dragged by the player) */
+    private float compactX;
 
     private HudMetrics.Sample lastSample;
     private Mode mode = Mode.NONE;
@@ -119,13 +122,11 @@ final class GameHud {
         this.attachLog = attachLog;
         this.visible = prefs.getBoolean("visible", true);
         this.compact = prefs.getBoolean("compact", false);
+        this.compactX = Math.max(0f, Math.min(1f, prefs.getFloat("compactX", 0f)));
         this.startSide = !"end".equals(prefs.getString("side", "start"));
         // Older versions stored pixels under "top"; the dp value has its own key
         this.topDp = prefs.getInt("topDp", 72);
         this.metrics = new HudMetrics(activity);
-        // Frame counting is only possible when the renderer draws through a TextureView (Zink);
-        // SurfaceView renderers do not tell the app when a frame is presented.
-        metrics.setFpsAvailable("zink".equals(this.renderer));
 
         ball = buildBall();
         compactView = buildCompact();
@@ -169,8 +170,60 @@ final class GameHud {
         bg.setStroke(Math.max(1, dp(1)), BORDER);
         v.setBackground(bg);
         v.setClickable(true);
-        v.setContentDescription("性能信息，点击查看详情");
+        v.setContentDescription("性能信息，点击查看详情，左右拖动调整位置");
         v.setOnClickListener(x -> setMode(Mode.INFO));
+        // Drag sideways along the top edge; a tap still opens the details
+        final int slop = ViewConfiguration.get(activity).getScaledTouchSlop();
+        v.setOnTouchListener(new View.OnTouchListener() {
+            float downX;
+            int downMargin;
+            boolean dragging;
+
+            @Override
+            public boolean onTouch(View view, MotionEvent e) {
+                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) view.getLayoutParams();
+                switch (e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downX = e.getRawX();
+                        downMargin = lp.leftMargin;
+                        dragging = false;
+                        view.setPressed(true);
+                        return true;
+                    case MotionEvent.ACTION_MOVE: {
+                        float dx = e.getRawX() - downX;
+                        if (!dragging && Math.abs(dx) > slop) {
+                            dragging = true;
+                            view.setPressed(false);
+                        }
+                        if (dragging) {
+                            int[] span = compactSpan();
+                            lp.leftMargin = Math.max(span[0], Math.min(span[1], Math.round(downMargin + dx)));
+                            view.setLayoutParams(lp);
+                        }
+                        return true;
+                    }
+                    case MotionEvent.ACTION_UP:
+                        view.setPressed(false);
+                        if (dragging) {
+                            int[] span = compactSpan();
+                            compactX = span[1] > span[0] ? (lp.leftMargin - span[0]) / (float) (span[1] - span[0]) : 0f;
+                            prefs.edit().putFloat("compactX", compactX).apply();
+                        } else {
+                            view.performClick();
+                        }
+                        return true;
+                    case MotionEvent.ACTION_CANCEL:
+                        view.setPressed(false);
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        });
+        // Its width follows the text; keep it inside the screen when that changes
+        v.addOnLayoutChangeListener((x, l, t, r, b, ol, ot, or, ob) -> {
+            if (r - l != or - ol) placeCompact();
+        });
         return v;
     }
 
@@ -259,6 +312,7 @@ final class GameHud {
         LinearLayout metricsRow = new LinearLayout(activity);
         metricsRow.setOrientation(LinearLayout.HORIZONTAL);
         cpuValue = metricCell(metricsRow, "CPU");
+        gpuValue = metricCell(metricsRow, "GPU");
         LinearLayout tempCell = new LinearLayout(activity);
         tempCell.setOrientation(LinearLayout.VERTICAL);
         tempLabel = label("温度", 10, MUTED, false, false);
@@ -395,12 +449,32 @@ final class GameHud {
         if (mode != Mode.NONE) positionPanel(mode == Mode.MENU ? menu : infoPanel);
     }
 
-    /** Below the camera cutout, centered. */
+    /** Top left, clear of the camera cutout: the center is where touch-control mods put buttons. */
     private void placeCompact() {
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) compactView.getLayoutParams();
         if (lp == null) return;
-        lp.topMargin = Math.max(dp(4), topInset() - dp(4));
+        int top = Math.max(dp(4), topInset() - dp(4));
+        int[] span = compactSpan();
+        int left = Math.round(span[0] + (span[1] - span[0]) * compactX);
+        if (lp.topMargin == top && lp.leftMargin == left) return;
+        lp.topMargin = top;
+        lp.leftMargin = left;
         compactView.setLayoutParams(lp);
+    }
+
+    /** Smallest and largest left margin that keep the compact bar on screen, clear of cutouts */
+    private int[] compactSpan() {
+        int left = dp(8), right = dp(8);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsets insets = parent.getRootWindowInsets();
+            if (insets != null) {
+                android.graphics.Insets i = insets.getInsets(WindowInsets.Type.displayCutout() | WindowInsets.Type.systemBars());
+                left += i.left;
+                right += i.right;
+            }
+        }
+        int max = parent.getWidth() - compactView.getWidth() - right;
+        return new int[]{left, Math.max(left, max)};
     }
 
     void attach() {
@@ -417,7 +491,7 @@ final class GameHud {
         parent.addView(ball, lp);
         FrameLayout.LayoutParams compactLp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-        compactLp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        compactLp.gravity = Gravity.TOP | Gravity.START;
         parent.addView(compactView, compactLp);
         compactView.setVisibility(compact ? View.VISIBLE : View.GONE);
         parent.addOnLayoutChangeListener(parentLayout);
@@ -471,10 +545,6 @@ final class GameHud {
         parent.removeView(menu);
         parent.removeView(infoPanel);
         parent.removeView(scrim);
-    }
-
-    void onFrame() {
-        metrics.frame();
     }
 
     boolean isVisible() {
@@ -787,6 +857,8 @@ final class GameHud {
 
         cpuValue.setText(String.format(Locale.ROOT, "%.0f%%", s.cpuPercent));
         cpuValue.setTextColor(s.cpuPercent > 80 ? WARN : TEXT);
+        gpuValue.setText(s.gpuPercent >= 0 ? String.format(Locale.ROOT, "%.0f%%", s.gpuPercent) : "--");
+        gpuValue.setTextColor(s.gpuPercent < 0 ? MUTED : s.gpuPercent > 90 ? WARN : TEXT);
 
         tempLabel.setText(s.batteryTemperature ? "电池温度" : "温度");
         boolean hasTemp = s.temperature > 0;
@@ -799,7 +871,7 @@ final class GameHud {
         detailValue.setVisibility(s.batteryPercent > 0 ? View.VISIBLE : View.GONE);
     }
 
-    /** e.g. "58 FPS · 1.2/3.0G · CPU 34% · 41°C" */
+    /** e.g. "58 FPS · 1.2/3.0G · CPU 34% · GPU 71% · 41°C" */
     private static String compactText(HudMetrics.Sample s) {
         StringBuilder b = new StringBuilder();
         if (s.fpsAvailable) b.append(String.format(Locale.ROOT, "%.0f FPS · ", s.fps));
@@ -807,6 +879,7 @@ final class GameHud {
             b.append(String.format(Locale.ROOT, "%.1f/%.1fG · ", s.heapUsed / 1073741824.0, s.heapMax / 1073741824.0));
         }
         b.append(String.format(Locale.ROOT, "CPU %.0f%%", s.cpuPercent));
+        if (s.gpuPercent >= 0) b.append(String.format(Locale.ROOT, " · GPU %.0f%%", s.gpuPercent));
         if (s.temperature > 0) b.append(String.format(Locale.ROOT, " · %.0f°C", s.temperature));
         return b.toString();
     }
@@ -840,6 +913,7 @@ final class GameHud {
             b.append("系统内存：").append(gbPair(s.systemUsed, s.systemTotal)).append('\n');
             if (s.swapTotal > 0) b.append("交换空间：").append(gbPair(s.swapUsed, s.swapTotal)).append('\n');
             b.append("CPU：").append(String.format(Locale.ROOT, "%.0f%%", s.cpuPercent)).append('\n');
+            if (s.gpuPercent >= 0) b.append("GPU：").append(String.format(Locale.ROOT, "%.0f%%", s.gpuPercent)).append('\n');
             if (s.temperature > 0) {
                 b.append(s.batteryTemperature ? "电池温度：" : "温度：")
                         .append(String.format(Locale.ROOT, "%.0f°C", s.temperature)).append('\n');

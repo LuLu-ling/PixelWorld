@@ -14,6 +14,8 @@ public final class JREUtils {
     public static native void setLdLibraryPath(String ldLibraryPath);
     public static native void setupBridgeWindow(Object surface);
     public static native void releaseBridgeWindow();
+    /** Frames the game has presented through GLFW so far (0 when it swaps elsewhere, e.g. SDL) */
+    public static native long getFrameCount();
     public static native void setupExitMethod(Context context);
     /** Registers the atexit handler that leaves through Android when the game exits */
     public static native void initializeHooks();

@@ -104,7 +104,7 @@ class _AccountsDialogState extends State<_AccountsDialog> {
                 label: const Text('微软登录'),
               ),
             ),
-            if (state.config.msClientId.trim().isEmpty) ...[
+            if (state.config.effectiveMsClientId.trim().isEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 '微软登录需要先在「设置 - 其他」中填写 Azure 应用 Client ID。',

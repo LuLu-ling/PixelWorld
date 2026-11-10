@@ -44,7 +44,7 @@ bool searchEngineNeedsKey(String engine) => const {'tavily', 'brave', 'serper'}.
 
 /// 搜索服务的 Key，和模型的 Key 分开加密保存
 abstract final class SearchKey {
-  static File get _file => File(p.join(Paths.appData, 'ai-search.dat'));
+  static File get _file => File(p.join(Paths.configDir, 'ai-search.dat'));
 
   static String load() {
     try {

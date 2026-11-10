@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -91,10 +92,10 @@ class AccountStore {
 
   final List<Account> accounts;
 
-  static File get _file => File(p.join(Paths.appData, 'accounts.dat'));
+  static File get _file => File(p.join(Paths.configDir, 'accounts.dat'));
 
   /// 早期版本明文保存的账户文件，读取后迁移到 accounts.dat
-  static File get _legacyFile => File(p.join(Paths.appData, 'accounts.json'));
+  static File get _legacyFile => File(p.join(Paths.configDir, 'accounts.json'));
 
   static List<Account> _parse(String text) =>
       (jsonDecode(text) as List).whereType<Map<String, dynamic>>().map(Account.fromJson).toList();
@@ -119,6 +120,7 @@ class AccountStore {
     await _file.parent.create(recursive: true);
     final text = jsonEncode([for (final a in accounts) a.toJson()]);
     await _file.writeAsBytes(SecureData.protect(Uint8List.fromList(utf8.encode(text))));
+    unawaited(Paths.backupConfigFile(_file));
   }
 
   /// 添加或更新账户（同类型同 UUID 视为同一账户）

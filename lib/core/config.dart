@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -121,7 +122,7 @@ class LauncherConfig extends ChangeNotifier {
     'dismissedBetaHint': '',
   };
 
-  static File get _file => File(p.join(Paths.appData, 'config.json'));
+  static File get _file => File(p.join(Paths.configDir, 'config.json'));
 
   static LauncherConfig load() {
     final data = _defaults();
@@ -141,6 +142,7 @@ class LauncherConfig extends ChangeNotifier {
   Future<void> _save() async {
     await _file.parent.create(recursive: true);
     await _file.writeAsString(const JsonEncoder.withIndent('  ').convert(_data));
+    unawaited(Paths.backupConfigFile(_file));
   }
 
   Future<void> update(Map<String, dynamic> patch) async {

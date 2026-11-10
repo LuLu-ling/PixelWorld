@@ -33,6 +33,8 @@ final class HudMetrics {
         long swapUsed;
         long swapTotal;
         double cpuPercent;
+        /** GPU busy share in percent; negative when the device does not expose it to apps */
+        double gpuPercent = -1;
         float temperature;
         boolean batteryTemperature;
         int batteryPercent;
@@ -62,6 +64,20 @@ final class HudMetrics {
     private long lastCpuTicks = -1;
     private String thermalPath;
     private boolean thermalPathResolved;
+    /** Index into GPU_FILES that worked; -1 = not probed yet, -2 = none readable */
+    private int gpuSource = -1;
+
+    /**
+     * GPU load files. Adreno's gpubusy ("busy total" of the last sample window) is readable by
+     * every app domain on recent Qualcomm builds, unlike gpu_busy_percentage; the others are
+     * "NN %" files on Mali / Exynos / MediaTek kernels.
+     */
+    private static final String[] GPU_FILES = {
+            "/sys/class/kgsl/kgsl-3d0/gpubusy",
+            "/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage",
+            "/sys/kernel/gpu/gpu_busy",
+            "/sys/class/misc/mali0/device/utilization",
+    };
 
     HudMetrics(Activity activity) {
         this.activity = activity;
@@ -123,6 +139,7 @@ final class HudMetrics {
         }
 
         s.cpuPercent = readCpu(now, previous);
+        s.gpuPercent = readGpu();
         try {
             readTemperature(s);
         } catch (Throwable ignored) {
@@ -135,6 +152,40 @@ final class HudMetrics {
 
         if (callback != null) callback.onSample(s);
         if (running) handler.postDelayed(tick, INTERVAL_MS);
+    }
+
+    /** GPU busy percent from the first readable file in GPU_FILES; -1 when there is none. */
+    private double readGpu() {
+        if (gpuSource == -2) return -1;
+        int from = gpuSource >= 0 ? gpuSource : 0;
+        int to = gpuSource >= 0 ? gpuSource + 1 : GPU_FILES.length;
+        for (int i = from; i < to; i++) {
+            double v = parseGpu(GPU_FILES[i]);
+            if (v >= 0) {
+                gpuSource = i;
+                return v;
+            }
+        }
+        // Probing failed (or the chosen file stopped working): give up instead of retrying every second
+        gpuSource = -2;
+        return -1;
+    }
+
+    private static double parseGpu(String path) {
+        try (BufferedReader r = new BufferedReader(new FileReader(path))) {
+            String line = r.readLine();
+            if (line == null) return -1;
+            String[] parts = line.trim().replace("%", " ").trim().split("\\s+");
+            if (parts.length >= 2 && path.endsWith("gpubusy")) {
+                long busy = Long.parseLong(parts[0]);
+                long total = Long.parseLong(parts[1]);
+                // An idle GPU reports 0 0
+                return total > 0 ? Math.max(0, Math.min(100, busy * 100.0 / total)) : 0;
+            }
+            return Math.max(0, Math.min(100, Double.parseDouble(parts[0])));
+        } catch (Throwable e) {
+            return -1;
+        }
     }
 
     /** Heap values written by {@code hud-agent.jar} inside the game JVM. */

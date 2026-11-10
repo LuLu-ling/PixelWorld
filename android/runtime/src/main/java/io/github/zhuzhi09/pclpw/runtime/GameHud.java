@@ -81,6 +81,7 @@ final class GameHud {
     private TextView systemValue;
     private TextView swapValue;
     private TextView cpuValue;
+    private TextView gpuValue;
     private TextView tempLabel;
     private TextView tempValue;
     private TextView timeValue;
@@ -259,6 +260,7 @@ final class GameHud {
         LinearLayout metricsRow = new LinearLayout(activity);
         metricsRow.setOrientation(LinearLayout.HORIZONTAL);
         cpuValue = metricCell(metricsRow, "CPU");
+        gpuValue = metricCell(metricsRow, "GPU");
         LinearLayout tempCell = new LinearLayout(activity);
         tempCell.setOrientation(LinearLayout.VERTICAL);
         tempLabel = label("温度", 10, MUTED, false, false);
@@ -787,6 +789,8 @@ final class GameHud {
 
         cpuValue.setText(String.format(Locale.ROOT, "%.0f%%", s.cpuPercent));
         cpuValue.setTextColor(s.cpuPercent > 80 ? WARN : TEXT);
+        gpuValue.setText(s.gpuPercent >= 0 ? String.format(Locale.ROOT, "%.0f%%", s.gpuPercent) : "--");
+        gpuValue.setTextColor(s.gpuPercent < 0 ? MUTED : s.gpuPercent > 90 ? WARN : TEXT);
 
         tempLabel.setText(s.batteryTemperature ? "电池温度" : "温度");
         boolean hasTemp = s.temperature > 0;
@@ -799,7 +803,7 @@ final class GameHud {
         detailValue.setVisibility(s.batteryPercent > 0 ? View.VISIBLE : View.GONE);
     }
 
-    /** e.g. "58 FPS · 1.2/3.0G · CPU 34% · 41°C" */
+    /** e.g. "58 FPS · 1.2/3.0G · CPU 34% · GPU 71% · 41°C" */
     private static String compactText(HudMetrics.Sample s) {
         StringBuilder b = new StringBuilder();
         if (s.fpsAvailable) b.append(String.format(Locale.ROOT, "%.0f FPS · ", s.fps));
@@ -807,6 +811,7 @@ final class GameHud {
             b.append(String.format(Locale.ROOT, "%.1f/%.1fG · ", s.heapUsed / 1073741824.0, s.heapMax / 1073741824.0));
         }
         b.append(String.format(Locale.ROOT, "CPU %.0f%%", s.cpuPercent));
+        if (s.gpuPercent >= 0) b.append(String.format(Locale.ROOT, " · GPU %.0f%%", s.gpuPercent));
         if (s.temperature > 0) b.append(String.format(Locale.ROOT, " · %.0f°C", s.temperature));
         return b.toString();
     }
@@ -840,6 +845,7 @@ final class GameHud {
             b.append("系统内存：").append(gbPair(s.systemUsed, s.systemTotal)).append('\n');
             if (s.swapTotal > 0) b.append("交换空间：").append(gbPair(s.swapUsed, s.swapTotal)).append('\n');
             b.append("CPU：").append(String.format(Locale.ROOT, "%.0f%%", s.cpuPercent)).append('\n');
+            if (s.gpuPercent >= 0) b.append("GPU：").append(String.format(Locale.ROOT, "%.0f%%", s.gpuPercent)).append('\n');
             if (s.temperature > 0) {
                 b.append(s.batteryTemperature ? "电池温度：" : "温度：")
                         .append(String.format(Locale.ROOT, "%.0f°C", s.temperature)).append('\n');

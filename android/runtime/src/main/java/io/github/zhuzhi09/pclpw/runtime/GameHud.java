@@ -730,6 +730,21 @@ final class GameHud {
         moveAnimator.start();
     }
 
+    /**
+     * Where the ball rests (ignoring the half-hidden idle state), in dp, which equals CSS pixels
+     * in the AI page: {"x", "y", "size", "start"}. The AI window opens next to it.
+     */
+    String aiAnchor() {
+        int pw = parent.getWidth();
+        int ph = parent.getHeight();
+        int size = dp(BALL_DP);
+        int x = startSide ? dp(EDGE_DP) : pw - size - dp(EDGE_DP);
+        int y = clamp(dp(topDp), topInset(), Math.max(topInset(), ph - size - dp(EDGE_DP)));
+        float d = activity.getResources().getDisplayMetrics().density;
+        return String.format(Locale.ROOT, "{\"x\":%.1f,\"y\":%.1f,\"size\":%.1f,\"start\":%b}",
+                x / d, y / d, size / d, startSide);
+    }
+
     private int topInset() {
         int cutout = 0;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

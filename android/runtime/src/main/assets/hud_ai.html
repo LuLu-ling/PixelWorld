@@ -30,15 +30,11 @@
   button, textarea { font: inherit; color: inherit; text-shadow: inherit; }
   button { cursor: pointer; border: 0; background: none; padding: 0; }
 
-  #backdrop {
-    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-    background: rgba(0, 0, 0, .10);
-    padding: 8px 8px calc(8px + var(--ime));
-  }
+  #backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .10); }
+  /* 位置和大小由脚本按悬浮球计算（见 layout） */
   .window {
-    position: relative; display: flex; overflow: hidden;
-    width: min(940px, 100%); height: 100%;
-    max-width: 100%; max-height: 100%;
+    position: absolute; left: 8px; top: 8px; display: flex; overflow: hidden;
+    width: min(760px, calc(100% - 16px)); height: calc(100% - 16px);
     background: var(--glass);
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
@@ -106,6 +102,15 @@
     color: var(--error); font-size: 12px; line-height: 1.6; display: flex; align-items: center; gap: 8px;
   }
   .notice span { flex: 1; }
+  /* 需要确认的启动器操作 */
+  .confirm { margin: 0 0 8px; }
+  .confirm .card { width: 100%; }
+  .confirm.danger .card { border-color: var(--error); }
+  .confirm .q { font-weight: 600; }
+  .confirm ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
+  .confirm .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .confirm .actions .btn { height: 30px; }
+  .confirm .actions .deny { margin-left: auto; }
 
   .md > :first-child { margin-top: 0; }
   .md > :last-child { margin-bottom: 0; }
@@ -147,7 +152,7 @@
   .hint { margin: 5px 2px 0; color: var(--faint); font-size: 11px; }
   body.ime .hint { display: none; }
 
-  /* 右下角拖动缩放；触摸区域比看到的角标大，手指容易按到。双击恢复默认大小 */
+  /* 拖动远离悬浮球的那个下角缩放，贴着球的角不动；触摸区域比角标大。双击恢复默认大小 */
   #resize {
     position: absolute; right: 0; bottom: 0; width: 34px; height: 34px; z-index: 5;
     touch-action: none; cursor: nwse-resize;
@@ -156,6 +161,11 @@
     content: ""; position: absolute; right: 6px; bottom: 6px; width: 10px; height: 10px;
     border-right: 2px solid var(--border); border-bottom: 2px solid var(--border);
     border-bottom-right-radius: 4px; opacity: .8;
+  }
+  .window.from-end #resize { right: auto; left: 0; cursor: nesw-resize; }
+  .window.from-end #resize::after {
+    right: auto; left: 6px; border-right: 0; border-left: 2px solid var(--border);
+    border-bottom-right-radius: 0; border-bottom-left-radius: 4px;
   }
   #resize.active::after { opacity: 1; }
   .window.resizing { outline: 1px solid var(--border); }
@@ -393,8 +403,55 @@
       messagesEl.appendChild(n);
     }
     renderStream();
+    renderConfirms();
     toBottom(true);
     followBottom = true;
+  }
+
+  /** 等待确认的操作：允许 / 本次对话都允许（只对普通修改）/ 拒绝 */
+  function renderConfirms() {
+    let box = document.getElementById("confirms");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "confirms";
+    }
+    messagesEl.appendChild(box);
+    box.innerHTML = "";
+    (data.confirms || []).forEach((c) => {
+      const row = document.createElement("div");
+      row.className = "confirm" + (c.danger ? " danger" : "");
+      const card = document.createElement("div");
+      card.className = "card";
+      const q = document.createElement("div");
+      q.className = "q";
+      q.textContent = (c.danger ? "需要确认（会删除或覆盖文件）：" : "需要确认：") + (c.title || "启动器操作");
+      card.appendChild(q);
+      if (c.details && c.details.length) {
+        const ul = document.createElement("ul");
+        c.details.forEach((d) => {
+          const li = document.createElement("li");
+          li.textContent = d;
+          ul.appendChild(li);
+        });
+        card.appendChild(ul);
+      }
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      const add = (text, cls, allow, always) => {
+        const b = document.createElement("button");
+        b.className = "btn" + (cls ? " " + cls : "");
+        b.textContent = text;
+        b.addEventListener("click", () => native("decide", c.call, allow, always));
+        actions.appendChild(b);
+      };
+      add("允许", "", true, false);
+      if (c.always) add("本次对话都允许", "", true, true);
+      add("拒绝", "deny", false, false);
+      card.appendChild(actions);
+      row.appendChild(card);
+      box.appendChild(row);
+    });
+    toBottom();
   }
 
   function renderHead() {
@@ -423,14 +480,25 @@
       data.status = String(text || "");
       if (streamEl) streamEl.querySelector(".state").textContent = data.status || "正在回答…";
     },
+    confirms(json) {
+      try { data.confirms = JSON.parse(json); } catch (e) { return; }
+      renderConfirms();
+    },
     restore(text) {
       if (!input.value) { input.value = String(text || ""); grow(); }
     },
     ime(px) {
       const v = Math.max(0, Number(px) || 0);
+      ime = v;
       document.documentElement.style.setProperty("--ime", v + "px");
       document.body.classList.toggle("ime", v > 0);
+      layout();
       if (v > 0) toBottom(true);
+    },
+    /** 悬浮球的位置（CSS 像素）：x、y 为球的左上角，size 为直径，start 为球在左侧 */
+    anchor(json) {
+      try { anchor = JSON.parse(json); } catch (e) { return; }
+      layout();
     }
   };
 
@@ -476,41 +544,61 @@
     setSide(side === null ? window.innerWidth >= 640 : side === "1");
   } catch (e) { setSide(window.innerWidth >= 640); }
 
-  // ---------- 拖动右下角缩放 ----------
-  // 窗口居中显示，所以宽高按手指移动距离的两倍变化，角标正好跟着手指走
+  // ---------- 贴着悬浮球展开，拖动下角缩放 ----------
+  // 球在左侧：窗口左上角贴在球右边；球在右侧：右上角贴在球左边。缩放时贴球的角不动。
   const handle = $("resize");
   const SIZE_KEY = "pclpw.hud.ai.size";
+  const EDGE = 8, GAP = 8, MIN_W = 360, MIN_H = 240, DEFAULT_W = 760;
+  let anchor = null;
+  let ime = 0;
   let drag = null;
   let saved = null;
 
-  function bounds() {
-    const area = $("backdrop").getBoundingClientRect();
-    const maxW = Math.max(300, area.width - 16);
-    const maxH = Math.max(200, area.height - 16 - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ime")) || 0));
-    return { minW: Math.min(360, maxW), minH: Math.min(240, maxH), maxW, maxH };
+  /** 按悬浮球和保存的大小计算窗口位置与大小；over 为拖动中的临时大小 */
+  function layout(over) {
+    const vw = window.innerWidth, vh = window.innerHeight - ime;
+    const a = anchor || { x: EDGE - GAP, y: EDGE, size: 0, start: true };
+    const start = a.start !== false;
+    win.classList.toggle("from-end", !start);
+    // 贴球的那一边（左缘或右缘）和顶边
+    let edgeX = start ? a.x + a.size + GAP : a.x - GAP;
+    let top = Math.max(EDGE, a.y);
+    const room = start ? vw - EDGE - edgeX : edgeX - EDGE;
+    // 球旁边放不下最小宽度时，窗口可以盖住球
+    if (room < MIN_W) edgeX = start ? Math.max(EDGE, vw - EDGE - MIN_W) : Math.min(vw - EDGE, EDGE + MIN_W);
+    const maxW = Math.max(MIN_W, start ? vw - EDGE - edgeX : edgeX - EDGE);
+    const size = over || saved;
+    let w = size ? size.w : Math.min(DEFAULT_W, maxW);
+    w = Math.max(Math.min(MIN_W, maxW), Math.min(maxW, w));
+    // 高度默认到屏幕底部；底下放不下时窗口整体上移
+    let h = size ? size.h : vh - EDGE - top;
+    h = Math.max(Math.min(MIN_H, vh - 2 * EDGE), Math.min(vh - 2 * EDGE, h));
+    if (top + h > vh - EDGE) top = Math.max(EDGE, vh - EDGE - h);
+    if (top + h > vh - EDGE) h = vh - EDGE - top;
+    const left = start ? edgeX : edgeX - w;
+    win.style.left = Math.round(Math.max(EDGE, left)) + "px";
+    win.style.top = Math.round(top) + "px";
+    win.style.width = Math.round(w) + "px";
+    win.style.height = Math.round(h) + "px";
   }
-  function applySize(w, h) {
-    const b = bounds();
-    win.style.width = Math.round(Math.max(b.minW, Math.min(b.maxW, w))) + "px";
-    win.style.height = Math.round(Math.max(b.minH, Math.min(b.maxH, h))) + "px";
-  }
+
   function resetSize() {
     saved = null;
-    win.style.width = "";
-    win.style.height = "";
     try { localStorage.removeItem(SIZE_KEY); } catch (e) {}
+    layout();
   }
   handle.addEventListener("pointerdown", (e) => {
     e.preventDefault();
     const r = win.getBoundingClientRect();
-    drag = { x: e.clientX, y: e.clientY, w: r.width, h: r.height, id: e.pointerId };
+    drag = { x: e.clientX, y: e.clientY, w: r.width, h: r.height, id: e.pointerId, start: !win.classList.contains("from-end") };
     handle.setPointerCapture(e.pointerId);
     handle.classList.add("active");
     win.classList.add("resizing");
   });
   handle.addEventListener("pointermove", (e) => {
     if (!drag || e.pointerId !== drag.id) return;
-    applySize(drag.w + (e.clientX - drag.x) * 2, drag.h + (e.clientY - drag.y) * 2);
+    const dx = e.clientX - drag.x;
+    layout({ w: drag.w + (drag.start ? dx : -dx), h: drag.h + (e.clientY - drag.y) });
   });
   function endDrag(e) {
     if (!drag || e.pointerId !== drag.id) return;
@@ -525,12 +613,13 @@
   handle.addEventListener("pointerup", endDrag);
   handle.addEventListener("pointercancel", endDrag);
   handle.addEventListener("dblclick", resetSize);
-  // 旋转屏幕或键盘弹出时保持在可见范围内
-  window.addEventListener("resize", () => { if (saved) applySize(saved.w, saved.h); });
+  // 旋转屏幕时重新贴好
+  window.addEventListener("resize", () => layout());
   try {
     const raw = localStorage.getItem(SIZE_KEY);
-    if (raw) { saved = JSON.parse(raw); applySize(saved.w, saved.h); }
+    if (raw) saved = JSON.parse(raw);
   } catch (e) { saved = null; }
+  layout();
 
   renderHead();
   renderList();

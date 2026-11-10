@@ -144,10 +144,18 @@ final class HudAiClient {
                 if (cb != null) post(() -> cb.onMessage(msg));
             }
         } catch (Throwable ignored) {
-            // socket closed
+            // socket shut down
         }
+        // Nothing reads this socket any more, so closing it here cannot interrupt a blocked thread
         io.execute(() -> {
-            if (socket == s) disconnect();
+            if (socket == s) {
+                socket = null;
+                out = null;
+            }
+            try {
+                s.close();
+            } catch (Throwable ignored) {
+            }
         });
         // Everything still waiting lost its answer
         if (!closed) {
@@ -156,13 +164,24 @@ final class HudAiClient {
         }
     }
 
+    /**
+     * Only shuts the socket down; the reader thread closes it once its read returns.
+     *
+     * <p>Closing a socket while another thread is blocked reading it makes Android signal that
+     * thread with SIGRTMIN+2. The game JVM's launcher resets signal handlers, so in the game
+     * process that signal killed the whole game. shutdown() wakes the reader without a signal.
+     */
     private void disconnect() {
         Socket s = socket;
         socket = null;
         out = null;
         if (s != null) {
             try {
-                s.close();
+                s.shutdownInput();
+            } catch (Throwable ignored) {
+            }
+            try {
+                s.shutdownOutput();
             } catch (Throwable ignored) {
             }
         }

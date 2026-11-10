@@ -128,6 +128,10 @@ static jint launchJVM(int margc, char** margv) {
    struct sigaction clean_sa;
    memset(&clean_sa, 0, sizeof (struct sigaction));
    for(int sigid = SIGHUP; sigid < NSIG; sigid++) {
+       // Pixel World: keep the real-time signals bionic and ART reserve for themselves
+       // (__SIGRTMIN .. SIGRTMIN-1). ART interrupts blocking I/O with __SIGRTMIN+2 when a
+       // socket is closed on another thread; with SIG_DFL that signal killed the whole game.
+       if(sigid >= __SIGRTMIN && sigid < SIGRTMIN) continue;
        // For some reason Android specifically checks if you set SIGSEGV to SIG_DFL.
        // There's probably a good reason for that but the signal handler here is
        // temporary and will be replaced by the Java VM's signal/crash handler.

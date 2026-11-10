@@ -63,10 +63,13 @@ final class GameAiDialog {
     private final StringBuilder streaming = new StringBuilder();
     private String status = "";
     private String notice = "";
+    /** Launcher operations waiting for the user's approval in the current answer */
+    private JSONArray confirms = new JSONArray();
     private boolean loading;
 
     private Runnable onClosed;
     private ViewTreeObserver.OnGlobalLayoutListener imeListener;
+    private String lastAnchor;
 
     GameAiDialog(Activity activity, FrameLayout parent, GameHud owner, String instance, String renderer) {
         this.activity = activity;
@@ -292,6 +295,13 @@ final class GameAiDialog {
                 call("PclHud.status(" + JSONObject.quote(status) + ")");
                 break;
             }
+            case "confirm":
+                confirms.put(msg);
+                call("PclHud.confirms(" + JSONObject.quote(confirms.toString()) + ")");
+                break;
+            case "confirmed":
+                removeConfirm(msg.optString("call"));
+                break;
             case "done":
                 finishAnswer(null);
                 loadList(false);
@@ -304,7 +314,30 @@ final class GameAiDialog {
         }
     }
 
+    private void removeConfirm(String callId) {
+        JSONArray next = new JSONArray();
+        for (int i = 0; i < confirms.length(); i++) {
+            JSONObject c = confirms.optJSONObject(i);
+            if (c != null && !callId.equals(c.optString("call"))) next.put(c);
+        }
+        confirms = next;
+        call("PclHud.confirms(" + JSONObject.quote(confirms.toString()) + ")");
+    }
+
+    /** The user's choice on a confirmation card; the launcher's own card closes too. */
+    private void decide(String callId, boolean allow, boolean always) {
+        if (client == null || currentId == null || callId == null) return;
+        JSONObject r = req("decide");
+        try {
+            r.put("session", currentId).put("call", callId).put("allow", allow).put("always", always);
+        } catch (Throwable ignored) {
+        }
+        client.request(r, null);
+        removeConfirm(callId);
+    }
+
     private void finishAnswer(String error) {
+        confirms = new JSONArray();
         boolean answered = streaming.length() > 0;
         if (answered) {
             try {
@@ -401,6 +434,7 @@ final class GameAiDialog {
             state.put("streaming", streaming.toString());
             state.put("status", status);
             state.put("notice", notice);
+            state.put("confirms", confirms);
             state.put("instance", instance + rendererName());
             call("PclHud.state(" + JSONObject.quote(state.toString()) + ")");
         } catch (Throwable ignored) {
@@ -499,6 +533,7 @@ final class GameAiDialog {
             parent.removeView(container);
             container = null;
         }
+        lastAnchor = null;
         if (webView != null) {
             InputMethodManager imm = (InputMethodManager) activity.getSystemService(Activity.INPUT_METHOD_SERVICE);
             if (imm != null) imm.hideSoftInputFromWindow(webView.getWindowToken(), 0);
@@ -563,6 +598,12 @@ final class GameAiDialog {
             if (insets != null) ime = Math.max(ime, insets.getInsets(WindowInsets.Type.ime()).bottom);
         }
         float density = activity.getResources().getDisplayMetrics().density;
+        // The window opens next to the ball; send its place first (also after rotation)
+        String anchor = owner.aiAnchor();
+        if (!anchor.equals(lastAnchor)) {
+            lastAnchor = anchor;
+            call("PclHud.anchor(" + JSONObject.quote(anchor) + ")");
+        }
         call("PclHud.ime(" + Math.round(ime / (density > 0 ? density : 1f)) + ")");
     }
 
@@ -584,6 +625,11 @@ final class GameAiDialog {
         @JavascriptInterface
         public void stop() {
             handler.post(GameAiDialog.this::stop);
+        }
+
+        @JavascriptInterface
+        public void decide(String callId, boolean allow, boolean always) {
+            handler.post(() -> GameAiDialog.this.decide(callId, allow, always));
         }
 
         @JavascriptInterface

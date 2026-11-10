@@ -91,6 +91,8 @@ final class GameHud {
     private final TextView compactView;
     private TextView compactItem;
     private boolean compact;
+    /** Where the compact bar sits along the top edge: 0 = left, 1 = right (dragged by the player) */
+    private float compactX;
 
     private HudMetrics.Sample lastSample;
     private Mode mode = Mode.NONE;
@@ -120,6 +122,7 @@ final class GameHud {
         this.attachLog = attachLog;
         this.visible = prefs.getBoolean("visible", true);
         this.compact = prefs.getBoolean("compact", false);
+        this.compactX = Math.max(0f, Math.min(1f, prefs.getFloat("compactX", 0f)));
         this.startSide = !"end".equals(prefs.getString("side", "start"));
         // Older versions stored pixels under "top"; the dp value has its own key
         this.topDp = prefs.getInt("topDp", 72);
@@ -170,8 +173,60 @@ final class GameHud {
         bg.setStroke(Math.max(1, dp(1)), BORDER);
         v.setBackground(bg);
         v.setClickable(true);
-        v.setContentDescription("性能信息，点击查看详情");
+        v.setContentDescription("性能信息，点击查看详情，左右拖动调整位置");
         v.setOnClickListener(x -> setMode(Mode.INFO));
+        // Drag sideways along the top edge; a tap still opens the details
+        final int slop = ViewConfiguration.get(activity).getScaledTouchSlop();
+        v.setOnTouchListener(new View.OnTouchListener() {
+            float downX;
+            int downMargin;
+            boolean dragging;
+
+            @Override
+            public boolean onTouch(View view, MotionEvent e) {
+                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) view.getLayoutParams();
+                switch (e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downX = e.getRawX();
+                        downMargin = lp.leftMargin;
+                        dragging = false;
+                        view.setPressed(true);
+                        return true;
+                    case MotionEvent.ACTION_MOVE: {
+                        float dx = e.getRawX() - downX;
+                        if (!dragging && Math.abs(dx) > slop) {
+                            dragging = true;
+                            view.setPressed(false);
+                        }
+                        if (dragging) {
+                            int[] span = compactSpan();
+                            lp.leftMargin = Math.max(span[0], Math.min(span[1], Math.round(downMargin + dx)));
+                            view.setLayoutParams(lp);
+                        }
+                        return true;
+                    }
+                    case MotionEvent.ACTION_UP:
+                        view.setPressed(false);
+                        if (dragging) {
+                            int[] span = compactSpan();
+                            compactX = span[1] > span[0] ? (lp.leftMargin - span[0]) / (float) (span[1] - span[0]) : 0f;
+                            prefs.edit().putFloat("compactX", compactX).apply();
+                        } else {
+                            view.performClick();
+                        }
+                        return true;
+                    case MotionEvent.ACTION_CANCEL:
+                        view.setPressed(false);
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        });
+        // Its width follows the text; keep it inside the screen when that changes
+        v.addOnLayoutChangeListener((x, l, t, r, b, ol, ot, or, ob) -> {
+            if (r - l != or - ol) placeCompact();
+        });
         return v;
     }
 
@@ -401,8 +456,28 @@ final class GameHud {
     private void placeCompact() {
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) compactView.getLayoutParams();
         if (lp == null) return;
-        lp.topMargin = Math.max(dp(4), topInset() - dp(4));
+        int top = Math.max(dp(4), topInset() - dp(4));
+        int[] span = compactSpan();
+        int left = Math.round(span[0] + (span[1] - span[0]) * compactX);
+        if (lp.topMargin == top && lp.leftMargin == left) return;
+        lp.topMargin = top;
+        lp.leftMargin = left;
         compactView.setLayoutParams(lp);
+    }
+
+    /** Smallest and largest left margin that keep the compact bar on screen, clear of cutouts */
+    private int[] compactSpan() {
+        int left = dp(8), right = dp(8);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsets insets = parent.getRootWindowInsets();
+            if (insets != null) {
+                android.graphics.Insets i = insets.getInsets(WindowInsets.Type.displayCutout() | WindowInsets.Type.systemBars());
+                left += i.left;
+                right += i.right;
+            }
+        }
+        int max = parent.getWidth() - compactView.getWidth() - right;
+        return new int[]{left, Math.max(left, max)};
     }
 
     void attach() {
@@ -419,7 +494,7 @@ final class GameHud {
         parent.addView(ball, lp);
         FrameLayout.LayoutParams compactLp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-        compactLp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        compactLp.gravity = Gravity.TOP | Gravity.START;
         parent.addView(compactView, compactLp);
         compactView.setVisibility(compact ? View.VISIBLE : View.GONE);
         parent.addOnLayoutChangeListener(parentLayout);

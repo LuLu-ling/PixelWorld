@@ -491,7 +491,7 @@ class _TopBar extends StatelessWidget {
     final leftInset = !isDesktop
         ? 12.0
         : Platform.isMacOS
-        ? macTrafficLightsWidth + 8
+        ? macTrafficLightsWidth + 20
         : 16.0;
 
     Widget brand = Row(

@@ -22,6 +22,8 @@ import '../optifine_compat.dart';
 import '../paths.dart';
 import '../safe_path.dart';
 import '../version.dart';
+import 'web_tools.dart';
+import 'workspace_tools.dart';
 
 /// 操作的类型：只读操作默认直接执行；其余都要用户允许
 enum ToolKind {
@@ -782,11 +784,30 @@ class AiToolbox {
         );
       },
     ),
+    ...workspaceTools(state),
+    ...webTools(state),
   ];
 
-  List<AiTool> get specs => [for (final t in all) t.spec];
+  /// 工作区与联网可以在设置里分别关闭；关闭后既不告诉模型，也不允许调用
+  bool _enabled(AiToolDef t) {
+    final n = t.spec.name;
+    if (n.startsWith('ws_')) return state.config.aiWorkspace;
+    if (n.startsWith('web_') || n == 'mcwiki_search') return state.config.aiWeb;
+    return true;
+  }
 
-  AiToolDef? find(String name) => all.where((t) => t.spec.name == name).firstOrNull;
+  List<AiTool> get specs => [for (final t in all) if (_enabled(t)) t.spec];
+
+  AiToolDef? find(String name) => all.where((t) => t.spec.name == name && _enabled(t)).firstOrNull;
+
+  /// 按开启的能力追加到系统提示的说明
+  Future<String?> promptExtra() async {
+    final parts = [
+      if (state.config.aiWorkspace) await workspacePrompt(state),
+      if (state.config.aiWeb) webPrompt,
+    ];
+    return parts.isEmpty ? null : parts.join('\n\n');
+  }
 
   // ---------- 安装游戏 ----------
 

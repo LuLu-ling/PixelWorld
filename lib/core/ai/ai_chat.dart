@@ -417,7 +417,6 @@ class ChatStore extends ChangeNotifier {
   }
 
   Future<void> _run(ChatSession s, AiSettings ai, {String? systemExtra, bool interactive = true}) async {
-    final system = systemExtra == null ? assistantSystemPrompt : '$assistantSystemPrompt\n\n$systemExtra';
     final gen = _gen[s.id] ?? 0;
     bool stopped() => (_gen[s.id] ?? 0) != gen;
     _errors.remove(s.id);
@@ -425,9 +424,14 @@ class ChatStore extends ChangeNotifier {
     _bump(s);
     unawaited(_save(s));
     notifyListeners();
-    final tools = toolbox != null && toolsEnabled() ? toolbox!.specs : const <AiTool>[];
+    final toolsOn = toolbox != null && toolsEnabled();
+    final tools = toolsOn ? toolbox!.specs : const <AiTool>[];
     try {
-      for (var round = 0; round < 16; round++) {
+      // 按开启的能力（工作区、联网）追加说明
+      final extra = toolsOn ? await toolbox!.promptExtra() : null;
+      final system = [assistantSystemPrompt, ?extra, ?systemExtra].join('\n\n');
+      // 工作区与联网任务需要更多轮工具调用
+      for (var round = 0; round < 32; round++) {
         _streaming[s.id] = '';
         notifyListeners();
         AiTurnEnd? end;

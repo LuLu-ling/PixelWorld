@@ -10,6 +10,8 @@ import android.util.SparseIntArray;
 import android.view.MotionEvent;
 import android.view.View;
 
+import net.kdt.pojavlaunch.Logger;
+
 import top.fifthlight.touchcontroller.proxy.client.LauncherProxyClient;
 import top.fifthlight.touchcontroller.proxy.client.MessageTransport;
 import top.fifthlight.touchcontroller.proxy.client.android.transport.UnixSocketTransportKt;

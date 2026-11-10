@@ -86,6 +86,11 @@ final class GameHud {
     private TextView timeValue;
     private TextView detailValue;
 
+    /** Always-on one-line stats at the top of the screen. */
+    private final TextView compactView;
+    private TextView compactItem;
+    private boolean compact;
+
     private HudMetrics.Sample lastSample;
     private Mode mode = Mode.NONE;
     private boolean visible;
@@ -113,6 +118,7 @@ final class GameHud {
         this.aiEnabled = aiEnabled;
         this.attachLog = attachLog;
         this.visible = prefs.getBoolean("visible", true);
+        this.compact = prefs.getBoolean("compact", false);
         this.startSide = !"end".equals(prefs.getString("side", "start"));
         // Older versions stored pixels under "top"; the dp value has its own key
         this.topDp = prefs.getInt("topDp", 72);
@@ -122,6 +128,7 @@ final class GameHud {
         metrics.setFpsAvailable("zink".equals(this.renderer));
 
         ball = buildBall();
+        compactView = buildCompact();
         menu = buildMenu();
         infoPanel = buildInfoPanel();
 
@@ -153,11 +160,46 @@ final class GameHud {
         return v;
     }
 
+    private TextView buildCompact() {
+        TextView v = label("--", 11, TEXT, true, false);
+        v.setSingleLine(true);
+        v.setGravity(Gravity.CENTER);
+        v.setPadding(dp(10), dp(3), dp(10), dp(3));
+        GradientDrawable bg = rounded(CARD, 999);
+        bg.setStroke(Math.max(1, dp(1)), BORDER);
+        v.setBackground(bg);
+        v.setClickable(true);
+        v.setContentDescription("性能信息，点击查看详情");
+        v.setOnClickListener(x -> setMode(Mode.INFO));
+        return v;
+    }
+
+    private String compactLabel() {
+        return compact ? "关闭常驻简略信息" : "常驻简略信息";
+    }
+
+    /** Turns the always-on stats line on or off; it stays even when the ball is hidden. */
+    private void setCompact(boolean value) {
+        compact = value;
+        prefs.edit().putBoolean("compact", value).apply();
+        if (compactItem != null) compactItem.setText(compactLabel());
+        compactView.setVisibility(value ? View.VISIBLE : View.GONE);
+        if (value) {
+            parent.bringChildToFront(compactView);
+            startSampling();
+        } else if (!visible) {
+            stopSampling();
+        }
+        setMode(Mode.NONE);
+    }
+
     private LinearLayout buildMenu() {
         LinearLayout card = card(176);
         card.setPadding(dp(6), dp(6), dp(6), dp(6));
         if (aiEnabled) card.addView(menuItem("问 AI", v -> openAiDialog()));
         card.addView(menuItem("基础信息", v -> setMode(Mode.INFO)));
+        compactItem = (TextView) menuItem(compactLabel(), v -> setCompact(!compact));
+        card.addView(compactItem);
         card.addView(menuItem("回到启动器", v -> {
             setMode(Mode.NONE);
             openLauncher();
@@ -347,7 +389,16 @@ final class GameHud {
     private void onParentLayout(View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) {
         if (r - l == or - ol && b - t == ob - ot) return;
         placeBall(false);
+        placeCompact();
         if (mode != Mode.NONE) positionPanel(mode == Mode.MENU ? menu : infoPanel);
+    }
+
+    /** Below the camera cutout, centered. */
+    private void placeCompact() {
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) compactView.getLayoutParams();
+        if (lp == null) return;
+        lp.topMargin = Math.max(dp(4), topInset() - dp(4));
+        compactView.setLayoutParams(lp);
     }
 
     void attach() {
@@ -362,15 +413,19 @@ final class GameHud {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(dp(BALL_DP), dp(BALL_DP));
         lp.gravity = Gravity.TOP | Gravity.START;
         parent.addView(ball, lp);
+        FrameLayout.LayoutParams compactLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        compactLp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        parent.addView(compactView, compactLp);
+        compactView.setVisibility(compact ? View.VISIBLE : View.GONE);
         parent.addOnLayoutChangeListener(parentLayout);
 
         ball.setVisibility(visible ? View.VISIBLE : View.GONE);
         ball.post(() -> {
             placeBall(false);
-            if (visible) {
-                startSampling();
-                wake();
-            }
+            placeCompact();
+            if (visible) wake();
+            if (visible || compact) startSampling();
         });
     }
 
@@ -398,10 +453,8 @@ final class GameHud {
     }
 
     void onResume() {
-        if (visible) {
-            startSampling();
-            wake();
-        }
+        if (visible) wake();
+        if (visible || compact) startSampling();
         if (aiDialog != null) aiDialog.onResume();
     }
 
@@ -412,6 +465,7 @@ final class GameHud {
         if (aiDialog != null) aiDialog.dispose();
         parent.removeOnLayoutChangeListener(parentLayout);
         parent.removeView(ball);
+        parent.removeView(compactView);
         parent.removeView(menu);
         parent.removeView(infoPanel);
         parent.removeView(scrim);
@@ -463,7 +517,7 @@ final class GameHud {
             wake();
         } else {
             handler.removeCallbacks(fadeRunnable);
-            stopSampling();
+            if (!compact) stopSampling();
             ball.animate().alpha(0f).setDuration(120).withEndAction(() -> {
                 if (!visible) ball.setVisibility(View.GONE);
             }).start();
@@ -723,8 +777,21 @@ final class GameHud {
         tempValue.setTextColor(!hasTemp ? MUTED : s.temperature >= 45 ? BAD : s.temperature >= 40 ? WARN : OK);
 
         timeValue.setText(duration(s.uptimeMs));
+        if (compact) compactView.setText(compactText(s));
         detailValue.setText(s.batteryPercent > 0 ? "电池 " + s.batteryPercent + "%" : "");
         detailValue.setVisibility(s.batteryPercent > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    /** e.g. "58 FPS · 1.2/3.0G · CPU 34% · 41°C" */
+    private static String compactText(HudMetrics.Sample s) {
+        StringBuilder b = new StringBuilder();
+        if (s.fpsAvailable) b.append(String.format(Locale.ROOT, "%.0f FPS · ", s.fps));
+        if (s.heapMax > 0) {
+            b.append(String.format(Locale.ROOT, "%.1f/%.1fG · ", s.heapUsed / 1073741824.0, s.heapMax / 1073741824.0));
+        }
+        b.append(String.format(Locale.ROOT, "CPU %.0f%%", s.cpuPercent));
+        if (s.temperature > 0) b.append(String.format(Locale.ROOT, " · %.0f°C", s.temperature));
+        return b.toString();
     }
 
     private static String gbPair(long used, long total) {

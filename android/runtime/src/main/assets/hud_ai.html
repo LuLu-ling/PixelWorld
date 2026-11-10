@@ -36,8 +36,9 @@
     padding: 8px 8px calc(8px + var(--ime));
   }
   .window {
-    display: flex; overflow: hidden;
+    position: relative; display: flex; overflow: hidden;
     width: min(940px, 100%); height: 100%;
+    max-width: 100%; max-height: 100%;
     background: var(--glass);
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
@@ -146,6 +147,19 @@
   .hint { margin: 5px 2px 0; color: var(--faint); font-size: 11px; }
   body.ime .hint { display: none; }
 
+  /* 右下角拖动缩放；触摸区域比看到的角标大，手指容易按到。双击恢复默认大小 */
+  #resize {
+    position: absolute; right: 0; bottom: 0; width: 34px; height: 34px; z-index: 5;
+    touch-action: none; cursor: nwse-resize;
+  }
+  #resize::after {
+    content: ""; position: absolute; right: 6px; bottom: 6px; width: 10px; height: 10px;
+    border-right: 2px solid var(--border); border-bottom: 2px solid var(--border);
+    border-bottom-right-radius: 4px; opacity: .8;
+  }
+  #resize.active::after { opacity: 1; }
+  .window.resizing { outline: 1px solid var(--border); }
+
   .list::-webkit-scrollbar, .messages::-webkit-scrollbar { width: 4px; }
   .list::-webkit-scrollbar-thumb, .messages::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
 </style>
@@ -182,6 +196,7 @@
         <div class="hint" id="hint">关闭窗口不会中断回答，回答会保存在启动器里</div>
       </div>
     </main>
+    <div id="resize" title="拖动调整大小，双击恢复默认"></div>
   </section>
 </div>
 
@@ -460,6 +475,62 @@
     const side = localStorage.getItem("pclpw.hud.ai.side");
     setSide(side === null ? window.innerWidth >= 640 : side === "1");
   } catch (e) { setSide(window.innerWidth >= 640); }
+
+  // ---------- 拖动右下角缩放 ----------
+  // 窗口居中显示，所以宽高按手指移动距离的两倍变化，角标正好跟着手指走
+  const handle = $("resize");
+  const SIZE_KEY = "pclpw.hud.ai.size";
+  let drag = null;
+  let saved = null;
+
+  function bounds() {
+    const area = $("backdrop").getBoundingClientRect();
+    const maxW = Math.max(300, area.width - 16);
+    const maxH = Math.max(200, area.height - 16 - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ime")) || 0));
+    return { minW: Math.min(360, maxW), minH: Math.min(240, maxH), maxW, maxH };
+  }
+  function applySize(w, h) {
+    const b = bounds();
+    win.style.width = Math.round(Math.max(b.minW, Math.min(b.maxW, w))) + "px";
+    win.style.height = Math.round(Math.max(b.minH, Math.min(b.maxH, h))) + "px";
+  }
+  function resetSize() {
+    saved = null;
+    win.style.width = "";
+    win.style.height = "";
+    try { localStorage.removeItem(SIZE_KEY); } catch (e) {}
+  }
+  handle.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const r = win.getBoundingClientRect();
+    drag = { x: e.clientX, y: e.clientY, w: r.width, h: r.height, id: e.pointerId };
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add("active");
+    win.classList.add("resizing");
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    applySize(drag.w + (e.clientX - drag.x) * 2, drag.h + (e.clientY - drag.y) * 2);
+  });
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    handle.classList.remove("active");
+    win.classList.remove("resizing");
+    try { handle.releasePointerCapture(e.pointerId); } catch (err) {}
+    const r = win.getBoundingClientRect();
+    saved = { w: r.width, h: r.height };
+    try { localStorage.setItem(SIZE_KEY, JSON.stringify(saved)); } catch (err) {}
+  }
+  handle.addEventListener("pointerup", endDrag);
+  handle.addEventListener("pointercancel", endDrag);
+  handle.addEventListener("dblclick", resetSize);
+  // 旋转屏幕或键盘弹出时保持在可见范围内
+  window.addEventListener("resize", () => { if (saved) applySize(saved.w, saved.h); });
+  try {
+    const raw = localStorage.getItem(SIZE_KEY);
+    if (raw) { saved = JSON.parse(raw); applySize(saved.w, saved.h); }
+  } catch (e) { saved = null; }
 
   renderHead();
   renderList();

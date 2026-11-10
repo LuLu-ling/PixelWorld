@@ -24,6 +24,8 @@ import top.fifthlight.touchcontroller.proxy.client.android.transport.UnixSocketT
  */
 final class TouchControllerBridge implements AutoCloseable {
     private static final String TAG = "PCLPW-TouchController";
+    /** Socket name of the running proxy; GameRuntime exports it again right before the JVM starts */
+    static volatile String socketName;
 
     private final LauncherProxyClient client;
     /** Android pointer id -> TouchController pointer index (must only grow) */
@@ -55,6 +57,8 @@ final class TouchControllerBridge implements AutoCloseable {
             }
             client.run();
             Os.setenv("TOUCH_CONTROLLER_PROXY_SOCKET", name, true);
+            socketName = name;
+            Log.i(TAG, "proxy started on @" + name + ", env=" + Os.getenv("TOUCH_CONTROLLER_PROXY_SOCKET"));
             Logger.appendToLog("Pixel World runtime: TouchController proxy on @" + name);
             return new TouchControllerBridge(client);
         } catch (Throwable e) {

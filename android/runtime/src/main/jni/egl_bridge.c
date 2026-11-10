@@ -90,6 +90,21 @@ JNIEXPORT void JNICALL Java_net_kdt_pojavlaunch_utils_JREUtils_setupBridgeWindow
 
 JNIEXPORT void JNICALL
 Java_net_kdt_pojavlaunch_utils_JREUtils_releaseBridgeWindow(ABI_COMPAT JNIEnv *env, ABI_COMPAT jclass clazz) {
+    // Pixel World: with Krypton Wrapper (gl4es on the system EGL) the next eglSwapBuffers on a
+    // dying window crashes inside the driver instead of returning EGL_BAD_SURFACE, so the game
+    // died when it went to the background. Ask the render thread to move to the 1x1 pbuffer while
+    // the surface is still valid (surfaceDestroyed has not returned yet), and wait for it.
+    const char *renderer = getenv("AMETHYST_RENDERER");
+    basic_render_window_t *bundle = pojav_environ->mainWindowBundle;
+    if (renderer != NULL && strcmp(renderer, "opengles2") == 0 && bundle != NULL) {
+        volatile char *state = &bundle->state;
+        bundle->newNativeSurface = NULL;
+        __atomic_thread_fence(__ATOMIC_SEQ_CST);
+        *state = STATE_RENDERER_NEW_WINDOW;
+        // gl_swap_surface itself waits 0.75 s; give the render thread up to 1.5 s in total
+        for (int i = 0; i < 300 && *state == STATE_RENDERER_NEW_WINDOW; i++) usleep(5000);
+        if (*state == STATE_RENDERER_NEW_WINDOW) printf("EGLBridge: render thread did not leave the window in time\n");
+    }
     ANativeWindow_release(pojav_environ->pojavWindow);
 }
 

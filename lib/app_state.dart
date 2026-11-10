@@ -571,6 +571,9 @@ class AppState extends ChangeNotifier {
         if (renderer.renderer == 'zink' && !gpu.hasVulkan11) {
           _launcherLog('警告：这台设备没有声明 Vulkan 1.1，所选渲染器可能无法启动');
         }
+        if (renderer.renderer == 'krypton' && sdl) {
+          _launcherLog('警告：Krypton Wrapper 在 26.3 快照及之后的版本上会崩溃，出现问题请换用 MobileGlues');
+        }
         await AndroidRuntime.launch(
           javaHome: java.path,
           gameDir: gameDir,

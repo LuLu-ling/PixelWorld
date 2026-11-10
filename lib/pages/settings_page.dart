@@ -220,7 +220,7 @@ class _AboutSection extends StatelessWidget {
             link(
               Icons.android,
               '安卓版游戏运行时',
-              '基于 Amethyst-Android（LGPL-3.0）、MobileGlues、LWJGL 与 OpenJDK，单独以 LGPL-3.0 开源',
+              '基于 Amethyst-Android（LGPL-3.0）、MobileGlues、Krypton Wrapper、LWJGL 与 OpenJDK，单独以 LGPL-3.0 开源',
               '${AppInfo.repoUrl}/blob/main/android/runtime/NOTICE.md',
             ),
             link(Icons.flutter_dash, 'Flutter', '跨平台界面框架', 'https://flutter.dev'),

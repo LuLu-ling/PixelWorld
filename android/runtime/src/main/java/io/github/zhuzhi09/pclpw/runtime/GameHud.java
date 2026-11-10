@@ -378,6 +378,8 @@ final class GameHud {
                 return " · 系统 GLES";
             case "mobileglues":
                 return " · MobileGlues";
+            case "krypton":
+                return " · Krypton Wrapper";
             default:
                 return "";
         }

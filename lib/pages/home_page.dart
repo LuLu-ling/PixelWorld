@@ -464,7 +464,7 @@ class _LaunchButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 18),
         textStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
-      icon: Icon(running ? Icons.stop : Icons.play_arrow, size: 20),
+      icon: Icon(running ? Icons.stop : Icons.rocket_launch, size: 19),
       label: Text(running ? '结束游戏' : '开始游戏'),
     );
   }
@@ -704,7 +704,7 @@ class _WorldCard extends StatelessWidget {
                   tooltip: '进入这个存档的版本',
                   onPressed: onPlay,
                   style: IconButton.styleFrom(minimumSize: const Size(40, 40), fixedSize: const Size(40, 40)),
-                  icon: const Icon(Icons.play_arrow, size: 20),
+                  icon: const Icon(Icons.rocket_launch, size: 19),
                 ),
               ),
             ],

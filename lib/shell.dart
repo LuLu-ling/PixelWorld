@@ -206,7 +206,7 @@ class _Rail extends StatelessWidget {
         children: [
           const AppLogo(size: 30),
           const SizedBox(height: 10),
-          item(MainPage.home, Icons.play_arrow_outlined, Icons.play_arrow, '启动'),
+          item(MainPage.home, Icons.rocket_launch_outlined, Icons.rocket_launch, '启动'),
           item(MainPage.download, Icons.download_outlined, Icons.download, '下载'),
           item(MainPage.tools, Icons.construction_outlined, Icons.construction, '工具'),
           item(MainPage.settings, Icons.settings_outlined, Icons.settings, '设置'),

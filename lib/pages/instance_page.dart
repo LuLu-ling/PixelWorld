@@ -162,7 +162,7 @@ class _InstancePageState extends State<InstancePage> {
                   FilledButton.icon(
                     onPressed: running ? null : () => _launch(info),
                     style: FilledButton.styleFrom(minimumSize: const Size(0, 44), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                    icon: const Icon(Icons.play_arrow, size: 20),
+                    icon: const Icon(Icons.rocket_launch, size: 19),
                     label: const Text('开始游戏'),
                   ),
                 ],

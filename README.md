@@ -16,7 +16,7 @@ Pixel World 是一个跨平台的 Minecraft 启动器，本项目为轻度使用
 | Windows | 可用 |
 | Android | 可用（需要 Android 8.0 及以上、64 位 ARM），游戏运行时见 [android/runtime](android/runtime/NOTICE.md) |
 | macOS | 可用（macOS 12 及以上，Apple 芯片与 Intel 通用，Apple 芯片上 1.12.2 到最新版本均已实测）；没有经过 Apple 公证 |
-| Linux | 测试中（Nightly 提供 x64 tar.gz，需要 Ubuntu 24.04 及以上） |
+| Linux | 测试中（Nightly 提供 x64 tar.gz、deb、rpm、AppImage 与 Arch 包，需要 Ubuntu 24.04 及以上） |
 
 ### 已支持
 

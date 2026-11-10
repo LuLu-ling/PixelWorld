@@ -14,6 +14,7 @@ import '../core/toolbox.dart';
 import '../widgets/format.dart';
 import '../widgets/settings_group.dart';
 import '../shell.dart';
+import '../platform.dart';
 import '../widgets/side_nav.dart';
 import 'diagnose_page.dart';
 import 'docs_page.dart';
@@ -23,7 +24,8 @@ import 'versions_page.dart';
 
 enum _Section { lobby, transfer, diagnose, toolbox, download, skin, server, achievement, docs }
 
-/// 工具：三列大块按钮（每块带一句说明），点开进入对应工具，左上角返回
+/// 工具。桌面：左侧二级菜单 + 右侧内容（鼠标操作，列表比卡片合适）；
+/// 手机：大块按钮（每块带一句说明），点开进入对应工具，左上角返回
 class ToolsPage extends StatefulWidget {
   const ToolsPage({super.key});
 
@@ -69,8 +71,41 @@ class _ToolsPageState extends State<ToolsPage> {
     ),
   ];
 
+  static Widget _content(_Section section) => switch (section) {
+    _Section.lobby => const _Lobby(),
+    _Section.transfer => const LanTransferPage(),
+    _Section.diagnose => const _Diagnose(),
+    _Section.toolbox => const _Toolbox(),
+    _Section.download => const _CustomDownload(),
+    _Section.skin => const _SkinTools(),
+    _Section.server => const _ServerQuery(),
+    _Section.achievement => const _Achievement(),
+    _Section.docs => const DocsPage(),
+  };
+
+  /// 桌面：和设置页一样的左侧分组菜单；「任务历史」打开外壳的子页面，不改变当前选中项
+  Widget _desktop(BuildContext context) {
+    final section = _section ?? _Section.transfer;
+    final current = _groups.expand((g) => g.$2).firstWhere((t) => t.section == section);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SideNav<_Tool>(
+          groups: [
+            for (final (title, tools) in _groups)
+              SideNavGroup(title, [for (final t in tools) SideNavItem(t, t.title, t.icon)]),
+          ],
+          value: current,
+          onChanged: (t) => t.sub != null ? ShellNav.of(context).open(t.sub!) : setState(() => _section = t.section),
+        ),
+        Expanded(child: ContentPanel(child: _content(section))),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (isDesktop) return _desktop(context);
     final theme = Theme.of(context);
     final section = _section;
     if (section != null) {
@@ -87,19 +122,7 @@ class _ToolsPageState extends State<ToolsPage> {
               ],
             ),
             Expanded(
-              child: ContentPanel(
-                child: switch (section) {
-                  _Section.lobby => const _Lobby(),
-                  _Section.transfer => const LanTransferPage(),
-                  _Section.diagnose => const _Diagnose(),
-                  _Section.toolbox => const _Toolbox(),
-                  _Section.download => const _CustomDownload(),
-                  _Section.skin => const _SkinTools(),
-                  _Section.server => const _ServerQuery(),
-                  _Section.achievement => const _Achievement(),
-                  _Section.docs => const DocsPage(),
-                },
-              ),
+              child: ContentPanel(child: _content(section)),
             ),
           ],
         ),

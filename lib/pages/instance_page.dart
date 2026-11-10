@@ -6,8 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
 import '../app_state.dart';
-import 'package:path/path.dart' as p;
-import '../widgets/cover_palette.dart';
+import '../widgets/version_icon.dart';
 import '../widgets/launch_dialogs.dart';
 import '../core/android_runtime.dart';
 import '../core/config.dart';
@@ -67,22 +66,6 @@ class _InstancePageState extends State<InstancePage> {
     }
   }
 
-  /// 存档里最新的封面（saves/*/icon.png）
-  static String? _latestIcon(String gameDir) {
-    try {
-      final saves = Directory(p.join(gameDir, 'saves'));
-      if (!saves.existsSync()) return null;
-      File? best;
-      for (final d in saves.listSync().whereType<Directory>()) {
-        final icon = File(p.join(d.path, 'icon.png'));
-        if (icon.existsSync() && (best == null || icon.lastModifiedSync().isAfter(best.lastModifiedSync()))) best = icon;
-      }
-      return best?.path;
-    } catch (_) {
-      return null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -111,7 +94,6 @@ class _InstancePageState extends State<InstancePage> {
       future: state.gameDirOf(info),
       builder: (context, snap) {
         final dir = snap.data;
-        final icon = dir == null ? null : _latestIcon(dir);
         return Padding(
           padding: const EdgeInsets.fromLTRB(14, 0, 16, 10),
           child: Column(
@@ -119,7 +101,29 @@ class _InstancePageState extends State<InstancePage> {
             children: [
               Row(
                 children: [
-                  CoverThumb(iconPath: icon, size: 48, radius: 10),
+                  // 点图标更换或恢复默认
+                  PopupMenuButton<String>(
+                    tooltip: '更换图标',
+                    onSelected: (v) async {
+                      final dir = state.paths.versionDir(info.id);
+                      try {
+                        if (v == 'pick') await pickVersionLogo(dir);
+                        if (v == 'reset') await resetVersionLogo(dir);
+                      } catch (e) {
+                        if (context.mounted) toast(context, '更换图标失败：${errorText(e)}');
+                      }
+                      if (mounted) setState(() {});
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'pick', child: Text('更换图标…')),
+                      PopupMenuItem(
+                        value: 'reset',
+                        enabled: customVersionLogo(state.paths.versionDir(info.id)) != null,
+                        child: const Text('恢复默认图标'),
+                      ),
+                    ],
+                    child: VersionIcon(info: info, versionDir: state.paths.versionDir(info.id), size: 48),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

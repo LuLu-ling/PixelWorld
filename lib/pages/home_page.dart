@@ -19,6 +19,7 @@ import '../platform.dart';
 import '../shell.dart';
 import '../widgets/cover_palette.dart';
 import '../widgets/launch_dialogs.dart';
+import '../widgets/version_icon.dart';
 import 'download_page.dart';
 import 'home_feed.dart';
 
@@ -209,11 +210,13 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final icon = latest == null ? null : p.join(latest!.path, 'icon.png');
     final v = version;
+    // 背景色：有自定义版本图标时从图标取色，否则用主题色（不再用存档封面）
+    final versionDir = v == null ? null : state.paths.versionDir(v.id);
+    final logo = versionDir == null ? null : customVersionLogo(versionDir);
     const white = Colors.white;
     return CoverBackground(
-      iconPath: icon,
+      iconPath: logo,
       borderRadius: BorderRadius.circular(14),
       child: Stack(
         children: [
@@ -228,8 +231,7 @@ class _HeroCard extends StatelessWidget {
               ),
             ),
           ),
-          if (latest != null)
-            Positioned(right: 16, top: 16, child: CoverThumb(iconPath: icon, size: 72, modified: latest!.modified)),
+          if (v != null) Positioned(right: 16, top: 16, child: VersionIcon(info: v, versionDir: versionDir!, size: 64, radius: 14)),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
             child: Column(
@@ -255,7 +257,7 @@ class _HeroCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Padding(
-                  padding: EdgeInsets.only(right: latest == null ? 0 : 84),
+                  padding: EdgeInsets.only(right: v == null ? 0 : 76),
                   child: Text(
                     v == null ? '还没有选择版本' : versionTitle(v),
                     maxLines: 1,
@@ -265,7 +267,7 @@ class _HeroCard extends StatelessWidget {
                 ),
                 if (v != null && versionTitle(v) != v.id)
                   Padding(
-                    padding: EdgeInsets.only(right: latest == null ? 0 : 84),
+                    padding: const EdgeInsets.only(right: 76),
                     child: Text(
                       v.id,
                       maxLines: 1,

@@ -176,7 +176,7 @@ class _SessionList extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return SizedBox(
-      width: 248,
+      width: 200,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -371,155 +371,167 @@ class _ChatViewState extends State<_ChatView> {
 
     final messages = s?.messages ?? const <ChatMessage>[];
 
-    return Column(
-      children: [
-        // 标题栏：会话名与当前模型
-        Padding(
-          padding: const EdgeInsets.fromLTRB(28, 12, 16, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(s?.title ?? '新对话', overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
-              ),
-              if (ai.ready) ...[
-                if (s != null) _ContextMeter(chats: widget.chats, session: s, ai: ai),
-                const SizedBox(width: 12),
-                Text(ai.model, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
-              ],
-              if (s != null)
-                IconButton(
-                  tooltip: widget.chats.canCompact(s) ? '压缩上下文：把较早的对话压缩成摘要' : '对话较短，暂时不需要压缩',
-                  icon: const Icon(Icons.compress),
-                  onPressed: ai.ready && !busy && widget.chats.canCompact(s) ? () => widget.chats.compact(s, ai) : null,
-                ),
-              IconButton(
-                tooltip: 'AI 设置',
-                icon: const Icon(Icons.tune),
-                onPressed: () => showAiSettingsDialog(context),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: messages.isEmpty && !busy
-              ? _Welcome(ready: ai.ready, onPick: _send)
-              : SelectionArea(
-                  child: ListView(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(28, 8, 28, 16),
-                    children: [
-                      for (var i = 0; i < messages.length; i++) ...[
-                        if (s!.summary != null && i == s.summaryUntil) _SummaryDivider(summary: s.summary!),
-                        if (messages[i].isUser)
-                          _UserMessage(text: messages[i].content)
-                        else if (!messages[i].isTool) ...[
-                          if (messages[i].content.isNotEmpty)
-                            _AssistantMessage(
-                              text: messages[i].content,
-                              // 只有最后一条是文字回答时才能重新生成
-                              onRetry: i == messages.length - 1 && messages[i].toolCalls.isEmpty && !busy
-                                  ? _retry
-                                  : null,
-                            ),
-                          for (final c in messages[i].toolCalls) _ToolCard(chats: widget.chats, session: s, call: c),
-                          if (_turnEnd(messages, i, busy)) _TurnStats(messages: _turnOf(messages, i)),
-                        ],
-                      ],
-                      if (s != null && widget.chats.isCompacting(s.id))
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
-                            children: [
-                              SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                              SizedBox(width: 12),
-                              Text('正在压缩上下文…'),
-                            ],
-                          ),
-                        ),
-                      if (busy && streaming != null)
-                        streaming.isEmpty
-                            ? const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                child: Row(
-                                  children: [
-                                    SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                                    SizedBox(width: 12),
-                                    Text('正在思考…'),
-                                  ],
-                                ),
-                              )
-                            : _AssistantMessage(text: streaming),
-                      if (error != null)
-                        Container(
-                          margin: const EdgeInsets.only(top: 8),
-                          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-                          decoration: BoxDecoration(
-                            color: scheme.errorContainer,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(error, style: TextStyle(color: scheme.onErrorContainer)),
-                              ),
-                              TextButton(onPressed: () => showAiSettingsDialog(context), child: const Text('设置')),
-                              TextButton(onPressed: _retry, child: const Text('重试')),
-                            ],
-                          ),
-                        ),
-                    ],
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: Column(
+          children: [
+            // 标题栏：会话名与当前模型
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 8, 2),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(s?.title ?? '新对话', overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
                   ),
-                ),
-        ),
-        // 输入框
-        Padding(
-          padding: const EdgeInsets.fromLTRB(28, 4, 28, 20),
-          child: Container(
-            decoration: BoxDecoration(color: scheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(24)),
-            padding: const EdgeInsets.fromLTRB(20, 4, 8, 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Focus(
-                    onKeyEvent: _onKey,
-                    child: TextField(
-                      controller: _input,
-                      focusNode: _focus,
-                      autofocus: true,
-                      minLines: 1,
-                      maxLines: 8,
-                      keyboardType: TextInputType.multiline,
-                      decoration: const InputDecoration(
-                        hintText: '输入问题，Enter 发送，Shift + Enter 换行',
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  if (ai.ready) ...[
+                    if (s != null) _ContextMeter(chats: widget.chats, session: s, ai: ai),
+                    const SizedBox(width: 12),
+                    Text(ai.model, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                  ],
+                  if (s != null)
+                    IconButton(
+                      tooltip: widget.chats.canCompact(s) ? '压缩上下文：把较早的对话压缩成摘要' : '对话较短，暂时不需要压缩',
+                      icon: const Icon(Icons.compress),
+                      onPressed: ai.ready && !busy && widget.chats.canCompact(s)
+                          ? () => widget.chats.compact(s, ai)
+                          : null,
+                    ),
+                  IconButton(
+                    tooltip: 'AI 设置',
+                    icon: const Icon(Icons.tune),
+                    onPressed: () => showAiSettingsDialog(context),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: messages.isEmpty && !busy
+                  ? _Welcome(ready: ai.ready, onPick: _send)
+                  : SelectionArea(
+                      child: ListView(
+                        controller: _scroll,
+                        padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+                        children: [
+                          for (var i = 0; i < messages.length; i++) ...[
+                            if (s!.summary != null && i == s.summaryUntil) _SummaryDivider(summary: s.summary!),
+                            if (messages[i].isUser)
+                              _UserMessage(text: messages[i].content)
+                            else if (!messages[i].isTool) ...[
+                              if (messages[i].content.isNotEmpty)
+                                _AssistantMessage(
+                                  text: messages[i].content,
+                                  // 只有最后一条是文字回答时才能重新生成
+                                  onRetry: i == messages.length - 1 && messages[i].toolCalls.isEmpty && !busy
+                                      ? _retry
+                                      : null,
+                                ),
+                              for (final c in messages[i].toolCalls)
+                                _ToolCard(chats: widget.chats, session: s, call: c),
+                              if (_turnEnd(messages, i, busy)) _TurnStats(messages: _turnOf(messages, i)),
+                            ],
+                          ],
+                          if (s != null && widget.chats.isCompacting(s.id))
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: Row(
+                                children: [
+                                  SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                                  SizedBox(width: 12),
+                                  Text('正在压缩上下文…'),
+                                ],
+                              ),
+                            ),
+                          if (busy && streaming != null)
+                            streaming.isEmpty
+                                ? const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    child: Row(
+                                      children: [
+                                        SizedBox.square(
+                                          dimension: 16,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Text('正在思考…'),
+                                      ],
+                                    ),
+                                  )
+                                : _AssistantMessage(text: streaming),
+                          if (error != null)
+                            Container(
+                              margin: const EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                              decoration: BoxDecoration(
+                                color: scheme.errorContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(error, style: TextStyle(color: scheme.onErrorContainer)),
+                                  ),
+                                  TextButton(onPressed: () => showAiSettingsDialog(context), child: const Text('设置')),
+                                  TextButton(onPressed: _retry, child: const Text('重试')),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: busy
-                      ? IconButton.filledTonal(
-                          tooltip: widget.chats.isExecuting(s.id) ? '操作执行中，完成后才能停止' : '停止',
-                          onPressed: widget.chats.isExecuting(s.id) ? null : () => widget.chats.stop(s),
-                          icon: const Icon(Icons.stop),
-                        )
-                      : ListenableBuilder(
-                          listenable: _input,
-                          builder: (context, _) => IconButton.filled(
-                            tooltip: '发送',
-                            onPressed: _input.text.trim().isEmpty ? null : _send,
-                            icon: const Icon(Icons.arrow_upward),
+            ),
+            // 输入框
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 12),
+              child: Container(
+                decoration: BoxDecoration(color: scheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.fromLTRB(14, 2, 6, 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Focus(
+                        onKeyEvent: _onKey,
+                        child: TextField(
+                          controller: _input,
+                          focusNode: _focus,
+                          autofocus: true,
+                          minLines: 1,
+                          maxLines: 8,
+                          keyboardType: TextInputType.multiline,
+                          decoration: const InputDecoration(
+                            hintText: '输入问题',
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: busy
+                          ? IconButton.filledTonal(
+                              tooltip: widget.chats.isExecuting(s.id) ? '操作执行中，完成后才能停止' : '停止',
+                              onPressed: widget.chats.isExecuting(s.id) ? null : () => widget.chats.stop(s),
+                              icon: const Icon(Icons.stop),
+                            )
+                          : ListenableBuilder(
+                              listenable: _input,
+                              builder: (context, _) => IconButton.filled(
+                                tooltip: '发送',
+                                onPressed: _input.text.trim().isEmpty ? null : _send,
+                                icon: const Icon(Icons.arrow_upward),
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

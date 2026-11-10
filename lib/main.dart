@@ -29,7 +29,7 @@ Future<void> main(List<String> args) async {
   };
   final state = await AppState.create();
   // 安卓：游戏进程通过本机回环端口向启动器里的 AI 提问
-  if (Platform.isAndroid) unawaited(HudBridge.start(state.config));
+  if (Platform.isAndroid) unawaited(HudBridge.start(state.config, state.chats));
   if (isDesktop) {
     final window = WindowManager.instance.getCurrent()!;
     window.title = AppInfo.name;
@@ -101,7 +101,7 @@ class PclPwApp extends StatelessWidget {
           final foreground = scheme.onSurface;
           WidgetsBinding.instance.addPostFrameCallback((_) => _syncLinuxWindowTheme(dark, background, foreground));
         }
-        return isDesktop ? child! : MobileScale(child: child!);
+        return AppScale(scale: state.config.uiScale, child: child!);
       },
     );
   }

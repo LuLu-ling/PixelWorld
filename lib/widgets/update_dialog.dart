@@ -123,8 +123,8 @@ class _UpdateDialogState extends State<_UpdateDialog> {
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 280),
+            // 更新日志占用剩下的高度并可滚动：手机横屏只有约 400 高，固定高度会把按钮挤出去
+            Flexible(
               child: SingleChildScrollView(child: MarkdownBody(data: r.body.isEmpty ? '没有更新说明' : r.body)),
             ),
             if (asset == null) ...[

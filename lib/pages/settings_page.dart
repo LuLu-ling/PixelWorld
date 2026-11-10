@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../app_info.dart';
 import '../app_scope.dart';
+import '../platform.dart';
 import '../widgets/theme_color_dialog.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
@@ -51,7 +52,7 @@ class _SettingsPageState extends State<SettingsPage> {
               _Section.manage => const GameStorageSection(),
               _Section.appearance => const _AppearanceSection(),
               _Section.ai => ListView(
-                padding: const EdgeInsets.all(28),
+                padding: const EdgeInsets.fromLTRB(6, 2, 16, 16),
                 children: const [
                   SettingsGroup(
                     title: 'AI 排障',
@@ -78,6 +79,15 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
+/// 没有缩放时的屏幕尺寸（去掉系统栏），用来显示「自动」算出的比例
+Size _unscaledSize(BuildContext context) {
+  final view = View.of(context);
+  final padding = view.padding;
+  final w = view.physicalSize.width - padding.right;
+  final h = view.physicalSize.height - padding.top - padding.bottom;
+  return Size(w, h) / view.devicePixelRatio;
+}
+
 class _AppearanceSection extends StatelessWidget {
   const _AppearanceSection();
 
@@ -85,7 +95,7 @@ class _AppearanceSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final cfg = AppScope.of(context).config;
     return ListView(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.fromLTRB(6, 2, 16, 16),
       children: [
         SettingsGroup(
           title: '个性化',
@@ -103,6 +113,26 @@ class _AppearanceSection extends StatelessWidget {
                 ],
                 selected: {cfg.themeMode},
                 onSelectionChanged: (s) => cfg.update({'themeMode': s.first}),
+              ),
+            ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              leading: const Icon(Icons.zoom_out_map),
+              title: const Text('界面缩放'),
+              subtitle: Text(
+                cfg.uiScale > 0
+                    ? '整个启动器按这个比例显示'
+                    : '自动：按屏幕尺寸计算，当前为 ${(autoUiScale(_unscaledSize(context)) * 100).round()}%',
+              ),
+              trailing: DropdownButton<double>(
+                value: uiScaleOptions.contains(cfg.uiScale) ? cfg.uiScale : 0.0,
+                underline: const SizedBox.shrink(),
+                borderRadius: BorderRadius.circular(12),
+                items: [
+                  for (final v in uiScaleOptions)
+                    DropdownMenuItem(value: v, child: Text(v == 0 ? '自动' : '${(v * 100).round()}%')),
+                ],
+                onChanged: (v) => cfg.update({'uiScale': v ?? 0.0}),
               ),
             ),
             ListTile(
@@ -165,7 +195,7 @@ class _AboutSection extends StatelessWidget {
       trailing: TextButton(onPressed: () => _open(url), child: Text(action)),
     );
     return ListView(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.fromLTRB(6, 2, 16, 16),
       children: [
         SettingsGroup(
           title: '关于',
@@ -220,7 +250,7 @@ class _AboutSection extends StatelessWidget {
             link(
               Icons.android,
               '安卓版游戏运行时',
-              '基于 Amethyst-Android（LGPL-3.0）、MobileGlues、LWJGL 与 OpenJDK，单独以 LGPL-3.0 开源',
+              '基于 Amethyst-Android（LGPL-3.0）、MobileGlues、Krypton Wrapper、LWJGL 与 OpenJDK，单独以 LGPL-3.0 开源',
               '${AppInfo.repoUrl}/blob/main/android/runtime/NOTICE.md',
             ),
             link(Icons.flutter_dash, 'Flutter', '跨平台界面框架', 'https://flutter.dev'),

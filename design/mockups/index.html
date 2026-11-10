@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>首页效果图</title>
+<style>
+  :root {
+    --bg: #141815; --rail: #101311; --surface: #1c221e; --surface-2: #232a25;
+    --primary: #8fd6a4; --on-primary: #0b3a1c; --primary-c: #2c5a3a; --on-primary-c: #c8f0d2;
+    --text: #e3e8e3; --muted: #a3ada5; --faint: #6f7a72; --line: rgba(255,255,255,.07);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0c0d0c; color: var(--text);
+    font-family: system-ui, "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+  .page { min-height: 100%; display: flex; flex-direction: column; align-items: center; padding: 10px 16px 16px; gap: 10px; }
+  .tabs { display: flex; gap: 6px; background: #1b1e1c; padding: 4px; border-radius: 999px; }
+  .tabs button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; padding: 7px 16px; border-radius: 999px; cursor: pointer; }
+  .tabs button.on { background: var(--primary-c); color: var(--on-primary-c); }
+  .note { color: var(--faint); font-size: 12px; text-align: center; max-width: 900px; line-height: 1.6; }
+
+  /* 手机横屏 3200×1440，约 914×411 dp */
+  .phone { width: 914px; height: 411px; border-radius: 26px; overflow: hidden; position: relative;
+    background: var(--bg); box-shadow: 0 0 0 8px #222, 0 20px 60px rgba(0,0,0,.6); transform-origin: top center; }
+  .phone img.shot { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cutout { position: absolute; left: 14px; top: 50%; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; background: #000; z-index: 9; }
+
+  .app { display: flex; height: 100%; }
+  /* 窄侧栏：只有图标，背景一直铺到挖孔那一侧 */
+  .rail { width: 112px; flex: none; background: var(--rail); display: flex; flex-direction: column; align-items: center;
+    padding: 10px 0 10px 40px; gap: 1px; }
+  .rail .logo { width: 32px; height: 32px; border-radius: 10px; margin-bottom: 6px; }
+  .nav { width: 60px; min-height: 52px; justify-content: center; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px 0; border-radius: 14px; color: var(--muted); font-size: 10px; cursor: default; }
+  .nav .ic { width: 52px; height: 30px; border-radius: 8px; display: grid; place-items: center; }
+  .nav.on { color: var(--text); }
+  .nav.on .ic { background: var(--primary-c); color: var(--on-primary-c); }
+  .rail .grow { flex: 1; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: #2e5b3d; display: grid; place-items: center; font-size: 14px; color: var(--on-primary-c); }
+
+  .main { flex: 1; min-width: 0; padding: 12px 18px 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .top { display: flex; align-items: center; gap: 8px; height: 38px; }
+  .top .hi { flex: 1; font-size: 15px; font-weight: 650; }
+  .top .hi small { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 8px; }
+  .icon-btn { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+  .tasks { display: flex; align-items: center; gap: 8px; height: 36px; min-width: 200px; padding: 0 10px 0 12px;
+    border-radius: 8px; background: var(--surface); color: var(--muted); font-size: 12px; cursor: pointer; }
+  .tasks .tt { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+  .tasks .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tasks .bar { display: none; height: 3px; border-radius: 2px; background: rgba(255,255,255,.1); overflow: hidden; }
+  .tasks .bar i { display: block; width: 42%; height: 100%; background: var(--primary); }
+  .tasks .run-ic { display: none; }
+  .tasks.running { background: var(--primary-c); color: var(--on-primary-c); }
+  .tasks.running .bar { display: block; }
+  .tasks.running .run-ic { display: block; }
+  .tasks.running .idle-ic { display: none; }
+  .status { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 8px;
+    background: var(--surface); font-size: 12px; color: var(--muted); cursor: pointer; }
+  .chip-acc { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px 0 7px; border-radius: 8px; background: var(--surface); font-size: 12px; }
+  .chip-acc .avatar { width: 22px; height: 22px; font-size: 11px; border-radius: 6px; }
+
+  /* 当前版本：背景是这个版本最近存档的画面 */
+  .hero { position: relative; height: 178px; border-radius: 14px; overflow: hidden; flex: none; }
+  /* 存档图标只有 64×64，大面积使用时模糊成氛围色，右侧再放一张清晰的像素小图 */
+  /* 存档封面只有 64×64：大面积用从封面提取的主色做渐变，原图按整数倍清晰放大放在右侧当画框 */
+  .hero .bg { position: absolute; inset: 0; }
+  .hero .thumb { position: absolute; right: 28px; top: 50%; width: 128px; height: 128px; margin-top: -64px;
+    border-radius: 12px; background-size: 100% 100%; image-rendering: pixelated; image-rendering: crisp-edges;
+    box-shadow: 0 12px 30px rgba(0,0,0,.45), 0 0 0 3px rgba(255,255,255,.14); transform: rotate(-3deg); }
+  .hero .thumb.back { right: 70px; transform: rotate(6deg) scale(.86); opacity: .55; filter: saturate(.8); }
+  .hero .thumb { position: absolute; right: 26px; top: 50%; width: 132px; height: 132px; margin-top: -66px;
+    border-radius: 10px; background-size: cover; image-rendering: pixelated;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.12); }
+  .hero { background: #121713; }
+  .hero .shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(14,18,15,.82) 0%, rgba(14,18,15,.55) 45%, rgba(14,18,15,.05) 100%); }
+  .hero .content { position: relative; height: 100%; padding: 20px 22px; display: flex; flex-direction: column; }
+  .hero .switch { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; font-size: 11.5px; color: var(--muted);
+    padding: 4px 10px; border-radius: 8px; background: rgba(255,255,255,.08); }
+  .hero h1 { margin: 10px 0 2px; font-size: 30px; line-height: 1.1; font-weight: 750; letter-spacing: .2px; }
+  .hero .id { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--faint); }
+  .hero .meta { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .hero .meta b { color: var(--text); font-weight: 600; }
+  .hero .actions { margin-top: auto; display: flex; gap: 8px; align-items: center; }
+  .play { height: 42px; padding: 0 26px; border-radius: 10px; border: 0; background: var(--primary); color: var(--on-primary);
+    font: inherit; font-size: 14.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+  .ghost { height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.25);
+    color: var(--text); font: inherit; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+
+  .ghost.more-btn { width: 42px; padding: 0; justify-content: center; font-size: 18px; letter-spacing: 1px; }
+  .sec { display: flex; align-items: baseline; gap: 8px; }
+  .sec h2 { margin: 0; font-size: 14px; font-weight: 650; }
+  .sec .more { margin-left: auto; font-size: 12px; color: var(--primary); }
+  .row { display: flex; gap: 10px; overflow: hidden; }
+  .world { width: 188px; flex: none; border-radius: 12px; overflow: hidden; background: var(--surface); position: relative; }
+  /* 卡片顶部：封面主色渐变 + 居中的清晰小封面（64 的整数倍附近，不拉伸） */
+  .world .img { height: 66px; position: relative; display: grid; place-items: center; }
+  .world .img i { width: 56px; height: 56px; border-radius: 10px; background-size: 100% 100%;
+    image-rendering: pixelated; image-rendering: crisp-edges; box-shadow: 0 6px 16px rgba(0,0,0,.4), 0 0 0 2px rgba(255,255,255,.12); }
+  .world .txt { padding: 7px 10px 9px; }
+  .world .t { font-size: 12.5px; font-weight: 600; }
+  .world .s { font-size: 10.5px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .world .go { position: absolute; right: 8px; top: 44px; width: 32px; height: 32px; border-radius: 50%; background: var(--primary);
+    color: var(--on-primary); display: grid; place-items: center; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+  svg { display: block; }
+
+  /* 左右两半 */
+  .toprow { display: flex; gap: 10px; flex: none; }
+  .toprow .hero { flex: 1 1 0; min-width: 0; }
+  .hero .thumb { right: 18px; top: 18px; margin-top: 0; width: 72px; height: 72px; border-radius: 10px; transform: none; }
+  .hero h1 { font-size: 24px; }
+  .hero .content { padding: 16px 18px; }
+  .hero .actions .play { padding: 0 18px; }
+  .side-panel .opt[data-opt="c"] { height: 100%; display: flex; flex-direction: column; }
+  .side-panel { flex: 1 1 0; min-width: 0; height: 178px; border-radius: 14px; background: var(--surface); padding: 12px 14px; overflow: hidden; }
+  .ph { display: flex; align-items: baseline; margin-bottom: 8px; font-size: 13px; }
+  .ph span { margin-left: auto; font-size: 11.5px; color: var(--primary); }
+  .vlist { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .vi { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 10px; background: var(--surface-2); min-width: 0; }
+  .vi i { width: 32px; height: 32px; flex: none; border-radius: 7px; background-size: 100% 100%; image-rendering: pixelated; }
+  .vi > div { flex: 1; min-width: 0; }
+  .vi .t { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vi .s { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vi .sw { font-size: 11px; color: var(--primary); }
+  .news { display: flex; flex-direction: column; gap: 6px; }
+  .ni { padding: 7px 10px; border-radius: 10px; background: var(--surface-2); }
+  .ni .t { font-size: 12.5px; font-weight: 600; margin-top: 2px; }
+  .ni .s { font-size: 10.5px; color: var(--muted); }
+  .ni .tag { display: inline-block; font-size: 10px; padding: 0 6px; border-radius: 4px; background: var(--primary-c); color: var(--on-primary-c); }
+  .ni .tag.snap { background: #5a4a22; color: #f3dfa6; }
+  .notice { flex: none; padding: 7px 11px 8px; border-radius: 10px; background: var(--primary-c);
+    color: var(--on-primary-c); font-size: 11.5px; line-height: 1.45; }
+  .notice .nh { display: flex; align-items: baseline; margin-bottom: 1px; }
+  .notice .nh b { font-size: 12.5px; }
+  .notice .nh em { margin-left: auto; font-style: normal; font-size: 11px; opacity: .85; }
+  .notice .nt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .quick { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 6px; margin-top: 8px; }
+  .q { display: flex; align-items: center; gap: 8px; padding: 0 12px; min-height: 0; border-radius: 8px !important; border-radius: 10px; background: var(--surface-2); font-size: 11.5px; color: var(--text); }
+  .q svg { color: var(--primary); flex: none; }
+  .last { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; background: var(--surface-2); }
+  .last .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex: none; }
+  .last .t { font-size: 13px; font-weight: 600; }
+  .last .s { font-size: 10.5px; color: var(--muted); }
+  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+  .ck { display: flex; align-items: center; gap: 6px; }
+  .okc { color: var(--primary); font-weight: 700; }
+  .warn { width: 14px; height: 14px; border-radius: 50%; background: #e0a84a; color: #2a1d05; font-size: 10px; font-weight: 800; display: grid; place-items: center; }
+  .opts { display: flex; gap: 6px; align-items: center; font-size: 12px; color: #8a948c; }
+  .opts button { border: 1px solid #2b322d; background: #161a17; color: #c9d1ca; font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+  .opts button.on { background: var(--primary-c); color: var(--on-primary-c); border-color: transparent; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="tabs">
+    <button class="on" data-v="new">新版</button>
+    <button data-v="old">现在</button>
+  </div>
+
+  <div class="opts" id="opts">右半边：
+    <button data-o="a">A 版本快速切换</button>
+    <button data-o="b">B Minecraft 动态</button>
+    <button class="on" data-o="c">C 公告 + 快捷操作</button>
+    <button data-o="d">D 上次运行</button>
+  </div>
+  <div class="phone" id="phone">
+    <div class="cutout"></div>
+    <div class="app" id="new">
+      <aside class="rail">
+        <img class="logo" src="logo.png" alt="">
+        <div class="nav on" data-href="index.html"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>启动</div>
+        <div class="nav" data-href="download.html"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg></div>下载</div>
+        <div class="nav" data-href="tools.html"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 7l3-3 3 3-3 3M4 20l9-9M7 4l3 3-3 3-3-3z"/></svg></div>工具</div>
+        <div class="nav" data-href="settings.html"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.4 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.4-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.2-.8.2-1.2z"/></svg></div>设置</div>
+        <div class="nav" data-href="ai.html"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H9l-5 4z"/></svg></div>AI</div>
+        <div class="grow"></div>
+      </aside>
+
+      <main class="main">
+        <div class="top">
+          <div class="hi">中午好，zhuzhi<small>准备好冒险了吗？</small></div>
+          <!-- 后台任务：顶栏独立区域，点击进入任务页（效果图里点击切换两种状态） -->
+          <div class="tasks" id="tasks" title="点击切换演示状态">
+            <svg class="idle-ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+            <svg class="run-ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg>
+            <div class="tt">
+              <span class="label">当前无后台任务</span>
+              <div class="bar"><i></i></div>
+            </div>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+          </div>
+          <div class="icon-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div>
+          <div class="icon-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 16V11a6 6 0 1112 0v5l2 2H4zM10 21h4"/></svg></div>
+          <div class="status"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 9a15 15 0 0120 0M5 12.5a10 10 0 0114 0M8.5 16a5 5 0 017 0"/><circle cx="12" cy="19.5" r="1.2" fill="currentColor"/></svg>
+            <svg width="20" height="12" viewBox="0 0 26 14" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="1" width="21" height="12" rx="3"/><rect x="3.5" y="3.5" width="13.5" height="7" rx="1.5" fill="currentColor" stroke="none"/><path d="M24 5v4"/></svg>80%</div>
+          <div class="chip-acc"><div class="avatar">Z</div>zhuzhi · 离线</div>
+        </div>
+
+        <div class="toprow">
+        <section class="hero">
+          <div class="bg" style="background-image:url(w1.png)"></div>
+          <div class="shade"></div>
+          <div class="thumb" data-cover="w1.png" style="background-image:url(w1.png)"></div>
+          <div class="content">
+            <div class="switch">切换版本
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></div>
+            <h1>1.21.4 Fabric</h1>
+            <div class="id">fabric-loader-0.20.1-1.21.4</div>
+            <div class="meta">12 个模组 · Zink 渲染 · 14 小时前玩过</div>
+            <div class="actions">
+              <button class="play"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>开始游戏</button>
+              <button class="ghost" data-href="instance.html"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h7"/></svg>版本设置</button>
+              <button class="ghost more-btn" title="更多：光影与资源包、导出整合包、复制版本…">⋯</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 右半边：候选方案，用效果图上方的按钮切换 -->
+        <section class="side-panel">
+          <div class="opt hidden" data-opt="a">
+            <div class="ph"><b>已安装的版本</b><span>全部 6 个 ›</span></div>
+            <div class="vlist">
+              <div class="vi"><i data-cover="w2.png" style="background-image:url(w2.png)"></i><div><div class="t">1.20.1 Forge</div><div class="s">47.4.28 · 38 个模组</div></div><span class="sw">切换</span></div>
+              <div class="vi"><i data-cover="w3.png" style="background-image:url(w3.png)"></i><div><div class="t">26.3</div><div class="s">原版 · 快照</div></div><span class="sw">切换</span></div>
+              <div class="vi"><i data-cover="w4.png" style="background-image:url(w4.png)"></i><div><div class="t">1.16.5</div><div class="s">原版</div></div><span class="sw">切换</span></div>
+              <div class="vi"><i data-cover="w1.png" style="background-image:url(w1.png)"></i><div><div class="t">1.20.1 Fabric</div><div class="s">0.20.1 · 5 个模组</div></div><span class="sw">切换</span></div>
+            </div>
+          </div>
+
+          <div class="opt hidden" data-opt="b">
+            <div class="ph"><b>Minecraft 动态</b><span>更多 ›</span></div>
+            <div class="news">
+              <div class="ni big"><div class="tag">正式版</div><div class="t">Java 版 1.21.10 发布</div><div class="s">修复了若干崩溃问题与性能改进 · 2 天前</div></div>
+              <div class="ni"><div class="tag snap">快照</div><div class="t">26.3 快照 5</div><div class="s">新的 Vulkan 渲染选项 · 5 天前</div></div>
+              <div class="ni"><div class="tag">新闻</div><div class="t">Minecraft Live 回顾</div><div class="s">新生物与生物群系一览 · 1 周前</div></div>
+            </div>
+          </div>
+
+          <div class="opt" data-opt="c">
+            <div class="notice"><div class="nh"><b>启动器公告</b><em>查看 ›</em></div><span class="nt">Pixel World 已迁移到新域名 pixelworld.zhuzhi.site，旧地址会继续自动跳转一段时间。</span></div>
+            <div class="quick">
+              <div class="q"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg>装模组</div>
+              <div class="q"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>管理模组</div>
+              <div class="q"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 2h10v10H3z"/></svg>版本文件夹</div>
+              <div class="q"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7"/></svg>查看日志</div>
+            </div>
+          </div>
+
+          <div class="opt hidden" data-opt="d">
+            <div class="ph"><b>上次运行</b><span>日志 ›</span></div>
+            <div class="last ok"><span class="dot"></span><div><div class="t">正常退出</div><div class="s">1.21.4 Fabric · 玩了 1 小时 12 分 · 14 小时前</div></div></div>
+            <div class="checks">
+              <div class="ck"><span class="okc">✓</span>Java 21（Android）</div>
+              <div class="ck"><span class="okc">✓</span>内存 4.0 GB / 12 GB</div>
+              <div class="ck"><span class="okc">✓</span>Zink · Turnip 驱动</div>
+              <div class="ck"><span class="warn">!</span>3 个模组有更新</div>
+            </div>
+          </div>
+        </section>
+        </div>
+
+        <div class="sec"><h2>最近游玩</h2><span class="more">全部存档 ›</span></div>
+        <div class="row">
+          <div class="world"><div class="img" data-cover="w2.png"><i style="background-image:url(w2.png)"></i></div>
+            <div class="go"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+            <div class="txt"><div class="t">新的世界</div><div class="s">1.20.1 Forge · 14 小时前</div></div></div>
+          <div class="world"><div class="img" data-cover="w1.png"><i style="background-image:url(w1.png)"></i></div>
+            <div class="go"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+            <div class="txt"><div class="t">新的世界</div><div class="s">1.21.4 Fabric · 1 天前</div></div></div>
+          <div class="world"><div class="img" data-cover="w3.png"><i style="background-image:url(w3.png)"></i></div>
+            <div class="go"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+            <div class="txt"><div class="t">新的世界</div><div class="s">26.3 原版 · 3 天前</div></div></div>
+          <div class="world"><div class="img" data-cover="w4.png"><i style="background-image:url(w4.png)"></i></div>
+            <div class="go"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+            <div class="txt"><div class="t">新的世界</div><div class="s">1.16.5 原版 · 5 天前</div></div></div>
+        </div>
+      </main>
+    </div>
+    <img class="shot hidden" id="old" src="now.png" alt="现在的首页">
+  </div>
+
+  <div class="note">按手机横屏（3200×1440，约 914×411）绘制。存档封面是你手机上真实的存档图标（64×64）：背景色从封面里自动取色，封面本身按像素风清晰显示，不拉伸铺满。模组数量、渲染器等为示意数据。</div>
+</div>
+<script>
+  const phone = document.getElementById("phone");
+  function fit() {
+    // 宽和高都要放得下（手机浏览器的地址栏会占掉一部分高度）
+    const s = Math.min(1.6, (window.innerWidth - 40) / 914, (window.innerHeight - 120) / 411);
+    phone.style.transform = "scale(" + s + ")";
+    phone.style.marginBottom = (411 * s - 411) + "px";
+  }
+  window.addEventListener("resize", fit); fit();
+
+  // 从 64×64 封面里提取主色：按色块统计，偏向饱和、不太暗的颜色，生成渐变底色
+  function palette(img) {
+    const c = document.createElement("canvas");
+    c.width = c.height = 32;
+    const g = c.getContext("2d");
+    g.drawImage(img, 0, 0, 32, 32);
+    const d = g.getImageData(0, 0, 32, 32).data;
+    const bins = new Map();
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], gr = d[i + 1], b = d[i + 2];
+      const key = (r >> 5) + "," + (gr >> 5) + "," + (b >> 5);
+      const max = Math.max(r, gr, b), min = Math.min(r, gr, b);
+      const w = 1 + (max - min) / 64 + (max > 40 ? 0.5 : 0);
+      const e = bins.get(key) || { r: 0, g: 0, b: 0, n: 0, w: 0 };
+      e.r += r; e.g += gr; e.b += b; e.n++; e.w += w;
+      bins.set(key, e);
+    }
+    const top = [...bins.values()].sort((a, b) => b.w - a.w);
+    const picked = [];
+    for (const e of top) {
+      const col = [e.r / e.n, e.g / e.n, e.b / e.n];
+      if (picked.every((p) => Math.hypot(p[0] - col[0], p[1] - col[1], p[2] - col[2]) > 60)) picked.push(col);
+      if (picked.length === 3) break;
+    }
+    while (picked.length < 3) picked.push(picked[0] || [40, 60, 45]);
+    return picked.map(([r, g, b]) => "rgb(" + Math.round(r * .8) + "," + Math.round(g * .8) + "," + Math.round(b * .8) + ")");
+  }
+  function paint(el, src) {
+    const img = new Image();
+    img.onload = () => {
+      const [a, b, c] = palette(img);
+      el.style.background =
+        "radial-gradient(circle at 78% 30%, " + a + " 0%, transparent 60%)," +
+        "radial-gradient(circle at 95% 95%, " + b + " 0%, transparent 55%)," +
+        "linear-gradient(135deg, " + c + ", " + a + ")";
+    };
+    img.src = src;
+  }
+  document.querySelectorAll(".world .img[data-cover]").forEach((el) => paint(el, el.dataset.cover));
+  const heroCover = document.querySelector(".hero .thumb[data-cover]");
+  if (heroCover) paint(document.querySelector(".hero .bg"), heroCover.dataset.cover);
+  document.querySelectorAll("#opts button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("#opts button").forEach((x) => x.classList.toggle("on", x === b));
+    document.querySelectorAll(".side-panel .opt").forEach((o) => o.classList.toggle("hidden", o.dataset.opt !== b.dataset.o));
+  }));
+  // 两张大卡片的分界线对齐顶栏「后台任务」的右边缘（实际实现时顶栏与卡片行共用同一组列宽）
+  function alignSplit() {
+    const t = document.getElementById("tasks"), hero = document.querySelector(".toprow .hero");
+    if (!t || !hero) return;
+    const s = phone.getBoundingClientRect().width / 914;
+    const w = (t.getBoundingClientRect().right - hero.getBoundingClientRect().left) / s;
+    hero.style.flex = "0 0 " + Math.round(w) + "px";
+  }
+  window.addEventListener("load", alignSplit);
+  window.addEventListener("resize", alignSplit);
+  alignSplit();
+  const tasks = document.getElementById("tasks");
+  tasks.addEventListener("click", () => {
+    const on = tasks.classList.toggle("running");
+    tasks.querySelector(".label").textContent = on ? "正在下载 Sodium · 42%（共 2 个任务）" : "当前无后台任务";
+  });
+  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("on", x === b));
+    document.getElementById("new").classList.toggle("hidden", b.dataset.v !== "new");
+    document.getElementById("old").classList.toggle("hidden", b.dataset.v !== "old");
+  }));
+</script>
+<script src="nav.js"></script>
+</body>
+</html>

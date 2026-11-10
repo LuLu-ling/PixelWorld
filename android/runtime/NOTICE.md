@@ -31,6 +31,7 @@ modified or replaced on its own, as the LGPL requires.
 | `src/main/java/org/libsdl/app/*` | SDL3's Android Java glue as modified by Amethyst-Android (runs without an SDLActivity); Amethyst launcher references replaced | zlib (SDL) / LGPL-3.0 (Amethyst changes) |
 | `src/main/java/net/kdt/pojavlaunch/EfficientAndroidLWJGLKeycode.java` | Amethyst-Android, GLFW to Android key code table | LGPL-3.0 |
 | `src/main/assets/lwjgl3/3.3.3/lwjgl-lwjglx.jar` | LWJGL 2 compatibility layer from [AngelAuraMC/lwjgl3](https://github.com/AngelAuraMC/lwjgl3), via Amethyst | BSD-3-Clause |
+| `src/main/jniLibs/arm64-v8a/libng_gl4es.so` | [Krypton Wrapper (NG-GL4ES)](https://github.com/BZLZHH/NG-GL4ES) tag `R0.4.5` (commit `6e153a1`), built with NDK 28.2 (`cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 -DCMAKE_BUILD_TYPE=Release`, target `ng_gl4es`); includes gl4es, gl4es-114-extra, glslang, SPIRV-Cross and cJSON | MIT (glslang: BSD-3-Clause and others; SPIRV-Cross: Apache-2.0), see `licenses/ng-gl4es-LICENSE.txt` |
 | `src/main/jniLibs/arm64-v8a/libSimpleFPEWrapper.so` | [SimpleFPEWrapper](https://github.com/MobileGL-Dev/SimpleFPEWrapper), fixed-function pipeline emulation; prebuilt from Amethyst `libs/SimpleFPEWrapper-release.aar` | LGPL-3.0 |
 
 Java runtimes are not bundled. The launcher downloads Android builds of OpenJDK

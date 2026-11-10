@@ -58,6 +58,9 @@ public final class GameRuntime {
     public static final String ZINK = "zink";
     /** The device's own GLES driver without translation, only for mods that render with GLES */
     public static final String SYSTEM_GLES = "system_gles";
+    /** Krypton Wrapper (NG-GL4ES): gl4es with more GL functions; emulates fixed function itself */
+    public static final String KRYPTON = "krypton";
+    public static final String KRYPTON_LIB = "libng_gl4es.so";
 
     /**
      * Environment of a renderer: the AMETHYST_RENDERER name the native bridge understands, the EGL
@@ -83,6 +86,10 @@ public final class GameRuntime {
                 return new RendererConfig("opengles3_desktopgl_zink_kopper", "libEGL_mesa.so", "libpojavexec.so", false);
             case SYSTEM_GLES:
                 return new RendererConfig("opengles_system_gles", null, "libpojavexec.so", false);
+            case KRYPTON:
+                // Same as Amethyst's "opengles2": gl4es on the system EGL, loaded by LWJGL directly.
+                // gl4es handles the fixed-function pipeline, so SFPEW is not used.
+                return new RendererConfig("opengles2", null, KRYPTON_LIB, false);
             default:
                 return new RendererConfig("opengles_mobileglues", RENDERER_LIB, RENDERER_LIB, true);
         }
@@ -315,7 +322,8 @@ public final class GameRuntime {
         env.put("LIBGL_NOERROR", "1");
         env.put("LIBGL_NOINTOVLHACK", "1");
         env.put("LIBGL_NORMALIZE", "1");
-        env.put("LIBGL_ES", "3");
+        // Krypton Wrapper crashes with anything but 2 here (see Amethyst JREUtils)
+        env.put("LIBGL_ES", KRYPTON.equals(renderer) ? "2" : "3");
         env.put("FORCE_VSYNC", "false");
         env.put("MESA_GLSL_CACHE_DIR", cache.getAbsolutePath());
         env.put("LD_LIBRARY_PATH", ldPath);

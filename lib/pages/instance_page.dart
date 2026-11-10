@@ -1,9 +1,13 @@
 import 'dart:io';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
+import '../app_state.dart';
+import '../widgets/version_icon.dart';
+import '../widgets/launch_dialogs.dart';
 import '../core/android_runtime.dart';
 import '../core/config.dart';
 import '../core/instance.dart';
@@ -32,7 +36,7 @@ const _folders = {
   _Section.schematics: InstanceFolder.schematics,
 };
 
-/// 版本设置：概览、独立设置、资源文件夹与服务器（PCL 的布局）
+/// 版本详情：顶部是封面、名称和常用操作，下面一排标签（模组、存档、资源包……、设置、概览）
 class InstancePage extends StatefulWidget {
   const InstancePage({super.key});
 
@@ -41,55 +45,148 @@ class InstancePage extends StatefulWidget {
 }
 
 class _InstancePageState extends State<InstancePage> {
-  _Section _section = _Section.overview;
+  _Section? _section;
+
+  Future<void> _launch(InstanceInfo info) async {
+    final state = AppScope.read(context);
+    if (state.selectedVersion?.id != info.id) await state.selectVersion(info.id);
+    if (!mounted) return;
+    final view = View.of(context);
+    final display = PlatformDispatcher.instance.displays.firstOrNull;
+    final launcher = view.physicalSize / view.devicePixelRatio;
+    final screen = display == null ? launcher : display.size / display.devicePixelRatio;
+    try {
+      await state.launch(
+        DialogLaunchPrompts(context),
+        launcherSize: (width: launcher.width.round(), height: launcher.height.round()),
+        screenSize: (width: screen.width.round(), height: screen.height.round()),
+      );
+    } catch (e) {
+      if (mounted) toast(context, '启动失败：${errorText(e)}');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final state = AppScope.of(context);
     final info = state.instance(state.instanceId);
     if (info == null) {
       return const Center(child: Text('这个版本已不存在'));
     }
-    final groups = [
-      const SideNavGroup(null, [
-        SideNavItem(_Section.overview, '概览', Icons.dashboard_outlined),
-        SideNavItem(_Section.setup, '设置', Icons.tune),
-      ]),
-      SideNavGroup('资源', [
-        const SideNavItem(_Section.saves, '存档', Icons.public),
-        const SideNavItem(_Section.screenshots, '截图', Icons.photo_library_outlined),
-        // 与 PCL 一样，没有加载器的版本不显示模组
-        if (info.modable) const SideNavItem(_Section.mods, '模组', Icons.extension_outlined),
-        const SideNavItem(_Section.resourcepacks, '资源包', Icons.layers_outlined),
-        const SideNavItem(_Section.shaderpacks, '光影', Icons.auto_awesome_outlined),
-        const SideNavItem(_Section.schematics, '投影', Icons.view_in_ar_outlined),
-        const SideNavItem(_Section.servers, '服务器', Icons.dns_outlined),
-      ]),
+    final tabs = <(_Section, String)>[
+      // 与 PCL 一样，没有加载器的版本不显示模组
+      if (info.modable) (_Section.mods, '模组'),
+      (_Section.saves, '存档'),
+      (_Section.resourcepacks, '资源包'),
+      (_Section.shaderpacks, '光影'),
+      (_Section.screenshots, '截图'),
+      (_Section.schematics, '投影'),
+      (_Section.servers, '服务器'),
+      (_Section.setup, '版本设置'),
+      (_Section.overview, '概览'),
     ];
-    final folder = _folders[_section];
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SideNav(groups: groups, value: _section, onChanged: (s) => setState(() => _section = s)),
-        Expanded(
-          child: ContentPanel(
-            child: FutureBuilder(
-              key: ValueKey('${info.id}-$_section'),
-              future: state.gameDirOf(info),
-              builder: (context, snap) {
-                if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                final dir = snap.data!;
-                return switch (_section) {
-                  _Section.overview => _Overview(info: info, gameDir: dir),
-                  _Section.setup => _Setup(info: info),
-                  _Section.servers => _Servers(gameDir: dir),
-                  _ => _Files(info: info, gameDir: dir, folder: folder!),
-                };
-              },
-            ),
+    final section = tabs.any((t) => t.$1 == _section) ? _section! : tabs.first.$1;
+    final folder = _folders[section];
+    final running = state.gameState != GameState.idle;
+    return FutureBuilder(
+      future: state.gameDirOf(info),
+      builder: (context, snap) {
+        final dir = snap.data;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 16, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  // 点图标更换或恢复默认
+                  PopupMenuButton<String>(
+                    tooltip: '更换图标',
+                    onSelected: (v) async {
+                      final dir = state.paths.versionDir(info.id);
+                      try {
+                        if (v == 'pick') await pickVersionLogo(dir);
+                        if (v == 'reset') await resetVersionLogo(dir);
+                      } catch (e) {
+                        if (context.mounted) toast(context, '更换图标失败：${errorText(e)}');
+                      }
+                      if (mounted) setState(() {});
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'pick', child: Text('更换图标…')),
+                      PopupMenuItem(
+                        value: 'reset',
+                        enabled: customVersionLogo(state.paths.versionDir(info.id)) != null,
+                        child: const Text('恢复默认图标'),
+                      ),
+                    ],
+                    child: VersionIcon(info: info, versionDir: state.paths.versionDir(info.id), size: 48),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          versionTitle(info),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          versionTitle(info) == info.id ? describeVersion(info) : info.id,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant, fontFamily: 'monospace'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: dir == null
+                        ? null
+                        : () async {
+                            try {
+                              await openInFileManager(dir);
+                            } catch (e) {
+                              if (context.mounted) toast(context, '打不开文件夹：${errorText(e)}');
+                            }
+                          },
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                    icon: const Icon(Icons.folder_outlined, size: 18),
+                    label: const Text('打开文件夹'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: running ? null : () => _launch(info),
+                    style: FilledButton.styleFrom(minimumSize: const Size(0, 44), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                    icon: const Icon(Icons.rocket_launch, size: 19),
+                    label: const Text('开始游戏'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              PageTabs<_Section>(tabs: tabs, value: section, onChanged: (s) => setState(() => _section = s)),
+              const SizedBox(height: 6),
+              Expanded(
+                child: dir == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : KeyedSubtree(
+                        key: ValueKey('${info.id}-$section'),
+                        child: switch (section) {
+                          _Section.overview => _Overview(info: info, gameDir: dir),
+                          _Section.setup => _Setup(info: info),
+                          _Section.servers => _Servers(gameDir: dir),
+                          _ => _Files(info: info, gameDir: dir, folder: folder!),
+                        },
+                      ),
+              ),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }

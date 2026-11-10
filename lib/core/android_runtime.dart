@@ -284,6 +284,7 @@ const androidRenderers = {
   'auto': '自动',
   'mobileglues': 'MobileGlues（推荐）',
   'zink': 'Zink（OpenGL 转 Vulkan）',
+  'krypton': 'Krypton Wrapper（GL4ES 改进版）',
   'system_gles': '系统 GLES 驱动（仅限支持 GLES 的模组）',
 };
 
@@ -294,6 +295,9 @@ const androidRendererHints = {
   'zink':
       'Mesa Zink：完整的 OpenGL 4.6，需要 Vulkan 1.1。骁龙（Adreno）上自动改用自带的开源驱动 Turnip，'
       '适合 MobileGlues 画面出错时使用',
+  'krypton':
+      'NG-GL4ES：OpenGL 转 OpenGL ES，速度快，自带固定管线支持，适合 1.16.5 及更早的版本，也能运行 Sodium。'
+      '26.3 快照起的版本暂不可用',
   'system_gles': '直接使用系统 GLES 驱动，不做转译。原版 Minecraft 无法以此运行',
 };
 

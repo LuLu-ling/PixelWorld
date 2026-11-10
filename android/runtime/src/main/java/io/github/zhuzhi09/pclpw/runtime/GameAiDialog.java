@@ -1,6 +1,9 @@
 package io.github.zhuzhi09.pclpw.runtime;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -9,7 +12,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowInsets;
@@ -21,6 +23,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -28,14 +31,11 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
 /**
- * Full in-game AI dialog. The layout and Markdown rendering live in a local WebView
- * ({@code assets/hud_ai.html}); sessions and the connection to the launcher's AI bridge stay in
- * Java. The WebView only talks to the game through the small {@link Bridge} interface.
+ * In-game AI dialog. The page ({@code assets/hud_ai.html}) only draws; the conversations live in
+ * the launcher and are read and written through {@link HudAiClient}, so the launcher's "AI" page
+ * and the game show the same history.
  */
 final class GameAiDialog {
 
@@ -46,29 +46,40 @@ final class GameAiDialog {
     private final String renderer;
     private final SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final HudAiClient aiClient;
 
+    private HudAiClient client;
     private FrameLayout container;
     private WebView webView;
     private boolean open;
     private boolean pageReady;
-    private boolean busy;
-    private boolean sessionsLoaded;
-    private String currentId = "";
+
+    /** null: a new conversation that is created by the first question. */
+    private String currentId;
     private JSONArray sessions = new JSONArray();
-    private final StringBuilder answer = new StringBuilder();
+    private JSONArray messages = new JSONArray();
+    private boolean busy;
+    private int askId;
+    private String lastQuestion = "";
+    private final StringBuilder streaming = new StringBuilder();
+    private String status = "";
+    private String notice = "";
+    /** Launcher operations waiting for the user's approval in the current answer */
+    private JSONArray confirms = new JSONArray();
+    private boolean loading;
+
     private Runnable onClosed;
     private ViewTreeObserver.OnGlobalLayoutListener imeListener;
+    private String lastAnchor;
 
-    GameAiDialog(Activity activity, FrameLayout parent, GameHud owner,
-                 String instance, String renderer) {
+    GameAiDialog(Activity activity, FrameLayout parent, GameHud owner, String instance, String renderer) {
         this.activity = activity;
         this.parent = parent;
         this.owner = owner;
         this.instance = instance;
         this.renderer = renderer;
         this.prefs = activity.getSharedPreferences("pclpw_hud_ai", Activity.MODE_PRIVATE);
-        this.aiClient = new HudAiClient(activity);
+        String saved = prefs.getString("current", "");
+        this.currentId = saved.isEmpty() ? null : saved;
     }
 
     void setOnClosed(Runnable listener) {
@@ -85,27 +96,29 @@ final class GameAiDialog {
                 container.setVisibility(View.VISIBLE);
                 parent.bringChildToFront(container);
             }
-            if (webView != null) webView.onResume();
             return;
         }
         open = true;
+        client = new HudAiClient(activity);
         ensureView();
         if (container == null) return;
-        if (!sessionsLoaded) loadSessions();
         container.setVisibility(View.VISIBLE);
         parent.bringChildToFront(container);
         if (webView != null) {
             webView.onResume();
             webView.requestFocus();
         }
-        if (pageReady) pushState();
+        refresh();
     }
 
+    /** Closing does not stop an answer: it keeps going in the launcher and is saved there. */
     void hide() {
         if (!open) return;
         open = false;
-        aiClient.cancel();
+        if (client != null) client.close();
+        client = null;
         busy = false;
+        streaming.setLength(0);
         destroyView();
         if (onClosed != null) onClosed.run();
     }
@@ -119,30 +132,330 @@ final class GameAiDialog {
     }
 
     void dispose() {
-        aiClient.cancel();
+        if (client != null) client.close();
+        client = null;
         destroyView();
         open = false;
     }
 
-    private void destroyView() {
-        if (container != null) {
-            if (imeListener != null) {
-                ViewTreeObserver observer = container.getViewTreeObserver();
-                if (observer.isAlive()) observer.removeOnGlobalLayoutListener(imeListener);
-                imeListener = null;
+    // ---------- launcher data ----------
+
+    private static JSONObject req(String type) {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("type", type);
+        } catch (Throwable ignored) {
+        }
+        return o;
+    }
+
+    /** Imports conversations kept by older versions in the game process, then loads the list. */
+    private void refresh() {
+        if (client == null) return;
+        loading = true;
+        notice = "";
+        pushState();
+        String legacy = prefs.getString("sessions", "");
+        if (!legacy.isEmpty() && !"[]".equals(legacy)) {
+            try {
+                JSONObject r = req("import").put("sessions", new JSONArray(legacy));
+                client.request(r, msg -> {
+                    if ("ok".equals(msg.optString("type"))) {
+                        prefs.edit().remove("sessions").apply();
+                        // Old ids are prefixed in the launcher
+                        if (currentId != null && !currentId.startsWith("game-") && msg.optInt("count") > 0) {
+                            currentId = "game-" + currentId;
+                        }
+                    }
+                    loadList(true);
+                });
+                return;
+            } catch (Throwable ignored) {
+                prefs.edit().remove("sessions").apply();
             }
-            parent.removeView(container);
-            container = null;
         }
-        if (webView != null) {
-            InputMethodManager imm = (InputMethodManager) activity.getSystemService(Activity.INPUT_METHOD_SERVICE);
-            if (imm != null) imm.hideSoftInputFromWindow(webView.getWindowToken(), 0);
-            webView.clearFocus();
-            webView.removeJavascriptInterface("PclHudNative");
-            webView.destroy();
-            webView = null;
+        loadList(true);
+    }
+
+    private void loadList(boolean thenCurrent) {
+        if (client == null) return;
+        client.request(req("list"), msg -> {
+            if ("error".equals(msg.optString("type"))) {
+                loading = false;
+                notice = msg.optString("message");
+                pushState();
+                return;
+            }
+            JSONArray list = msg.optJSONArray("sessions");
+            sessions = list == null ? new JSONArray() : list;
+            if (currentId != null && indexOf(currentId) < 0) setCurrent(null);
+            if (thenCurrent && currentId != null) {
+                load(currentId);
+            } else {
+                loading = false;
+                pushState();
+            }
+        });
+    }
+
+    private void load(String id) {
+        if (client == null) return;
+        setCurrent(id);
+        messages = new JSONArray();
+        streaming.setLength(0);
+        status = "";
+        busy = false;
+        loading = true;
+        pushState();
+        JSONObject r = req("load");
+        try {
+            r.put("session", id);
+        } catch (Throwable ignored) {
         }
-        pageReady = false;
+        final int[] requestId = new int[1];
+        requestId[0] = client.request(r, msg -> {
+            if (!id.equals(currentId)) return;
+            String type = msg.optString("type");
+            if ("load".equals(type)) {
+                JSONObject s = msg.optJSONObject("session");
+                messages = s != null && s.optJSONArray("messages") != null ? s.optJSONArray("messages") : new JSONArray();
+                loading = false;
+                busy = s != null && s.optBoolean("busy");
+                if (busy) askId = requestId[0];
+                pushState();
+                return;
+            }
+            if ("error".equals(type) && !busy) {
+                loading = false;
+                notice = msg.optString("message");
+                pushState();
+                return;
+            }
+            // The launcher is still answering this conversation; it streams the rest here
+            onAnswer(msg);
+        });
+    }
+
+    private void ask(String text) {
+        if (!open || busy || client == null) return;
+        final String question = text == null ? "" : text.trim();
+        if (question.isEmpty()) return;
+        lastQuestion = question;
+        try {
+            messages.put(new JSONObject().put("role", "user").put("content", question));
+        } catch (Throwable ignored) {
+        }
+        busy = true;
+        notice = "";
+        status = "正在连接启动器…";
+        streaming.setLength(0);
+        pushState();
+
+        JSONObject r = req("ask");
+        try {
+            r.put("text", question);
+            r.put("context", owner.aiContext());
+            if (currentId != null) r.put("session", currentId);
+        } catch (Throwable ignored) {
+        }
+        askId = client.request(r, this::onAnswer);
+    }
+
+    private void onAnswer(JSONObject msg) {
+        if (msg.optInt("id") != askId) return;
+        switch (msg.optString("type")) {
+            case "start": {
+                String id = msg.optString("session");
+                if (!id.isEmpty() && !id.equals(currentId)) {
+                    setCurrent(id);
+                    try {
+                        sessions = prepend(new JSONObject()
+                                .put("id", id)
+                                .put("title", msg.optString("title", "新对话"))
+                                .put("updated", System.currentTimeMillis()));
+                    } catch (Throwable ignored) {
+                    }
+                }
+                status = "正在回答…";
+                pushState();
+                break;
+            }
+            case "delta":
+                streaming.append(msg.optString("text"));
+                call("PclHud.stream(" + JSONObject.quote(streaming.toString()) + ")");
+                break;
+            case "replace":
+                streaming.setLength(0);
+                streaming.append(msg.optString("text"));
+                call("PclHud.stream(" + JSONObject.quote(streaming.toString()) + ")");
+                break;
+            case "status": {
+                String text = msg.optString("text");
+                status = text.isEmpty() ? "正在回答…" : text;
+                call("PclHud.status(" + JSONObject.quote(status) + ")");
+                break;
+            }
+            case "confirm":
+                confirms.put(msg);
+                call("PclHud.confirms(" + JSONObject.quote(confirms.toString()) + ")");
+                break;
+            case "confirmed":
+                removeConfirm(msg.optString("call"));
+                break;
+            case "done":
+                finishAnswer(null);
+                loadList(false);
+                break;
+            case "error":
+                finishAnswer(msg.optString("message", "AI 请求失败"));
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void removeConfirm(String callId) {
+        JSONArray next = new JSONArray();
+        for (int i = 0; i < confirms.length(); i++) {
+            JSONObject c = confirms.optJSONObject(i);
+            if (c != null && !callId.equals(c.optString("call"))) next.put(c);
+        }
+        confirms = next;
+        call("PclHud.confirms(" + JSONObject.quote(confirms.toString()) + ")");
+    }
+
+    /** The user's choice on a confirmation card; the launcher's own card closes too. */
+    private void decide(String callId, boolean allow, boolean always) {
+        if (client == null || currentId == null || callId == null) return;
+        JSONObject r = req("decide");
+        try {
+            r.put("session", currentId).put("call", callId).put("allow", allow).put("always", always);
+        } catch (Throwable ignored) {
+        }
+        client.request(r, null);
+        removeConfirm(callId);
+    }
+
+    private void finishAnswer(String error) {
+        confirms = new JSONArray();
+        boolean answered = streaming.length() > 0;
+        if (answered) {
+            try {
+                messages.put(new JSONObject().put("role", "assistant").put("content", streaming.toString()));
+            } catch (Throwable ignored) {
+            }
+        }
+        busy = false;
+        streaming.setLength(0);
+        status = "";
+        notice = error == null ? "" : error;
+        pushState();
+        // Nothing came back: give the question back so it can be sent again
+        if (error != null && !answered && !lastQuestion.isEmpty()) {
+            call("PclHud.restore(" + JSONObject.quote(lastQuestion) + ")");
+        }
+    }
+
+    private void stop() {
+        if (!busy || client == null || currentId == null) return;
+        JSONObject r = req("cancel");
+        try {
+            r.put("session", currentId);
+        } catch (Throwable ignored) {
+        }
+        client.request(r, null);
+        status = "正在停止…";
+        call("PclHud.status(" + JSONObject.quote(status) + ")");
+    }
+
+    private void newSession() {
+        if (busy) return;
+        setCurrent(null);
+        messages = new JSONArray();
+        notice = "";
+        pushState();
+    }
+
+    private void delete(String id) {
+        if (client == null) return;
+        JSONObject r = req("delete");
+        try {
+            r.put("session", id);
+        } catch (Throwable ignored) {
+        }
+        if (id.equals(currentId)) {
+            if (busy) return;
+            setCurrent(null);
+            messages = new JSONArray();
+        }
+        JSONArray next = new JSONArray();
+        for (int i = 0; i < sessions.length(); i++) {
+            JSONObject s = sessions.optJSONObject(i);
+            if (s != null && !id.equals(s.optString("id"))) next.put(s);
+        }
+        sessions = next;
+        pushState();
+        client.request(r, msg -> loadList(false));
+    }
+
+    private void setCurrent(String id) {
+        currentId = id;
+        prefs.edit().putString("current", id == null ? "" : id).apply();
+    }
+
+    private int indexOf(String id) {
+        for (int i = 0; i < sessions.length(); i++) {
+            JSONObject s = sessions.optJSONObject(i);
+            if (s != null && id.equals(s.optString("id"))) return i;
+        }
+        return -1;
+    }
+
+    private JSONArray prepend(JSONObject first) {
+        JSONArray next = new JSONArray();
+        next.put(first);
+        String id = first.optString("id");
+        for (int i = 0; i < sessions.length(); i++) {
+            JSONObject s = sessions.optJSONObject(i);
+            if (s != null && !id.equals(s.optString("id"))) next.put(s);
+        }
+        return next;
+    }
+
+    private void pushState() {
+        if (!pageReady || webView == null) return;
+        try {
+            JSONObject state = new JSONObject();
+            state.put("sessions", sessions);
+            state.put("currentId", currentId == null ? "" : currentId);
+            state.put("messages", messages);
+            state.put("busy", busy);
+            state.put("loading", loading);
+            state.put("streaming", streaming.toString());
+            state.put("status", status);
+            state.put("notice", notice);
+            state.put("confirms", confirms);
+            state.put("instance", instance + rendererName());
+            call("PclHud.state(" + JSONObject.quote(state.toString()) + ")");
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private String rendererName() {
+        switch (renderer) {
+            case "zink":
+                return " · Zink";
+            case "angle":
+                return " · ANGLE";
+            case "system_gles":
+                return " · 系统 GLES";
+            case "mobileglues":
+                return " · MobileGlues";
+            case "krypton":
+                return " · Krypton Wrapper";
+            default:
+                return "";
+        }
     }
 
     // ---------- WebView ----------
@@ -200,12 +513,36 @@ final class GameAiDialog {
         } catch (Throwable e) {
             TextView error = new TextView(activity);
             error.setText("无法打开游戏内 AI 界面：\n" + e);
-            error.setTextColor(0xFFFF9D9D);
+            error.setTextColor(0xFFFFFFFF);
+            error.setBackgroundColor(0xB0181818);
             error.setTextSize(13);
-            error.setPadding(dp(20), dp(20), dp(20), dp(20));
+            int pad = Math.round(20 * activity.getResources().getDisplayMetrics().density);
+            error.setPadding(pad, pad, pad, pad);
             container.removeAllViews();
             container.addView(error);
         }
+    }
+
+    private void destroyView() {
+        if (container != null) {
+            if (imeListener != null) {
+                ViewTreeObserver observer = container.getViewTreeObserver();
+                if (observer.isAlive()) observer.removeOnGlobalLayoutListener(imeListener);
+                imeListener = null;
+            }
+            parent.removeView(container);
+            container = null;
+        }
+        lastAnchor = null;
+        if (webView != null) {
+            InputMethodManager imm = (InputMethodManager) activity.getSystemService(Activity.INPUT_METHOD_SERVICE);
+            if (imm != null) imm.hideSoftInputFromWindow(webView.getWindowToken(), 0);
+            webView.clearFocus();
+            webView.removeJavascriptInterface("PclHudNative");
+            webView.destroy();
+            webView = null;
+        }
+        pageReady = false;
     }
 
     private void openLink(Uri uri) {
@@ -213,8 +550,20 @@ final class GameAiDialog {
         String scheme = uri.getScheme();
         if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) return;
         try {
-            activity.startActivity(new Intent(Intent.ACTION_VIEW, uri)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            activity.startActivity(new Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void copy(String text) {
+        try {
+            ClipboardManager cm = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm == null) return;
+            cm.setPrimaryClip(ClipData.newPlainText("Pixel World AI", text));
+            // Android 13+ shows its own confirmation
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                Toast.makeText(activity, "已复制", Toast.LENGTH_SHORT).show();
+            }
         } catch (Throwable ignored) {
         }
     }
@@ -226,266 +575,6 @@ final class GameAiDialog {
             int n;
             while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
             return new String(out.toByteArray(), StandardCharsets.UTF_8);
-        }
-    }
-
-    private final class Bridge {
-        @JavascriptInterface
-        public void ready() {
-            handler.post(() -> {
-                pageReady = true;
-                updateIme();
-                pushState();
-            });
-        }
-
-        @JavascriptInterface
-        public void ask(String text) {
-            handler.post(() -> GameAiDialog.this.ask(text));
-        }
-
-        @JavascriptInterface
-        public void newSession() {
-            handler.post(GameAiDialog.this::newSession);
-        }
-
-        @JavascriptInterface
-        public void selectSession(String id) {
-            handler.post(() -> select(id));
-        }
-
-        @JavascriptInterface
-        public void deleteSession(String id) {
-            handler.post(() -> delete(id));
-        }
-
-        @JavascriptInterface
-        public void close() {
-            handler.post(GameAiDialog.this::hide);
-        }
-    }
-
-    // ---------- sessions ----------
-
-    private void loadSessions() {
-        try {
-            sessions = new JSONArray(prefs.getString("sessions", "[]"));
-        } catch (Throwable e) {
-            sessions = new JSONArray();
-        }
-        if (sessions.length() == 0) {
-            newSession();
-            sessionsLoaded = true;
-            return;
-        }
-        currentId = prefs.getString("current", "");
-        if (find(currentId) == null) currentId = sessions.optJSONObject(0).optString("id");
-        sessionsLoaded = true;
-    }
-
-    private JSONObject currentSession() {
-        return find(currentId);
-    }
-
-    private JSONObject find(String id) {
-        if (TextUtils.isEmpty(id)) return null;
-        for (int i = 0; i < sessions.length(); i++) {
-            JSONObject s = sessions.optJSONObject(i);
-            if (s != null && id.equals(s.optString("id"))) return s;
-        }
-        return null;
-    }
-
-    private void newSession() {
-        String id = UUID.randomUUID().toString();
-        JSONObject session = new JSONObject();
-        try {
-            session.put("id", id);
-            session.put("title", "新对话");
-            session.put("updated", System.currentTimeMillis());
-            session.put("messages", new JSONArray());
-        } catch (Throwable ignored) {
-        }
-        currentId = id;
-        moveToFront(session);
-        save();
-        pushState();
-    }
-
-    private void select(String id) {
-        if (find(id) == null) return;
-        currentId = id;
-        save();
-        pushState();
-    }
-
-    private void delete(String id) {
-        JSONArray next = new JSONArray();
-        for (int i = 0; i < sessions.length(); i++) {
-            JSONObject s = sessions.optJSONObject(i);
-            if (s == null || id.equals(s.optString("id"))) continue;
-            next.put(s);
-        }
-        sessions = next;
-        if (sessions.length() == 0) {
-            newSession();
-            return;
-        }
-        if (id.equals(currentId)) currentId = sessions.optJSONObject(0).optString("id");
-        save();
-        pushState();
-    }
-
-    private void moveToFront(JSONObject session) {
-        JSONArray next = new JSONArray();
-        next.put(session);
-        String id = session.optString("id");
-        for (int i = 0; i < sessions.length(); i++) {
-            JSONObject s = sessions.optJSONObject(i);
-            if (s == null || id.equals(s.optString("id"))) continue;
-            next.put(s);
-        }
-        sessions = next;
-    }
-
-    private void save() {
-        prefs.edit()
-                .putString("sessions", sessions.toString())
-                .putString("current", currentId)
-                .apply();
-    }
-
-    private void ask(String text) {
-        if (!open || busy) return;
-        final String question = text == null ? "" : text.trim();
-        if (question.isEmpty()) return;
-        JSONObject session = currentSession();
-        if (session == null) {
-            newSession();
-            session = currentSession();
-        }
-        if (session == null) return;
-        JSONArray messages = session.optJSONArray("messages");
-        if (messages == null) {
-            messages = new JSONArray();
-            try {
-                session.put("messages", messages);
-            } catch (Throwable ignored) {
-            }
-        }
-        try {
-            messages.put(new JSONObject().put("role", "user").put("content", question));
-            if ("新对话".equals(session.optString("title"))) {
-                session.put("title", titleFrom(question));
-            }
-            session.put("updated", System.currentTimeMillis());
-        } catch (Throwable ignored) {
-        }
-        moveToFront(session);
-        save();
-        busy = true;
-        answer.setLength(0);
-        pushState();
-        call("PclHud.busy(true)");
-
-        final List<String[]> history = new ArrayList<>();
-        try {
-            int last = messages.length() - 1;
-            for (int i = Math.max(0, last - 8); i < last; i++) {
-                JSONObject m = messages.optJSONObject(i);
-                if (m == null) continue;
-                String role = m.optString("role");
-                String content = m.optString("content");
-                if ((role.equals("user") || role.equals("assistant")) && !content.isEmpty()) {
-                    history.add(new String[]{role, content});
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-
-        final JSONObject target = session;
-        aiClient.ask(question, owner.aiContext(), history, new HudAiClient.Listener() {
-            @Override
-            public void onStart() {
-                if (open) call("PclHud.busy(true)");
-            }
-
-            @Override
-            public void onDelta(String text) {
-                if (!open) return;
-                answer.append(text);
-                call("PclHud.delta(" + JSONObject.quote(text) + ")");
-            }
-
-            @Override
-            public void onDone() {
-                busy = false;
-                if (!open) return;
-                try {
-                    JSONArray messages = target.optJSONArray("messages");
-                    if (messages != null) {
-                        messages.put(new JSONObject().put("role", "assistant").put("content", answer.toString()));
-                    }
-                    target.put("updated", System.currentTimeMillis());
-                    moveToFront(target);
-                    save();
-                } catch (Throwable ignored) {
-                }
-                call("PclHud.done()");
-                pushState();
-            }
-
-            @Override
-            public void onError(String message) {
-                busy = false;
-                if (open) call("PclHud.error(" + JSONObject.quote(message) + ")");
-            }
-        });
-    }
-
-    private static String titleFrom(String text) {
-        String line = text.trim().split("\n")[0].trim();
-        return line.length() > 30 ? line.substring(0, 30) + "…" : (line.isEmpty() ? "新对话" : line);
-    }
-
-    // ---------- JS state ----------
-
-    private void pushState() {
-        if (!pageReady || webView == null) return;
-        try {
-            JSONObject state = new JSONObject();
-            JSONArray list = new JSONArray();
-            for (int i = 0; i < sessions.length(); i++) {
-                JSONObject s = sessions.optJSONObject(i);
-                if (s == null) continue;
-                list.put(new JSONObject()
-                        .put("id", s.optString("id"))
-                        .put("title", s.optString("title"))
-                        .put("updated", s.optLong("updated")));
-            }
-            state.put("sessions", list);
-            state.put("currentId", currentId);
-            JSONObject current = currentSession();
-            state.put("messages", current != null ? current.optJSONArray("messages") : new JSONArray());
-            state.put("busy", busy);
-            state.put("instance", instance + rendererName());
-            call("PclHud.state(" + JSONObject.quote(state.toString()) + ")");
-        } catch (Throwable ignored) {
-        }
-    }
-
-    private String rendererName() {
-        switch (renderer) {
-            case "zink":
-                return " · Zink";
-            case "angle":
-                return " · ANGLE";
-            case "system_gles":
-                return " · 系统 GLES";
-            case "mobileglues":
-                return " · MobileGlues";
-            default:
-                return "";
         }
     }
 
@@ -506,16 +595,81 @@ final class GameAiDialog {
         int ime = Math.max(0, screen - frame.bottom);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             WindowInsets insets = container.getRootWindowInsets();
-            if (insets != null) {
-                ime = Math.max(ime, insets.getInsets(WindowInsets.Type.ime()).bottom);
-            }
+            if (insets != null) ime = Math.max(ime, insets.getInsets(WindowInsets.Type.ime()).bottom);
         }
         float density = activity.getResources().getDisplayMetrics().density;
-        int css = Math.round(ime / (density > 0 ? density : 1f));
-        call("PclHud.ime(" + css + ")");
+        // The window opens next to the ball; send its place first (also after rotation)
+        String anchor = owner.aiAnchor();
+        if (!anchor.equals(lastAnchor)) {
+            lastAnchor = anchor;
+            call("PclHud.anchor(" + JSONObject.quote(anchor) + ")");
+        }
+        call("PclHud.ime(" + Math.round(ime / (density > 0 ? density : 1f)) + ")");
     }
 
-    private int dp(float v) {
-        return Math.round(v * activity.getResources().getDisplayMetrics().density);
+    private final class Bridge {
+        @JavascriptInterface
+        public void ready() {
+            handler.post(() -> {
+                pageReady = true;
+                updateIme();
+                pushState();
+            });
+        }
+
+        @JavascriptInterface
+        public void ask(String text) {
+            handler.post(() -> GameAiDialog.this.ask(text));
+        }
+
+        @JavascriptInterface
+        public void stop() {
+            handler.post(GameAiDialog.this::stop);
+        }
+
+        @JavascriptInterface
+        public void decide(String callId, boolean allow, boolean always) {
+            handler.post(() -> GameAiDialog.this.decide(callId, allow, always));
+        }
+
+        @JavascriptInterface
+        public void newSession() {
+            handler.post(GameAiDialog.this::newSession);
+        }
+
+        @JavascriptInterface
+        public void selectSession(String id) {
+            handler.post(() -> {
+                if (!busy && id != null && !id.equals(currentId)) load(id);
+            });
+        }
+
+        @JavascriptInterface
+        public void deleteSession(String id) {
+            handler.post(() -> delete(id));
+        }
+
+        @JavascriptInterface
+        public void reload() {
+            handler.post(GameAiDialog.this::refresh);
+        }
+
+        @JavascriptInterface
+        public void copy(String text) {
+            handler.post(() -> GameAiDialog.this.copy(text));
+        }
+
+        @JavascriptInterface
+        public void openLauncher() {
+            handler.post(() -> {
+                hide();
+                owner.openLauncher();
+            });
+        }
+
+        @JavascriptInterface
+        public void close() {
+            handler.post(GameAiDialog.this::hide);
+        }
     }
 }

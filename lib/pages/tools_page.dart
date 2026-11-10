@@ -13,6 +13,7 @@ import '../core/task.dart';
 import '../core/toolbox.dart';
 import '../widgets/format.dart';
 import '../widgets/settings_group.dart';
+import '../shell.dart';
 import '../widgets/side_nav.dart';
 import 'diagnose_page.dart';
 import 'docs_page.dart';
@@ -22,7 +23,7 @@ import 'versions_page.dart';
 
 enum _Section { lobby, transfer, diagnose, toolbox, download, skin, server, achievement, docs }
 
-/// 工具（PCL 的布局）：联机与实用工具
+/// 工具：三列大块按钮（每块带一句说明），点开进入对应工具，左上角返回
 class ToolsPage extends StatefulWidget {
   const ToolsPage({super.key});
 
@@ -30,52 +31,169 @@ class ToolsPage extends StatefulWidget {
   State<ToolsPage> createState() => _ToolsPageState();
 }
 
+class _Tool {
+  const _Tool(this.section, this.title, this.hint, this.icon, {this.sub});
+
+  final _Section? section;
+  final String title;
+  final String hint;
+  final IconData icon;
+
+  /// 进入外壳的子页面（任务历史）而不是工具页内的分类
+  final SubPage? sub;
+}
+
 class _ToolsPageState extends State<ToolsPage> {
-  _Section _section = _Section.toolbox;
+  _Section? _section;
 
   static const _groups = [
-    SideNavGroup('联机', [
-      SideNavItem(_Section.lobby, '联机大厅', Icons.lan_outlined, trailing: '规划中'),
-      SideNavItem(_Section.transfer, '局域网互传', Icons.swap_horiz),
-    ]),
-    SideNavGroup('实用工具', [
-      SideNavItem(_Section.diagnose, '错误分析', Icons.troubleshoot),
-      SideNavItem(_Section.toolbox, '百宝箱', Icons.handyman_outlined),
-      SideNavItem(_Section.download, '自定义下载', Icons.download_for_offline_outlined),
-      SideNavItem(_Section.skin, '皮肤与头像', Icons.face_outlined),
-      SideNavItem(_Section.server, '服务器查询', Icons.dns_outlined),
-      SideNavItem(_Section.achievement, '成就图片', Icons.emoji_events_outlined),
-    ]),
-    SideNavGroup('帮助', [SideNavItem(_Section.docs, '使用文档', Icons.menu_book_outlined)]),
+    (
+      '游戏',
+      [
+        _Tool(_Section.transfer, '局域网互传', '在两台设备之间传模组、存档、整个版本', Icons.swap_horiz),
+        _Tool(_Section.diagnose, '错误分析', '查看日志，自动找出崩溃原因', Icons.troubleshoot),
+        _Tool(_Section.download, '自定义下载', '按链接下载文件到指定位置', Icons.download_for_offline_outlined),
+        _Tool(_Section.skin, '皮肤与头像', '查看和下载正版玩家的皮肤', Icons.face_outlined),
+        _Tool(_Section.server, '服务器查询', '查询服务器在线人数和延迟', Icons.dns_outlined),
+        _Tool(_Section.achievement, '成就图片', '生成自定义的成就弹窗图片', Icons.emoji_events_outlined),
+      ],
+    ),
+    (
+      '其他',
+      [
+        _Tool(null, '任务历史', '下载与安装记录', Icons.history, sub: SubPage.tasks),
+        _Tool(_Section.toolbox, '百宝箱', '今日人品、随机种子等小工具', Icons.handyman_outlined),
+        _Tool(_Section.docs, '使用文档', '在启动器里阅读官网文档', Icons.menu_book_outlined),
+        _Tool(_Section.lobby, '联机大厅', '规划中', Icons.lan_outlined),
+      ],
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final theme = Theme.of(context);
+    final section = _section;
+    if (section != null) {
+      final tool = _groups.expand((g) => g.$2).firstWhere((t) => t.section == section);
+      return Padding(
+        padding: const EdgeInsets.only(left: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                IconButton(tooltip: '返回工具', onPressed: () => setState(() => _section = null), icon: const Icon(Icons.arrow_back)),
+                Text(tool.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              ],
+            ),
+            Expanded(
+              child: ContentPanel(
+                child: switch (section) {
+                  _Section.lobby => const _Lobby(),
+                  _Section.transfer => const LanTransferPage(),
+                  _Section.diagnose => const _Diagnose(),
+                  _Section.toolbox => const _Toolbox(),
+                  _Section.download => const _CustomDownload(),
+                  _Section.skin => const _SkinTools(),
+                  _Section.server => const _ServerQuery(),
+                  _Section.achievement => const _Achievement(),
+                  _Section.docs => const DocsPage(),
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 0, 16, 16),
       children: [
-        SideNav(groups: _groups, value: _section, onChanged: (s) => setState(() => _section = s)),
-        Expanded(
-          child: ContentPanel(
-            child: switch (_section) {
-              _Section.lobby => const _Lobby(),
-              _Section.transfer => const LanTransferPage(),
-              _Section.diagnose => const _Diagnose(),
-              _Section.toolbox => const _Toolbox(),
-              _Section.download => const _CustomDownload(),
-              _Section.skin => const _SkinTools(),
-              _Section.server => const _ServerQuery(),
-              _Section.achievement => const _Achievement(),
-              _Section.docs => const DocsPage(),
+        for (final (title, tools) in _groups) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 4, 2, 8),
+            child: Text(title, style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          ),
+          LayoutBuilder(
+            builder: (context, c) {
+              final cols = c.maxWidth > 900 ? 4 : (c.maxWidth > 560 ? 3 : 2);
+              final w = (c.maxWidth - 10 * (cols - 1)) / cols;
+              return Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final t in tools)
+                    SizedBox(
+                      width: w,
+                      child: _ToolTile(
+                        tool: t,
+                        onTap: () => t.sub != null ? ShellNav.of(context).open(t.sub!) : setState(() => _section = t.section),
+                      ),
+                    ),
+                ],
+              );
             },
           ),
-        ),
+          const SizedBox(height: 12),
+        ],
       ],
     );
   }
 }
 
-Widget _page(List<Widget> children) => ListView(padding: const EdgeInsets.all(28), children: children);
+class _ToolTile extends StatelessWidget {
+  const _ToolTile({required this.tool, required this.onTap});
+
+  final _Tool tool;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Material(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 76),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(11)),
+                  child: Icon(tool.icon, color: scheme.onPrimaryContainer, size: 21),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(tool.title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(
+                        tool.hint,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Widget _page(List<Widget> children) => ListView(padding: const EdgeInsets.fromLTRB(6, 2, 16, 16), children: children);
 
 Future<String?> _saveAs(String name, {String label = 'PNG 图片', List<String> ext = const ['png']}) async {
   final loc = await getSaveLocation(

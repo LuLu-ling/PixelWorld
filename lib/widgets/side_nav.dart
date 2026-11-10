@@ -22,76 +22,34 @@ class SideNavGroup<T> {
   final List<SideNavItem<T>> items;
 }
 
-/// 二级页面左侧的分组导航（PCL 的布局），选中项为 MD3 药丸形指示器
+/// 二级页面左侧的分组导航：每项 44 高的圆角矩形，选中项带浅色底和左侧主题色竖线
 class SideNav<T> extends StatelessWidget {
-  const SideNav({super.key, required this.groups, required this.value, required this.onChanged});
+  const SideNav({super.key, required this.groups, required this.value, required this.onChanged, this.width = 196});
 
   final List<SideNavGroup<T>> groups;
   final T value;
   final ValueChanged<T> onChanged;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return SizedBox(
-      width: 232,
+      width: width,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+        padding: const EdgeInsets.fromLTRB(14, 0, 6, 16),
         children: [
           for (final g in groups) ...[
             if (g.title != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
                 child: Text(g.title!, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
               ),
             for (final item in g.items)
               Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Material(
-                  color: item.value == value ? scheme.secondaryContainer : Colors.transparent,
-                  shape: const StadiumBorder(),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () => onChanged(item.value),
-                    child: SizedBox(
-                      height: 48,
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 16),
-                          if (item.loader != null)
-                            LoaderIcon(
-                              item.loader!,
-                              size: 22,
-                              color: item.value == value ? scheme.onSecondaryContainer : scheme.onSurfaceVariant,
-                            )
-                          else
-                            Icon(
-                              item.icon,
-                              size: 22,
-                              color: item.value == value ? scheme.onSecondaryContainer : scheme.onSurfaceVariant,
-                            ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              item.label,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: item.value == value ? scheme.onSecondaryContainer : scheme.onSurface,
-                              ),
-                            ),
-                          ),
-                          if (item.trailing != null)
-                            Text(
-                              item.trailing!,
-                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
-                            ),
-                          const SizedBox(width: 16),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                padding: const EdgeInsets.only(bottom: 2),
+                child: _SideNavTile(item: item, selected: item.value == value, onTap: () => onChanged(item.value)),
               ),
           ],
         ],
@@ -100,21 +58,167 @@ class SideNav<T> extends StatelessWidget {
   }
 }
 
-/// 右侧内容区：左上圆角的面板
+class _SideNavTile<T> extends StatelessWidget {
+  const _SideNavTile({required this.item, required this.selected, required this.onTap});
+
+  final SideNavItem<T> item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final iconColor = selected ? scheme.primary : scheme.onSurfaceVariant;
+    return Material(
+      color: selected ? scheme.surfaceContainer : Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: 44,
+          child: Row(
+            children: [
+              Container(
+                width: 3,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: selected ? scheme.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 11),
+              if (item.loader != null)
+                LoaderIcon(item.loader!, size: 19, color: iconColor)
+              else
+                Icon(item.icon, size: 19, color: iconColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  item.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (item.trailing != null)
+                Text(item.trailing!, style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+              const SizedBox(width: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 右侧内容区（新外壳里不再画单独的底板，只负责裁剪）
 class ContentPanel extends StatelessWidget {
   const ContentPanel({super.key, required this.child});
 
   final Widget child;
 
   @override
+  Widget build(BuildContext context) => ClipRect(child: child);
+}
+
+/// 页面顶部的一排分类标签（下载、版本详情等），每个标签 40 高，选中项下面有主题色下划线
+class PageTabs<T> extends StatelessWidget {
+  const PageTabs({super.key, required this.tabs, required this.value, required this.onChanged, this.trailing});
+
+  final List<(T, String)> tabs;
+  final T value;
+  final ValueChanged<T> onChanged;
+  final Widget? trailing;
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.only(topLeft: Radius.circular(24)),
+      height: 44,
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .4)))),
+      child: Row(
+        children: [
+          Expanded(
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                for (final (v, label) in tabs)
+                  InkWell(
+                    onTap: () => onChanged(v),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: v == value ? scheme.primary : Colors.transparent, width: 2),
+                        ),
+                      ),
+                      child: Text(
+                        label,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: v == value ? scheme.onSurface : scheme.onSurfaceVariant,
+                          fontWeight: v == value ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          ?trailing,
+        ],
       ),
-      clipBehavior: Clip.antiAlias,
-      child: child,
+    );
+  }
+}
+
+/// 一组互斥的小选项（正式版 / 快照 / …），每项 34 高
+class SegmentPicker<T> extends StatelessWidget {
+  const SegmentPicker({super.key, required this.options, required this.value, required this.onChanged});
+
+  final List<(T, String)> options;
+  final T value;
+  final ValueChanged<T> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(color: scheme.surfaceContainer, borderRadius: BorderRadius.circular(10)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final (v, label) in options)
+            Material(
+              color: v == value ? scheme.surfaceContainerHighest : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                onTap: () => onChanged(v),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  alignment: Alignment.center,
+                  child: Text(
+                    label,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: v == value ? scheme.onSurface : scheme.onSurfaceVariant,
+                      fontWeight: v == value ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

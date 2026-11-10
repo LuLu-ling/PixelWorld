@@ -181,7 +181,11 @@ class LauncherConfig extends ChangeNotifier {
   int get themeColor => (_data['themeColor'] as num?)?.toInt() ?? 0xFF2F6B4F;
   String get selectedVersion => _get('selectedVersion');
   String get selectedAccount => _get('selectedAccount');
-  String get msClientId => _get('msClientId');
+  /// 用户自己填写的 Client ID。早期版本会把内置 ID 预填进设置，保存后会存成"自填"，这里当作未填写
+  String get msClientId {
+    final v = _get('msClientId');
+    return AppInfo.msClientId.isNotEmpty && v.trim() == AppInfo.msClientId ? '' : v;
+  }
 
   /// 用户没有填写时使用 CI 注入的默认 Client ID
   String get effectiveMsClientId {

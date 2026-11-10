@@ -708,7 +708,9 @@ class MiscSection extends StatelessWidget {
               icon: Icons.key_outlined,
               title: 'Azure 应用 Client ID',
               subtitle: '微软登录需要 Azure 公共客户端应用；留空时使用启动器内置的 Client ID',
-              value: cfg.effectiveMsClientId,
+              // 只显示用户自己填的 ID；内置 ID 不回显到输入框
+              value: cfg.msClientId,
+              hint: AppInfo.msClientId.isEmpty ? '未填写' : '留空时使用内置 Client ID',
               wide: true,
               onSaved: (v) => cfg.update({'msClientId': v.trim()}),
             ),

@@ -149,7 +149,7 @@ class _InstallerPageState extends State<_InstallerPage> {
             height: 40,
             child: Stack(
               children: [
-                const Positioned.fill(child: DragToMoveArea(child: SizedBox.expand())),
+                Positioned.fill(child: DragToMoveArea(child: SizedBox.expand())),
                 Positioned(
                   left: 16,
                   top: 0,

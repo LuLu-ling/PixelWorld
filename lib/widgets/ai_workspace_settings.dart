@@ -28,7 +28,7 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
     if (_loaded) return;
     _loaded = true;
     _searchUrl.text = AppScope.read(context).config.aiSearchUrl;
-    _searchKey.text = SearchKey.load();
+    _searchKey.text = SearchKey.load(AppScope.read(context).config.aiSearchEngine);
   }
 
   @override
@@ -161,7 +161,11 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
             isExpanded: true,
             decoration: const InputDecoration(labelText: '搜索引擎', border: OutlineInputBorder()),
             items: [for (final e in searchEngines.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
-            onChanged: (v) => cfg.update({'aiSearchEngine': v ?? 'auto'}),
+            onChanged: (v) {
+              cfg.update({'aiSearchEngine': v ?? 'auto'});
+              // 每个服务的 Key 分开保存，切换后显示对应服务的 Key
+              setState(() => _searchKey.text = SearchKey.load(v ?? 'auto'));
+            },
           ),
           if (engine == 'searxng') ...[
             const SizedBox(height: 12),
@@ -176,21 +180,23 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
               onChanged: (v) => cfg.update({'aiSearchUrl': v.trim()}),
             ),
           ],
-          if (searchEngineNeedsKey(engine)) ...[
+          if (searchEngineTakesKey(engine)) ...[
             const SizedBox(height: 12),
             TextField(
               controller: _searchKey,
               obscureText: !_showKey,
               decoration: InputDecoration(
-                labelText: '搜索服务的 API Key',
-                helperText: '和模型的 Key 分开保存，只会发给所选的搜索服务',
+                labelText: engine == 'exa' ? 'Exa 的 API Key（可以不填）' : '搜索服务的 API Key',
+                helperText: engine == 'exa'
+                    ? '不填也能用，有频率限制；填了之后额度更高。只会发给 Exa'
+                    : '和模型的 Key 分开保存，只会发给所选的搜索服务',
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
                   onPressed: () => setState(() => _showKey = !_showKey),
                   icon: Icon(_showKey ? Icons.visibility_off_outlined : Icons.visibility_outlined),
                 ),
               ),
-              onChanged: SearchKey.save,
+              onChanged: (v) => SearchKey.save(engine, v),
             ),
           ],
           const SizedBox(height: 8),

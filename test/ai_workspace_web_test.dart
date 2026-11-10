@@ -122,6 +122,21 @@ void main() {
     expect(r.text, isNot(contains('版权')));
   });
 
+  test('解析 Exa 的 MCP 响应（SSE 与普通 JSON）', () {
+    const text = 'Title: Iris issue\nURL: https://github.com/IrisShaders/Iris/issues/3136\nPublished: 2026-10-01\nHighlights:\nIncompatibility between Iris and Sodium.\n\n---\n\nTitle: N/A\nURL: https://example.com/a\nText: Second   result';
+    final sse = 'event: message\ndata: ${jsonEncode({'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': text}]}})}\n\n';
+    final r = parseMcpResult(sse)!;
+    final list = parseExa('${(r['content'] as List).first['text']}');
+    expect(list.length, 2);
+    expect(list[0].title, 'Iris issue');
+    expect(list[0].url, 'https://github.com/IrisShaders/Iris/issues/3136');
+    expect(list[0].snippet, 'Incompatibility between Iris and Sodium.');
+    expect(list[1].title, 'https://example.com/a');
+    expect(list[1].snippet, 'Second result');
+    expect(parseMcpResult(jsonEncode({'result': {'content': []}})), isNotNull);
+    expect(() => parseMcpResult(jsonEncode({'error': {'message': 'rate limited'}})), throwsA(isA<ToolError>()));
+  });
+
   group('系统代理解析', () {
     test('Windows：开启时读取地址与例外', () {
       const out = r'''

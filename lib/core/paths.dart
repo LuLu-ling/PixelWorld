@@ -82,7 +82,7 @@ abstract final class Paths {
 }
 
 /// 放在配置目录的文件（小、不能重新生成）
-const configFileNames = ['config.json', 'accounts.dat', 'accounts.json', 'ai.dat', 'ai-search.dat'];
+const configFileNames = ['config.json', 'accounts.dat', 'accounts.json', 'ai.dat'];
 
 /// 启动器旁边备份的文件
 const backedUpFileNames = ['config.json', 'accounts.dat'];

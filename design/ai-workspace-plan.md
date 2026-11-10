@@ -3,7 +3,7 @@
 > 状态：草案；P0、P2 已实施（2026-11-11）
 
 > 实施时的调整：
-> - P2 默认搜索不需要 Key：DuckDuckGo，失败时必应（固定英文市场；必应对程序发出的中文查询会返回不相关的结果）；另有 `mcwiki_search`（MediaWiki API，用说明来源的 User-Agent）。
+> - P2 默认搜索不需要 Key：Exa 公开的 MCP 接口（opencode 也这样做），失败时 DuckDuckGo，再失败时必应（固定英文市场；必应对程序发出的中文查询会返回不相关的结果）；另有 `mcwiki_search`（MediaWiki API，用说明来源的 User-Agent）。
 > - 不按 DNS 解析结果拦截地址（代理的 fake-ip、TUN、Tailscale 的 100.64/10 会被误判），只拒绝网址里写明的本机与内网地址；请求跟随系统代理（Windows 注册表、macOS scutil、环境变量）。
 > - 安卓下载目录直接用 `AndroidStorage.root/Download`，没有新增原生接口；P0 的 AI 页工作区面板尚未实现，设置页已有工作区与联网设置。
 > - P1（Lua）暂缓，视实际需要再定。

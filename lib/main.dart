@@ -101,7 +101,7 @@ class PclPwApp extends StatelessWidget {
           final foreground = scheme.onSurface;
           WidgetsBinding.instance.addPostFrameCallback((_) => _syncLinuxWindowTheme(dark, background, foreground));
         }
-        return isDesktop ? child! : MobileScale(child: child!);
+        return AppScale(scale: state.config.uiScale, child: child!);
       },
     );
   }

@@ -76,6 +76,8 @@ class LauncherConfig extends ChangeNotifier {
     // 首页的使用提示与 Minecraft 版本动态
     'homeHints': true,
     'homeNews': true,
+    // 界面缩放：0 为自动（按屏幕尺寸计算），否则为比例，例如 0.9
+    'uiScale': 0.0,
     // AI 排障：接口格式、地址与模型（API Key 加密保存在 ai.dat）；发送前是否让用户确认内容
     'aiProvider': 'openai',
     'aiBaseUrl': '',
@@ -146,6 +148,8 @@ class LauncherConfig extends ChangeNotifier {
   List<String> get dismissedNotices => [for (final x in (_data['dismissedNotices'] as List? ?? const [])) '$x'];
   String get dismissedChangelog => _get('dismissedChangelog');
   bool get storageAsked => _get('storageAsked');
+  /// 界面缩放，0 为自动
+  double get uiScale => ((_data['uiScale'] as num?) ?? 0).toDouble();
   double get renderScale => (_data['renderScale'] as num).toDouble().clamp(0.25, 1.0);
   String get androidRenderer => _get('androidRenderer');
   bool get gameHud => _data['gameHud'] as bool? ?? true;

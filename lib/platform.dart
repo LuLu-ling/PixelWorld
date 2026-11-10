@@ -25,13 +25,16 @@ class MobileScale extends StatelessWidget {
   static const _minWidth = 760.0;
   static const _minHeight = 360.0;
 
+  /// 手机上整体显示比例：100% 偏大、原来的约 79% 太小，取 90%
+  static const _scale = .9;
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       left: false,
       child: LayoutBuilder(
         builder: (context, c) {
-          final scale = min(1.0, min(c.maxWidth / _minWidth, c.maxHeight / _minHeight));
+          final scale = min(_scale, min(c.maxWidth / _minWidth, c.maxHeight / _minHeight));
           if (scale >= 1) return child;
           final mq = MediaQuery.of(context);
           final size = Size(c.maxWidth / scale, c.maxHeight / scale);

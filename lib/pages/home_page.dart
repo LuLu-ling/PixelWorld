@@ -506,7 +506,7 @@ class _SidePanel extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(child: _QuickButton(icon: Icons.folder_outlined, label: '版本文件夹', onTap: onFolder)),
+                      Expanded(child: _QuickButton(icon: Icons.folder_outlined, label: '文件夹', onTap: onFolder)),
                       const SizedBox(width: 6),
                       Expanded(child: _QuickButton(icon: Icons.article_outlined, label: '查看日志', onTap: onLog)),
                     ],

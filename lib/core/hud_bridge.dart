@@ -90,9 +90,11 @@ class HudBridge {
           }
           authorized = true;
           session = HudSession(chats, () => AiSettings.load(config), (m) {
+            // 不要每条都 flush：上一次 flush 还没结束时再 write 会抛出
+            // 「StreamSink is bound to a stream」，连续发出的消息（例如状态和确认卡片）就丢了。
+            // Socket 写入后会自行发送。
             try {
               socket.write('${jsonEncode(m)}\n');
-              unawaited(socket.flush());
             } catch (_) {}
           });
           continue;

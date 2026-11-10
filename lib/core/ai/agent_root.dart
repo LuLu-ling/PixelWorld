@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import '../../app_state.dart';
 import '../android_storage.dart';
 import '../paths.dart';
+import '../safe_path.dart';
 
 /// AI 可以访问的一个文件夹（「根」）。模型只看到 [id] 和相对路径，看不到 [path]。
 enum RootKind { workspace, game, downloads, user }
@@ -88,4 +89,16 @@ String newRootId(String path, Iterable<String> taken) {
     id = '$base-$i';
   }
   return id;
+}
+
+/// 按「根 id + 相对路径」找到文件（界面上打开 AI 写的文件用）；不存在或不安全时返回 null
+Future<File?> resolveAgentFile(AppState state, String rootId, String rel) async {
+  final root = (await agentRoots(state)).where((r) => r.id == rootId).firstOrNull;
+  if (root == null || rel.trim().isEmpty) return null;
+  try {
+    final f = File(resolveInside(root.path, rel.trim().replaceAll(r'\', '/')));
+    return f.existsSync() ? f : null;
+  } on UnsafePathException {
+    return null;
+  }
 }

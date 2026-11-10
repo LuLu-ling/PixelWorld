@@ -98,6 +98,8 @@ class LauncherConfig extends ChangeNotifier {
     // 上下文长度（0 表示按模型自动判断）与自动压缩的阈值（0 表示不自动压缩）
     'aiContextWindow': 0,
     'aiCompactAt': 64000,
+    // AI 页右侧边栏是否展开（窄窗口时默认收起，不受这个设置影响）
+    'aiPanel': true,
     // 安卓：首次打开时已经询问过游戏文件夹放在哪里
     'storageAsked': false,
     // 安卓：游戏的渲染分辨率相对屏幕分辨率的比例（代替桌面端的窗口大小）
@@ -226,4 +228,5 @@ class LauncherConfig extends ChangeNotifier {
   String get aiSearchUrl => _get('aiSearchUrl');
   int get aiContextWindow => (_data['aiContextWindow'] as num).toInt();
   int get aiCompactAt => (_data['aiCompactAt'] as num).toInt();
+  bool get aiPanel => _get('aiPanel');
 }

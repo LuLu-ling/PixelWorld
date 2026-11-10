@@ -94,6 +94,29 @@ void main() {
     expect(Directory(p.join(dataDir, 'ai_sessions')).existsSync(), isTrue);
   });
 
+  test('某个文件夹被占用时先移其余的，下次启动再移剩下的', () async {
+    await writeLegacy(legacy);
+    await Directory(p.join(legacy, 'ai')).create();
+    final lock = await File(p.join(legacy, 'ai', 'busy.txt')).open(mode: FileMode.write);
+
+    var used = await migrateWindowsLayout(legacy: [legacy], configDir: configDir, dataDir: dataDir);
+    expect(used, dataDir);
+    expect(File(p.join(dataDir, 'runtime', 'jre', 'java.exe')).existsSync(), isTrue);
+    expect(Directory(p.join(legacy, 'ai')).existsSync(), isTrue);
+    // 已经移走的那几项，配置里的路径改到了新位置
+    var cfg = jsonDecode(File(p.join(configDir, 'config.json')).readAsStringSync()) as Map;
+    expect(cfg['javaPath'], p.join(dataDir, 'runtime', 'jre', 'java.exe'));
+    expect(cfg['gameDir'], p.join(dataDir, '.minecraft'));
+
+    await lock.close();
+    used = await migrateWindowsLayout(legacy: [legacy], configDir: configDir, dataDir: dataDir);
+    expect(used, dataDir);
+    expect(File(p.join(dataDir, 'ai', 'busy.txt')).existsSync(), isTrue);
+    expect(Directory(legacy).existsSync(), isFalse);
+    cfg = jsonDecode(File(p.join(configDir, 'config.json')).readAsStringSync()) as Map;
+    expect(cfg['javaPath'], p.join(dataDir, 'runtime', 'jre', 'java.exe'));
+  }, skip: Platform.isWindows ? false : '只有 Windows 上打开的文件会阻止改名');
+
   test('从启动器旁边的备份恢复缺失的配置与账户', () async {
     final backup = p.join(root.path, 'App', 'backup');
     await Directory(backup).create(recursive: true);

@@ -41,16 +41,16 @@ import java.util.Locale;
  */
 final class GameHud {
 
-    // Plain light palette: gray card, white content
-    /** Translucent gray so the game shows through; the content on it stays solid white. */
-    private static final int CARD = 0xB8EDEDED;
-    private static final int WHITE = 0xFFFFFFFF;
-    private static final int PRESSED = 0xFFE2E2E2;
-    private static final int TEXT = 0xFF1F1F1F;
-    private static final int MUTED = 0xFF6B6B6B;
-    private static final int OK = 0xFF1E7B3A;
-    private static final int WARN = 0xFF9A5B00;
-    private static final int BAD = 0xFFB3261E;
+    // Translucent panels with thin white outlines; the game shows through behind them
+    private static final int CARD = 0x75181818;
+    private static final int FILL = 0x1AFFFFFF;
+    private static final int PRESSED = 0x40FFFFFF;
+    private static final int BORDER = 0xE0FFFFFF;
+    private static final int TEXT = 0xFFFFFFFF;
+    private static final int MUTED = 0xBDFFFFFF;
+    private static final int OK = 0xFF8FE3A6;
+    private static final int WARN = 0xFFFFD27A;
+    private static final int BAD = 0xFFFFB4AB;
 
     private static final long FADE_DELAY_MS = 4000;
     private static final float FADED_ALPHA = 0.45f;
@@ -138,7 +138,7 @@ final class GameHud {
         View v = new View(activity);
         GradientDrawable outer = new GradientDrawable();
         outer.setShape(GradientDrawable.OVAL);
-        outer.setColor(WHITE);
+        outer.setColor(0xFFFFFFFF);
         outer.setStroke(dp(1), 0xFFC8C8C8);
         GradientDrawable inner = new GradientDrawable();
         inner.setShape(GradientDrawable.OVAL);
@@ -259,7 +259,7 @@ final class GameHud {
     private LinearLayout section() {
         LinearLayout s = new LinearLayout(activity);
         s.setOrientation(LinearLayout.VERTICAL);
-        s.setBackground(rounded(WHITE, 10));
+        s.setBackground(outlined(FILL, 10));
         s.setPadding(dp(12), dp(10), dp(12), dp(10));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -273,7 +273,7 @@ final class GameHud {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(14), 0, dp(14), 0);
         row.setMinHeight(dp(42));
-        row.setBackground(pressable(WHITE, 10));
+        row.setBackground(pressable(10));
         row.setClickable(true);
         row.setOnClickListener(listener);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
@@ -289,7 +289,7 @@ final class GameHud {
         v.setGravity(Gravity.CENTER);
         v.setPadding(dp(12), 0, dp(12), 0);
         v.setMinHeight(dp(34));
-        v.setBackground(pressable(filled ? WHITE : CARD, 9));
+        v.setBackground(pressable(9));
         v.setClickable(true);
         v.setOnClickListener(listener);
         LinearLayout.LayoutParams lp = filled
@@ -805,11 +805,18 @@ final class GameHud {
         return d;
     }
 
-    /** Rounded background that turns gray while pressed. */
-    private Drawable pressable(int color, int radiusDp) {
+    /** Translucent fill with a thin white outline. */
+    private GradientDrawable outlined(int fill, int radiusDp) {
+        GradientDrawable d = rounded(fill, radiusDp);
+        d.setStroke(Math.max(1, dp(1)), BORDER);
+        return d;
+    }
+
+    /** Outlined background that brightens while pressed. */
+    private Drawable pressable(int radiusDp) {
         android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
-        states.addState(new int[]{android.R.attr.state_pressed}, rounded(PRESSED, radiusDp));
-        states.addState(new int[]{}, rounded(color, radiusDp));
+        states.addState(new int[]{android.R.attr.state_pressed}, outlined(PRESSED, radiusDp));
+        states.addState(new int[]{}, outlined(FILL, radiusDp));
         return states;
     }
 

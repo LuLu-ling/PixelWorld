@@ -477,8 +477,8 @@ final class GameAiDialog {
         } catch (Throwable e) {
             TextView error = new TextView(activity);
             error.setText("无法打开游戏内 AI 界面：\n" + e);
-            error.setTextColor(0xFF1F1F1F);
-            error.setBackgroundColor(0xFFEDEDED);
+            error.setTextColor(0xFFFFFFFF);
+            error.setBackgroundColor(0xB0181818);
             error.setTextSize(13);
             int pad = Math.round(20 * activity.getResources().getDisplayMetrics().density);
             error.setPadding(pad, pad, pad, pad);

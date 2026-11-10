@@ -218,14 +218,9 @@ class _ToolTile extends StatelessWidget {
 
 Widget _page(List<Widget> children) => ListView(padding: const EdgeInsets.fromLTRB(6, 2, 16, 16), children: children);
 
-Future<String?> _saveAs(String name, {String label = 'PNG 图片', List<String> ext = const ['png']}) async {
-  final loc = await getSaveLocation(
-    suggestedName: name,
-    confirmButtonText: '保存',
-    acceptedTypeGroups: [XTypeGroup(label: label, extensions: ext)],
-  );
-  return loc?.path;
-}
+/// 选择保存位置：桌面端系统对话框，手机上内置文件管理器
+Future<String?> _saveAs(BuildContext context, String name, {String label = 'PNG 图片', List<String> ext = const ['png']}) =>
+    pickSavePath(context, name, extensions: ext, label: label);
 
 // ---------- 联机大厅（规划中） ----------
 
@@ -266,15 +261,16 @@ class _Diagnose extends StatelessWidget {
   }
 
   Future<void> _file(BuildContext context) async {
-    final f = await openFile(
-      acceptedTypeGroups: const [
-        XTypeGroup(label: '日志', extensions: ['log', 'txt']),
-      ],
+    final path = await pickFile(
+      context,
+      label: '日志',
+      extensions: const ['log', 'txt'],
+      start: Platform.isAndroid ? AppScope.read(context).config.gameDir : null,
     );
-    if (f == null || !context.mounted) return;
-    final text = utf8.decode(await f.readAsBytes(), allowMalformed: true);
+    if (path == null || !context.mounted) return;
+    final text = utf8.decode(await File(path).readAsBytes(), allowMalformed: true);
     if (!context.mounted) return;
-    _open(context, f.name, text);
+    _open(context, p.basename(path), text);
   }
 
   void _open(BuildContext context, String name, String text) {
@@ -594,7 +590,7 @@ class _SkinToolsState extends State<_SkinTools> {
 
   Future<void> _saveSkin() async {
     final s = _skin!;
-    final path = await _saveAs('${s.name}.png');
+    final path = await _saveAs(context, '${s.name}.png');
     if (path == null) return;
     await File(path).writeAsBytes(s.png);
     if (mounted) toast(context, '已保存 $path');
@@ -602,7 +598,8 @@ class _SkinToolsState extends State<_SkinTools> {
 
   Future<void> _saveHead() async {
     final png = await renderHead(_source!, _size);
-    final path = await _saveAs('${_skin?.name ?? 'Head'}-$_size.png');
+    if (!mounted) return;
+    final path = await _saveAs(context, '${_skin?.name ?? 'Head'}-$_size.png');
     if (path == null) return;
     await File(path).writeAsBytes(png);
     if (mounted) toast(context, '已保存 $path');
@@ -854,7 +851,7 @@ class _AchievementState extends State<_Achievement> {
   }
 
   Future<void> _save() async {
-    final path = await _saveAs('${_title.text.trim().isEmpty ? 'achievement' : _title.text.trim()}.png');
+    final path = await _saveAs(context, '${_title.text.trim().isEmpty ? 'achievement' : _title.text.trim()}.png');
     if (path == null) return;
     await File(path).writeAsBytes(_png!);
     if (mounted) toast(context, '已保存 $path');

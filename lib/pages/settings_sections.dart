@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'package:file_selector/file_selector.dart';
+import '../core/android_storage.dart';
+import 'file_manager_page.dart';
 import 'package:flutter/material.dart';
 
 import '../app_info.dart';
@@ -526,17 +527,17 @@ class _JavaSectionState extends State<JavaSection> {
   late Future<List<JavaInfo>> _javas = listJavas();
 
   Future<void> _pick() async {
-    final file = await openFile(
-      confirmButtonText: '选择',
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'Java', extensions: ['exe']),
-      ],
+    final path = await pickFile(
+      context,
+      label: 'Java',
+      extensions: Platform.isWindows ? const ['exe'] : null,
+      start: Platform.isAndroid ? AndroidStorage.root : null,
     );
-    if (file == null || !mounted) return;
-    final info = await probeJava(file.path);
+    if (path == null || !mounted) return;
+    final info = await probeJava(path);
     if (!mounted) return;
     if (info == null) return toast(context, '无法运行这个 Java');
-    await AppScope.read(context).config.update({'javaPath': file.path});
+    await AppScope.read(context).config.update({'javaPath': path});
     setState(() => _javas = listJavas());
   }
 

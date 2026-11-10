@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -86,9 +87,19 @@ class LauncherConfig extends ChangeNotifier {
     // 允许 AI 执行启动器操作（修改操作都需要用户确认）；只读操作是否也需要确认
     'aiTools': true,
     'aiConfirmRead': false,
+    // AI 工作区：应用数据目录下的可读写文件夹 + 当前版本游戏目录（只读）+ 用户在设置里添加的文件夹
+    'aiWorkspace': true,
+    // 用户添加的文件夹：[{id, label, path, writable}]，只能在设置界面添加，AI 不能自己扩大范围
+    'aiUserRoots': <Map<String, dynamic>>[],
+    // 联网搜索与抓取网页；搜索引擎 auto 为内置（DuckDuckGo，失败时必应），也可以填自己的服务
+    'aiWeb': true,
+    'aiSearchEngine': 'auto',
+    'aiSearchUrl': '',
     // 上下文长度（0 表示按模型自动判断）与自动压缩的阈值（0 表示不自动压缩）
     'aiContextWindow': 0,
     'aiCompactAt': 64000,
+    // AI 页右侧边栏是否展开（窄窗口时默认收起，不受这个设置影响）
+    'aiPanel': true,
     // 安卓：首次打开时已经询问过游戏文件夹放在哪里
     'storageAsked': false,
     // 安卓：游戏的渲染分辨率相对屏幕分辨率的比例（代替桌面端的窗口大小）
@@ -113,7 +124,7 @@ class LauncherConfig extends ChangeNotifier {
     'dismissedBetaHint': '',
   };
 
-  static File get _file => File(p.join(Paths.appData, 'config.json'));
+  static File get _file => File(p.join(Paths.configDir, 'config.json'));
 
   static LauncherConfig load() {
     final data = _defaults();
@@ -133,6 +144,7 @@ class LauncherConfig extends ChangeNotifier {
   Future<void> _save() async {
     await _file.parent.create(recursive: true);
     await _file.writeAsString(const JsonEncoder.withIndent('  ').convert(_data));
+    unawaited(Paths.backupConfigFile(_file));
   }
 
   Future<void> update(Map<String, dynamic> patch) async {
@@ -206,6 +218,15 @@ class LauncherConfig extends ChangeNotifier {
   bool get aiConfirm => _get('aiConfirm');
   bool get aiTools => _get('aiTools');
   bool get aiConfirmRead => _get('aiConfirmRead');
+  bool get aiWorkspace => _get('aiWorkspace');
+  List<Map<String, dynamic>> get aiUserRoots => [
+    for (final x in (_data['aiUserRoots'] as List? ?? const []))
+      if (x is Map) x.cast<String, dynamic>(),
+  ];
+  bool get aiWeb => _get('aiWeb');
+  String get aiSearchEngine => _get('aiSearchEngine');
+  String get aiSearchUrl => _get('aiSearchUrl');
   int get aiContextWindow => (_data['aiContextWindow'] as num).toInt();
   int get aiCompactAt => (_data['aiCompactAt'] as num).toInt();
+  bool get aiPanel => _get('aiPanel');
 }

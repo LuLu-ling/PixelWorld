@@ -22,6 +22,8 @@ import '../optifine_compat.dart';
 import '../paths.dart';
 import '../safe_path.dart';
 import '../version.dart';
+import 'web_tools.dart';
+import 'workspace_tools.dart';
 
 /// 操作的类型：只读操作默认直接执行；其余都要用户允许
 enum ToolKind {
@@ -268,8 +270,8 @@ class AiToolbox {
     AiToolDef(
       spec: AiTool(
         'search_resources',
-        '在 Modrinth 搜索资源：模组、光影包、资源包、数据包或整合包。指定 version 时只列出与该版本兼容的结果。'
-            '推荐资源时可以按下载量（downloads）或关注数（follows）排序。',
+        '在 Modrinth 搜索资源：模组、光影包、资源包、数据包或整合包。可以用 game_version（例如 1.21.1）和 loader 筛选，'
+            '不需要先安装那个版本；也可以用 version 指定已安装的版本。推荐资源时可以按下载量（downloads）或关注数（follows）排序。',
         _schema(
           {
             'type': {
@@ -277,7 +279,14 @@ class AiToolbox {
               'enum': [for (final t in ResourceType.values) t.tag],
             },
             'query': {'type': 'string', 'description': '关键词，可以为空（只按排序列出热门资源）'},
-            'version': {'type': 'string', 'description': '可选：已安装的版本名称，用于筛选兼容的结果'},
+            'version': {'type': 'string', 'description': '可选：已安装的版本名称，按它的游戏版本和加载器筛选'},
+            'game_version': {'type': 'string', 'description': '可选：游戏版本，例如 1.21.1；不需要先安装这个版本'},
+            'loader': {
+              'type': 'string',
+              'enum': ['fabric', 'forge', 'neoforge', 'quilt'],
+              'description': '可选：模组加载器（只对模组有效）',
+            },
+            'limit': {'type': 'integer', 'description': '结果数量，1–20，默认 12'},
             'sort': {
               'type': 'string',
               'enum': ['relevance', 'downloads', 'follows', 'newest', 'updated'],
@@ -290,34 +299,55 @@ class AiToolbox {
       label: '搜索资源',
       prepare: (a) async {
         final type = _resourceType(a['type']);
-        final v = '${a['version'] ?? ''}'.trim().isEmpty ? null : _version(a);
+        final f = _filter(a, type);
         final q = '${a['query'] ?? ''}'.trim();
         final sort = '${a['sort'] ?? 'relevance'}';
+        final limit = ((a['limit'] as num?)?.toInt() ?? 12).clamp(1, 20);
         return ToolPlan(
-          '在 Modrinth 搜索${type.label}${q.isEmpty ? '' : '「$q」'}',
-          () => _searchResources(type, q, v, sort),
+          '在 Modrinth 搜索${f == null ? '' : '${f.label} 的'}${type.label}${q.isEmpty ? '' : '「$q」'}',
+          () => _searchResources(type, q, f, sort, limit),
         );
       },
     ),
     AiToolDef(
       spec: AiTool(
         'get_project',
-        '查看 Modrinth 项目的详情：简介、分类、支持的游戏版本，以及与某个已安装版本兼容的最新版本和必需的前置。',
-        _schema(
-          {
-            'project': {'type': 'string', 'description': 'Modrinth 项目 ID 或 slug'},
-            'version': {'type': 'string', 'description': '可选：已安装的版本名称，用于查看兼容的版本'},
+        '查看 Modrinth 项目：简介、分类、支持的游戏版本；指定 game_version / loader（或已安装的 version）时，'
+            '给出是否支持、对应的最新版本和必需的前置。比较多个项目时用 projects 一次查完（最多 10 个，只返回摘要）。',
+        _schema({
+          'project': {'type': 'string', 'description': 'Modrinth 项目 ID 或 slug（查看一个项目的详情）'},
+          'projects': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description': '多个项目 ID 或 slug（一次比较多个，最多 10 个）',
           },
-          ['project'],
-        ),
+            'version': {'type': 'string', 'description': '可选：已安装的版本名称，按它的游戏版本和加载器筛选'},
+            'game_version': {'type': 'string', 'description': '可选：游戏版本，例如 1.21.1；不需要先安装这个版本'},
+            'loader': {
+              'type': 'string',
+              'enum': ['fabric', 'forge', 'neoforge', 'quilt'],
+              'description': '可选：模组加载器（只对模组有效）',
+            },
+        }),
       ),
       kind: ToolKind.read,
       label: '查看项目详情',
       prepare: (a) async {
-        final project = '${a['project'] ?? ''}'.trim();
-        if (project.isEmpty) throw ToolError('请提供项目 ID');
-        final v = '${a['version'] ?? ''}'.trim().isEmpty ? null : _version(a);
-        return ToolPlan('查看 Modrinth 项目 $project', () => _projectInfo(project, v));
+        final ids = <String>{
+          for (final x in (a['projects'] as List? ?? const [])) '$x'.trim(),
+          '${a['project'] ?? ''}'.trim(),
+        }..remove('');
+        if (ids.isEmpty) throw ToolError('请提供项目 ID（project 或 projects）');
+        if (ids.length > 10) throw ToolError('一次最多查看 10 个项目');
+        final f = _filter(a, ResourceType.mod);
+        if (ids.length == 1) return ToolPlan('查看 Modrinth 项目 ${ids.first}', () => _projectInfo(ids.first, f));
+        return ToolPlan('比较 ${ids.length} 个 Modrinth 项目', () async {
+          final rows = await Future.wait([
+            for (final id in ids)
+              _projectInfo(id, f, brief: true).catchError((Object e) => '- $id：查询失败（$e）'),
+          ]);
+          return rows.join('\n');
+        });
       },
     ),
     AiToolDef(
@@ -782,11 +812,30 @@ class AiToolbox {
         );
       },
     ),
+    ...workspaceTools(state),
+    ...webTools(state),
   ];
 
-  List<AiTool> get specs => [for (final t in all) t.spec];
+  /// 工作区与联网可以在设置里分别关闭；关闭后既不告诉模型，也不允许调用
+  bool _enabled(AiToolDef t) {
+    final n = t.spec.name;
+    if (n.startsWith('ws_')) return state.config.aiWorkspace;
+    if (n.startsWith('web_') || n == 'mcwiki_search') return state.config.aiWeb;
+    return true;
+  }
 
-  AiToolDef? find(String name) => all.where((t) => t.spec.name == name).firstOrNull;
+  List<AiTool> get specs => [for (final t in all) if (_enabled(t)) t.spec];
+
+  AiToolDef? find(String name) => all.where((t) => t.spec.name == name && _enabled(t)).firstOrNull;
+
+  /// 按开启的能力追加到系统提示的说明
+  Future<String?> promptExtra() async {
+    final parts = [
+      if (state.config.aiWorkspace) await workspacePrompt(state),
+      if (state.config.aiWeb) webPrompt,
+    ];
+    return parts.isEmpty ? null : parts.join('\n\n');
+  }
 
   // ---------- 安装游戏 ----------
 
@@ -911,48 +960,78 @@ class AiToolbox {
   static ResourceType _resourceType(Object? v) =>
       ResourceType.values.where((t) => t.tag == '$v').firstOrNull ?? (throw ToolError('不支持的资源类型：$v'));
 
-  Future<String> _searchResources(ResourceType type, String q, InstanceInfo? v, String sort) async {
-    String? loader;
-    if (v != null && type == ResourceType.mod) {
+  /// 兼容性筛选：已安装的版本（version）优先，否则用 game_version + loader，不需要先安装那个版本
+  ({String? gameVersion, List<String> loaders, String label})? _filter(Map<String, dynamic> a, ResourceType type) {
+    if ('${a['version'] ?? ''}'.trim().isNotEmpty) {
+      final v = _version(a);
       final loaders = modrinthLoaders(v.loader);
-      if (loaders.isEmpty) throw ToolError('${v.id} 不能安装模组（没有模组加载器）');
-      loader = loaders.first;
+      if (type == ResourceType.mod && loaders.isEmpty && a['projects'] == null && a['project'] == null) {
+        throw ToolError('${v.id} 不能安装模组（没有模组加载器）');
+      }
+      return (gameVersion: v.gameVersion, loaders: loaders, label: '${v.id}（${v.gameVersion}）');
     }
-    final r = await Modrinth.search(type: type, query: q, gameVersion: v?.gameVersion, loader: loader, sort: sort);
-    if (r.hits.isEmpty) return '没有找到结果';
+    final gv = '${a['game_version'] ?? ''}'.trim();
+    final loader = '${a['loader'] ?? ''}'.trim().toLowerCase();
+    if (gv.isEmpty && loader.isEmpty) return null;
+    return (
+      gameVersion: gv.isEmpty ? null : gv,
+      loaders: loader.isEmpty ? const <String>[] : [loader],
+      label: [if (gv.isNotEmpty) gv, if (loader.isNotEmpty) loader].join(' '),
+    );
+  }
+
+  Future<String> _searchResources(
+    ResourceType type,
+    String q,
+    ({String? gameVersion, List<String> loaders, String label})? f,
+    String sort,
+    int limit,
+  ) async {
+    final loader = type == ResourceType.mod ? f?.loaders.firstOrNull : null;
+    final r = await Modrinth.search(type: type, query: q, gameVersion: f?.gameVersion, loader: loader, sort: sort);
+    if (r.hits.isEmpty) return '没有找到结果${f == null ? '' : '（已筛选 ${f.label}）'}';
     return [
-      if (v != null) '已筛选与 ${v.gameVersion}${loader == null ? '' : '（$loader）'} 兼容的结果，共 ${r.total} 个：',
-      for (final h in r.hits.take(12))
+      if (f != null) '已筛选与 ${f.label} 兼容的结果，共 ${r.total} 个：',
+      for (final h in r.hits.take(limit))
         '- ${h.title}（项目 ID：${h.id}，下载 ${h.downloads} 次，关注 ${h.follows}，分类：${h.categories.take(5).join('/')}）：'
             '${h.description.length > 120 ? '${h.description.substring(0, 120)}…' : h.description}',
     ].join('\n');
   }
 
-  Future<String> _projectInfo(String project, InstanceInfo? v) async {
+  /// 项目信息；[brief] 时只给一行摘要（比较多个项目时用）
+  Future<String> _projectInfo(
+    String project,
+    ({String? gameVersion, List<String> loaders, String label})? f, {
+    bool brief = false,
+  }) async {
     final info = await Modrinth.project(project, ResourceType.mod);
+    String? compat;
+    if (f != null) {
+      final list = await Modrinth.versions(project, gameVersion: f.gameVersion);
+      // 模组按加载器筛选；光影、资源包等不区分加载器
+      final compatible = list
+          .where((x) => f.loaders.isEmpty || x.loaders.any(f.loaders.contains) || !x.loaders.any(_modLoaderTags.contains))
+          .toList();
+      String describe(ResourceVersion x) =>
+          '${x.versionNumber}（${x.type}，${x.loaders.join('/')}，版本 ID ${x.id}'
+          '${x.requires.isEmpty ? '' : '，必需前置的项目 ID：${x.requires.join('、')}'}）';
+      compat = compatible.isEmpty
+          ? '不支持 ${f.label}'
+          : '支持 ${f.label}，最新：${compatible.take(brief ? 1 : 3).map(describe).join('；')}';
+    }
+    if (brief) {
+      return '- ${info.hit.title}（项目 ID：${info.hit.id}，下载 ${info.hit.downloads} 次）：${compat ?? '支持 ${info.gameVersions.reversed.take(5).join('、')} 等'}';
+    }
     final body = info.body.replaceAll(RegExp(r'!\[[^\]]*\]\([^)]*\)|<[^>]+>'), '').trim();
-    final lines = [
+    return [
       '${info.hit.title}（项目 ID：${info.hit.id}，作者 ${info.hit.author}，下载 ${info.hit.downloads} 次）',
       '简介：${info.hit.description}',
       '分类：${info.hit.categories.join('、')}',
       '页面：${info.page}',
       '支持的游戏版本（最新的 10 个）：${info.gameVersions.reversed.take(10).join('、')}',
-    ];
-    if (v != null) {
-      final loaders = modrinthLoaders(v.loader);
-      final list = await Modrinth.versions(project, gameVersion: v.gameVersion);
-      // 模组按加载器筛选；光影、资源包等不区分加载器
-      final compatible = list
-          .where((x) => loaders.isEmpty || x.loaders.any(loaders.contains) || !x.loaders.any(_modLoaderTags.contains))
-          .toList();
-      lines.add(
-        compatible.isEmpty
-            ? '没有与 ${v.id}（${v.gameVersion}）兼容的版本'
-            : '与 ${v.id} 兼容的版本：${[for (final x in compatible.take(3)) '${x.versionNumber}（${x.type}，版本 ID ${x.id}${x.requires.isEmpty ? '' : '，有必需的前置'}）'].join('；')}',
-      );
-    }
-    lines.add('说明（节选）：${body.length > 1500 ? '${body.substring(0, 1500)}…' : body}');
-    return lines.join('\n');
+      ?compat,
+      '说明（节选）：${body.length > 1500 ? '${body.substring(0, 1500)}…' : body}',
+    ].join('\n');
   }
 
   static const _modLoaderTags = {'fabric', 'forge', 'neoforge', 'quilt', 'legacy-fabric', 'liteloader'};

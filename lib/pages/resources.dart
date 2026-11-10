@@ -1,4 +1,4 @@
-import 'package:file_selector/file_selector.dart';
+import 'file_manager_page.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -78,16 +78,11 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
   }
 
   Future<void> _installFromFile() async {
-    final file = await openFile(
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'Modrinth 整合包', extensions: ['mrpack']),
-      ],
-      confirmButtonText: '选择',
-    );
-    if (file == null || !mounted) return;
+    final path = await pickFile(context, extensions: const ['mrpack'], label: 'Modrinth 整合包');
+    if (path == null || !mounted) return;
     setState(() => _installingPack = true);
     try {
-      final id = await AppScope.read(context).installModpackFile(file.path);
+      final id = await AppScope.read(context).installModpackFile(path);
       if (mounted) toast(context, '已安装整合包为 $id');
     } catch (e) {
       if (mounted) toast(context, e is TaskCancelled ? '任务已中断' : '安装失败：${errorText(e)}');

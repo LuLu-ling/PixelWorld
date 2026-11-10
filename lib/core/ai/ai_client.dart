@@ -62,7 +62,7 @@ class AiSettings {
     await f.writeAsBytes(SecureData.protect(Uint8List.fromList(utf8.encode(apiKey.trim()))));
   }
 
-  static File get _keyFile => File(p.join(Paths.appData, 'ai.dat'));
+  static File get _keyFile => File(p.join(Paths.configDir, 'ai.dat'));
 
   static String _readKey() {
     try {

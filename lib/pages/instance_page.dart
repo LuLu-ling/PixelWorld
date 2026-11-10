@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'dart:ui' show PlatformDispatcher;
 
-import 'package:file_selector/file_selector.dart';
+import '../core/android_storage.dart';
+import 'file_manager_page.dart';
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
@@ -379,9 +380,9 @@ class _SetupState extends State<_Setup> {
 
   Future<void> _chooseJava(String key) async {
     if (key == 'browse') {
-      final file = await openFile(confirmButtonText: '选择');
-      if (file == null) return;
-      return _save({'VersionArgumentJavaSelect': serializeJava(JavaExist(file.path))});
+      final path = await pickFile(context, label: 'Java', start: Platform.isAndroid ? AndroidStorage.root : null);
+      if (path == null) return;
+      return _save({'VersionArgumentJavaSelect': serializeJava(JavaExist(path))});
     }
     final pref = switch (key) {
       'global' => const JavaGlobal(),

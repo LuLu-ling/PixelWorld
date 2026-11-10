@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -10,6 +12,7 @@ import '../core/ai/ai_prompt.dart';
 import '../core/crash.dart';
 import '../shell.dart';
 import '../widgets/ai_settings.dart';
+import '../widgets/ai_side_panel.dart';
 import '../widgets/side_nav.dart';
 
 const _mono = TextStyle(
@@ -94,25 +97,90 @@ Future<bool> confirmAiSend(BuildContext context, AiSettings ai, String text) asy
   return ok == true;
 }
 
-/// AI 助手：左侧会话列表，右侧对话
-class AiPage extends StatelessWidget {
+/// AI 助手：左侧会话列表，中间对话，右侧可以收起的侧边栏（环境、上下文、文件）
+class AiPage extends StatefulWidget {
   const AiPage({super.key});
 
   @override
+  State<AiPage> createState() => _AiPageState();
+}
+
+class _AiPageState extends State<AiPage> {
+  /// 窄窗口时侧边栏盖在对话上，默认收起，不记住
+  bool _overlay = false;
+
+  /// 宽于这个值时侧边栏固定在右侧
+  static const _dockWidth = 1000.0;
+
+  @override
   Widget build(BuildContext context) {
-    final chats = AppScope.read(context).chats;
+    final state = AppScope.of(context);
+    final chats = state.chats;
     return ListenableBuilder(
       listenable: chats,
-      builder: (context, _) => Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SessionList(chats: chats),
-          Expanded(
-            child: ContentPanel(
-              child: _ChatView(key: ValueKey(chats.currentId), chats: chats, session: chats.current),
-            ),
-          ),
-        ],
+      builder: (context, _) => LayoutBuilder(
+        builder: (context, box) {
+          final wide = box.maxWidth >= _dockWidth;
+          final open = wide ? state.config.aiPanel : _overlay;
+          void toggle() => wide ? state.config.update({'aiPanel': !state.config.aiPanel}) : setState(() => _overlay = !_overlay);
+          final page = Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SessionList(chats: chats),
+              Expanded(
+                child: ContentPanel(
+                  child: _ChatView(
+                    key: ValueKey(chats.currentId),
+                    chats: chats,
+                    session: chats.current,
+                    panelOpen: open,
+                    onTogglePanel: toggle,
+                  ),
+                ),
+              ),
+              if (wide && open)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 12, 12),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: SizedBox(
+                      width: AiSidePanel.width,
+                      child: AiSidePanel(chats: chats, session: chats.current),
+                    ),
+                  ),
+                ),
+            ],
+          );
+          if (wide || !_overlay) return page;
+          return Stack(
+            children: [
+              page,
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: () => setState(() => _overlay = false),
+                  child: const ColoredBox(color: Colors.black38),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                bottom: 0,
+                right: 0,
+                width: math.min(AiSidePanel.width + 24, box.maxWidth * .88),
+                child: Material(
+                  elevation: 8,
+                  child: SafeArea(
+                    left: false,
+                    child: AiSidePanel(
+                      chats: chats,
+                      session: chats.current,
+                      onClose: () => setState(() => _overlay = false),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -262,10 +330,14 @@ class _SessionList extends StatelessWidget {
 // ---------- 对话 ----------
 
 class _ChatView extends StatefulWidget {
-  const _ChatView({super.key, required this.chats, required this.session});
+  const _ChatView({super.key, required this.chats, required this.session, this.panelOpen = false, this.onTogglePanel});
 
   final ChatStore chats;
   final ChatSession? session;
+
+  /// 右侧边栏是否展开，以及标题栏的开关按钮
+  final bool panelOpen;
+  final VoidCallback? onTogglePanel;
 
   @override
   State<_ChatView> createState() => _ChatViewState();
@@ -403,6 +475,14 @@ class _ChatViewState extends State<_ChatView> {
                     icon: const Icon(Icons.tune),
                     onPressed: () => showAiSettingsDialog(context),
                   ),
+                  if (widget.onTogglePanel != null)
+                    IconButton(
+                      tooltip: widget.panelOpen ? '收起侧边栏' : '展开侧边栏（环境、上下文、文件）',
+                      isSelected: widget.panelOpen,
+                      icon: const Icon(Icons.view_sidebar_outlined),
+                      selectedIcon: const Icon(Icons.view_sidebar),
+                      onPressed: widget.onTogglePanel,
+                    ),
                 ],
               ),
             ),
@@ -824,6 +904,20 @@ class _ToolCardState extends State<_ToolCard> {
                   ),
                   if (canExpand)
                     Icon(_expanded ? Icons.expand_less : Icons.expand_more, size: 18, color: scheme.onSurfaceVariant),
+                  if (result?.status == ToolStatus.done && const {'ws_write', 'ws_edit', 'ws_move'}.contains(widget.call.name))
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: TextButton.icon(
+                        style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                        onPressed: () => openAgentFile(
+                          context,
+                          '${widget.call.args['root'] ?? ''}',
+                          '${widget.call.name == 'ws_move' ? widget.call.args['to'] : widget.call.args['path']}',
+                        ),
+                        icon: const Icon(Icons.open_in_new, size: 16),
+                        label: const Text('打开'),
+                      ),
+                    ),
                 ],
               ),
             ),

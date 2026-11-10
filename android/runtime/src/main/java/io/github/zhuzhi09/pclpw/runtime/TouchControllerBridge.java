@@ -10,8 +10,6 @@ import android.util.SparseIntArray;
 import android.view.MotionEvent;
 import android.view.View;
 
-import net.kdt.pojavlaunch.Logger;
-
 import top.fifthlight.touchcontroller.proxy.client.LauncherProxyClient;
 import top.fifthlight.touchcontroller.proxy.client.MessageTransport;
 import top.fifthlight.touchcontroller.proxy.client.android.transport.UnixSocketTransportKt;
@@ -56,11 +54,13 @@ final class TouchControllerBridge implements AutoCloseable {
                 });
             }
             client.run();
+            TouchControllerBridge bridge = new TouchControllerBridge(client);
+            // Export the name last: the mod must only find a proxy that we actually feed with touches.
+            // (No Logger here: its native library is not loaded yet in onCreate.)
             Os.setenv("TOUCH_CONTROLLER_PROXY_SOCKET", name, true);
             socketName = name;
-            Log.i(TAG, "proxy started on @" + name + ", env=" + Os.getenv("TOUCH_CONTROLLER_PROXY_SOCKET"));
-            Logger.appendToLog("Pixel World runtime: TouchController proxy on @" + name);
-            return new TouchControllerBridge(client);
+            Log.i(TAG, "proxy started on @" + name);
+            return bridge;
         } catch (Throwable e) {
             Log.w(TAG, "Cannot start the TouchController proxy", e);
             return null;

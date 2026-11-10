@@ -350,7 +350,10 @@ public final class GameRuntime {
         env.put("DALVIK_APPLICATION", Tools.jObjectToString(activity.getApplication()));
         env.put("DALVIK_JAVAVM", String.valueOf(Tools.getJavaVMPointer()));
         // TouchController reads its proxy socket with System.getenv when the mod loads
-        if (TouchControllerBridge.socketName != null) env.put("TOUCH_CONTROLLER_PROXY_SOCKET", TouchControllerBridge.socketName);
+        if (TouchControllerBridge.socketName != null) {
+            env.put("TOUCH_CONTROLLER_PROXY_SOCKET", TouchControllerBridge.socketName);
+            Logger.appendToLog("Pixel World runtime: TouchController proxy on @" + TouchControllerBridge.socketName);
+        }
         for (Map.Entry<String, String> e : env.entrySet()) {
             Os.setenv(e.getKey(), e.getValue(), true);
         }
@@ -424,7 +427,6 @@ public final class GameRuntime {
         JREUtils.chdir(gameDir.getAbsolutePath());
         // Registered last so it runs before the exit handlers of the JVM libraries
         JREUtils.initializeHooks();
-        android.util.Log.i("PCLPW-TouchController", "before JVM: env=" + Os.getenv("TOUCH_CONTROLLER_PROXY_SOCKET"));
         int code = VMLauncher.launchJVM(argv.toArray(new String[0]));
         Logger.appendToLog("Java exit code: " + code);
         return code;

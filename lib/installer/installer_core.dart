@@ -8,7 +8,13 @@ import '../app_info.dart';
 /// Windows 安装与卸载。安装包外壳（installer/Shell.cs）解压出程序后，
 /// 以 --pw-install 启动本程序显示安装界面；已安装的程序以 --pw-uninstall 启动显示卸载界面。
 
+/// 安装和打包用的主程序文件名。
+/// v0.3.3 及以前的便携版更新只认 PCL.PW.exe，所以要等认得两个名字的版本作为正式版发布之后，
+/// 再改成 Pixel World.exe（同时改 installer/Shell.cs 的 AppExe 和 tool/build_installer.dart）。
 const exeName = 'PCL.PW.exe';
+
+/// 认得的所有主程序文件名，新名字在前
+const appExeNames = ['Pixel World.exe', 'PCL.PW.exe'];
 const _regKey = r'HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\PCL.PW';
 const _manifestName = '.pw-install.json';
 
@@ -35,7 +41,7 @@ String get sourceDir => p.dirname(Platform.resolvedExecutable);
 bool isInstallDir(String dir) {
   if (dir.isEmpty) return false;
   final d = p.normalize(p.absolute(dir));
-  return File(p.join(d, _manifestName)).existsSync() || File(p.join(d, exeName)).existsSync();
+  return File(p.join(d, _manifestName)).existsSync() || appExeNames.any((n) => File(p.join(d, n)).existsSync());
 }
 
 /// 旧版本使用过的程序目录名
@@ -77,8 +83,11 @@ String? findInstalledDir() {
   return null;
 }
 
-/// 启动器的用户数据目录（设置、账户、默认游戏文件夹）
-String get userDataDir => p.join(Platform.environment['APPDATA'] ?? '', AppInfo.name);
+/// 启动器的用户数据目录：配置与账户在 Roaming，游戏文件夹、Java 等数据在 Local（见 lib/core/paths.dart）
+List<String> get userDataDirs => [
+  for (final env in ['APPDATA', 'LOCALAPPDATA'])
+    if ((Platform.environment[env] ?? '').isNotEmpty) p.join(Platform.environment[env]!, AppInfo.name),
+];
 
 class Manifest {
   Manifest(this.files, this.shortcuts);
@@ -133,13 +142,15 @@ Future<void> _removeFiles(String dir, List<String> files) async {
 
 /// 运行中的 exe 无法以写方式打开
 Future<void> _ensureNotRunning(String dir) async {
-  final exe = File(p.join(dir, exeName));
-  if (!exe.existsSync()) return;
-  try {
-    final raf = await exe.open(mode: FileMode.append);
-    await raf.close();
-  } catch (_) {
-    throw Exception('${AppInfo.name} 正在运行，请先关闭它再安装');
+  for (final name in appExeNames) {
+    final exe = File(p.join(dir, name));
+    if (!exe.existsSync()) continue;
+    try {
+      final raf = await exe.open(mode: FileMode.append);
+      await raf.close();
+    } catch (_) {
+      throw Exception('${AppInfo.name} 正在运行，请先关闭它再安装');
+    }
   }
 }
 
@@ -244,7 +255,8 @@ Future<void> startCleanup(String dir, {required bool removeData}) async {
     'file\t${p.join(dir, _manifestName)}',
     for (final s in manifest.shortcuts) 'file\t$s',
     for (final d in parents) 'dir\t$d',
-    if (removeData) 'tree\t$userDataDir',
+    if (removeData)
+      for (final d in userDataDirs) 'tree\t$d',
     'key\t$_regKey',
   ];
   final id = 'pw-cleanup-$pid';

@@ -59,7 +59,7 @@ Future<void> main() async {
   final stage = Directory(p.join(dist.path, name));
   if (stage.existsSync()) await stage.delete(recursive: true);
   await copyTree(Directory(p.join(root, 'build', 'windows', 'x64', 'runner', 'Release')), stage);
-  // Flutter 的可执行文件名不能带点，发布时改名
+  // Flutter 的可执行文件名不能带点，发布时改名（和 lib/installer/installer_core.dart 的 exeName 一起改）
   await File(p.join(stage.path, 'pcl_pw.exe')).rename(p.join(stage.path, 'PCL.PW.exe'));
 
   // 给外壳补上版本信息与图标：没有这些元数据的匿名 .NET 程序更容易被杀毒软件误判

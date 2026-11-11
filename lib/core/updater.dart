@@ -4,10 +4,12 @@ import 'dart:io';
 
 import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
 import '../app_info.dart';
+import '../installer/installer_core.dart' show appExeNames;
 import 'site_api.dart';
 
 /// 启动器的更新通道，对应 GitHub Releases 中的三类发布（见 .github/workflows/release.yml）
@@ -326,16 +328,8 @@ Future<void> applyUpdate(File file) async {
   await extractFileToDisk(file.path, stage.path);
   final top = stage.listSync().whereType<Directory>().toList();
   final source = top.length == 1 && stage.listSync().length == 1 ? top.single.path : stage.path;
-  if (!File(p.join(source, 'PCL.PW.exe')).existsSync()) throw Exception('更新包中找不到 PCL.PW.exe');
   final target = p.dirname(Platform.resolvedExecutable);
-  final exe = p.join(target, 'PCL.PW.exe');
-  String q(String s) => "'${s.replaceAll("'", "''")}'";
-  final script = [
-    'Wait-Process -Id $pid -ErrorAction SilentlyContinue',
-    'Start-Sleep -Milliseconds 500',
-    'robocopy ${q(source)} ${q(target)} /E /R:5 /W:1 /NFL /NDL /NJH /NJS | Out-Null',
-    'Start-Process ${q(File(exe).existsSync() ? exe : Platform.resolvedExecutable)}',
-  ].join('; ');
+  final script = portableUpdateScript(source: source, target: target, pid: pid).join('; ');
   await Process.start('powershell.exe', [
     '-NoProfile',
     '-WindowStyle',
@@ -343,6 +337,23 @@ Future<void> applyUpdate(File file) async {
     '-Command',
     script,
   ], mode: ProcessStartMode.detached);
+}
+
+/// 便携版替换脚本（PowerShell）的各条命令。主程序可能叫 Pixel World.exe 或 PCL.PW.exe（见 [appExeNames]），
+/// 以更新包里的为准；名字变了时删掉旧名字的程序，免得留下一个过期的 exe
+@visibleForTesting
+List<String> portableUpdateScript({required String source, required String target, required int pid}) {
+  String q(String s) => "'${s.replaceAll("'", "''")}'";
+  final name = appExeNames.where((n) => File(p.join(source, n)).existsSync()).firstOrNull;
+  if (name == null) throw Exception('更新包中找不到主程序（${appExeNames.join(' 或 ')}）');
+  return [
+    'Wait-Process -Id $pid -ErrorAction SilentlyContinue',
+    'Start-Sleep -Milliseconds 500',
+    'robocopy ${q(source)} ${q(target)} /E /R:5 /W:1 /NFL /NDL /NJH /NJS | Out-Null',
+    for (final old in appExeNames)
+      if (old != name) 'Remove-Item -LiteralPath ${q(p.join(target, old))} -Force -ErrorAction SilentlyContinue',
+    'Start-Process ${q(p.join(target, name))}',
+  ];
 }
 
 class _DigestSink implements Sink<Digest> {

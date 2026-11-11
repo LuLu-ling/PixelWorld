@@ -15,6 +15,11 @@ void main() {
     await File(p.join(dir.path, exeName)).delete();
     expect(isInstallDir(dir.path), isFalse);
 
+    // 改名后的主程序也能识别
+    await File(p.join(dir.path, 'Pixel World.exe')).writeAsString('');
+    expect(isInstallDir(dir.path), isTrue);
+    await File(p.join(dir.path, 'Pixel World.exe')).delete();
+
     await File(p.join(dir.path, '.pw-install.json')).writeAsString('{"files":[],"shortcuts":[]}');
     expect(isInstallDir(dir.path), isTrue);
 

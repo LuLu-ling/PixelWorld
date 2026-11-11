@@ -91,6 +91,29 @@ void main() {
     expect(assetFor(r, android: false, windows: false, macos: true)?.name, endsWith('-macos.dmg'));
   });
 
+  test('便携版更新认得新旧两个主程序名，换名时删掉旧名字的程序', () {
+    final dir = Directory.systemTemp.createTempSync('pw-portable');
+    try {
+      final src = p.join(dir.path, 'src');
+      final dst = p.join(dir.path, 'dst');
+      Directory(src).createSync();
+      expect(() => portableUpdateScript(source: src, target: dst, pid: 1), throwsException);
+
+      File(p.join(src, 'PCL.PW.exe')).writeAsStringSync('');
+      var s = portableUpdateScript(source: src, target: dst, pid: 1);
+      expect(s.last, "Start-Process '${p.join(dst, 'PCL.PW.exe')}'");
+      expect(s.where((c) => c.startsWith('Remove-Item')).single, contains("'${p.join(dst, 'Pixel World.exe')}'"));
+
+      File(p.join(src, 'PCL.PW.exe')).deleteSync();
+      File(p.join(src, 'Pixel World.exe')).writeAsStringSync('');
+      s = portableUpdateScript(source: src, target: dst, pid: 1);
+      expect(s.last, "Start-Process '${p.join(dst, 'Pixel World.exe')}'");
+      expect(s.where((c) => c.startsWith('Remove-Item')).single, contains("'${p.join(dst, 'PCL.PW.exe')}'"));
+    } finally {
+      dir.deleteSync(recursive: true);
+    }
+  });
+
   test('读取 GitHub 提供的 SHA-256', () {
     final r = Release.fromJson({
       'tag_name': 'v1.0.0',

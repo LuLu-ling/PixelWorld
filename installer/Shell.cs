@@ -17,6 +17,7 @@ using Microsoft.Win32;
 
 static class Program
 {
+    // 和 lib/installer/installer_core.dart 的 exeName 一起改
     const string AppExe = "PCL.PW.exe";
 
     [STAThread]

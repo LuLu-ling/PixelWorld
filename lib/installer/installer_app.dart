@@ -296,7 +296,7 @@ class _InstallerPageState extends State<_InstallerPage> {
             onChanged: (v) => setState(() => _removeData = v!),
             title: Text('同时删除启动器数据', style: TextStyle(color: _removeData ? scheme.error : null)),
             subtitle: Text(
-              '设置、账户与默认游戏文件夹（$userDataDir）。默认游戏文件夹中的存档也会被删除',
+              '设置、账户与默认游戏文件夹（${userDataDirs.join('、')}）。默认游戏文件夹中的存档也会被删除',
               style: TextStyle(color: _removeData ? scheme.error : null),
             ),
           ),

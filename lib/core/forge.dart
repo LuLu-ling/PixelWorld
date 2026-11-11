@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as p;
 
 import 'download.dart';
@@ -190,23 +191,40 @@ Future<String> installForgeLike(
           kind != LoaderKind.cleanroom &&
           _installerSupportsOffline(zip) &&
           await _prepareInstallerFiles(g, gameVersion, kind, profile, [innerJson, profile], dl, task, label);
-      if (offline) await _patchInstallerProfile(installer.path);
-      // Cleanroom 的新版安装器有自己的命令行格式
-      final args = kind == LoaderKind.cleanroom
-          ? ['client', '--version', version, '-d', g.root, '--no-gui', '-y']
-          : ['--installClient', g.root, if (offline) '--offline'];
-      id = await _runInstaller(
+      Future<String> run(String jar, {required bool offline}) => _runInstaller(
         g,
         gameVersion,
-        installer.path,
+        jar,
         dl,
         task,
         label,
         javaVersion: innerJava,
-        args: args,
+        // Cleanroom 的新版安装器有自己的命令行格式
+        args: kind == LoaderKind.cleanroom
+            ? ['client', '--version', version, '-d', g.root, '--no-gui', '-y']
+            : ['--installClient', g.root, if (offline) '--offline'],
         expectedId: expectedId,
         offline: offline,
       );
+      if (!offline) {
+        id = await run(installer.path, offline: false);
+      } else {
+        final patched = Paths.tempFile('${kind.name}-$version-installer-offline.jar');
+        try {
+          final jar = await patchInstallerProfile(installer.path, patched.path) ? patched.path : installer.path;
+          String? offlineId;
+          try {
+            offlineId = await run(jar, offline: true);
+          } catch (e) {
+            if (task.cancelled) rethrow;
+            // 离线安装出问题时（例如安装器版本差异），改用原安装器联网安装一次
+            task.output('离线安装失败，改为联网安装：$e');
+          }
+          id = offlineId ?? await run(installer.path, offline: false);
+        } finally {
+          if (patched.existsSync()) await patched.delete().catchError((_) => patched);
+        }
+      }
     }
     // NeoForge 1.20.1 的安装器生成的版本名形如 1.20.1-forge-47.1.106，容易与 Forge 混淆
     final wanted =
@@ -350,27 +368,35 @@ bool _installerSupportsOffline(Archive zip) {
   return utf8.decode(cls.content as List<int>, allowMalformed: true).contains('attempt any network calls');
 }
 
+/// jar 签名文件：改动 jar 里的文件后必须一起去掉，否则 Java 读取改过的文件时会因摘要不符抛出 SecurityException
+final _signatureFile = RegExp(r'^META-INF/[^/]+\.(SF|RSA|DSA|EC)$', caseSensitive: false);
+
 /// 去掉负责下载 Mojang 映射的处理器：文件已由启动器下好，而这个处理器不认 --offline。
-Future<void> _patchInstallerProfile(String installer) async {
-  final file = File(installer);
-  final archive = ZipDecoder().decodeBytes(await file.readAsBytes());
+/// 写到 [output]（不覆盖原安装器，离线安装失败时还要用原安装器联网重试）；不需要改动时返回 false。
+/// Forge 安装器带签名，改了 install_profile.json 之后要去掉签名文件，否则安装器读不了自己的配置，
+/// 只输出「A problem installing was detected」就退出
+@visibleForTesting
+Future<bool> patchInstallerProfile(String installer, String output) async {
+  final archive = ZipDecoder().decodeBytes(await File(installer).readAsBytes());
   final entry = archive.findFile('install_profile.json');
-  if (entry == null) return;
+  if (entry == null) return false;
   final profile = jsonDecode(utf8.decode(entry.content as List<int>)) as Map<String, dynamic>;
   final processors = (profile['processors'] as List? ?? const []).whereType<Map>().toList();
   final kept = [
     for (final pr in processors)
       if (!_isMojmapsProcessor(pr)) pr,
   ];
-  if (kept.length == processors.length) return;
+  if (kept.length == processors.length) return false;
   profile['processors'] = kept;
 
   final out = Archive();
   final patched = utf8.encode(jsonEncode(profile));
   for (final f in archive.files) {
+    if (_signatureFile.hasMatch(f.name)) continue;
     out.addFile(f.name == 'install_profile.json' ? ArchiveFile.bytes(f.name, patched) : f);
   }
-  await file.writeAsBytes(ZipEncoder().encode(out), flush: true);
+  await File(output).writeAsBytes(ZipEncoder().encode(out), flush: true);
+  return true;
 }
 
 /// 新版安装器：命令行安装到当前游戏文件夹，返回新增的版本名
@@ -411,7 +437,8 @@ Future<String> _runInstaller(
   if (r.code != 0) throw Exception('$label 安装器运行失败（退出代码 ${r.code}）\n${tail()}');
   // 安卓上拿不到 System.exit 的退出代码，安装器报告失败时按输出判断
   if (Platform.isAndroid &&
-      RegExp(r'There was an error during installation|Exception in thread "main"').hasMatch(r.output)) {
+      RegExp(r'There was an error during installation|A problem installing was detected|Exception in thread "main"')
+          .hasMatch(r.output)) {
     throw Exception('$label 安装器运行失败\n${tail()}');
   }
   // 优先用安装器自带的版本名（已安装过同一个版本时，安装器会覆盖它，不新增文件夹）。

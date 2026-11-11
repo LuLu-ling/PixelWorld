@@ -20,9 +20,7 @@ void main() {
     'Forge 1.20.1 使用离线模式安装',
     () async {
       final reuse = Platform.environment['PCLPW_GAME_DIR'];
-      final dir = reuse == null
-          ? await Directory.systemTemp.createTemp('pclpw_forge_e2e')
-          : Directory(reuse);
+      final dir = reuse == null ? await Directory.systemTemp.createTemp('pclpw_forge_e2e') : Directory(reuse);
       await dir.create(recursive: true);
       // 测试里没有 Flutter 引擎，自行指定启动器数据目录（Java 运行时与校验缓存）
       Paths.appData = p.join(dir.path, 'appdata');
@@ -38,7 +36,14 @@ void main() {
       });
       var ok = false;
       try {
-        final id = await installForgeLike(g, LoaderKind.forge, '1.20.1', '1.20.1-47.4.28', dl, task);
+        final id = await installForgeLike(
+          g,
+          LoaderKind.forge,
+          '1.20.1',
+          Platform.environment['PCLPW_FORGE_VERSION'] ?? '1.20.1-47.4.10',
+          dl,
+          task,
+        );
         expect(File(g.versionJson(id)).existsSync(), isTrue);
         expect(File(g.versionJar(id)).existsSync(), isTrue);
         // 安装器只有在真正进入离线模式时才会打印这一行

@@ -209,7 +209,38 @@ Future<String> installVanilla(GamePaths g, String id, Downloader dl, TaskProgres
   return result;
 }
 
-/// 确保加载器依赖的原版已安装（以原版版本号命名）
+/// 确保加载器依赖的原版已安装（以原版版本号命名），并且客户端 jar 完整。
+/// 只有 JSON、没有 jar 时（下载中断、从别的启动器复制过来等），Forge 安装器会自己去 Mojang 官方源下载，
+/// 不走镜像也不重试，国内经常失败（Failed to download version manifest），所以由启动器先补上
 Future<void> ensureVanilla(GamePaths g, String gameVersion, Downloader dl, TaskProgress task) async {
-  if (!File(g.versionJson(gameVersion)).existsSync()) await installVanilla(g, gameVersion, dl, task);
+  if (!File(g.versionJson(gameVersion)).existsSync()) {
+    await installVanilla(g, gameVersion, dl, task);
+    return;
+  }
+  final item = await vanillaJarItem(g, gameVersion);
+  if (item == null) {
+    // JSON 里没有下载信息（可能被别的启动器改过），重新获取原版 JSON
+    await installVanilla(g, gameVersion, dl, task);
+    return;
+  }
+  if (await Downloader.isComplete(item)) return;
+  task.setStage('下载 Minecraft $gameVersion 本体');
+  await dl.downloadAll([item], task.progress, cancelled: () => task.cancelled);
+}
+
+/// 原版客户端 jar 的下载项（路径固定为 versions/<版本>/<版本>.jar，Forge 安装器在这里找它）
+Future<DownloadItem?> vanillaJarItem(GamePaths g, String gameVersion) async {
+  try {
+    final raw = jsonDecode(await File(g.versionJson(gameVersion)).readAsString()) as Map<String, dynamic>;
+    final client = (raw['downloads'] as Map?)?['client'] as Map?;
+    if (client == null || client['url'] is! String) return null;
+    return DownloadItem(
+      url: '${client['url']}',
+      path: g.versionJar(gameVersion),
+      sha1: client['sha1'] as String?,
+      size: (client['size'] as num?)?.toInt(),
+    );
+  } catch (_) {
+    return null;
+  }
 }

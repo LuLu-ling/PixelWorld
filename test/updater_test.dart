@@ -74,6 +74,23 @@ void main() {
     expect(assetFor(n, android: true, windows: false)?.name, 'PCL.PW-nightly-abc1234-android-arm64.apk');
   });
 
+  test('发布文件改名为 PixelWorld- 后仍按后缀选中（旧版本的更新器也只看后缀）', () {
+    final r = rel(
+      'nightly',
+      files: [
+        'PixelWorld-nightly-abc1234-android-arm64.apk',
+        'PixelWorld-nightly-abc1234-linux-x64.tar.gz',
+        'PixelWorld-nightly-abc1234-macos.dmg',
+        'PixelWorld-nightly-abc1234-windows-x64-portable.zip',
+        'PixelWorld-nightly-abc1234-windows-x64-setup.exe',
+      ],
+    );
+    expect(assetFor(r, android: true, windows: false)?.name, 'PixelWorld-nightly-abc1234-android-arm64.apk');
+    expect(assetFor(r, android: false, windows: true, installed: true)?.name, endsWith('-windows-x64-setup.exe'));
+    expect(assetFor(r, android: false, windows: true, installed: false)?.name, endsWith('-windows-x64-portable.zip'));
+    expect(assetFor(r, android: false, windows: false, macos: true)?.name, endsWith('-macos.dmg'));
+  });
+
   test('读取 GitHub 提供的 SHA-256', () {
     final r = Release.fromJson({
       'tag_name': 'v1.0.0',

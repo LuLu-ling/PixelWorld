@@ -98,7 +98,7 @@ jobs:
           flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons             --dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL" --dart-define=PCLPW_MS_CLIENT_ID="$PCLPW_MS_CLIENT_ID"
           version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
           mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-release.apk "dist/PCL.PW-$version-android-arm64.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/PixelWorld-$version-android-arm64.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: android
@@ -122,12 +122,12 @@ jobs:
           app="build/macos/Build/Products/Release/Pixel World.app"
           # 没有开发者证书：整个应用重新做一次临时签名，保证各个框架的签名一致
           codesign --force --deep --sign - "$app"
-          # 安装镜像：PCL.PW.app 与「应用程序」文件夹的快捷方式，拖进去即可安装
+          # 安装镜像：Pixel World.app 与「应用程序」文件夹的快捷方式，拖进去即可安装
           stage="$RUNNER_TEMP/dmg"
           mkdir -p "$stage" dist
           cp -R "$app" "$stage/"
           ln -s /Applications "$stage/Applications"
-          hdiutil create -volname "Pixel World" -srcfolder "$stage" -ov -format UDZO "dist/PCL.PW-$version-macos.dmg"
+          hdiutil create -volname "Pixel World" -srcfolder "$stage" -ov -format UDZO "dist/PixelWorld-$version-macos.dmg"
       - uses: actions/upload-artifact@v4
         with:
           name: macos
@@ -159,9 +159,9 @@ jobs:
           flutter pub get
           flutter build linux --release --dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL" --dart-define=PCLPW_MS_CLIENT_ID="$PCLPW_MS_CLIENT_ID"
           version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
-          stage="$RUNNER_TEMP/PCL.PW"
+          stage="$RUNNER_TEMP/PixelWorld"
           bundle=build/linux/x64/release/bundle
-          rm -rf "$stage" "$RUNNER_TEMP"/pclpw-* "$RUNNER_TEMP"/PCL.PW.AppDir
+          rm -rf "$stage" "$RUNNER_TEMP"/pclpw-* "$RUNNER_TEMP"/PixelWorld.AppDir
           mkdir -p "$stage" dist
           cp -R "$bundle/." "$stage/"
           icon="$stage/data/flutter_assets/assets/icon/icon.png"
@@ -169,7 +169,7 @@ jobs:
           desktop="$RUNNER_TEMP/io.github.zhuzhi09.pcl_pw.desktop"
           cp packaging/linux/io.github.zhuzhi09.pcl_pw.desktop "$desktop"
 
-          tar -C "$RUNNER_TEMP" -czf "dist/PCL.PW-$version-linux-x64.tar.gz" PCL.PW
+          tar -C "$RUNNER_TEMP" -czf "dist/PixelWorld-$version-linux-x64.tar.gz" PixelWorld
 
           # Debian / Ubuntu
           pkg="$RUNNER_TEMP/pkgroot"
@@ -182,7 +182,7 @@ jobs:
           install -m644 "$desktop" "$pkg/usr/share/applications/io.github.zhuzhi09.pcl_pw.desktop"
           install -m644 "$icon" "$pkg/usr/share/icons/hicolor/256x256/apps/io.github.zhuzhi09.pcl_pw.png"
           sed "s/@VERSION@/$version/" packaging/linux/control > "$pkg/DEBIAN/control"
-          dpkg-deb --build --root-owner-group "$pkg" "dist/PCL.PW-$version-linux-amd64.deb"
+          dpkg-deb --build --root-owner-group "$pkg" "dist/PixelWorld-$version-linux-amd64.deb"
 
           # Fedora / openSUSE / RHEL
           rpmtop="$RUNNER_TEMP/rpmbuild"
@@ -195,7 +195,7 @@ jobs:
             -e "s|@ICON@|$icon|g" \
             packaging/linux/pcl-pw.spec > "$spec"
           rpmbuild -bb --define "_topdir $rpmtop" "$spec"
-          cp "$rpmtop/RPMS/x86_64/pcl-pw-$version-1.x86_64.rpm" "dist/PCL.PW-$version-linux-x86_64.rpm"
+          cp "$rpmtop/RPMS/x86_64/pcl-pw-$version-1.x86_64.rpm" "dist/PixelWorld-$version-linux-x86_64.rpm"
 
           # Arch / CachyOS / Manjaro
           archbuild="$RUNNER_TEMP/archbuild"
@@ -207,13 +207,13 @@ jobs:
             -e "s|@ICON@|$icon|g" \
             packaging/linux/PKGBUILD > "$archbuild/PKGBUILD"
           sed "s|^PKGEXT=.*|PKGEXT='.pkg.tar.zst'|" /etc/makepkg.conf > "$RUNNER_TEMP/makepkg.conf"
-          (cd "$archbuild" && PACKAGER="PCL.PW <paper_zhu@163.com>" \
+          (cd "$archbuild" && PACKAGER="Pixel World <paper_zhu@163.com>" \
             makepkg --config "$RUNNER_TEMP/makepkg.conf" --nodeps --noconfirm)
           cp "$archbuild/pcl-pw-$version-1-x86_64.pkg.tar.zst" \
-            "dist/PCL.PW-$version-linux-x86_64.pkg.tar.zst"
+            "dist/PixelWorld-$version-linux-x86_64.pkg.tar.zst"
 
           # AppImage
-          appdir="$RUNNER_TEMP/PCL.PW.AppDir"
+          appdir="$RUNNER_TEMP/PixelWorld.AppDir"
           mkdir -p "$appdir/usr/bin"
           cp -a "$stage/." "$appdir/usr/bin/"
           sed 's/^Exec=.*/Exec=pcl_pw/' "$desktop" > "$appdir/io.github.zhuzhi09.pcl_pw.desktop"
@@ -225,7 +225,7 @@ jobs:
             https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x "$RUNNER_TEMP/appimagetool"
           ARCH=x86_64 "$RUNNER_TEMP/appimagetool" --appimage-extract-and-run \
-            "$appdir" "dist/PCL.PW-$version-linux-x86_64.AppImage"
+            "$appdir" "dist/PixelWorld-$version-linux-x86_64.AppImage"
       - uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -257,7 +257,7 @@ jobs:
           about="本软件是第三方基于 PCL 二次创作的产物，与 PCL 及其作者无关，请勿就本软件的问题打扰 PCL 作者。"
           downloads=$'- Windows：安装包（`*-setup.exe`）或便携版（`*-portable.zip`）\n- 安卓：`*-android-arm64.apk`，需要 Android 8.0 及以上、64 位 ARM 处理器\n- macOS：`*-macos.dmg`，需要 macOS 12 及以上，Apple 芯片与 Intel 通用。没有经过 Apple 公证，首次打开时如果提示无法验证开发者，请到「系统设置 → 隐私与安全性」中点「仍要打开」'
           if [ "$LINUX_RESULT" = "success" ]; then
-            downloads+=$'\n- Linux（测试版）：需要 Ubuntu 24.04 及以上（glibc 2.39+）\n  - `*-linux-amd64.deb`：Debian/Ubuntu 安装包\n  - `*-linux-x86_64.rpm`：Fedora/openSUSE/RHEL 安装包\n  - `*-linux-x86_64.pkg.tar.zst`：Arch / CachyOS / Manjaro 安装包，`sudo pacman -U 文件名`\n  - `*-linux-x86_64.AppImage`：下载后 `chmod +x` 直接运行\n  - `*-linux-x64.tar.gz`：解压后运行 `PCL.PW/pcl_pw`'
+            downloads+=$'\n- Linux（测试版）：需要 Ubuntu 24.04 及以上（glibc 2.39+）\n  - `*-linux-amd64.deb`：Debian/Ubuntu 安装包\n  - `*-linux-x86_64.rpm`：Fedora/openSUSE/RHEL 安装包\n  - `*-linux-x86_64.pkg.tar.zst`：Arch / CachyOS / Manjaro 安装包，`sudo pacman -U 文件名`\n  - `*-linux-x86_64.AppImage`：下载后 `chmod +x` 直接运行\n  - `*-linux-x64.tar.gz`：解压后运行 `PixelWorld/pcl_pw`'
           fi
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             tag="$GITHUB_REF_NAME"
@@ -272,13 +272,13 @@ jobs:
             else
               notes=$(printf '%s\n\n%s\n' "$downloads" "$about")
             fi
-            flags=(--title "PCL.PW $tag" --notes "$notes" --verify-tag)
+            flags=(--title "Pixel World $tag" --notes "$notes" --verify-tag)
             case "$tag" in *-*) flags+=(--prerelease) ;; *) flags+=(--latest) ;; esac
             gh release delete "$tag" --yes 2>/dev/null || true
             gh release create "$tag" "${flags[@]}" dist/*
           else
             # 文件名标明 nightly 与提交号，避免和正式版混淆
-            for f in dist/PCL.PW-"$version"-*; do mv "$f" "${f/PCL.PW-$version-/PCL.PW-nightly-$sha-}"; done
+            for f in dist/PixelWorld-"$version"-*; do mv "$f" "${f/PixelWorld-$version-/PixelWorld-nightly-$sha-}"; done
             # 更新日志：和上一次 nightly 比较；没有可比的对象时显示本次提交的说明
             prev=$(gh release view nightly --json targetCommitish --jq .targetCommitish 2>/dev/null || true)
             changes=""
@@ -292,7 +292,7 @@ jobs:
             notes=$(printf '自动构建的测试版，来自 main 分支的 %s，可能不稳定。\n\n## 更新日志\n\n%s\n\n%s\n\n%s\n' "$GITHUB_SHA" "$changes" "$downloads" "$about")
             gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
             gh release create nightly --prerelease --target "$GITHUB_SHA" \
-              --title "PCL.PW Nightly ($sha)" --notes "$notes" dist/*
+              --title "Pixel World Nightly ($sha)" --notes "$notes" dist/*
           fi
       # 更新启动器的更新接口：官网（site 分支）的 docs/api/v1/update.json。
       # 公告 notices.json 在 site 分支上手动维护，这里不改动

@@ -55,7 +55,7 @@ Future<void> main() async {
   await run('flutter', ['build', 'windows', '--release', '--no-tree-shake-icons', ...defines], cwd: root);
 
   final dist = Directory(p.join(root, 'dist'));
-  final name = 'PCL.PW-$version-windows-x64';
+  final name = 'PixelWorld-$version-windows-x64';
   final stage = Directory(p.join(dist.path, name));
   if (stage.existsSync()) await stage.delete(recursive: true);
   await copyTree(Directory(p.join(root, 'build', 'windows', 'x64', 'runner', 'Release')), stage);

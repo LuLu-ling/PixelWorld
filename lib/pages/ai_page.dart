@@ -801,7 +801,7 @@ class _ToolCardState extends State<_ToolCard> {
     final chats = widget.chats;
     final pending = chats.pendingOf(widget.call.id);
     final result = widget.session.resultOf(widget.call.id);
-    final def = chats.toolbox?.find(widget.call.name);
+    final def = chats.hub?.find(widget.call.name);
     final kind = def?.kind ?? ToolKind.read;
     final title = result?.title ?? pending?.plan?.title ?? def?.label ?? widget.call.name;
     final details = result?.details ?? pending?.plan?.details ?? const <String>[];

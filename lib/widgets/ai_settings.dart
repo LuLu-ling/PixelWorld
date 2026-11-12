@@ -8,6 +8,7 @@ import '../core/ai/ai_client.dart';
 import '../core/ai/ai_context.dart';
 import '../core/secure.dart';
 import '../platform.dart';
+import 'ai_mcp_settings.dart';
 import 'ai_workspace_settings.dart';
 
 /// AI 排障的接口设置：用户自己填写接口地址、模型与 API Key
@@ -309,6 +310,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
             onChanged: (v) => cfg.update({'aiConfirmRead': v}),
           ),
         if (cfg.aiTools) const AiWorkspaceSettings(),
+        if (cfg.aiTools) const AiMcpSettings(),
         if (widget.showButtons) ...[
           const SizedBox(height: 8),
           Row(

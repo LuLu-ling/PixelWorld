@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -18,6 +19,41 @@ class AiMcpSettings extends StatefulWidget {
 }
 
 class _AiMcpSettingsState extends State<AiMcpSettings> {
+  McpHub? _hub;
+  bool _probing = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final hub = AppScope.read(context).chats.hub;
+    if (hub == _hub) return;
+    _hub?.statusVersion.removeListener(_changed);
+    _hub = hub?..statusVersion.addListener(_changed);
+    // 打开这一页时连接一次外部服务，显示工具数或失败原因
+    _probe();
+  }
+
+  @override
+  void dispose() {
+    _hub?.statusVersion.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _probe() async {
+    final hub = _hub;
+    if (hub == null || _probing) return;
+    setState(() => _probing = true);
+    try {
+      await hub.probe();
+    } finally {
+      if (mounted) setState(() => _probing = false);
+    }
+  }
+
   Future<void> _setPolicy(AppState state, String id, McpPolicy policy) => state.config.update({
     'aiMcpPolicy': {...state.config.aiMcpPolicy, id: policy.name},
   });
@@ -46,6 +82,8 @@ class _AiMcpSettingsState extends State<AiMcpSettings> {
     await McpSecret.save(saved.config.id, saved.token);
     await _saveServers(state, list);
     await _setPolicy(state, saved.config.id, saved.policy);
+    // 新的配置马上连接一次，显示状态
+    unawaited(_probe());
   }
 
   Future<void> _remove(AppState state, McpServerConfig s) async {
@@ -79,12 +117,29 @@ class _AiMcpSettingsState extends State<AiMcpSettings> {
 
     Widget policyMenu(String id, {bool readOnlyTools = false}) {
       if (readOnlyTools) return Text('只有查看类操作', style: muted);
-      return DropdownButton<McpPolicy>(
-        value: McpPolicy.parse(cfg.aiMcpPolicy[id]),
-        underline: const SizedBox.shrink(),
-        borderRadius: BorderRadius.circular(12),
-        items: [for (final p in McpPolicy.values) DropdownMenuItem(value: p, child: Text(p.label))],
-        onChanged: (v) => _setPolicy(state, id, v ?? McpPolicy.ask),
+      // 弹出菜单会自动避开屏幕边缘（下拉框贴着右边时菜单会被截掉）
+      final current = McpPolicy.parse(cfg.aiMcpPolicy[id]);
+      return PopupMenuButton<McpPolicy>(
+        initialValue: current,
+        tooltip: '权限',
+        onSelected: (v) => _setPolicy(state, id, v),
+        itemBuilder: (_) => [for (final p in McpPolicy.values) PopupMenuItem(value: p, child: Text(p.label))],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                current.label,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: current == McpPolicy.readOnly ? scheme.primary : scheme.onSurface,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.arrow_drop_down, color: scheme.onSurfaceVariant),
+            ],
+          ),
+        ),
       );
     }
 
@@ -128,6 +183,7 @@ class _AiMcpSettingsState extends State<AiMcpSettings> {
               [
                 s.config.isJar ? p.basename(s.config.jar) : s.config.url,
                 McpPolicy.parse(cfg.aiMcpPolicy[s.id]).label,
+                if (s.config.trusted) '信任只读声明',
                 if (s.error != null)
                   '连接失败：${s.error!.split('\n').first}'
                 else if (s.toolCount != null)
@@ -156,13 +212,16 @@ class _AiMcpSettingsState extends State<AiMcpSettings> {
               ],
             ),
           ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: () => _edit(state),
-            icon: const Icon(Icons.add),
-            label: const Text('添加 MCP 服务'),
-          ),
+        Row(
+          children: [
+            TextButton.icon(onPressed: () => _edit(state), icon: const Icon(Icons.add), label: const Text('添加 MCP 服务')),
+            const SizedBox(width: 8),
+            TextButton.icon(
+              onPressed: _probing ? null : _probe,
+              icon: const Icon(Icons.refresh),
+              label: Text(_probing ? '正在连接…' : '刷新状态'),
+            ),
+          ],
         ),
       ],
     );
@@ -196,6 +255,7 @@ class _McpServerDialogState extends State<_McpServerDialog> {
   late final _args = TextEditingController(text: widget.old?.args.join(' ') ?? '');
   late String _type = widget.old?.type ?? 'http';
   late McpPolicy _policy = widget.policy;
+  late bool _trusted = widget.old?.trusted ?? false;
   bool _showToken = false;
   bool _testing = false;
   String? _result;
@@ -230,6 +290,7 @@ class _McpServerDialogState extends State<_McpServerDialog> {
         jar: _jar.text.trim(),
         args: _args.text.trim().isEmpty ? const [] : _args.text.trim().split(RegExp(r'\s+')),
         enabled: widget.old?.enabled ?? true,
+        trusted: _trusted,
       ),
       null,
     );
@@ -360,10 +421,15 @@ class _McpServerDialogState extends State<_McpServerDialog> {
                 items: [for (final p in McpPolicy.values) DropdownMenuItem(value: p, child: Text(p.label))],
                 onChanged: (v) => setState(() => _policy = v ?? McpPolicy.ask),
               ),
-              const SizedBox(height: 8),
-              Text(
-                '外部服务的每个工具在本次对话中第一次使用时都需要你确认；服务声明会删除内容的工具每次都要确认。',
-                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('信任这个服务的只读声明'),
+                subtitle: const Text(
+                  '打开后，服务声明只读的工具直接执行，不用确认；关闭时，每个工具在本次对话中第一次使用都要确认。'
+                  '声明会删除内容的工具始终每次确认。只对你信任的服务打开',
+                ),
+                value: _trusted,
+                onChanged: (v) => setState(() => _trusted = v),
               ),
               if (_result != null) ...[
                 const SizedBox(height: 12),

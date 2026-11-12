@@ -29,6 +29,7 @@ class McpServerConfig {
     this.jar = '',
     this.args = const [],
     this.enabled = true,
+    this.trusted = false,
   });
 
   factory McpServerConfig.fromJson(Map<String, dynamic> j) => McpServerConfig(
@@ -39,6 +40,7 @@ class McpServerConfig {
     jar: '${j['jar'] ?? ''}',
     args: [for (final a in (j['args'] as List? ?? const [])) '$a'],
     enabled: j['enabled'] != false,
+    trusted: j['trusted'] == true,
   );
 
   /// 小写字母、数字，用于工具名前缀
@@ -52,6 +54,9 @@ class McpServerConfig {
   final List<String> args;
   final bool enabled;
 
+  /// 信任服务对工具的「只读」声明：声明只读的工具不需要确认（会修改内容的仍然要确认）
+  final bool trusted;
+
   bool get isJar => type == 'jar';
 
   Map<String, dynamic> toJson() => {
@@ -62,22 +67,36 @@ class McpServerConfig {
     if (isJar) 'jar': jar,
     if (isJar && args.isNotEmpty) 'args': args,
     'enabled': enabled,
+    if (trusted) 'trusted': true,
   };
 
-  McpServerConfig copyWith({String? name, String? url, String? jar, List<String>? args, bool? enabled}) =>
-      McpServerConfig(
-        id: id,
-        name: name ?? this.name,
-        type: type,
-        url: url ?? this.url,
-        jar: jar ?? this.jar,
-        args: args ?? this.args,
-        enabled: enabled ?? this.enabled,
-      );
+  McpServerConfig copyWith({
+    String? name,
+    String? url,
+    String? jar,
+    List<String>? args,
+    bool? enabled,
+    bool? trusted,
+  }) => McpServerConfig(
+    id: id,
+    name: name ?? this.name,
+    type: type,
+    url: url ?? this.url,
+    jar: jar ?? this.jar,
+    args: args ?? this.args,
+    enabled: enabled ?? this.enabled,
+    trusted: trusted ?? this.trusted,
+  );
 
   /// 配置变化（地址、jar、参数）后要重新连接
-  String get signature => jsonEncode([type, url, jar, args]);
+  String get signature => jsonEncode([type, url, jar, args, trusted]);
 }
+
+/// 默认配置好并打开的服务：Exa 公开的搜索服务（不需要 Key，国内可以直连）。
+/// 它的工具都只读，所以信任它的只读声明，用的时候不用确认
+const defaultMcpServers = [
+  McpServerConfig(id: 'exa', name: 'Exa 搜索', type: 'http', url: 'https://mcp.exa.ai/mcp', trusted: true),
+];
 
 final mcpIdPattern = RegExp(r'^[a-z0-9]{1,16}$');
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:path/path.dart' as p;
 
 import '../../app_state.dart';
@@ -101,10 +102,14 @@ String mcpToolName(String serverId, String tool) {
 
 /// 用户添加的外部 MCP 服务：用到时才连接，配置变化后重连
 class ExternalMcpServer extends McpServer {
-  ExternalMcpServer(this.config, this.state);
+  ExternalMcpServer(this.config, AppState state, {Future<McpTransport> Function(McpServerConfig c)? open})
+    : _open = open ?? ((c) => openMcpTransport(c, state));
+
+  /// 按配置打开连接（测试时可以换成假的服务）
+  ExternalMcpServer.withOpener(this.config, Future<McpTransport> Function(McpServerConfig c) open) : _open = open;
 
   McpServerConfig config;
-  final AppState state;
+  final Future<McpTransport> Function(McpServerConfig c) _open;
   McpClient? _client;
   List<HubTool>? _tools;
   DateTime? _listedAt;
@@ -125,7 +130,7 @@ class ExternalMcpServer extends McpServer {
 
   Future<McpClient> _connect() => _connecting ??= () async {
     try {
-      final c = await McpClient.connect(await openMcpTransport(config, state));
+      final c = await McpClient.connect(await _open(config));
       _client = c;
       _error = null;
       return c;
@@ -158,8 +163,13 @@ class ExternalMcpServer extends McpServer {
               '[来自 MCP 服务「$name」] ${t.description.length > 1000 ? '${t.description.substring(0, 1000)}…' : t.description}',
               t.inputSchema,
             ),
-            // 服务声明的只读提示不能用来跳过确认；声明会删除内容的工具每次都要确认
-            kind: t.destructive ? ToolKind.danger : ToolKind.write,
+            // 默认不相信服务的「只读」声明（第一次使用要确认）；用户设为信任的服务，声明只读的工具按查看类操作处理。
+            // 声明会删除内容的工具每次都要确认
+            kind: t.destructive
+                ? ToolKind.danger
+                : config.trusted && t.readOnly
+                ? ToolKind.read
+                : ToolKind.write,
             label: '$name：${t.name}',
             prepare: (args) async {
               final shown = jsonEncode(args);
@@ -308,12 +318,28 @@ class McpHub {
 
   McpPolicy policyOf(String serverId) => McpPolicy.parse(state.config.aiMcpPolicy[serverId]);
 
+  /// 外部服务的连接状态（工具数、失败原因）变化时加一，界面据此刷新
+  final statusVersion = ValueNotifier(0);
+
+  /// 列出一个服务的工具；失败或超时时返回空列表，原因记在服务上
+  Future<List<HubTool>> _toolsOf(McpServer s) => s.tools().timeout(const Duration(seconds: 40)).catchError((Object e) {
+    if (s is ExternalMcpServer) s._error = e is TimeoutException ? '连接超时' : '$e';
+    return <HubTool>[];
+  });
+
+  /// 连接所有打开的外部服务并列出工具，用于在设置里显示状态
+  Future<void> probe() async {
+    await Future.wait([
+      for (final s in externals)
+        if (s.config.enabled) _toolsOf(s),
+    ]);
+    statusVersion.value++;
+  }
+
   /// 列出所有可用工具（外部服务连不上时跳过，原因见 [McpServer.error]）
   Future<List<AiTool>> specs() async {
-    final servers = active;
-    final lists = await Future.wait([
-      for (final s in servers) s.tools().timeout(const Duration(seconds: 40)).catchError((_) => <HubTool>[]),
-    ]);
+    final lists = await Future.wait([for (final s in active) _toolsOf(s)]);
+    statusVersion.value++;
     _cache.clear();
     for (final t in lists.expand((l) => l)) {
       _cache.putIfAbsent(t.name, () => t);

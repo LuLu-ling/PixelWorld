@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../app_info.dart';
-import 'ai/mcp_client.dart' show McpServerConfig;
+import 'ai/mcp_client.dart' show McpServerConfig, defaultMcpServers;
 import 'paths.dart';
 
 /// 默认 JVM 参数
@@ -96,7 +96,7 @@ class LauncherConfig extends ChangeNotifier {
     'aiWeb': true,
     'aiSearchEngine': 'auto',
     // 外部 MCP 服务（见 core/ai/mcp_client.dart）与每个服务的权限（ask / readOnly，键为服务 id，内置服务为 game、workspace、web）
-    'aiMcpServers': <Map<String, dynamic>>[],
+    'aiMcpServers': [for (final s in defaultMcpServers) s.toJson()],
     'aiMcpPolicy': <String, dynamic>{},
     'aiSearchUrl': '',
     // 上下文长度（0 表示按模型自动判断）与自动压缩的阈值（0 表示不自动压缩）

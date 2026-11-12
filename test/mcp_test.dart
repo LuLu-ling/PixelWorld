@@ -215,6 +215,58 @@ void main() {
     });
   });
 
+  test('外部服务：默认不相信只读声明，设为信任后只读工具按查看类操作处理', () async {
+    final (server, _) = await _fakeHttpServer();
+    try {
+      final url = 'http://127.0.0.1:${server.port}/mcp';
+      Future<McpTransport> open(McpServerConfig c) async => McpHttpTransport(Uri.parse(c.url), token: 'secret');
+      final config = McpServerConfig(id: 'fake', name: '假服务', type: 'http', url: url);
+
+      final plain = ExternalMcpServer.withOpener(config, open);
+      final kinds = {for (final t in await plain.tools()) t.name: t.kind};
+      expect(kinds, {'mcp_fake_search': ToolKind.write, 'mcp_fake_delete_all': ToolKind.danger});
+      expect(plain.toolCount, 2);
+      await plain.close();
+
+      // 信任后是另一份配置，会重新连接
+      final trustedConfig = config.copyWith(trusted: true);
+      expect(trustedConfig.signature, isNot(config.signature));
+      final trusted = ExternalMcpServer.withOpener(trustedConfig, open);
+      final tools = await trusted.tools();
+      expect(
+        {for (final t in tools) t.name: t.kind},
+        {'mcp_fake_search': ToolKind.read, 'mcp_fake_delete_all': ToolKind.danger},
+      );
+      // 调用结果带上「来自外部服务」的提示
+      final out = await (await tools.first.prepare({'q': 'x'})).run();
+      expect(out, contains('外部 MCP 服务'));
+      expect(out, contains('found 3'));
+      await trusted.close();
+    } finally {
+      await server.close(force: true);
+    }
+  });
+
+  test('连不上时记下原因', () async {
+    final s = ExternalMcpServer.withOpener(
+      const McpServerConfig(id: 'down', name: '没开的服务', type: 'http', url: 'http://127.0.0.1:1/mcp'),
+      (c) async => McpHttpTransport(Uri.parse(c.url)),
+    );
+    await expectLater(s.tools(), throwsA(isA<McpError>()));
+    expect(s.error, contains('连不上'));
+  });
+
+  test('默认配置好 Exa，并信任它的只读声明', () {
+    final exa = defaultMcpServers.single;
+    expect(exa.url, 'https://mcp.exa.ai/mcp');
+    expect(exa.enabled, isTrue);
+    expect(exa.trusted, isTrue);
+    expect(checkMcpUrl(exa.url), isNull);
+    final back = McpServerConfig.fromJson(exa.toJson());
+    expect(back.trusted, isTrue);
+    expect(back.signature, exa.signature);
+  });
+
   test('工具名、网址检查与结果格式', () {
     expect(mcpToolName('gh', 'list.issues'), 'mcp_gh_list_issues');
     expect(mcpToolName('gh', 'x' * 100).length, 64);

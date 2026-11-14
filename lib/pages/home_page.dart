@@ -18,6 +18,7 @@ import '../core/site_api.dart';
 import '../core/updater.dart';
 import '../platform.dart';
 import '../shell.dart';
+import '../widgets/app_background.dart';
 import '../widgets/cover_palette.dart';
 import '../widgets/launch_dialogs.dart';
 import '../widgets/version_icon.dart';
@@ -581,10 +582,9 @@ class _QuickButton extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final enabled = onTap != null;
-    return Material(
+    return GlassPanel(
       color: scheme.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(8),
-      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
@@ -702,13 +702,10 @@ extension on _NoticeStripState {
   Widget _neutral(BuildContext context, String title, String body) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Material(
+    return GlassPanel(
       color: scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .4)),
-      ),
-      clipBehavior: Clip.antiAlias,
+      borderRadius: BorderRadius.circular(14),
+      border: BorderSide(color: scheme.outlineVariant.withValues(alpha: .4)),
       child: InkWell(
         onTap: () => showNoticesDialog(context),
         child: Padding(
@@ -834,21 +831,24 @@ class _EmptyWorlds extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Container(
-      height: 72,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(12)),
-      child: Row(
-        children: [
-          Icon(Icons.landscape_outlined, color: scheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              '开始一次游戏后，最近的存档会出现在这里。',
-              style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+    return GlassPanel(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 72,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        child: Row(
+          children: [
+            Icon(Icons.landscape_outlined, color: scheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '开始一次游戏后，最近的存档会出现在这里。',
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1017,9 +1017,20 @@ class _DesktopHomeState extends State<_DesktopHome> {
                     height: _headerH,
                     child: Row(
                       children: [
-                        Text('最近游玩', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                        OnBackground(
+                          builder: (context, fg, _) => Text(
+                            '最近游玩',
+                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: fg),
+                          ),
+                        ),
                         const Spacer(),
-                        TextButton(onPressed: widget.onSettings, child: const Text('全部存档 ›')),
+                        OnBackground(
+                          builder: (context, fg, _) => TextButton(
+                            onPressed: widget.onSettings,
+                            style: fg == null ? null : TextButton.styleFrom(foregroundColor: fg),
+                            child: const Text('全部存档 ›'),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1047,16 +1058,18 @@ class _DesktopHomeState extends State<_DesktopHome> {
                   SizedBox(
                     height: _moreH,
                     child: Center(
-                      child: TextButton.icon(
-                        onPressed: () => _scroll.animateTo(
-                          math.min(foldH, _scroll.position.maxScrollExtent),
-                          duration: const Duration(milliseconds: 350),
-                          curve: Curves.easeOutCubic,
+                      child: OnBackground(
+                        builder: (context, _, muted) => TextButton.icon(
+                          onPressed: () => _scroll.animateTo(
+                            math.min(foldH, _scroll.position.maxScrollExtent),
+                            duration: const Duration(milliseconds: 350),
+                            curve: Curves.easeOutCubic,
+                          ),
+                          style: TextButton.styleFrom(foregroundColor: muted ?? theme.colorScheme.onSurfaceVariant),
+                          iconAlignment: IconAlignment.end,
+                          icon: const Icon(Icons.expand_more, size: 18),
+                          label: const Text('向下滚动查看更多'),
                         ),
-                        style: TextButton.styleFrom(foregroundColor: theme.colorScheme.onSurfaceVariant),
-                        iconAlignment: IconAlignment.end,
-                        icon: const Icon(Icons.expand_more, size: 18),
-                        label: const Text('向下滚动查看更多'),
                       ),
                     ),
                   ),
@@ -1123,109 +1136,110 @@ class _DesktopHero extends StatelessWidget {
     final scheme = theme.colorScheme;
     final v = version;
     final versionDir = v == null ? null : state.paths.versionDir(v.id);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .4)),
-        color: scheme.surfaceContainerLow,
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Material(
-            color: scheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(8),
-            child: InkWell(
-              onTap: onVersions,
+    return GlassPanel(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(16),
+      border: BorderSide(color: scheme.outlineVariant.withValues(alpha: .4)),
+      extraOpacity: .12,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Material(
+              color: scheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('切换版本', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
-                    Icon(Icons.expand_more, size: 16, color: scheme.onSurfaceVariant),
-                  ],
+              child: InkWell(
+                onTap: onVersions,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('切换版本', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                      Icon(Icons.expand_more, size: 16, color: scheme.onSurfaceVariant),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              if (v != null) ...[
-                VersionIcon(info: v, versionDir: versionDir!, size: 44, radius: 12),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      v == null ? '还没有选择版本' : versionTitle(v),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    if (v != null && versionTitle(v) != v.id)
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (v != null) ...[
+                  VersionIcon(info: v, versionDir: versionDir!, size: 44, radius: 12),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        v.id,
+                        v == null ? '还没有选择版本' : versionTitle(v),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontFamily: 'monospace',
-                        ),
+                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
                       ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (v == null)
-            Text('先下载或选择一个版本，准备好就开始', style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant))
-          else
-            _VersionFacts(state: state, version: v, latest: latest, color: scheme.onSurfaceVariant),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _LaunchButton(state: state, version: v, onLaunch: onLaunch),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: onSettings,
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
-                icon: const Icon(Icons.tune, size: 18),
-                label: const Text('版本设置'),
-              ),
-              const SizedBox(width: 8),
-              PopupMenuButton<String>(
-                tooltip: '更多',
-                onSelected: (value) {
-                  if (value == 'versions') onVersions();
-                  if (value == 'log') onLog();
-                  if (value == 'folder') onFolder?.call();
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'versions', child: Text('版本选择')),
-                  PopupMenuItem(value: 'folder', enabled: onFolder != null, child: const Text('打开版本文件夹')),
-                  const PopupMenuItem(value: 'log', child: Text('游戏日志')),
-                ],
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: scheme.outline),
+                      if (v != null && versionTitle(v) != v.id)
+                        Text(
+                          v.id,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                    ],
                   ),
-                  child: Icon(Icons.more_horiz, color: scheme.onSurfaceVariant),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (v == null)
+              Text('先下载或选择一个版本，准备好就开始', style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant))
+            else
+              _VersionFacts(state: state, version: v, latest: latest, color: scheme.onSurfaceVariant),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _LaunchButton(state: state, version: v, onLaunch: onLaunch),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: onSettings,
+                  style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: const Text('版本设置'),
+                ),
+                const SizedBox(width: 8),
+                PopupMenuButton<String>(
+                  tooltip: '更多',
+                  onSelected: (value) {
+                    if (value == 'versions') onVersions();
+                    if (value == 'log') onLog();
+                    if (value == 'folder') onFolder?.call();
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'versions', child: Text('版本选择')),
+                    PopupMenuItem(value: 'folder', enabled: onFolder != null, child: const Text('打开版本文件夹')),
+                    const PopupMenuItem(value: 'log', child: Text('游戏日志')),
+                  ],
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: scheme.outline),
+                    ),
+                    child: Icon(Icons.more_horiz, color: scheme.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1258,64 +1272,78 @@ class _WorldTileState extends State<_WorldTile> {
       future: CoverPalette.of(icon),
       builder: (context, snap) {
         final tint = snap.data?.colors.firstOrNull ?? scheme.primary;
+        final glass = BackgroundScope.activeOf(context);
+        Widget card(Widget content) => glass != null
+            ? GlassPanel(
+                color: base,
+                borderRadius: BorderRadius.circular(14),
+                overlay: CoverGlow(
+                  colors: snap.data?.colors ?? [tint],
+                  strength: glass.controller.coverGlow * (_hover ? 1.3 : 1),
+                ),
+                child: content,
+              )
+            : Material(
+                borderRadius: BorderRadius.circular(14),
+                clipBehavior: Clip.antiAlias,
+                child: Ink(
+                  // 最近游玩保留封面颜色的渐变（界面其他地方默认不用渐变）
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color.lerp(base, tint, _hover ? .45 : .32)!, base],
+                      stops: const [0, .55],
+                    ),
+                  ),
+                  child: content,
+                ),
+              );
         return MouseRegion(
           onEnter: (_) => setState(() => _hover = true),
           onExit: (_) => setState(() => _hover = false),
-          child: Material(
-            borderRadius: BorderRadius.circular(14),
-            clipBehavior: Clip.antiAlias,
-            child: Ink(
-              // 最近游玩保留封面颜色的渐变（界面其他地方默认不用渐变）
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color.lerp(base, tint, _hover ? .45 : .32)!, base],
-                  stops: const [0, .55],
-                ),
-              ),
-              child: InkWell(
-                onTap: widget.onTap,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Row(
-                    children: [
-                      CoverThumb(iconPath: icon, size: 44, radius: 9, modified: widget.world.modified),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.world.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                            Text(
-                              [
-                                if (widget.versionName.isNotEmpty) widget.versionName,
-                                _timeAgo(widget.world.modified),
-                              ].join(' · '),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
+          child: card(
+            InkWell(
+              onTap: widget.onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  children: [
+                    CoverThumb(iconPath: icon, size: 44, radius: 9, modified: widget.world.modified),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.world.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            [
+                              if (widget.versionName.isNotEmpty) widget.versionName,
+                              _timeAgo(widget.world.modified),
+                            ].join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        tooltip: '进入这个存档的版本',
-                        onPressed: widget.onPlay,
-                        style: IconButton.styleFrom(
-                          backgroundColor: _hover ? scheme.primaryFixed : scheme.onSurface.withValues(alpha: .06),
-                          foregroundColor: _hover ? scheme.onPrimaryFixed : scheme.primary,
-                          minimumSize: const Size(36, 36),
-                          fixedSize: const Size(36, 36),
-                        ),
-                        icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                    ),
+                    IconButton(
+                      tooltip: '进入这个存档的版本',
+                      onPressed: widget.onPlay,
+                      style: IconButton.styleFrom(
+                        backgroundColor: _hover ? scheme.primaryFixed : scheme.onSurface.withValues(alpha: .06),
+                        foregroundColor: _hover ? scheme.onPrimaryFixed : scheme.primary,
+                        minimumSize: const Size(36, 36),
+                        fixedSize: const Size(36, 36),
                       ),
-                    ],
-                  ),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                    ),
+                  ],
                 ),
               ),
             ),

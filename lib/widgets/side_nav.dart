@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/instance.dart';
+import 'app_background.dart';
 import 'loader_icon.dart';
 
 class SideNavItem<T> {
@@ -35,24 +36,31 @@ class SideNav<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    // 启用背景图片时，二级菜单放在一块毛玻璃面板上，不直接压在背景上
+    final glass = BackgroundScope.activeOf(context) != null;
+    final list = ListView(
+      padding: glass ? const EdgeInsets.fromLTRB(6, 6, 6, 12) : const EdgeInsets.fromLTRB(14, 0, 6, 16),
+      children: [
+        for (final g in groups) ...[
+          if (g.title != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+              child: Text(g.title!, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+            ),
+          for (final item in g.items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: _SideNavTile(item: item, selected: item.value == value, onTap: () => onChanged(item.value)),
+            ),
+        ],
+      ],
+    );
+    if (!glass) return SizedBox(width: width, child: list);
     return SizedBox(
       width: width,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 0, 6, 16),
-        children: [
-          for (final g in groups) ...[
-            if (g.title != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-                child: Text(g.title!, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
-              ),
-            for (final item in g.items)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: _SideNavTile(item: item, selected: item.value == value, onTap: () => onChanged(item.value)),
-              ),
-          ],
-        ],
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 4, 16),
+        child: GlassPanel(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(20), child: list),
       ),
     );
   }

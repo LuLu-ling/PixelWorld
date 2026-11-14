@@ -159,6 +159,9 @@ class LauncherConfig extends ChangeNotifier {
 
   T _get<T>(String key) => _data[key] as T;
 
+  /// 按键名读取的原始设置（个性化背景等由各自的模块解释，见 widgets/app_background.dart）
+  Map<String, dynamic> get raw => _data;
+
   String get gameDir => _get('gameDir');
   String get updateChannel => _get('updateChannel');
   bool get updateAutoCheck => _get('updateAutoCheck');

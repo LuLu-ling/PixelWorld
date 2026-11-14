@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_info.dart';
+import 'file_manager_page.dart' show pickFile;
+import '../widgets/app_background.dart';
 import '../app_scope.dart';
 import '../platform.dart';
 import '../widgets/theme_color_dialog.dart';
@@ -166,19 +170,11 @@ class _AppearanceSection extends StatelessWidget {
                 onChanged: (v) => cfg.update({'uiScale': v ?? 0.0}),
               ),
             ),
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              leading: CircleAvatar(radius: 13, backgroundColor: Color(cfg.themeColor)),
-              title: const Text('主题色'),
-              subtitle: const Text('按 Material Design 3 从主题色生成整套浅色与深色配色'),
-              trailing: const Icon(Icons.palette_outlined),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-              child: ThemeColorPicker(current: cfg.themeColor, onChanged: (color) => cfg.update({'themeColor': color})),
-            ),
+            const _ThemeColorSetting(),
           ],
         ),
+        // 背景图片只在电脑上生效
+        if (isDesktop) const _BackgroundSettings(),
         SettingsGroup(
           title: '首页',
           children: [
@@ -201,6 +197,259 @@ class _AppearanceSection extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// 主题色：设了背景图片时可以跟随背景（MD3 从图片取色），否则手动选择
+class _ThemeColorSetting extends StatelessWidget {
+  const _ThemeColorSetting();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context);
+    final cfg = state.config;
+    final bg = state.background;
+    final hasImage = isDesktop && bg.imagePath.isNotEmpty;
+    final auto = hasImage && bg.themeFromImage;
+    final seed = Theme.of(context).colorScheme.primary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          leading: CircleAvatar(radius: 13, backgroundColor: auto ? seed : Color(cfg.themeColor)),
+          title: const Text('主题色'),
+          subtitle: Text(auto ? '跟随背景：按 Material Design 3 从背景图片取色，换图片后自动更新' : '按 Material Design 3 从主题色生成整套浅色与深色配色'),
+          trailing: hasImage
+              ? SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: true, label: Text('跟随背景')),
+                    ButtonSegment(value: false, label: Text('手动选择')),
+                  ],
+                  selected: {auto},
+                  onSelectionChanged: (v) => cfg.update({BackgroundPrefs.themeFromImageKey: v.first}),
+                )
+              : const Icon(Icons.palette_outlined),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+          child: auto
+              ? Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    for (final (i, c) in bg.candidates.indexed)
+                      Tooltip(
+                        message: i == 0 ? '推荐' : '候选 ${i + 1}',
+                        child: InkResponse(
+                          onTap: () => cfg.update({BackgroundPrefs.seedIndexKey: i}),
+                          radius: 22,
+                          child: CircleAvatar(
+                            radius: 17,
+                            backgroundColor: c,
+                            child: i == bg.seedIndex.clamp(0, bg.candidates.length - 1)
+                                ? Icon(
+                                    Icons.check,
+                                    size: 18,
+                                    color: ThemeData.estimateBrightnessForColor(c) == Brightness.dark
+                                        ? Colors.white
+                                        : Colors.black,
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ),
+                  ],
+                )
+              : ThemeColorPicker(current: cfg.themeColor, onChanged: (color) => cfg.update({'themeColor': color})),
+        ),
+      ],
+    );
+  }
+}
+
+/// 背景图片（电脑端）：选择图片、两种模糊、封面色散、面板不透明度与降低透明度
+class _BackgroundSettings extends StatelessWidget {
+  const _BackgroundSettings();
+
+  Future<void> _pick(BuildContext context) async {
+    final bg = AppScope.read(context).background;
+    final path = await pickFile(context, extensions: const ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'], label: '图片');
+    if (path == null) return;
+    try {
+      await bg.setImage(path);
+    } catch (e) {
+      if (context.mounted) toast(context, '无法使用这张图片：$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context);
+    final bg = state.background;
+    final cfg = state.config;
+    final path = bg.imagePath;
+    final has = path.isNotEmpty;
+    final scheme = Theme.of(context).colorScheme;
+    return SettingsGroup(
+      title: '背景图片',
+      children: [
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          leading: const Icon(Icons.wallpaper_outlined),
+          title: const Text('背景图片'),
+          subtitle: Text(has ? '显示在整个窗口后面，界面面板会变成毛玻璃' : '选择一张图片作为启动器的背景（只在电脑上生效）'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (has)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    File(path),
+                    width: 120,
+                    height: 68,
+                    fit: BoxFit.cover,
+                    cacheWidth: 240,
+                    errorBuilder: (_, _, _) => Container(width: 120, height: 68, color: scheme.surfaceContainerHighest),
+                  ),
+                ),
+              const SizedBox(width: 12),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton.tonal(onPressed: () => _pick(context), child: Text(has ? '换一张…' : '选择图片…')),
+                  if (has) ...[
+                    const SizedBox(height: 6),
+                    OutlinedButton(onPressed: bg.clearImage, child: const Text('移除')),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (has) ...[
+          _PrefSlider(
+            icon: Icons.blur_on,
+            title: '背景模糊',
+            subtitle: '整张背景图片的模糊程度；为 0 时背景保持清晰',
+            value: bg.blur,
+            min: 0,
+            max: 48,
+            label: (v) => v.round().toString(),
+            onCommit: (v) => cfg.update({BackgroundPrefs.blurKey: v.roundToDouble()}),
+          ),
+          _PrefSlider(
+            icon: Icons.blur_linear,
+            title: '面板模糊',
+            subtitle: '只模糊面板后面的部分（毛玻璃），与背景模糊互不影响；为 0 时面板后面也是清晰的',
+            value: bg.panelBlur,
+            min: 0,
+            max: 40,
+            label: (v) => v.round().toString(),
+            onCommit: (v) => cfg.update({BackgroundPrefs.panelBlurKey: v.roundToDouble()}),
+          ),
+          _PrefSlider(
+            icon: Icons.opacity,
+            title: '面板不透明度',
+            subtitle: '面板越透明，背景图片越明显',
+            value: bg.opacity,
+            min: .35,
+            max: .95,
+            label: (v) => '${(v * 100).round()}%',
+            live: true,
+            onCommit: (v) => cfg.update({BackgroundPrefs.opacityKey: (v * 100).roundToDouble() / 100}),
+          ),
+          _PrefSlider(
+            icon: Icons.gradient,
+            title: '封面色散',
+            subtitle: '最近游玩的卡片上，从封面取出的颜色向外扩散的强弱',
+            value: bg.coverGlow,
+            min: 0,
+            max: 1,
+            label: (v) => '${(v * 100).round()}%',
+            live: true,
+            onCommit: (v) => cfg.update({BackgroundPrefs.glowKey: (v * 100).roundToDouble() / 100}),
+          ),
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            secondary: const Icon(Icons.layers_outlined),
+            title: const Text('降低透明度'),
+            subtitle: const Text('保留背景图片，但面板几乎不透明，适合图片很花或者想要更清楚的文字'),
+            value: bg.solid,
+            onChanged: (v) => cfg.update({BackgroundPrefs.solidKey: v}),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// 设置里的滑块：拖动时只更新显示，松手才保存（模糊要重新计算图片，不能每一帧都算）。
+/// [live] 为 true 时拖动中也保存（不透明度、色散只是重画，开销很小）
+class _PrefSlider extends StatefulWidget {
+  const _PrefSlider({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.label,
+    required this.onCommit,
+    this.live = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final double value;
+  final double min;
+  final double max;
+  final String Function(double) label;
+  final ValueChanged<double> onCommit;
+  final bool live;
+
+  @override
+  State<_PrefSlider> createState() => _PrefSliderState();
+}
+
+class _PrefSliderState extends State<_PrefSlider> {
+  double? _dragging;
+
+  @override
+  Widget build(BuildContext context) {
+    final v = (_dragging ?? widget.value).clamp(widget.min, widget.max);
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      leading: Icon(widget.icon),
+      title: Text(widget.title),
+      subtitle: Text(widget.subtitle),
+      trailing: SizedBox(
+        width: 260,
+        child: Row(
+          children: [
+            Expanded(
+              child: Slider(
+                value: v,
+                min: widget.min,
+                max: widget.max,
+                onChanged: (x) {
+                  setState(() => _dragging = x);
+                  if (widget.live) widget.onCommit(x);
+                },
+                onChangeEnd: (x) {
+                  widget.onCommit(x);
+                  setState(() => _dragging = null);
+                },
+              ),
+            ),
+            SizedBox(width: 44, child: Text(widget.label(v), textAlign: TextAlign.end)),
+          ],
+        ),
+      ),
     );
   }
 }

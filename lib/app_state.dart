@@ -15,6 +15,7 @@ import 'core/ai/ai_chat.dart';
 import 'core/ai/ai_context.dart';
 import 'core/ai/ai_tools.dart';
 import 'core/ai/mcp_hub.dart';
+import 'widgets/app_background.dart';
 import 'compat/pcl/paths.dart';
 import 'core/config.dart';
 import 'core/android_runtime.dart';
@@ -55,6 +56,7 @@ abstract interface class LaunchPrompts implements AuthPrompts {
 class AppState extends ChangeNotifier {
   AppState._(this.config, this.accounts) {
     config.addListener(notifyListeners);
+    background.addListener(notifyListeners);
     chats
       ..hub = McpHub(this, AiToolbox(this))
       ..toolsEnabled = (() => config.aiTools)
@@ -142,6 +144,9 @@ class AppState extends ChangeNotifier {
 
   /// AI 助手的对话（单独通知，避免回答生成时整个界面重建）
   final chats = ChatStore.load();
+
+  /// 电脑端的个性化背景（背景图片、毛玻璃面板、从背景取主题色）
+  late final background = BackgroundController(config);
 
   /// 最近一次启动的游戏，用于崩溃分析
   GameRun? lastRun;

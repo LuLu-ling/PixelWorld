@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>主页背景图片效果图</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0b0d0c; color: #e2e6e2;
+    font-family: system-ui, "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", sans-serif; }
+  .page { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px 16px 28px; }
+  .tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 4px; border-radius: 999px; background: #1a1d1b; }
+  .tabs button { border: 0; background: none; color: #9aa59d; font: inherit; font-size: 14px; padding: 8px 16px; border-radius: 999px; cursor: pointer; }
+  .tabs button.on { background: #2f5d47; color: #d7f2e3; }
+  .controls { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 22px; font-size: 13px; color: #9aa59d; }
+  .controls label { display: flex; align-items: center; gap: 8px; }
+  .controls input[type=range] { width: 130px; accent-color: #7fc7a1; }
+  .controls .pick { border: 1px solid #3a423d; background: #1a1d1b; color: #cfe3d7; border-radius: 999px; padding: 6px 14px; cursor: pointer; font: inherit; font-size: 13px; }
+  .note { max-width: 980px; color: #7c877f; font-size: 13px; line-height: 1.7; text-align: center; }
+  .note b { color: #b7c3ba; font-weight: 600; }
+
+  /* ---------- 窗口：按真实逻辑像素 1100×700 画，整体缩放进浏览器 ---------- */
+  .stage { width: min(1100px, 100%); }
+  .win { position: relative; width: 1100px; height: 700px; border-radius: 10px; overflow: hidden; transform-origin: top left;
+    box-shadow: 0 0 0 1px #2c322e, 0 30px 80px rgba(0,0,0,.6); }
+
+  /* 主题色（默认种子 #2F6B4F 生成的 MD3 配色，近似值） */
+  .win.dark  { --bg:#111412; --rail:#171a18; --s1:#1d201e; --s2:#232724; --s3:#2d322f; --text:#e1e4e0; --muted:#a6aea8; --faint:#78817b;
+               --primary:#94d5b1; --on-primary:#00391f; --pc:#0f5135; --on-pc:#b0f1cc; --sel:#2f5d47; --line:rgba(255,255,255,.07); --tint:17,20,18; --dim:.35; }
+  .win.light { --bg:#f5fbf6; --rail:#eaf0eb; --s1:#eff5f0; --s2:#e9efea; --s3:#dfe5e0; --text:#171d19; --muted:#404943; --faint:#707973;
+               --primary:#2c6a4c; --on-primary:#ffffff; --pc:#b0f1cc; --on-pc:#002113; --sel:#c4e8d3; --line:rgba(0,0,0,.08); --tint:245,251,246; --dim:.10; }
+  .win { background: var(--bg); color: var(--text); }
+
+  /* 背景层：图片整体模糊一次，再按明暗压一层颜色保证文字清楚 */
+  .bgimg { position: absolute; inset: 0; background-size: 1100px 700px; background-repeat: no-repeat; filter: blur(var(--blur, 24px)); display: none; }
+  .bgdim { position: absolute; inset: 0; background: rgba(var(--tint), var(--dim)); display: none; }
+  .win.image .bgimg, .win.image .bgdim { display: block; }
+
+  .app { position: relative; display: flex; width: 100%; height: 100%; }
+
+  /* 面板：没有背景图时是实色；有背景图时半透明，透出模糊后的背景 */
+  .panel { background: var(--s1); }
+  .win.image .panel { background: rgba(var(--tint), var(--alpha, .62)); }
+  .win.image.solid .panel { background: rgba(var(--tint), .94); }
+  .win.image .panel.strong { background: rgba(var(--tint), calc(var(--alpha, .62) + .12)); }
+  .win.image .panel { box-shadow: inset 0 0 0 1px var(--line); }
+  /* 面板自己画一份和窗口对齐的背景图片，用「面板模糊」单独模糊，再叠一层主题色：与背景模糊互不影响 */
+  .win.image .panel, .win.image .rail { position: relative; overflow: hidden; isolation: isolate; background: transparent !important; }
+  .glass, .tintl { position: absolute; z-index: -1; pointer-events: none; }
+  .glass { background-size: 1100px 700px; background-repeat: no-repeat; filter: blur(var(--pblur, 0px)); }
+  .tintl { inset: 0; background: rgba(var(--tint), var(--alpha, .62)); }
+  .win.image .panel.strong .tintl { background: rgba(var(--tint), calc(var(--alpha, .62) + .12)); }
+  .win.image .rail .tintl { background: rgba(var(--tint), calc(var(--alpha, .62) + .08)); }
+  .win.image.solid .tintl { background: rgba(var(--tint), .94) !important; }
+
+  .rail { width: 76px; flex: none; display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 4px; background: var(--rail); }
+  .win.image .rail { background: rgba(var(--tint), calc(var(--alpha, .62) + .08)); box-shadow: inset -1px 0 0 var(--line); }
+  .logo { width: 30px; height: 30px; border-radius: 9px; margin-bottom: 10px; background: #2b6bd9; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 800; }
+  .nav { width: 60px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0; color: var(--muted); font-size: 11px; }
+  .nav .ic { width: 52px; height: 30px; border-radius: 15px; display: grid; place-items: center; }
+  .nav.on { color: var(--text); font-weight: 600; }
+  .nav.on .ic { background: var(--sel); color: var(--on-pc); }
+  .win.light .nav.on .ic { color: var(--on-pc); }
+  svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .top { height: 56px; flex: none; display: flex; align-items: center; gap: 10px; padding-left: 20px; }
+  .hello b { font-size: 17px; } .hello span { color: var(--muted); font-size: 13px; margin-left: 8px; }
+  .grow { flex: 1; }
+  .pill { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border-radius: 17px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .ibtn { width: 34px; height: 34px; border-radius: 17px; display: grid; place-items: center; color: var(--muted); }
+  .av { width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+  .wb { display: flex; height: 100%; margin-left: 4px; } .wb div { width: 46px; display: grid; place-items: center; color: var(--muted); } .wb svg { width: 14px; height: 14px; stroke-width: 1.4; }
+
+  .content { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px; padding: 4px 20px 18px; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; height: 300px; }
+
+  .hero { border-radius: 20px; padding: 18px 22px; display: flex; flex-direction: column; }
+  .win:not(.image) .hero { background: var(--s1); box-shadow: inset 0 0 0 1px var(--line); }
+  .chip { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 12px; border-radius: 8px; background: var(--s3); font-size: 12.5px; }
+  .win.image .chip { background: rgba(var(--tint), .5); }
+  .vtitle { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+  .vicon { width: 56px; height: 56px; border-radius: 14px; background: var(--pc); color: var(--on-pc); display: grid; place-items: center; }
+  .vicon svg { width: 28px; height: 28px; }
+  .vname { font-size: 26px; font-weight: 800; }
+  .vsub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .facts { display: flex; gap: 18px; margin-top: auto; color: var(--muted); font-size: 13px; }
+  .btns { display: flex; gap: 10px; margin-top: 16px; }
+  .btn { height: 44px; padding: 0 22px; border-radius: 22px; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
+  .btn.fill { background: var(--primary); color: var(--on-primary); }
+  .btn.out { box-shadow: inset 0 0 0 1px var(--faint); color: var(--text); font-weight: 600; }
+  .btn.icon { width: 44px; padding: 0; justify-content: center; }
+
+  .side { display: flex; flex-direction: column; gap: 12px; }
+  .notice { border-radius: 16px; padding: 12px 16px; }
+  .notice b { font-size: 14px; } .notice div { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .quick { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .q { border-radius: 14px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 14px; }
+  .q svg { width: 18px; height: 18px; color: var(--muted); }
+
+  .sect { display: flex; align-items: baseline; justify-content: space-between; }
+  .sect b { font-size: 15px; } .sect span { color: var(--primary); font-size: 13px; }
+  .worlds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .wt { height: 64px; border-radius: 14px; display: flex; align-items: center; gap: 12px; padding: 0 10px; position: relative; overflow: hidden; }
+  .wt .grad { position: absolute; inset: 0; opacity: .9; }
+  .wt > *:not(.grad):not(.glass):not(.tintl):not(.disp) { position: relative; }
+  /* 自定义背景时：存档条和其他面板一样是毛玻璃，再叠一层封面主色的微弱色散 */
+  .disp { position: absolute; inset: 0; z-index: -1; pointer-events: none; display: none; mix-blend-mode: screen; opacity: var(--disp, .55); }
+  .win.light .disp { mix-blend-mode: multiply; opacity: calc(var(--disp, .55) * .6); }
+  .win.image .wt .grad { display: none; }
+  .win.image .wt .disp { display: block; }
+  .thumb { width: 44px; height: 44px; border-radius: 9px; box-shadow: 0 6px 14px rgba(0,0,0,.35); image-rendering: pixelated; }
+  /* 直接放在背景上的文字（问候、小标题）：按它后面背景的亮度自动用黑字或白字，深色与浅色模式同一套逻辑 */
+  .onbg-light, .onbg-light * { color: #f5f7f5 !important; text-shadow: 0 1px 1px rgba(0,0,0,.35); }
+  .onbg-dark, .onbg-dark * { color: #111512 !important; text-shadow: 0 1px 1px rgba(255,255,255,.3); }
+  .onbg-light span, .onbg-light small { color: rgba(245,247,245,.78) !important; }
+  .onbg-dark span, .onbg-dark small { color: rgba(17,21,18,.72) !important; }
+  .wt b { font-size: 14px; display: block; } .wt small { color: var(--muted); font-size: 12px; }
+  .more { text-align: center; color: var(--faint); font-size: 12.5px; margin-top: auto; }
+
+  /* 设置页 */
+  .settings { flex: 1; min-height: 0; display: flex; gap: 0; }
+  .subnav { width: 196px; flex: none; padding: 0 6px 16px 14px; display: flex; flex-direction: column; gap: 2px; }
+  /* 二级菜单在背景图模式下也是毛玻璃面板，不直接压在背景上 */
+  .win.image .subnav { margin: 0 4px 16px 12px; padding: 4px 6px 12px; border-radius: 20px; }
+  .gtitle { font-size: 12px; color: var(--muted); padding: 12px 12px 6px; }
+  .sitem { height: 44px; border-radius: 22px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 14px; color: var(--muted); }
+  .sitem.on { background: var(--sel); color: var(--on-pc); font-weight: 700; }
+  .sitem svg { width: 19px; height: 19px; }
+  .scontent { flex: 1; min-width: 0; padding: 2px 20px 16px 6px; overflow: hidden; }
+  .scontent h3 { margin: 4px 0 10px 4px; font-size: 14px; font-weight: 600; }
+  .group { border-radius: 18px; overflow: hidden; }
+  .srow { display: flex; align-items: center; gap: 16px; padding: 14px 20px; box-shadow: 0 1px 0 var(--line); }
+  .srow:last-child { box-shadow: none; }
+  .srow .t { flex: 1; } .srow .t b { font-size: 14px; font-weight: 600; display: block; } .srow .t small { color: var(--muted); font-size: 12.5px; }
+  .srow svg { color: var(--muted); }
+  .preview { width: 150px; height: 84px; border-radius: 10px; background-size: cover; background-position: center; box-shadow: inset 0 0 0 1px var(--line); }
+  .seg { display: flex; border-radius: 18px; box-shadow: inset 0 0 0 1px var(--faint); overflow: hidden; font-size: 13px; }
+  .seg div { padding: 7px 14px; } .seg .on { background: var(--sel); color: var(--on-pc); font-weight: 600; }
+  .slider { width: 200px; height: 4px; border-radius: 2px; background: var(--s3); position: relative; }
+  .slider i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--primary); }
+  .slider em { position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--primary); }
+  .sw { width: 52px; height: 32px; border-radius: 16px; background: var(--s3); position: relative; box-shadow: inset 0 0 0 2px var(--faint); }
+  .sw::after { content: ""; position: absolute; left: 8px; top: 8px; width: 16px; height: 16px; border-radius: 50%; background: var(--faint); }
+  .sw.on { background: var(--primary); box-shadow: none; } .sw.on::after { left: 24px; top: 4px; width: 24px; height: 24px; background: var(--on-primary); }
+  .swatches { display: flex; gap: 10px; margin-top: 10px; align-items: center; }
+  .swatches .sc { width: 34px; height: 34px; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 2px rgba(255,255,255,.18); position: relative; }
+  .swatches .sc.on::after { content: "✓"; position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+  .swatches input[type=color] { width: 40px; height: 34px; border: 0; padding: 0; background: none; cursor: pointer; }
+  #tmode div { cursor: pointer; }
+  .tbtn { height: 36px; padding: 0 16px; border-radius: 18px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; box-shadow: inset 0 0 0 1px var(--faint); }
+  .tbtn.fill { box-shadow: none; background: var(--sel); color: var(--on-pc); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="tabs" id="tabs">
+    <button data-v="plain" class="on">默认：没有背景图</button>
+    <button data-v="dark">背景图 · 深色</button>
+    <button data-v="light">背景图 · 浅色</button>
+    <button data-v="settings">设置：背景图片</button>
+  </div>
+  <div class="controls">
+    <label>背景模糊 <input type="range" id="blur" min="0" max="48" value="8"><span id="blurv">8</span></label>
+    <label>面板模糊 <input type="range" id="pblur" min="0" max="40" value="20"><span id="pblurv">20</span></label>
+    <label>封面色散 <input type="range" id="disp" min="0" max="100" value="55"><span id="dispv">55%</span></label>
+    <label>面板不透明度 <input type="range" id="alpha" min="35" max="95" value="62"><span id="alphav">62%</span></label>
+    <label><input type="checkbox" id="solid"> 降低透明度</label>
+    <button class="pick" id="pick">换成我的图片预览…</button>
+    <input type="file" id="file" accept="image/*" hidden>
+  </div>
+  <div class="note" id="note"></div>
+  <div class="stage" id="stage"><div class="win dark" id="win"></div></div>
+</div>
+
+<template id="tpl-home">
+  <div class="bgimg"></div><div class="bgdim"></div>
+  <div class="app">
+    <div class="rail">
+      <div class="logo">PW</div>
+      <div class="nav on"><div class="ic"><svg viewBox="0 0 24 24"><path d="M5 19c2-6 6-11 14-14-2 8-7 12-13 14z"/><path d="M9 15l-3 3"/></svg></div>启动</div>
+      <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 4v11m-5-5l5 5 5-5M5 20h14"/></svg></div>下载</div>
+      <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M14 7l3-3 3 3-3 3m-3-3l-9 9 3 3 9-9"/></svg></div>工具</div>
+      <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.4-6.4l-2.1 2.1M7.7 16.3l-2.1 2.1m12.8 0l-2.1-2.1M7.7 7.7L5.6 5.6"/></svg></div>设置</div>
+      <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></div>AI</div>
+    </div>
+    <div class="main">
+      <div class="top">
+        <div class="hello"><b>晚上好，zhuzhi</b><span>准备好冒险了吗？</span></div>
+        <div class="pill panel" style="margin-left:14px">✓ 当前无后台任务</div>
+        <div class="grow"></div>
+        <div class="ibtn"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></div>
+        <div class="ibtn"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4zM10 20h4"/></svg></div>
+        <div class="pill panel" style="padding-left:4px;color:var(--text)"><span class="av">Z</span>zhuzhi · 离线</div>
+        <div class="wb"><div><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></div><div><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></div><div><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></div></div>
+      </div>
+      <div class="content">
+        <div class="row">
+          <div class="hero panel strong">
+            <div class="chip">切换版本 ▾</div>
+            <div class="vtitle">
+              <div class="vicon"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg></div>
+              <div><div class="vname">1.21.4 Fabric</div><div class="vsub">fabric-loader-0.20.1-1.21.4</div></div>
+            </div>
+            <div class="facts"><span>25 个模组</span><span>Krypton Wrapper 渲染</span><span>21 小时前玩过</span></div>
+            <div class="btns">
+              <div class="btn fill">🚀 开始游戏</div><div class="btn out">⚙ 版本设置</div><div class="btn out icon">···</div>
+            </div>
+          </div>
+          <div class="side">
+            <div class="notice panel"><b>启动器公告</b><div>暂无公告</div></div>
+            <div class="quick">
+              <div class="q panel"><svg viewBox="0 0 24 24"><path d="M12 4v11m-5-5l5 5 5-5M5 20h14"/></svg>装模组</div>
+              <div class="q panel"><svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h14"/></svg>管理模组</div>
+              <div class="q panel"><svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></svg>文件夹</div>
+              <div class="q panel"><svg viewBox="0 0 24 24"><path d="M6 4h12v16H6zM9 9h6M9 13h6"/></svg>查看日志</div>
+            </div>
+          </div>
+        </div>
+        <div class="sect"><b>最近游玩</b><span>全部存档 ›</span></div>
+        <div class="worlds">
+          <div class="wt panel"><div class="grad" style="background:linear-gradient(90deg, rgba(84,140,190,.45), transparent 55%)"></div><div class="disp" style="background:radial-gradient(70% 140% at 8% 50%, rgba(84,140,200,.55), transparent 70%), radial-gradient(60% 120% at 30% 100%, rgba(230,236,245,.30), transparent 70%)"></div><canvas class="thumb" data-c="sky"></canvas><div><b>新的世界</b><small>1.21.4 Fabric · 21 小时前</small></div></div>
+          <div class="wt panel"><div class="grad" style="background:linear-gradient(90deg, rgba(80,150,90,.45), transparent 55%)"></div><div class="disp" style="background:radial-gradient(70% 140% at 8% 50%, rgba(60,140,70,.55), transparent 70%), radial-gradient(60% 120% at 30% 100%, rgba(120,175,215,.30), transparent 70%)"></div><canvas class="thumb" data-c="forest"></canvas><div><b>新的世界</b><small>1.20.1 Fabric · 1 天前</small></div></div>
+          <div class="wt panel"><div class="grad" style="background:linear-gradient(90deg, rgba(150,130,80,.45), transparent 55%)"></div><div class="disp" style="background:radial-gradient(70% 140% at 8% 50%, rgba(150,175,80,.55), transparent 70%), radial-gradient(60% 120% at 30% 100%, rgba(160,200,230,.30), transparent 70%)"></div><canvas class="thumb" data-c="plains"></canvas><div><b>新的世界</b><small>1.20.1 Forge · 2 天前</small></div></div>
+        </div>
+        <div class="more">向下滚动查看更多</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-settings">
+  <div class="bgimg"></div><div class="bgdim"></div>
+  <div class="app">
+    <div class="rail">
+      <div class="logo">PW</div>
+      <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M5 19c2-6 6-11 14-14-2 8-7 12-13 14z"/></svg></div>启动</div>
+      <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 4v11m-5-5l5 5 5-5M5 20h14"/></svg></div>下载</div>
+      <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M14 7l3-3 3 3-3 3m-3-3l-9 9 3 3 9-9"/></svg></div>工具</div>
+      <div class="nav on"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3m9-9h-3M6 12H3"/></svg></div>设置</div>
+      <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></div>AI</div>
+    </div>
+    <div class="main">
+      <div class="top"><div class="hello"><b>设置</b></div><div class="grow"></div>
+        <div class="wb"><div><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></div><div><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></div><div><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></div></div>
+      </div>
+      <div class="settings">
+        <div class="subnav panel">
+          <div class="gtitle">游戏</div>
+          <div class="sitem"><svg viewBox="0 0 24 24"><path d="M5 19c2-6 6-11 14-14-2 8-7 12-13 14z"/></svg>启动</div>
+          <div class="sitem"><svg viewBox="0 0 24 24"><path d="M6 8h10v6a4 4 0 01-4 4h-2a4 4 0 01-4-4z"/></svg>Java</div>
+          <div class="gtitle">启动器</div>
+          <div class="sitem on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="9" cy="10" r="1"/><circle cx="14" cy="9" r="1"/></svg>个性化</div>
+          <div class="sitem"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg>其他</div>
+          <div class="gtitle">AI</div>
+          <div class="sitem"><svg viewBox="0 0 24 24"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></svg>模型与接口</div>
+        </div>
+        <div class="scontent">
+          <h3>个性化</h3>
+          <div class="group panel">
+            <div class="srow"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 100 18 6 6 0 010-18z"/></svg><div class="t"><b>颜色模式</b><small>启动器界面的明暗模式</small></div>
+              <div class="seg"><div>跟随系统</div><div>浅色</div><div class="on">深色</div></div></div>
+            <div class="srow"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/></svg>
+              <div class="t"><b>背景图片</b><small>只在电脑上生效。显示在整个窗口后面，界面面板会变成半透明</small></div>
+              <div class="preview" id="pv"></div>
+              <div style="display:flex;flex-direction:column;gap:8px"><div class="tbtn fill">选择图片…</div><div class="tbtn">移除</div></div></div>
+            <div class="srow"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/></svg><div class="t"><b>背景模糊</b><small>整张背景图片的模糊程度；为 0 时背景保持清晰</small></div>
+              <div class="slider"><i style="width:17%"></i><em style="left:17%"></em></div></div>
+            <div class="srow"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="3"/><path d="M8 10h8M8 14h5"/></svg><div class="t"><b>面板模糊</b><small>只模糊面板后面的部分（毛玻璃），越模糊，面板上的文字越清楚</small></div>
+              <div class="slider"><i style="width:50%"></i><em style="left:50%"></em></div></div>
+            <div class="srow"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 14h16"/></svg><div class="t"><b>面板不透明度</b><small>面板越透明，背景图片越明显</small></div>
+              <div class="slider"><i style="width:45%"></i><em style="left:45%"></em></div></div>
+            <div class="srow"><svg viewBox="0 0 24 24"><path d="M4 12h16"/></svg><div class="t"><b>降低透明度</b><small>保留背景图片，但面板几乎不透明，适合图片很花或者想要更清楚的文字</small></div>
+              <div class="sw"></div></div>
+            <div class="srow" style="align-items:flex-start"><svg viewBox="0 0 24 24" style="margin-top:2px"><path d="M4 7h16M4 12h10M4 17h6"/></svg>
+              <div class="t"><b>主题色</b><small id="themehint"></small>
+                <div class="swatches" id="swatches"></div></div>
+              <div class="seg" id="tmode"><div data-m="auto">跟随背景（MD3）</div><div data-m="manual">手动选择</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+// 默认背景：用代码画的像素风景（自己画的，不涉及版权）
+function scenery(w, h) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  const sky = g.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#5b8fc9'); sky.addColorStop(.55, '#a9cbe6'); sky.addColorStop(1, '#e6d6b8');
+  g.fillStyle = sky; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#fff4c8'; g.fillRect(w * .72, h * .16, 64, 64);
+  const px = 16; let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const layer = (base, amp, col, top) => { for (let x = 0; x < w; x += px) { const y = Math.round((base + Math.sin(x / 140 + amp) * 40 + rnd() * 24) / px) * px;
+      g.fillStyle = col; g.fillRect(x, y, px, h - y); g.fillStyle = top; g.fillRect(x, y, px, px); } };
+  layer(h * .52, 1, '#6e8aa4', '#86a2bb'); layer(h * .62, 3, '#4f7a4a', '#6da35d'); layer(h * .74, 5, '#6b4a2f', '#5c9a45');
+  for (let i = 0; i < 9; i++) { const x = Math.round(rnd() * w / px) * px, y = h * .66 + rnd() * 60; g.fillStyle = '#5b3b22'; g.fillRect(x + px, y, px, px * 3); g.fillStyle = '#2f6b33'; g.fillRect(x, y - px * 2, px * 3, px * 2.5); }
+  return c.toDataURL('image/jpeg', .9);
+}
+function thumb(cv, kind) {
+  cv.width = 16; cv.height = 16; const g = cv.getContext('2d');
+  const sky = { sky: '#6fa8dc', forest: '#7fb2d8', plains: '#9cc4e4' }[kind];
+  g.fillStyle = sky; g.fillRect(0, 0, 16, 16);
+  g.fillStyle = kind === 'forest' ? '#2f6b33' : '#5c9a45'; g.fillRect(0, 9, 16, 7);
+  g.fillStyle = '#6b4a2f'; g.fillRect(0, 12, 16, 4);
+  if (kind === 'forest') { g.fillStyle = '#1f4f25'; g.fillRect(3, 3, 5, 6); g.fillRect(10, 4, 4, 5); }
+  if (kind === 'sky') { g.fillStyle = '#f2f2f2'; g.fillRect(2, 3, 6, 2); g.fillRect(9, 5, 5, 2); }
+}
+
+let image = scenery(1400, 900);
+
+// ---------- 主题色：跟随背景（按 MD3 的思路取候选色）或手动选择 ----------
+let themeMode = 'auto', seedIdx = 0, manual = '#2f6b4f', candidates = [];
+const hsl = (h, s, l) => `hsl(${h} ${s}% ${l}%)`;
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h = 0, s = 0; const l = (mx + mn) / 2;
+  if (mx !== mn) {
+    const d = mx - mn; s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn);
+    h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60;
+  }
+  return [h, s * 100, l * 100];
+}
+function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+// 候选色：按色相分组，按「面积 × 鲜艳程度」打分（Android 壁纸取色的 Score 也是这个思路），色相相差 30° 以上才算不同的候选
+function extract(src) {
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => {
+      const c = document.createElement('canvas'); c.width = 80; c.height = 50; const g = c.getContext('2d'); g.drawImage(im, 0, 0, 80, 50);
+      const d = g.getImageData(0, 0, 80, 50).data; const bins = Array.from({ length: 36 }, () => ({ n: 0, r: 0, g: 0, b: 0, s: 0 }));
+      for (let i = 0; i < d.length; i += 4) {
+        const [h, s, l] = rgbToHsl(d[i], d[i + 1], d[i + 2]); if (s < 12 || l < 10 || l > 92) continue;
+        const k = bins[Math.floor(h / 10) % 36]; k.n++; k.r += d[i]; k.g += d[i + 1]; k.b += d[i + 2]; k.s += s;
+      }
+      const scored = bins.map((k, i) => ({ i, score: k.n * (k.n ? k.s / k.n : 0), k })).filter(x => x.k.n).sort((a, b) => b.score - a.score);
+      const out = [];
+      for (const x of scored) {
+        const h = x.i * 10 + 5;
+        if (out.every(o => Math.min(Math.abs(o.h - h), 360 - Math.abs(o.h - h)) >= 30)) {
+          out.push({ h, hex: `rgb(${Math.round(x.k.r / x.k.n)},${Math.round(x.k.g / x.k.n)},${Math.round(x.k.b / x.k.n)})` });
+        }
+        if (out.length === 4) break;
+      }
+      if (!out.length) out.push({ h: 150, hex: '#2f6b4f' });
+      res(out);
+    };
+    im.src = src;
+  });
+}
+// 由种子色相生成一套近似的 MD3 配色（真正实现时用 material_color_utilities 的 DynamicScheme）
+function themeVars(h, dark) {
+  return dark
+    ? { '--bg': hsl(h, 8, 7), '--rail': hsl(h, 8, 9), '--s1': hsl(h, 8, 11), '--s2': hsl(h, 8, 13), '--s3': hsl(h, 7, 18),
+        '--text': hsl(h, 10, 89), '--muted': hsl(h, 7, 68), '--faint': hsl(h, 5, 49), '--primary': hsl(h, 50, 74), '--on-primary': hsl(h, 70, 14),
+        '--pc': hsl(h, 45, 22), '--on-pc': hsl(h, 65, 88), '--sel': hsl(h, 32, 30) }
+    : { '--bg': hsl(h, 30, 97), '--rail': hsl(h, 20, 93), '--s1': hsl(h, 20, 95), '--s2': hsl(h, 16, 92), '--s3': hsl(h, 12, 87),
+        '--text': hsl(h, 12, 10), '--muted': hsl(h, 7, 27), '--faint': hsl(h, 5, 45), '--primary': hsl(h, 52, 30), '--on-primary': '#fff',
+        '--pc': hsl(h, 60, 86), '--on-pc': hsl(h, 70, 10), '--sel': hsl(h, 45, 83) };
+}
+const themeKeys = ['--bg', '--rail', '--s1', '--s2', '--s3', '--text', '--muted', '--faint', '--primary', '--on-primary', '--pc', '--on-pc', '--sel', '--tint'];
+function seedHue() { return themeMode === 'manual' ? rgbToHsl(...hexToRgb(manual))[0] : (candidates[seedIdx] || candidates[0] || { h: 150 }).h; }
+function applyTheme() {
+  themeKeys.forEach(k => win.style.removeProperty(k));
+  if (view === 'plain') return;
+  const dark = view !== 'light'; const h = Math.round(seedHue());
+  for (const [k, x] of Object.entries(themeVars(h, dark))) win.style.setProperty(k, x);
+  // 面板的半透明底色（rgb 三个数）
+  const c = document.createElement('div'); c.style.color = dark ? hsl(h, 12, 8) : hsl(h, 30, 96); document.body.appendChild(c);
+  const m = getComputedStyle(c).color.match(/\d+/g); c.remove(); win.style.setProperty('--tint', m.slice(0, 3).join(','));
+}
+function renderTheme() {
+  const sw = win.querySelector('#swatches'); if (!sw) return;
+  win.querySelectorAll('#tmode div').forEach(d => { d.classList.toggle('on', d.dataset.m === themeMode); d.onclick = () => { themeMode = d.dataset.m; render(); }; });
+  win.querySelector('#themehint').textContent = themeMode === 'auto'
+    ? '从背景图片里取出的候选色，默认用第一个；点其他颜色切换，换背景图片后自动更新'
+    : '自己选择一个颜色作为主题色，不随背景图片变化';
+  sw.innerHTML = '';
+  if (themeMode === 'auto') {
+    candidates.forEach((c, i) => {
+      const e = document.createElement('div'); e.className = 'sc' + (i === seedIdx ? ' on' : '');
+      e.style.background = c.hex; e.title = '色相 ' + c.h + '°'; e.onclick = () => { seedIdx = i; render(); }; sw.appendChild(e);
+    });
+  } else {
+    const inp = document.createElement('input'); inp.type = 'color'; inp.value = manual;
+    inp.oninput = () => { manual = inp.value; applyTheme(); }; inp.onchange = () => render(); sw.appendChild(inp);
+    const t = document.createElement('div'); t.className = 'tbtn'; t.textContent = '更多颜色…'; sw.appendChild(t);
+  }
+}
+async function refreshCandidates() { candidates = await extract(image); seedIdx = 0; render(); }
+const notes = {
+  plain: '<b>默认（没有背景图片）</b>：和现在一样，纯色，没有渐变。没设背景图片的人看不到任何变化。',
+  dark: '<b>设了背景图片 · 深色</b>：背景图片按「背景模糊」整体模糊，面板再按「面板模糊」单独模糊它后面的部分（毛玻璃）；侧栏、顶栏的小部件、卡片和快捷按钮变成带主题色的半透明面板。最近游玩也是毛玻璃，再叠一层从封面取出的颜色、从封面位置向外的微弱色散（可以用「封面色散」调强弱）。上面的滑块可以调模糊和不透明度，也可以换成你自己的图片看看。',
+  light: '<b>设了背景图片 · 浅色</b>：面板是带白色的半透明，背景上压一层很淡的白色。直接放在背景上的文字（问候、小标题）和深色模式一样，按后面背景的亮度自动用黑字或白字。',
+  settings: '<b>设置 → 个性化</b>：选择图片、调模糊和不透明度、降低透明度，以及主题色：「跟随背景（MD3）」从背景图片取候选色并生成整套配色，「手动选择」自己选颜色。背景图片只在电脑上生效，手机保持实色。'
+};
+const win = document.getElementById('win');
+let view = 'plain';
+function render() {
+  const tpl = document.getElementById(view === 'settings' ? 'tpl-settings' : 'tpl-home');
+  win.innerHTML = tpl.innerHTML;
+  win.className = 'win ' + (view === 'light' ? 'light' : 'dark') + (view === 'plain' ? '' : ' image') + (document.getElementById('solid').checked ? ' solid' : '');
+  win.querySelector('.bgimg').style.backgroundImage = `url(${image})`;
+  const pv = win.querySelector('#pv'); if (pv) pv.style.backgroundImage = `url(${image})`;
+  win.querySelectorAll('canvas.thumb').forEach(c => thumb(c, c.dataset.c));
+  win.style.setProperty('--blur', document.getElementById('blur').value + 'px');
+  win.style.setProperty('--pblur', document.getElementById('pblur').value + 'px');
+  win.style.setProperty('--disp', document.getElementById('disp').value / 100);
+  win.style.setProperty('--alpha', document.getElementById('alpha').value / 100);
+  applyTheme();
+  renderTheme();
+  if (view !== 'plain') glassify();
+  document.getElementById('note').innerHTML = notes[view];
+  fit();
+  adaptText();
+}
+// 背景上的文字：取它后面那块背景（模糊后、压过一层颜色之后）的平均亮度，亮就用黑字，暗就用白字
+let lumaCanvas = null, lumaFor = null;
+function lumaAt(x, y, w, h) {
+  if (lumaFor !== image) {
+    const im = new Image(); im.src = image; lumaCanvas = document.createElement('canvas'); lumaCanvas.width = 110; lumaCanvas.height = 70;
+    const ready = () => { lumaCanvas.getContext('2d').drawImage(im, 0, 0, 110, 70); lumaFor = image; adaptText(); };
+    if (im.complete && im.naturalWidth) ready(); else { im.onload = ready; return null; }
+  }
+  const d = lumaCanvas.getContext('2d').getImageData(Math.max(0, x / 10 | 0), Math.max(0, y / 10 | 0), Math.max(1, w / 10 | 0), Math.max(1, h / 10 | 0)).data;
+  let sum = 0; for (let i = 0; i < d.length; i += 4) sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+  return sum / (d.length / 4);
+}
+function adaptText() {
+  if (view === 'plain') return;
+  const w = win.getBoundingClientRect(); const k = w.width / 1100; const dark = view !== 'light';
+  const dim = dark ? .35 : .10, dimL = dark ? .05 : .97;
+  win.querySelectorAll('.hello, .sect, .more, .scontent h3').forEach(el => {
+    el.classList.remove('onbg-light', 'onbg-dark');
+    const r = el.getBoundingClientRect(); const L0 = lumaAt((r.left - w.left) / k, (r.top - w.top) / k, r.width / k, r.height / k);
+    if (L0 == null) return;
+    const L = L0 * (1 - dim) + dimL * dim;
+    el.classList.add(L > .55 ? 'onbg-dark' : 'onbg-light');
+  });
+}
+
+// 给每个面板加上和窗口对齐的背景副本（模糊程度只看「面板模糊」）与主题色层
+function glassify() {
+  const w = win.getBoundingClientRect(); const k = w.width / 1100;
+  win.querySelectorAll('.panel, .rail').forEach(el => {
+    const r = el.getBoundingClientRect(); const x = (r.left - w.left) / k, y = (r.top - w.top) / k;
+    const pad = 40; // 留出边缘，模糊后边缘不发虚
+    const g = document.createElement('div'); g.className = 'glass';
+    Object.assign(g.style, { left: -pad + 'px', top: -pad + 'px', right: -pad + 'px', bottom: -pad + 'px',
+      backgroundImage: `url(${image})`, backgroundPosition: `${-x + pad}px ${-y + pad}px` });
+    const t = document.createElement('div'); t.className = 'tintl';
+    el.prepend(t); el.prepend(g);
+  });
+}
+function fit() {
+  const stage = document.getElementById('stage'); const s = Math.min(1, stage.clientWidth / 1100);
+  win.style.transform = `scale(${s})`; stage.style.height = 700 * s + 'px';
+}
+document.getElementById('tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b)); view = b.dataset.v; render(); };
+for (const id of ['blur', 'pblur', 'alpha', 'disp']) document.getElementById(id).oninput = e => {
+  document.getElementById(id + 'v').textContent = e.target.value + (id === 'alpha' || id === 'disp' ? '%' : ''); render(); };
+document.getElementById('solid').onchange = render;
+document.getElementById('pick').onclick = () => document.getElementById('file').click();
+document.getElementById('file').onchange = e => { const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader(); r.onload = () => { image = r.result; refreshCandidates(); if (view === 'plain') { view = 'dark';
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.v === 'dark')); } render(); }; r.readAsDataURL(f); };
+addEventListener('resize', fit);
+render();
+refreshCandidates();
+</script>
+</body>
+</html>

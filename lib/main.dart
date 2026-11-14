@@ -90,8 +90,9 @@ class PclPwApp extends StatelessWidget {
       title: AppInfo.name,
       navigatorKey: appNavigator,
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(Brightness.light, seed: Color(state.config.themeColor)),
-      darkTheme: buildTheme(Brightness.dark, seed: Color(state.config.themeColor)),
+      // 设了背景图片并选择跟随背景时，主题色取自背景图片
+      theme: buildTheme(Brightness.light, seed: state.background.themeSeed ?? Color(state.config.themeColor)),
+      darkTheme: buildTheme(Brightness.dark, seed: state.background.themeSeed ?? Color(state.config.themeColor)),
       themeMode: themeModeOf(state.config.themeMode),
       home: const Shell(),
       builder: (context, child) {

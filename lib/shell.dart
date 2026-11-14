@@ -11,6 +11,7 @@ import 'app_state.dart';
 import 'core/crash.dart';
 import 'platform.dart';
 import 'widgets/accounts_dialog.dart';
+import 'widgets/app_background.dart';
 import 'widgets/app_logo.dart';
 import 'widgets/device_status.dart';
 import 'widgets/shell_layout.dart';
@@ -169,35 +170,46 @@ class _ShellState extends State<Shell> {
     final shell = Scaffold(
       key: _navKey,
       backgroundColor: scheme.surface,
-      body: KeyedSubtree(
-        key: _rootKey,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _Rail(page: _page, sub: _sub, onMain: _goMain),
-            Expanded(
-              child: MediaQuery.removePadding(
-                context: context,
-                removeLeft: true,
-                removeTop: true,
-                removeRight: true,
-                removeBottom: true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _TopBar(
-                      page: _page,
-                      sub: _sub,
-                      onBack: () => setState(() => _sub = null),
-                      rootKey: _rootKey,
-                      splitX: _splitX,
+      body: BackgroundScope(
+        controller: AppScope.of(context).background,
+        rootKey: _rootKey,
+        child: KeyedSubtree(
+          key: _rootKey,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 电脑端设了背景图片时铺满整个窗口；没有时什么都不画
+              const BackgroundLayer(),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _Rail(page: _page, sub: _sub, onMain: _goMain),
+                  Expanded(
+                    child: MediaQuery.removePadding(
+                      context: context,
+                      removeLeft: true,
+                      removeTop: true,
+                      removeRight: true,
+                      removeBottom: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _TopBar(
+                            page: _page,
+                            sub: _sub,
+                            onBack: () => setState(() => _sub = null),
+                            rootKey: _rootKey,
+                            splitX: _splitX,
+                          ),
+                          Expanded(child: pageView),
+                        ],
+                      ),
                     ),
-                    Expanded(child: pageView),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -232,22 +244,25 @@ class _Rail extends StatelessWidget {
       selected: page == p && (sub == null || p == MainPage.home && sub == SubPage.instance),
       onTap: () => onMain(p),
     );
-    return Container(
-      width: width + inset,
-      padding: EdgeInsets.fromLTRB(inset, top, 0, 10),
+    return GlassPanel(
       color: scheme.surfaceContainerLow,
-      child: Column(
-        children: [
-          const AppLogo(size: 30),
-          const SizedBox(height: 10),
-          item(MainPage.home, Icons.rocket_launch_outlined, Icons.rocket_launch, '启动'),
-          item(MainPage.download, Icons.download_outlined, Icons.download, '下载'),
-          item(MainPage.tools, Icons.construction_outlined, Icons.construction, '工具'),
-          // 手机上的内置文件管理器（电脑上打开文件夹用系统的资源管理器）
-          if (!isDesktop) item(MainPage.files, Icons.folder_outlined, Icons.folder, '文件'),
-          item(MainPage.settings, Icons.settings_outlined, Icons.settings, '设置'),
-          item(MainPage.ai, Icons.chat_bubble_outline, Icons.chat_bubble, 'AI'),
-        ],
+      extraOpacity: .08,
+      child: Container(
+        width: width + inset,
+        padding: EdgeInsets.fromLTRB(inset, top, 0, 10),
+        child: Column(
+          children: [
+            const AppLogo(size: 30),
+            const SizedBox(height: 10),
+            item(MainPage.home, Icons.rocket_launch_outlined, Icons.rocket_launch, '启动'),
+            item(MainPage.download, Icons.download_outlined, Icons.download, '下载'),
+            item(MainPage.tools, Icons.construction_outlined, Icons.construction, '工具'),
+            // 手机上的内置文件管理器（电脑上打开文件夹用系统的资源管理器）
+            if (!isDesktop) item(MainPage.files, Icons.folder_outlined, Icons.folder, '文件'),
+            item(MainPage.settings, Icons.settings_outlined, Icons.settings, '设置'),
+            item(MainPage.ai, Icons.chat_bubble_outline, Icons.chat_bubble, 'AI'),
+          ],
+        ),
       ),
     );
   }
@@ -365,55 +380,63 @@ class _TopBarState extends State<_TopBar> {
     final scheme = theme.colorScheme;
     final state = AppScope.of(context);
     final sub = widget.sub;
-    Widget title;
-    if (sub != null) {
-      final text = sub == SubPage.instance ? '版本详情' : _subTitles[sub]!;
-      title = Row(
-        children: [
-          IconButton(tooltip: '返回', onPressed: widget.onBack, icon: const Icon(Icons.arrow_back, size: 20)),
-          const SizedBox(width: 2),
-          Flexible(
-            child: Text(
-              text,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      );
-    } else if (widget.page == MainPage.home) {
-      title = Text.rich(
-        TextSpan(
+    Widget title(Color? muted) {
+      if (sub != null) {
+        final text = sub == SubPage.instance ? '版本详情' : _subTitles[sub]!;
+        return Row(
           children: [
-            TextSpan(
-              text: greeting(state.selectedAccount?.name),
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            if (!compact)
-              TextSpan(
-                text: '  准备好冒险了吗？',
-                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            IconButton(tooltip: '返回', onPressed: widget.onBack, icon: const Icon(Icons.arrow_back, size: 20)),
+            const SizedBox(width: 2),
+            Flexible(
+              child: Text(
+                text,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
+            ),
           ],
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.titleMedium,
-      );
-    } else {
-      title = Text(
-        _mainTitles[widget.page]!,
-        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-      );
+        );
+      } else if (widget.page == MainPage.home) {
+        return Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: greeting(state.selectedAccount?.name),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              if (!compact)
+                TextSpan(
+                  text: '  准备好冒险了吗？',
+                  style: theme.textTheme.bodySmall?.copyWith(color: muted ?? scheme.onSurfaceVariant),
+                ),
+            ],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleMedium,
+        );
+      } else {
+        return Text(
+          _mainTitles[widget.page]!,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        );
+      }
     }
+
     // 桌面端：标题区域拖动窗口
-    Widget titleArea = Align(alignment: Alignment.centerLeft, child: title);
+    Widget titleArea = Align(
+      alignment: Alignment.centerLeft,
+      child: OnBackground(builder: (context, fg, muted) => title(muted)),
+    );
     if (isDesktop && !Platform.isLinux) titleArea = DragToMoveArea(child: SizedBox.expand(child: titleArea));
 
     return SizedBox(
       height: 56,
       child: Padding(
-        padding: EdgeInsets.only(left: (sub != null ? 6 : 14) + (Platform.isMacOS ? 8 : 0), right: isDesktop && !nativeWindowButtons ? 0 : 14),
+        padding: EdgeInsets.only(
+          left: (sub != null ? 6 : 14) + (Platform.isMacOS ? 8 : 0),
+          right: isDesktop && !nativeWindowButtons ? 0 : 14,
+        ),
         child: Row(
           children: [
             Expanded(child: titleArea),
@@ -469,20 +492,25 @@ class _BarChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: color ?? scheme.surfaceContainer,
-      borderRadius: BorderRadius.circular(9),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          height: 38,
-          padding: padding ?? const EdgeInsets.symmetric(horizontal: 12),
-          alignment: Alignment.center,
-          child: child,
-        ),
+    final content = InkWell(
+      onTap: onTap,
+      child: Container(
+        height: 38,
+        padding: padding ?? const EdgeInsets.symmetric(horizontal: 12),
+        alignment: Alignment.center,
+        child: child,
       ),
     );
+    // 指定了颜色（例如任务出错时）保持实色，其余在启用背景时是毛玻璃
+    if (color != null) {
+      return Material(
+        color: color,
+        borderRadius: BorderRadius.circular(9),
+        clipBehavior: Clip.antiAlias,
+        child: content,
+      );
+    }
+    return GlassPanel(color: scheme.surfaceContainer, borderRadius: BorderRadius.circular(9), child: content);
   }
 }
 

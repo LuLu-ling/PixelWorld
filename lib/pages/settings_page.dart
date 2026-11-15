@@ -160,6 +160,8 @@ class _AppearanceSection extends StatelessWidget {
                     : '自动：按屏幕尺寸计算，当前为 ${(autoUiScale(_unscaledSize(context)) * 100).round()}%',
               ),
               trailing: DropdownButton<double>(
+                // 鼠标选完后不保留焦点高亮（否则会留一块灰底）
+                focusColor: Colors.transparent,
                 value: uiScaleOptions.contains(cfg.uiScale) ? cfg.uiScale : 0.0,
                 underline: const SizedBox.shrink(),
                 borderRadius: BorderRadius.circular(12),
@@ -336,6 +338,8 @@ class _BackgroundSettings extends StatelessWidget {
               _ => '填充：铺满整个窗口，多出来的部分裁掉',
             }),
             trailing: DropdownButton<String>(
+              // 鼠标选完后不保留焦点高亮（否则会留一块灰底）
+              focusColor: Colors.transparent,
               value: bg.fit,
               underline: const SizedBox(),
               borderRadius: BorderRadius.circular(12),

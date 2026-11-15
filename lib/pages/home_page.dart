@@ -24,6 +24,7 @@ import '../widgets/launch_dialogs.dart';
 import '../widgets/version_icon.dart';
 import 'download_page.dart';
 import 'home_feed.dart';
+import 'instance_page.dart' show instanceSectionRequest;
 
 /// 启动页：左边是当前版本（背景取自存档封面的颜色），右边是公告和常用操作，下面是最近游玩。
 /// 左右分界线对齐顶栏「后台任务」的右边缘。
@@ -80,10 +81,12 @@ class _HomePageState extends State<HomePage> {
     if (mounted) await _launch();
   }
 
-  void _openInstance() {
+  /// 打开当前版本的详情；[section] 指定先显示的标签（例如 'saves' 存档）
+  void _openInstance([String? section]) {
     final version = AppScope.read(context).selectedVersion;
     if (version == null) return;
     AppScope.read(context).instanceId = version.id;
+    instanceSectionRequest.value = section;
     ShellNav.of(context).open(SubPage.instance);
   }
 
@@ -118,7 +121,9 @@ class _HomePageState extends State<HomePage> {
             loading: snap.connectionState == ConnectionState.waiting && worlds.isEmpty,
             onLaunch: _launch,
             onVersions: () => ShellNav.of(context).open(SubPage.versions),
-            onSettings: version == null ? null : _openInstance,
+            onSettings: version == null ? null : () => _openInstance('setup'),
+            onSaves: version == null ? null : () => _openInstance('saves'),
+            onManageMods: version == null ? null : () => _openInstance('mods'),
             onLog: () => ShellNav.of(context).open(SubPage.log),
             onFolder: version == null ? null : _openFolder,
             onInstallMods: () {
@@ -141,7 +146,7 @@ class _HomePageState extends State<HomePage> {
                   latest: latest,
                   onLaunch: _launch,
                   onVersions: () => ShellNav.of(context).open(SubPage.versions),
-                  onSettings: version == null ? null : _openInstance,
+                  onSettings: version == null ? null : () => _openInstance('setup'),
                   onLog: () => ShellNav.of(context).open(SubPage.log),
                   onFolder: version == null ? null : _openFolder,
                 ),
@@ -150,7 +155,7 @@ class _HomePageState extends State<HomePage> {
                     downloadTabRequest.value = 'mods';
                     ShellNav.of(context).goMain(MainPage.download);
                   },
-                  onManageMods: version == null ? null : _openInstance,
+                  onManageMods: version == null ? null : () => _openInstance('mods'),
                   onFolder: version == null ? null : _openFolder,
                   onLog: () => ShellNav.of(context).open(SubPage.log),
                 ),
@@ -163,7 +168,10 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Text('最近游玩', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                   const Spacer(),
-                  TextButton(onPressed: version == null ? null : _openInstance, child: const Text('全部存档 ›')),
+                  TextButton(
+                    onPressed: version == null ? null : () => _openInstance('saves'),
+                    child: const Text('全部存档 ›'),
+                  ),
                 ],
               ),
             ),
@@ -869,6 +877,8 @@ class _DesktopHome extends StatefulWidget {
     required this.onLaunch,
     required this.onVersions,
     required this.onSettings,
+    required this.onSaves,
+    required this.onManageMods,
     required this.onLog,
     required this.onFolder,
     required this.onInstallMods,
@@ -884,6 +894,12 @@ class _DesktopHome extends StatefulWidget {
   final VoidCallback onLaunch;
   final VoidCallback onVersions;
   final VoidCallback? onSettings;
+
+  /// 全部存档：打开版本详情的存档页
+  final VoidCallback? onSaves;
+
+  /// 管理模组：打开版本详情的模组页
+  final VoidCallback? onManageMods;
   final VoidCallback onLog;
   final VoidCallback? onFolder;
   final VoidCallback onInstallMods;
@@ -950,6 +966,8 @@ class _DesktopHomeState extends State<_DesktopHome> {
                   onLaunch: widget.onLaunch,
                   onVersions: widget.onVersions,
                   onSettings: widget.onSettings,
+                  onSaves: widget.onSaves,
+                  onManageMods: widget.onManageMods,
                   onLog: widget.onLog,
                   onFolder: widget.onFolder,
                   onInstallMods: widget.onInstallMods,
@@ -1004,7 +1022,7 @@ class _DesktopHomeState extends State<_DesktopHome> {
                                           child: _QuickButton(
                                             icon: Icons.view_list_outlined,
                                             label: '管理模组',
-                                            onTap: widget.onSettings,
+                                            onTap: widget.onManageMods,
                                           ),
                                         ),
                                       ],
@@ -1054,7 +1072,7 @@ class _DesktopHomeState extends State<_DesktopHome> {
                           const Spacer(),
                           OnBackground(
                             builder: (context, fg, _) => TextButton(
-                              onPressed: widget.onSettings,
+                              onPressed: widget.onSaves,
                               style: fg == null ? null : TextButton.styleFrom(foregroundColor: fg),
                               child: const Text('全部存档 ›'),
                             ),
@@ -1144,6 +1162,8 @@ class _WallpaperFold extends StatelessWidget {
     required this.onLaunch,
     required this.onVersions,
     required this.onSettings,
+    required this.onSaves,
+    required this.onManageMods,
     required this.onLog,
     required this.onFolder,
     required this.onInstallMods,
@@ -1160,6 +1180,12 @@ class _WallpaperFold extends StatelessWidget {
   final VoidCallback onLaunch;
   final VoidCallback onVersions;
   final VoidCallback? onSettings;
+
+  /// 全部存档：打开版本详情的存档页
+  final VoidCallback? onSaves;
+
+  /// 管理模组：打开版本详情的模组页
+  final VoidCallback? onManageMods;
   final VoidCallback onLog;
   final VoidCallback? onFolder;
   final VoidCallback onInstallMods;
@@ -1227,7 +1253,7 @@ class _WallpaperFold extends StatelessWidget {
               const Spacer(),
               tool(Icons.campaign_outlined, '启动器公告', () => showNoticesDialog(context)),
               tool(Icons.download_outlined, '装模组', onInstallMods),
-              tool(Icons.view_list_outlined, '管理模组', onSettings),
+              tool(Icons.view_list_outlined, '管理模组', onManageMods),
               tool(Icons.folder_outlined, '文件夹', onFolder),
               tool(Icons.article_outlined, '查看日志', onLog),
               Container(
@@ -1300,7 +1326,7 @@ class _WallpaperFold extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
-                  onTap: onSettings,
+                  onTap: onSaves,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: Row(

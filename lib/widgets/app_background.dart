@@ -544,7 +544,9 @@ class OnBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = BackgroundScope.activeOf(context);
     final l0 = scope?.controller.averageLuminance;
-    if (scope == null || l0 == null) return builder(context, null, null);
+    // 已经在毛玻璃面板里面（例如版本详情里的设置分组标题）：不是直接压在背景上，用面板上的正常颜色
+    final inGlass = context.dependOnInheritedWidgetOfExactType<_InGlass>() != null;
+    if (scope == null || l0 == null || inGlass) return builder(context, null, null);
     // 算上背景层上压的那层颜色
     final l = Theme.of(context).brightness == Brightness.dark ? l0 * .65 : l0 * .9 + .1;
     final darkText = l > .55;

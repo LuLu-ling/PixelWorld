@@ -12,6 +12,7 @@ import 'ai_prompt.dart';
 import 'ai_tools.dart';
 import 'mcp_hub.dart';
 import '../paths.dart';
+import '../safe_write.dart';
 
 /// 工具调用的结果状态
 enum ToolStatus { done, denied, error, cancelled }
@@ -316,8 +317,7 @@ class ChatStore extends ChangeNotifier {
 
   Future<void> _save(ChatSession s) async {
     try {
-      await _dir.create(recursive: true);
-      await File(p.join(_dir.path, '${s.id}.json')).writeAsString(jsonEncode(s.toJson()));
+      await writeFileSafely(File(p.join(_dir.path, '${s.id}.json')), utf8.encode(jsonEncode(s.toJson())));
     } catch (_) {
       // 保存失败不影响对话
     }

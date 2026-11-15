@@ -7,6 +7,7 @@ import '../app_info.dart';
 import 'download.dart';
 import 'instance.dart';
 import 'paths.dart';
+import 'safe_write.dart';
 import 'task.dart';
 
 const _api = 'https://api.modrinth.com/v2';
@@ -347,5 +348,5 @@ class Favorites {
   }
 
   static Future<void> save(List<ResourceHit> list) =>
-      _file.writeAsString(const JsonEncoder.withIndent('  ').convert([for (final h in list) h.toJson()]));
+      writeFileSafely(_file, utf8.encode(const JsonEncoder.withIndent('  ').convert([for (final h in list) h.toJson()])));
 }

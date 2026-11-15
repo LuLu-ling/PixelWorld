@@ -12,6 +12,7 @@ import '../shell.dart';
 import '../widgets/loader_label.dart';
 import 'file_manager_page.dart';
 import '../widgets/side_nav.dart';
+import 'instance_page.dart' show instanceSectionRequest;
 
 /// 版本选择：左侧游戏文件夹，右侧该文件夹中的版本（PCL 的布局）
 class VersionsPage extends StatelessWidget {
@@ -164,6 +165,7 @@ class VersionsPage extends StatelessWidget {
                                   icon: const Icon(Icons.settings_outlined),
                                   onPressed: () {
                                     state.instanceId = v.id;
+                                    instanceSectionRequest.value = 'setup';
                                     ShellNav.of(context).open(SubPage.instance);
                                   },
                                 ),

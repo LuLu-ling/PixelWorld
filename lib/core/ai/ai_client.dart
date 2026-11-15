@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import '../config.dart';
 import '../paths.dart';
 import '../secure.dart';
+import '../safe_write.dart';
 
 /// 接口格式：OpenAI 兼容（DeepSeek、通义千问、Kimi、OpenRouter、Ollama 等）或 Anthropic
 enum AiProvider { openai, anthropic }
@@ -57,9 +58,7 @@ class AiSettings {
 
   Future<void> save(LauncherConfig cfg) async {
     await cfg.update({'aiProvider': provider.name, 'aiBaseUrl': baseUrl.trim(), 'aiModel': model.trim()});
-    final f = _keyFile;
-    await f.parent.create(recursive: true);
-    await f.writeAsBytes(SecureData.protect(Uint8List.fromList(utf8.encode(apiKey.trim()))));
+    await writeFileSafely(_keyFile, SecureData.protect(Uint8List.fromList(utf8.encode(apiKey.trim()))));
   }
 
   static File get _keyFile => File(p.join(Paths.configDir, 'ai.dat'));

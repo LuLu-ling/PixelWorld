@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
 import '../app_state.dart';
+import '../widgets/app_background.dart';
 import '../widgets/version_icon.dart';
 import '../widgets/launch_dialogs.dart';
 import '../core/android_runtime.dart';
@@ -38,6 +39,9 @@ const _folders = {
   _Section.schematics: InstanceFolder.schematics,
 };
 
+/// 打开版本详情时要先显示的标签（例如首页「全部存档」打开存档页），打开后清空
+final instanceSectionRequest = ValueNotifier<String?>(null);
+
 /// 版本详情：顶部是封面、名称和常用操作，下面一排标签（模组、存档、资源包……、设置、概览）
 class InstancePage extends StatefulWidget {
   const InstancePage({super.key});
@@ -48,6 +52,14 @@ class InstancePage extends StatefulWidget {
 
 class _InstancePageState extends State<InstancePage> {
   _Section? _section;
+
+  @override
+  void initState() {
+    super.initState();
+    final want = instanceSectionRequest.value;
+    instanceSectionRequest.value = null;
+    if (want != null) _section = _Section.values.where((s) => s.name == want).firstOrNull;
+  }
 
   Future<void> _launch(InstanceInfo info) async {
     final state = AppScope.read(context);
@@ -96,97 +108,112 @@ class _InstancePageState extends State<InstancePage> {
       future: state.gameDirOf(info),
       builder: (context, snap) {
         final dir = snap.data;
+        // 启用背景图片时：顶部信息和下面的内容各放在一块毛玻璃上，不直接压在背景上
+        final glass = BackgroundScope.activeOf(context) != null;
+        Widget panel(Widget child, EdgeInsets padding) => glass
+            ? GlassPanel(
+                color: scheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(padding: padding, child: child),
+              )
+            : child;
         return Padding(
           padding: const EdgeInsets.fromLTRB(14, 0, 16, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  // 点图标更换或恢复默认
-                  PopupMenuButton<String>(
-                    tooltip: '更换图标',
-                    onSelected: (v) async {
-                      final dir = state.paths.versionDir(info.id);
-                      try {
-                        if (v == 'pick') await pickVersionLogo(dir);
-                        if (v == 'reset') await resetVersionLogo(dir);
-                      } catch (e) {
-                        if (context.mounted) toast(context, '更换图标失败：${errorText(e)}');
-                      }
-                      if (mounted) setState(() {});
-                    },
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(value: 'pick', child: Text('更换图标…')),
-                      PopupMenuItem(
-                        value: 'reset',
-                        enabled: customVersionLogo(state.paths.versionDir(info.id)) != null,
-                        child: const Text('恢复默认图标'),
-                      ),
-                    ],
-                    child: VersionIcon(info: info, versionDir: state.paths.versionDir(info.id), size: 48),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          versionTitle(info),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                        Text(
-                          versionTitle(info) == info.id ? describeVersion(info) : info.id,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                            fontFamily: 'monospace',
-                          ),
+              panel(
+                Row(
+                  children: [
+                    // 点图标更换或恢复默认
+                    PopupMenuButton<String>(
+                      tooltip: '更换图标',
+                      onSelected: (v) async {
+                        final dir = state.paths.versionDir(info.id);
+                        try {
+                          if (v == 'pick') await pickVersionLogo(dir);
+                          if (v == 'reset') await resetVersionLogo(dir);
+                        } catch (e) {
+                          if (context.mounted) toast(context, '更换图标失败：${errorText(e)}');
+                        }
+                        if (mounted) setState(() {});
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(value: 'pick', child: Text('更换图标…')),
+                        PopupMenuItem(
+                          value: 'reset',
+                          enabled: customVersionLogo(state.paths.versionDir(info.id)) != null,
+                          child: const Text('恢复默认图标'),
                         ),
                       ],
+                      child: VersionIcon(info: info, versionDir: state.paths.versionDir(info.id), size: 48),
                     ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: dir == null
-                        ? null
-                        : () async {
-                            try {
-                              await openInFileManager(dir);
-                            } catch (e) {
-                              if (context.mounted) toast(context, '打不开文件夹：${errorText(e)}');
-                            }
-                          },
-                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
-                    icon: const Icon(Icons.folder_outlined, size: 18),
-                    label: const Text('打开文件夹'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: running ? null : () => _launch(info),
-                    style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
-                    icon: const Icon(Icons.rocket_launch, size: 19),
-                    label: const Text('开始游戏'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              PageTabs<_Section>(tabs: tabs, value: section, onChanged: (s) => setState(() => _section = s)),
-              const SizedBox(height: 6),
-              Expanded(
-                child: dir == null
-                    ? const Center(child: CircularProgressIndicator())
-                    : KeyedSubtree(
-                        key: ValueKey('${info.id}-$section'),
-                        child: switch (section) {
-                          _Section.overview => _Overview(info: info, gameDir: dir),
-                          _Section.setup => _Setup(info: info),
-                          _Section.servers => _Servers(gameDir: dir),
-                          _ => _Files(info: info, gameDir: dir, folder: folder!),
-                        },
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            versionTitle(info),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          Text(
+                            versionTitle(info) == info.id ? describeVersion(info) : info.id,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: dir == null
+                          ? null
+                          : () async {
+                              try {
+                                await openInFileManager(dir);
+                              } catch (e) {
+                                if (context.mounted) toast(context, '打不开文件夹：${errorText(e)}');
+                              }
+                            },
+                      style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+                      icon: const Icon(Icons.folder_outlined, size: 18),
+                      label: const Text('打开文件夹'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: running ? null : () => _launch(info),
+                      style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+                      icon: const Icon(Icons.rocket_launch, size: 19),
+                      label: const Text('开始游戏'),
+                    ),
+                  ],
+                ),
+                const EdgeInsets.all(10),
+              ),
+              SizedBox(height: glass ? 8 : 4),
+              PageTabs<_Section>(tabs: tabs, value: section, onChanged: (s) => setState(() => _section = s)),
+              SizedBox(height: glass ? 8 : 6),
+              Expanded(
+                child: panel(
+                  dir == null
+                      ? const Center(child: CircularProgressIndicator())
+                      : KeyedSubtree(
+                          key: ValueKey('${info.id}-$section'),
+                          child: switch (section) {
+                            _Section.overview => _Overview(info: info, gameDir: dir),
+                            _Section.setup => _Setup(info: info),
+                            _Section.servers => _Servers(gameDir: dir),
+                            _ => _Files(info: info, gameDir: dir, folder: folder!),
+                          },
+                        ),
+                  const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                ),
               ),
             ],
           ),

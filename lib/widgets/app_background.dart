@@ -34,6 +34,9 @@ abstract final class BackgroundPrefs {
   /// 设了背景图片时首页用「壁纸」排版：内容放在顶部和底部，中间留给图片
   static const homeLayoutKey = 'bgHomeWallpaper';
 
+  /// 背景暗化：背景图片上压一层颜色的浓度（深色压黑、浅色压白），0～0.7；小于 0 表示用默认值
+  static const dimKey = 'bgDim';
+
   static const defaults = <String, dynamic>{
     imageKey: '',
     blurKey: 8.0,
@@ -44,6 +47,7 @@ abstract final class BackgroundPrefs {
     themeFromImageKey: true,
     seedIndexKey: 0,
     homeLayoutKey: true,
+    dimKey: -1.0,
   };
 
   /// 背景图片复制到启动器自己的数据目录，原图移动或删除后仍然可用
@@ -81,6 +85,12 @@ class BackgroundController extends ChangeNotifier {
   double get blur => (_get<num>(BackgroundPrefs.blurKey)).toDouble();
   double get panelBlur => (_get<num>(BackgroundPrefs.panelBlurKey)).toDouble();
   double get opacity => (_get<num>(BackgroundPrefs.opacityKey)).toDouble();
+
+  /// 背景暗化的浓度；没有调过时用默认值（深色 35%、浅色 10%，和以前一样）
+  double dimFor(Brightness b) {
+    final v = (_get<num>(BackgroundPrefs.dimKey)).toDouble();
+    return v < 0 ? (b == Brightness.dark ? .35 : .10) : v.clamp(0.0, .7);
+  }
   double get coverGlow => (_get<num>(BackgroundPrefs.glowKey)).toDouble();
   bool get solid => _get<bool>(BackgroundPrefs.solidKey);
   bool get themeFromImage => _get<bool>(BackgroundPrefs.themeFromImageKey);
@@ -323,7 +333,11 @@ class BackgroundLayer extends StatelessWidget {
     return RepaintBoundary(
       child: CustomPaint(
         painter: _CoverPainter(scope.controller.backgroundImage!),
-        foregroundPainter: _DimPainter(dark ? const Color(0x59000000) : const Color(0x1AFFFFFF)),
+        foregroundPainter: _DimPainter(
+          (dark ? Colors.black : Colors.white).withValues(
+            alpha: scope.controller.dimFor(dark ? Brightness.dark : Brightness.light),
+          ),
+        ),
         child: const SizedBox.expand(),
       ),
     );
@@ -548,7 +562,9 @@ class OnBackground extends StatelessWidget {
     final inGlass = context.dependOnInheritedWidgetOfExactType<_InGlass>() != null;
     if (scope == null || l0 == null || inGlass) return builder(context, null, null);
     // 算上背景层上压的那层颜色
-    final l = Theme.of(context).brightness == Brightness.dark ? l0 * .65 : l0 * .9 + .1;
+    final b = Theme.of(context).brightness;
+    final dim = scope.controller.dimFor(b);
+    final l = b == Brightness.dark ? l0 * (1 - dim) : l0 * (1 - dim) + dim;
     final darkText = l > .55;
     final fg = darkText ? const Color(0xFF111512) : const Color(0xFFF5F7F5);
     final muted = fg.withValues(alpha: darkText ? .72 : .78);

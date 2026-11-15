@@ -335,6 +335,20 @@ class _BackgroundSettings extends StatelessWidget {
                 cfg.update({BackgroundPrefs.blurKey: v.roundToDouble()}, persist: persist),
           ),
           _PrefSlider(
+            icon: Icons.brightness_6_outlined,
+            title: '背景暗化',
+            subtitle: Theme.of(context).brightness == Brightness.dark
+                ? '在背景图片上压一层黑色，图片很亮或很花时调高，界面和文字更清楚'
+                : '在背景图片上压一层白色，图片很暗或很花时调高，界面和文字更清楚',
+            value: bg.dimFor(Theme.of(context).brightness),
+            min: 0,
+            max: .7,
+            label: (v) => '${(v * 100).round()}%',
+            live: true,
+            onCommit: (v, {required persist}) =>
+                cfg.update({BackgroundPrefs.dimKey: (v * 100).roundToDouble() / 100}, persist: persist),
+          ),
+          _PrefSlider(
             icon: Icons.blur_linear,
             title: '面板模糊',
             subtitle: '只模糊面板后面的部分（毛玻璃），与背景模糊互不影响；为 0 时面板后面也是清晰的',

@@ -1,4 +1,5 @@
 import 'file_manager_page.dart';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -8,6 +9,7 @@ import '../core/instance_files.dart';
 import '../core/modrinth.dart';
 import '../core/task.dart';
 import '../widgets/format.dart';
+import '../widgets/app_background.dart';
 
 /// 社区资源（Modrinth）：搜索列表，点击进入详情
 class ResourceBrowser extends StatefulWidget {
@@ -108,8 +110,7 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
           child: Row(
             children: [
               Expanded(
-                child: TextField(
-                  controller: _query,
+                child: GlassField(
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search, size: 20),
                     hintText: '在 Modrinth 搜索${widget.type.label}',
@@ -119,18 +120,23 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                   ),
-                  onSubmitted: (_) => _search(),
+                  child: (decoration) =>
+                      TextField(controller: _query, decoration: decoration, onSubmitted: (_) => _search()),
                 ),
               ),
               if (current != null && widget.type != ResourceType.modpack) ...[
                 const SizedBox(width: 8),
-                FilterChip(
-                  label: Text('适配 ${current.id}', overflow: TextOverflow.ellipsis),
-                  selected: _fitCurrent,
-                  onSelected: (v) {
-                    _fitCurrent = v;
-                    _search();
-                  },
+                GlassPanel(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  child: FilterChip(
+                    label: Text('适配 ${current.id}', overflow: TextOverflow.ellipsis),
+                    selected: _fitCurrent,
+                    onSelected: (v) {
+                      _fitCurrent = v;
+                      _search();
+                    },
+                  ),
                 ),
               ],
               const SizedBox(width: 8),
@@ -148,20 +154,23 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
                   PopupMenuItem(value: 'newest', child: Text('最新发布')),
                   PopupMenuItem(value: 'updated', child: Text('最近更新')),
                 ],
-                child: Container(
-                  height: 40,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(10)),
-                  alignment: Alignment.center,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '排序 ${const {'relevance': '相关性', 'downloads': '下载量', 'follows': '关注数', 'newest': '最新发布', 'updated': '最近更新'}[_sort]}',
-                        style: theme.textTheme.labelLarge,
-                      ),
-                      const Icon(Icons.arrow_drop_down, size: 20),
-                    ],
+                child: GlassPanel(
+                  color: scheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    height: 40,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '排序 ${const {'relevance': '相关性', 'downloads': '下载量', 'follows': '关注数', 'newest': '最新发布', 'updated': '最近更新'}[_sort]}',
+                          style: theme.textTheme.labelLarge,
+                        ),
+                        const Icon(Icons.arrow_drop_down, size: 20),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -186,7 +195,9 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_error!),
+                      OnBackground(
+                        builder: (context, fg, _) => Text(_error!, style: TextStyle(color: fg)),
+                      ),
                       const SizedBox(height: 12),
                       FilledButton.tonal(onPressed: _search, child: const Text('重试')),
                     ],
@@ -196,7 +207,10 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
               ? const Center(child: CircularProgressIndicator())
               : _hits.isEmpty
               ? Center(
-                  child: Text('没有找到结果', style: TextStyle(color: scheme.onSurfaceVariant)),
+                  child: OnBackground(
+                    builder: (context, _, muted) =>
+                        Text('没有找到结果', style: TextStyle(color: muted ?? scheme.onSurfaceVariant)),
+                  ),
                 )
               : ListView.builder(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -264,63 +278,65 @@ class ResourceCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final state = AppScope.of(context);
     final fav = state.isFavorite(hit.id);
-    return Card.filled(
-      color: scheme.surfaceContainerLow,
-      margin: const EdgeInsets.only(bottom: 8),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ResourceIcon(url: hit.icon),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text.rich(
-                      TextSpan(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GlassPanel(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ResourceIcon(url: hit.icon),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: hit.title, style: theme.textTheme.titleMedium),
+                            if (hit.author.isNotEmpty)
+                              TextSpan(
+                                text: '  by ${hit.author}',
+                                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                              ),
+                          ],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hit.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          TextSpan(text: hit.title, style: theme.textTheme.titleMedium),
-                          if (hit.author.isNotEmpty)
-                            TextSpan(
-                              text: '  by ${hit.author}',
-                              style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                            ),
+                          for (final c in hit.categories.take(4)) _Tag(c),
+                          _Stat(Icons.download_outlined, formatCount(hit.downloads)),
+                          if (hit.updated.isNotEmpty) _Stat(Icons.update, timeAgo(hit.updated)),
                         ],
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      hit.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        for (final c in hit.categories.take(4)) _Tag(c),
-                        _Stat(Icons.download_outlined, formatCount(hit.downloads)),
-                        if (hit.updated.isNotEmpty) _Stat(Icons.update, timeAgo(hit.updated)),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                tooltip: fav ? '取消收藏' : '收藏',
-                onPressed: () => state.toggleFavorite(hit),
-                icon: Icon(fav ? Icons.favorite : Icons.favorite_border, color: fav ? scheme.error : null),
-              ),
-            ],
+                IconButton(
+                  tooltip: fav ? '取消收藏' : '收藏',
+                  onPressed: () => state.toggleFavorite(hit),
+                  icon: Icon(fav ? Icons.favorite : Icons.favorite_border, color: fav ? scheme.error : null),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -488,8 +504,9 @@ class _ResourceDetailState extends State<ResourceDetail> {
             ? all
             : all.where((v) => _compatible(v, inst)).toList();
         final warning = _warning(inst);
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 24, 24),
+        final glass = BackgroundScope.activeOf(context) != null;
+        final page = ListView(
+          padding: glass ? const EdgeInsets.fromLTRB(8, 12, 20, 20) : const EdgeInsets.fromLTRB(16, 12, 24, 24),
           children: [
             Row(
               children: [
@@ -539,7 +556,7 @@ class _ResourceDetailState extends State<ResourceDetail> {
               )
             else ...[
               Card.filled(
-                color: scheme.surfaceContainerLow,
+                color: glassCardColor(context, scheme.surfaceContainerLow),
                 margin: const EdgeInsets.only(left: 56),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -598,7 +615,7 @@ class _ResourceDetailState extends State<ResourceDetail> {
                 Padding(
                   padding: const EdgeInsets.only(left: 56, bottom: 6),
                   child: Card.filled(
-                    color: scheme.surfaceContainerLow,
+                    color: glassCardColor(context, scheme.surfaceContainerLow),
                     margin: EdgeInsets.zero,
                     child: ListTile(
                       title: Text(v.name, overflow: TextOverflow.ellipsis),
@@ -625,6 +642,11 @@ class _ResourceDetailState extends State<ResourceDetail> {
                 ),
             ],
           ],
+        );
+        if (!glass) return page;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: GlassPanel(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(16), child: page),
         );
       },
     );
@@ -653,7 +675,7 @@ class _FavoritesListState extends State<FavoritesList> {
     if (_open != null) return ResourceDetail(hit: _open!, onBack: () => setState(() => _open = null));
     final theme = Theme.of(context);
     final favorites = AppScope.of(context).favorites;
-    return ListView(
+    final list = ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       children: [
         Padding(
@@ -669,6 +691,12 @@ class _FavoritesListState extends State<FavoritesList> {
           ),
         for (final h in favorites) ResourceCard(hit: h, onTap: () => setState(() => _open = h)),
       ],
+    );
+    if (BackgroundScope.activeOf(context) == null) return list;
+    return GlassPanel(
+      color: theme.colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(16),
+      child: list,
     );
   }
 }

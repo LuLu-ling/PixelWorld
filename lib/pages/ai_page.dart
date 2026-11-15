@@ -14,6 +14,7 @@ import '../shell.dart';
 import '../widgets/ai_settings.dart';
 import '../widgets/ai_side_panel.dart';
 import '../widgets/side_nav.dart';
+import '../widgets/app_background.dart';
 
 const _mono = TextStyle(
   fontFamily: 'Consolas',
@@ -122,13 +123,15 @@ class _AiPageState extends State<AiPage> {
         builder: (context, box) {
           final wide = box.maxWidth >= _dockWidth;
           final open = wide ? state.config.aiPanel : _overlay;
-          void toggle() => wide ? state.config.update({'aiPanel': !state.config.aiPanel}) : setState(() => _overlay = !_overlay);
+          void toggle() =>
+              wide ? state.config.update({'aiPanel': !state.config.aiPanel}) : setState(() => _overlay = !_overlay);
           final page = Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _SessionList(chats: chats),
               Expanded(
                 child: ContentPanel(
+                  glass: true,
                   child: _ChatView(
                     key: ValueKey(chats.currentId),
                     chats: chats,
@@ -140,8 +143,9 @@ class _AiPageState extends State<AiPage> {
               ),
               if (wide && open)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 0, 12, 12),
-                  child: ClipRRect(
+                  padding: const EdgeInsets.fromLTRB(0, 0, 16, 16),
+                  child: GlassPanel(
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(16),
                     child: SizedBox(
                       width: AiSidePanel.width,
@@ -243,85 +247,92 @@ class _SessionList extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return SizedBox(
-      width: 200,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: FilledButton.tonalIcon(
-              onPressed: () => chats.open(null),
-              icon: const Icon(Icons.add),
-              label: const Text('新对话'),
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-            ),
+    // 启用背景图片时会话列表放在一块毛玻璃上，和设置页的二级菜单一样
+    final glass = BackgroundScope.activeOf(context) != null;
+    final column = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, glass ? 14 : 12, 16, 8),
+          child: FilledButton.tonalIcon(
+            onPressed: () => chats.open(null),
+            icon: const Icon(Icons.add),
+            label: const Text('新对话'),
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44)),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(28, 12, 16, 8),
-            child: Text('历史对话', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
-          ),
-          Expanded(
-            child: chats.sessions.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
-                    child: Text('还没有对话', style: TextStyle(color: scheme.onSurfaceVariant)),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                    itemCount: chats.sessions.length,
-                    itemBuilder: (context, i) {
-                      final s = chats.sessions[i];
-                      final selected = s.id == chats.currentId;
-                      final fg = selected ? scheme.onSecondaryContainer : scheme.onSurface;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: Material(
-                          color: selected ? scheme.secondaryContainer : Colors.transparent,
-                          borderRadius: BorderRadius.circular(24),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: () => chats.open(s.id),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          s.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: theme.textTheme.labelLarge?.copyWith(color: fg),
-                                        ),
-                                        Text(
-                                          chats.isBusy(s.id) ? '正在回答…' : _when(s.updated),
-                                          style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuButton<String>(
-                                    tooltip: '更多',
-                                    icon: Icon(Icons.more_horiz, size: 18, color: scheme.onSurfaceVariant),
-                                    onSelected: (v) => v == 'rename' ? _rename(context, s) : _delete(context, s),
-                                    itemBuilder: (context) => const [
-                                      PopupMenuItem(value: 'rename', child: Text('重命名')),
-                                      PopupMenuItem(value: 'delete', child: Text('删除')),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(28, 12, 16, 8),
+          child: Text('历史对话', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+        ),
+        Expanded(
+          child: chats.sessions.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: Text('还没有对话', style: TextStyle(color: scheme.onSurfaceVariant)),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                  itemCount: chats.sessions.length,
+                  itemBuilder: (context, i) {
+                    final s = chats.sessions[i];
+                    final selected = s.id == chats.currentId;
+                    final fg = selected ? scheme.onSecondaryContainer : scheme.onSurface;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Material(
+                        color: selected ? scheme.secondaryContainer : Colors.transparent,
+                        borderRadius: BorderRadius.circular(24),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () => chats.open(s.id),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        s.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.labelLarge?.copyWith(color: fg),
+                                      ),
+                                      Text(
+                                        chats.isBusy(s.id) ? '正在回答…' : _when(s.updated),
+                                        style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                                      ),
                                     ],
                                   ),
-                                ],
-                              ),
+                                ),
+                                PopupMenuButton<String>(
+                                  tooltip: '更多',
+                                  icon: Icon(Icons.more_horiz, size: 18, color: scheme.onSurfaceVariant),
+                                  onSelected: (v) => v == 'rename' ? _rename(context, s) : _delete(context, s),
+                                  itemBuilder: (context) => const [
+                                    PopupMenuItem(value: 'rename', child: Text('重命名')),
+                                    PopupMenuItem(value: 'delete', child: Text('删除')),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-          ),
-        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+    if (!glass) return SizedBox(width: 200, child: column);
+    return SizedBox(
+      width: 212,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 0, 16),
+        child: GlassPanel(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(20), child: column),
       ),
     );
   }
@@ -906,7 +917,8 @@ class _ToolCardState extends State<_ToolCard> {
                   ),
                   if (canExpand)
                     Icon(_expanded ? Icons.expand_less : Icons.expand_more, size: 18, color: scheme.onSurfaceVariant),
-                  if (result?.status == ToolStatus.done && const {'ws_write', 'ws_edit', 'ws_move'}.contains(widget.call.name))
+                  if (result?.status == ToolStatus.done &&
+                      const {'ws_write', 'ws_edit', 'ws_move'}.contains(widget.call.name))
                     Padding(
                       padding: const EdgeInsets.only(left: 6),
                       child: TextButton.icon(

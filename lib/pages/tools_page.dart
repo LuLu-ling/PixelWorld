@@ -16,6 +16,7 @@ import '../widgets/settings_group.dart';
 import '../shell.dart';
 import '../platform.dart';
 import '../widgets/side_nav.dart';
+import '../widgets/app_background.dart';
 import 'diagnose_page.dart';
 import 'docs_page.dart';
 import 'file_manager_page.dart';
@@ -98,7 +99,24 @@ class _ToolsPageState extends State<ToolsPage> {
           value: current,
           onChanged: (t) => t.sub != null ? ShellNav.of(context).open(t.sub!) : setState(() => _section = t.section),
         ),
-        Expanded(child: ContentPanel(child: _content(section))),
+        Expanded(
+          child: Builder(
+            builder: (context) {
+              // 错误分析、百宝箱本身是一张张卡片，直接放在背景上；其余的放在一块毛玻璃上，四周留出边距
+              final glass =
+                  section != _Section.diagnose &&
+                  section != _Section.toolbox &&
+                  BackgroundScope.activeOf(context) != null;
+              return ContentPanel(
+                glass: glass,
+                child: Padding(
+                  padding: glass ? const EdgeInsets.fromLTRB(14, 12, 0, 0) : EdgeInsets.zero,
+                  child: _content(section),
+                ),
+              );
+            },
+          ),
+        ),
       ],
     );
   }
@@ -117,13 +135,15 @@ class _ToolsPageState extends State<ToolsPage> {
           children: [
             Row(
               children: [
-                IconButton(tooltip: '返回工具', onPressed: () => setState(() => _section = null), icon: const Icon(Icons.arrow_back)),
+                IconButton(
+                  tooltip: '返回工具',
+                  onPressed: () => setState(() => _section = null),
+                  icon: const Icon(Icons.arrow_back),
+                ),
                 Text(tool.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
               ],
             ),
-            Expanded(
-              child: ContentPanel(child: _content(section)),
-            ),
+            Expanded(child: ContentPanel(child: _content(section))),
           ],
         ),
       );
@@ -149,7 +169,8 @@ class _ToolsPageState extends State<ToolsPage> {
                       width: w,
                       child: _ToolTile(
                         tool: t,
-                        onTap: () => t.sub != null ? ShellNav.of(context).open(t.sub!) : setState(() => _section = t.section),
+                        onTap: () =>
+                            t.sub != null ? ShellNav.of(context).open(t.sub!) : setState(() => _section = t.section),
                       ),
                     ),
                 ],
@@ -173,10 +194,9 @@ class _ToolTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Material(
+    return GlassPanel(
       color: scheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: ConstrainedBox(
@@ -219,8 +239,12 @@ class _ToolTile extends StatelessWidget {
 Widget _page(List<Widget> children) => ListView(padding: const EdgeInsets.fromLTRB(6, 2, 16, 16), children: children);
 
 /// 选择保存位置：桌面端系统对话框，手机上内置文件管理器
-Future<String?> _saveAs(BuildContext context, String name, {String label = 'PNG 图片', List<String> ext = const ['png']}) =>
-    pickSavePath(context, name, extensions: ext, label: label);
+Future<String?> _saveAs(
+  BuildContext context,
+  String name, {
+  String label = 'PNG 图片',
+  List<String> ext = const ['png'],
+}) => pickSavePath(context, name, extensions: ext, label: label);
 
 // ---------- 联机大厅（规划中） ----------
 

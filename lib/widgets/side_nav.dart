@@ -119,12 +119,26 @@ class _SideNavTile<T> extends StatelessWidget {
 
 /// 右侧内容区（新外壳里不再画单独的底板，只负责裁剪）
 class ContentPanel extends StatelessWidget {
-  const ContentPanel({super.key, required this.child});
+  const ContentPanel({super.key, required this.child, this.glass = false});
 
   final Widget child;
 
+  /// 启用背景图片时把整块内容放在一块毛玻璃面板上（内容是直接排版的文字、表单时用；
+  /// 内容本身已经是一张张卡片的页面，例如设置，不需要）
+  final bool glass;
+
   @override
-  Widget build(BuildContext context) => ClipRect(child: child);
+  Widget build(BuildContext context) {
+    if (!glass || BackgroundScope.activeOf(context) == null) return ClipRect(child: child);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 0, 16, 16),
+      child: GlassPanel(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        child: child,
+      ),
+    );
+  }
 }
 
 /// 页面顶部的一排分类标签（下载、版本详情等），每个标签 40 高，选中项下面有主题色下划线
@@ -140,11 +154,16 @@ class PageTabs<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Container(
+    // 启用背景图片时整排标签放在一条毛玻璃上
+    final glass = BackgroundScope.activeOf(context) != null;
+    final bar = Container(
       height: 44,
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .4))),
-      ),
+      padding: glass ? const EdgeInsets.symmetric(horizontal: 6) : null,
+      decoration: glass
+          ? null
+          : BoxDecoration(
+              border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .4))),
+            ),
       child: Row(
         children: [
           Expanded(
@@ -179,6 +198,8 @@ class PageTabs<T> extends StatelessWidget {
         ],
       ),
     );
+    if (!glass) return bar;
+    return GlassPanel(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(14), child: bar);
   }
 }
 
@@ -196,7 +217,10 @@ class SegmentPicker<T> extends StatelessWidget {
     final scheme = theme.colorScheme;
     return Container(
       padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(color: scheme.surfaceContainer, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: glassCardColor(context, scheme.surfaceContainer),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

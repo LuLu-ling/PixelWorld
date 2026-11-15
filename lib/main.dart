@@ -17,6 +17,7 @@ import 'platform.dart';
 import 'shell.dart';
 import 'theme.dart';
 import 'widgets/launch_splash.dart';
+import 'widgets/smooth_wheel.dart';
 
 Future<void> main(List<String> args) async {
   // 安装包外壳与系统「应用」列表会以安装 / 卸载模式启动；这时不读写启动器的用户数据
@@ -24,6 +25,8 @@ Future<void> main(List<String> args) async {
   if (installer != null) return runInstaller(installer, args);
 
   WidgetsFlutterBinding.ensureInitialized();
+  // 电脑上鼠标滚轮平滑滚动
+  if (isDesktop) SmoothWheel.install();
   FlutterError.onError = (details) {
     stderr.writeln('PCLPW FLUTTER ERROR: ${details.exceptionAsString()}\n${details.stack}');
     FlutterError.presentError(details);

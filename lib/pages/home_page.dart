@@ -1213,7 +1213,10 @@ class _WallpaperFold extends StatelessWidget {
                 VersionIcon(info: v, versionDir: state.paths.versionDir(v.id), size: 40, radius: 11),
                 const SizedBox(width: 12),
               ],
-              Flexible(
+              // 版本名按自己的长度显示（最长 280，超出省略）；剩下的宽度全部给后面的 Spacer，
+              // 图标和按钮才会靠到最右边（以前用 Flexible 和 Spacer 平分，用不完的那一半会留在最右边）
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 280),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,

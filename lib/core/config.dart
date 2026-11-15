@@ -145,16 +145,46 @@ class LauncherConfig extends ChangeNotifier {
     return LauncherConfig._(data);
   }
 
-  Future<void> _save() async {
-    await _file.parent.create(recursive: true);
-    await _file.writeAsString(const JsonEncoder.withIndent('  ').convert(_data));
-    unawaited(Paths.backupConfigFile(_file));
+  Future<void>? _saving;
+  var _dirty = false;
+
+  /// 保存排队：同一时间只写一次，写的过程中又有修改就在写完后再写一次（多次修改合并成一次）。
+  /// 以前连续修改（例如拖动滑块）会同时打开同一个文件写入，Windows 上报「文件正被使用」，还可能把配置写坏。
+  /// 先写到临时文件再替换，写到一半出错也不会留下损坏的配置
+  Future<void> _save() {
+    _dirty = true;
+    return _saving ??= _flush().whenComplete(() => _saving = null);
   }
 
-  Future<void> update(Map<String, dynamic> patch) async {
+  Future<void> _flush() async {
+    var retried = false;
+    while (_dirty) {
+      _dirty = false;
+      try {
+        await _file.parent.create(recursive: true);
+        final tmp = File('${_file.path}.tmp');
+        await tmp.writeAsString(const JsonEncoder.withIndent('  ').convert(_data), flush: true);
+        await tmp.rename(_file.path);
+        unawaited(Paths.backupConfigFile(_file));
+      } catch (e) {
+        // 保存失败（例如文件刚好被备份或杀毒软件占用）：稍等再试一次；还是失败就留到下次修改时保存，修改在内存里仍然生效
+        if (!retried) {
+          retried = true;
+          _dirty = true;
+          await Future<void>.delayed(const Duration(milliseconds: 200));
+        } else {
+          stderr.writeln('保存配置失败：$e');
+        }
+      }
+    }
+  }
+
+  /// 修改设置并保存。[persist] 为 false 时只在内存里生效、通知界面，不写文件
+  /// （拖动滑块时每一帧都在变，松手时再保存一次）
+  Future<void> update(Map<String, dynamic> patch, {bool persist = true}) async {
     _data.addAll(patch);
     notifyListeners();
-    await _save();
+    if (persist) await _save();
   }
 
   T _get<T>(String key) => _data[key] as T;

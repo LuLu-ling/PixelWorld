@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>首页排版预设</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0b0d0c; color: #e2e6e2;
+    font-family: system-ui, "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", sans-serif; }
+  .page { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 16px 28px; }
+  .bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; }
+  .tabs { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: #1a1d1b; }
+  .tabs button { border: 0; background: none; color: #9aa59d; font: inherit; font-size: 14px; padding: 7px 16px; border-radius: 999px; cursor: pointer; }
+  .tabs button.on { background: #2f5d47; color: #d7f2e3; }
+  .controls { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 20px; font-size: 13px; color: #9aa59d; }
+  .controls label { display: flex; align-items: center; gap: 8px; }
+  .controls input[type=range] { width: 110px; accent-color: #7fc7a1; }
+  .controls select { background: #1a1d1b; color: #cfe3d7; border: 1px solid #3a423d; border-radius: 8px; padding: 4px 6px; font: inherit; }
+  .pick { border: 1px solid #3a423d; background: #1a1d1b; color: #cfe3d7; border-radius: 999px; padding: 6px 14px; cursor: pointer; font: inherit; font-size: 13px; }
+  .note { max-width: 1000px; color: #7c877f; font-size: 13px; line-height: 1.75; text-align: center; }
+  .note b { color: #b7c3ba; font-weight: 600; }
+
+  /* ---------- 窗口：按真实逻辑像素 1100×700 画，整体缩放进浏览器 ---------- */
+  .stage { width: min(1100px, 100%); }
+  .win { position: relative; width: 1100px; height: 700px; border-radius: 10px; overflow: hidden; transform-origin: top left;
+    box-shadow: 0 0 0 1px #2c322e, 0 30px 80px rgba(0,0,0,.6); background: var(--bg); color: var(--text); }
+  .bgimg { position: absolute; inset: 0; background-size: 1100px 700px; filter: blur(var(--blur, 8px)); transform: scale(1.04); }
+  .bgdim { position: absolute; inset: 0; background: rgba(var(--dimc), var(--dim, .2)); }
+  .app { position: relative; display: flex; width: 100%; height: 100%; }
+
+  /* 毛玻璃：面板自己画一份和窗口对齐的背景，用「面板模糊」单独模糊，再叠一层主题色 */
+  .panel, .rail { position: relative; overflow: hidden; isolation: isolate; box-shadow: inset 0 0 0 1px var(--line); }
+  .glass, .tintl { position: absolute; z-index: -1; pointer-events: none; }
+  .glass { background-size: 1100px 700px; filter: blur(var(--pblur, 20px)); }
+  .tintl { inset: 0; background: rgba(var(--tint), var(--alpha, .62)); }
+  .panel.strong .tintl { background: rgba(var(--tint), calc(var(--alpha, .62) + .1)); }
+  .rail .tintl { background: rgba(var(--tint), calc(var(--alpha, .62) + var(--railx, .08))); }
+  /* 面板里面的卡片：半透明叠在面板上，不再重复画背景 */
+  .card { background: rgba(var(--tint), .45); box-shadow: inset 0 0 0 1px var(--line); }
+
+  .rail { width: 76px; flex: none; display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 4px; }
+  .logo { width: 30px; height: 30px; border-radius: 9px; margin-bottom: 10px; background: #2b6bd9; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 800; }
+  .nav { width: 60px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0; color: var(--muted); font-size: 11px; }
+  .nav .ic { width: 52px; height: 30px; border-radius: 15px; display: grid; place-items: center; }
+  .nav.on { color: var(--text); font-weight: 600; } .nav.on .ic { background: var(--sel); color: var(--on-pc); }
+  svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+  .top { height: 56px; flex: none; display: flex; align-items: center; gap: 10px; padding-left: 20px; }
+  .hello b { font-size: 17px; } .hello span { font-size: 13px; margin-left: 8px; }
+  .grow { flex: 1; }
+  .pill { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border-radius: 17px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .ibtn { width: 34px; height: 34px; border-radius: 17px; display: grid; place-items: center; color: var(--muted); position: relative; }
+  .ibtn.tip:hover::after { content: attr(data-t); position: absolute; top: 40px; left: 50%; transform: translateX(-50%); background: #222; color: #eee;
+    font-size: 12px; padding: 4px 8px; border-radius: 6px; white-space: nowrap; z-index: 9; }
+  .av { width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+  .wb { display: flex; height: 100%; margin-left: 4px; } .wb div { width: 46px; display: grid; place-items: center; color: var(--muted); } .wb svg { width: 14px; height: 14px; stroke-width: 1.4; }
+
+  /* 直接放在背景上的文字：整张图统一黑字或白字；可选柔和光晕 */
+  .onbg { color: var(--fg) !important; text-shadow: var(--fgshadow); } .onbg span, .onbg small { color: var(--fgm) !important; }
+
+  .btn { height: 44px; padding: 0 22px; border-radius: 22px; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .btn.fill { background: var(--primary); color: var(--on-primary); }
+  .btn.out { box-shadow: inset 0 0 0 1px var(--faint); color: var(--text); font-weight: 600; }
+  .btn.icon { width: 44px; padding: 0; justify-content: center; }
+  .btn.sm { height: 36px; padding: 0 16px; font-size: 13px; } .btn.sm.icon { width: 36px; padding: 0; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 12px; border-radius: 8px; font-size: 12.5px; background: rgba(var(--tint), .5); box-shadow: inset 0 0 0 1px var(--line); white-space: nowrap; }
+  .vicon { border-radius: 14px; background: var(--pc); color: var(--on-pc); display: grid; place-items: center; flex: none; }
+  .muted { color: var(--muted); }
+  .thumb { width: 44px; height: 44px; border-radius: 9px; box-shadow: 0 6px 14px rgba(0,0,0,.35); image-rendering: pixelated; flex: none; }
+  .wt { border-radius: 14px; display: flex; align-items: center; gap: 12px; padding: 0 10px; position: relative; overflow: hidden; min-width: 0; }
+  .wt b { font-size: 14px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .wt small { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .disp { position: absolute; inset: 0; z-index: -1; pointer-events: none; mix-blend-mode: screen; opacity: .5; }
+  .win.light .disp { mix-blend-mode: multiply; opacity: .3; }
+
+  /* ---------- 标准：现在的布局 ---------- */
+  .std { gap: 16px; padding: 4px 20px 18px; }
+  .std .row { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; height: 300px; }
+  .std .hero { border-radius: 20px; padding: 18px 22px; display: flex; flex-direction: column; }
+  .std .vicon { width: 56px; height: 56px; } .std .vicon svg { width: 28px; height: 28px; }
+  .std .vname { font-size: 26px; font-weight: 800; }
+  .std .side { display: flex; flex-direction: column; gap: 12px; }
+  .std .notice { border-radius: 16px; padding: 12px 16px; flex: 1; } .std .notice b { font-size: 14px; }
+  .std .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .q { height: 44px; border-radius: 14px; display: flex; align-items: center; gap: 10px; padding: 0 14px; font-size: 14px; }
+  .q svg { width: 18px; height: 18px; color: var(--muted); }
+  .std .sect { display: flex; justify-content: space-between; align-items: baseline; } .std .sect b { font-size: 15px; } .std .sect span { font-size: 13px; }
+  .std .worlds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; } .std .wt { height: 64px; }
+  .std .more { text-align: center; font-size: 12.5px; margin-top: auto; }
+
+  /* ---------- 壁纸：内容放在顶部和底部，中间留给图片 ---------- */
+  .wp { padding: 2px 20px 18px; gap: 12px; }
+  .strip { height: 64px; border-radius: 18px; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 12px; flex: none; }
+  .strip .vicon { width: 40px; height: 40px; border-radius: 11px; } .strip .vicon svg { width: 20px; height: 20px; }
+  .strip .vname { font-size: 16px; font-weight: 800; } .strip .vsub { font-size: 12px; }
+  .sep { width: 1px; height: 26px; background: var(--line); margin: 0 2px; }
+  .badge::before { content: ""; position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--primary); }
+  .void { flex: 1; min-height: 0; position: relative; }
+  .dock { border-radius: 20px; padding: 8px; display: flex; align-items: stretch; gap: 12px; flex: none; position: relative; }
+  .start { width: 200px; height: 48px; border-radius: 24px; background: var(--primary); color: var(--on-primary); display: flex; align-items: center; gap: 12px; padding: 0 22px; flex: none; }
+  .start b { font-size: 15px; display: block; line-height: 1.2; } .start small { font-size: 11.5px; opacity: .8; display: block; line-height: 1.2; }
+  .start svg { width: 22px; height: 22px; }
+  .dock .worlds { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; } .dock .wt { height: 48px; padding: 0 8px; gap: 10px; border-radius: 12px; } .dock .thumb { width: 32px; height: 32px; border-radius: 7px; box-shadow: none; } .dock .wt b { font-size: 13px; } .dock .wt small { font-size: 11.5px; }
+  .dock .all { width: 96px; border-radius: 12px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; font-size: 12.5px; color: var(--muted); flex: none; cursor: pointer; }
+  .handle { position: absolute; left: 50%; top: -11px; transform: translateX(-50%); width: 64px; height: 22px; border-radius: 11px; display: grid; place-items: center; cursor: pointer; }
+  .handle svg { width: 16px; height: 16px; color: var(--muted); }
+  /* 首页可以往下滚动：第一屏正好是窗口的高度（顶部条 + 留给壁纸的空白 + 底部条），往下是全部存档、公告和快捷操作；背景图片固定不动 */
+  .scroller { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(127,127,127,.4) transparent; }
+  .screen { display: flex; flex-direction: column; }
+  .hint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+  .below { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; padding: 6px 20px 20px; align-items: start; }
+  .below .box { border-radius: 18px; padding: 14px 16px; }
+  .below .feed, .below .side { display: flex; flex-direction: column; gap: 12px; } .below .side { padding-top: 8px; }
+  .feedhead { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; } .feedhead b { font-size: 16px; } .feedhead span { font-size: 12px; }
+  .below .news { border-radius: 18px; padding: 12px; display: flex; gap: 14px; }
+  .nimg { width: 160px; height: 90px; border-radius: 12px; flex: none; }
+  .news b { font-size: 15px; display: block; } .news small { color: var(--muted); font-size: 12px; } .news p { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+  .kv { display: flex; justify-content: space-between; font-size: 13px; margin-top: 10px; } .kv span { color: var(--muted); } .kv b { font-weight: 600; }
+
+  /* ---------- 极简：只有底部一条 ---------- */
+  .mini { justify-content: flex-end; align-items: center; padding: 0 20px 22px; }
+  .mdock { border-radius: 30px; padding: 10px 10px 10px 12px; display: flex; align-items: center; gap: 12px; }
+  .mdock .vicon { width: 40px; height: 40px; border-radius: 12px; } .mdock .vicon svg { width: 20px; height: 20px; }
+  .mdock .vname { font-size: 15px; font-weight: 800; } .mdock .vsub { font-size: 12px; }
+  .mdock .start { width: auto; height: 52px; border-radius: 26px; padding: 0 24px; } .mdock .start b { font-size: 15px; }
+
+  /* 主题色（深色、浅色），由背景图片取色后覆盖 */
+  .win.dark  { --bg:#111412; --text:#e1e4e0; --muted:#a6aea8; --faint:#78817b; --primary:#94d5b1; --on-primary:#00391f; --pc:#0f5135; --on-pc:#b0f1cc; --sel:#2f5d47; --line:rgba(255,255,255,.08); --tint:17,20,18; --dimc:0,0,0; }
+  .win.light { --bg:#f5fbf6; --text:#171d19; --muted:#404943; --faint:#707973; --primary:#2c6a4c; --on-primary:#fff; --pc:#b0f1cc; --on-pc:#002113; --sel:#c4e8d3; --line:rgba(0,0,0,.08); --tint:245,251,246; --dimc:255,255,255; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="bar">
+    <div class="tabs" id="layout">
+      <button data-v="std">标准（现在）</button>
+      <button data-v="wp" class="on">壁纸</button>
+      <button data-v="mini">极简</button>
+    </div>
+    <div class="tabs" id="mode">
+      <button data-v="dark" class="on">深色</button>
+      <button data-v="light">浅色</button>
+    </div>
+    <button class="pick" id="pick">换成我的图片…</button>
+    <input type="file" id="file" accept="image/*" hidden>
+  </div>
+  <div class="controls">
+    <label>背景模糊 <input type="range" id="blur" min="0" max="48" value="0"><span id="blurv">0</span></label>
+    <label>面板模糊 <input type="range" id="pblur" min="0" max="40" value="20"><span id="pblurv">20</span></label>
+    <label>面板不透明度 <input type="range" id="alpha" min="35" max="95" value="62"><span id="alphav">62%</span></label>
+    <label>背景暗化 <input type="range" id="dim" min="0" max="70" value="15"><span id="dimv">15%</span></label>
+    <label>契合度 <select id="fit">
+      <option value="fill">填充</option><option value="fit">适应</option><option value="stretch">拉伸</option>
+      <option value="tile">平铺</option><option value="center">居中</option><option value="span">跨区</option></select></label>
+    <label>对齐位置 <select id="focus">
+      <option value="50,50">居中</option><option value="50,20">靠上</option><option value="50,80">靠下</option>
+      <option value="25,50">靠左</option><option value="75,50">靠右</option></select></label>
+    <label><input type="checkbox" id="glow" checked> 背景文字光晕</label>
+    <label><input type="checkbox" id="rail" checked> 侧栏与面板一样透明</label>
+  </div>
+  <div class="note" id="note"></div>
+  <div class="stage" id="stage"><div class="win dark" id="win"></div></div>
+</div>
+
+<template id="tpl-shell">
+  <div class="bgimg"></div><div class="bgdim"></div>
+  <div class="app">
+    <div class="rail">
+      <div class="logo">PW</div>
+      <div class="nav on"><div class="ic"><svg viewBox="0 0 24 24"><path d="M5 19c2-6 6-11 14-14-2 8-7 12-13 14z"/><path d="M9 15l-3 3"/></svg></div>启动</div>
+      <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 4v11m-5-5l5 5 5-5M5 20h14"/></svg></div>下载</div>
+      <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M14 7l3-3 3 3-3 3m-3-3l-9 9 3 3 9-9"/></svg></div>工具</div>
+      <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3m9-9h-3M6 12H3"/></svg></div>设置</div>
+      <div class="nav"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></div>AI</div>
+    </div>
+    <div class="main">
+      <div class="top">
+        <div class="hello onbg"><b>下午好，Steve</b><span>准备好冒险了吗？</span></div>
+        <div class="pill panel" style="margin-left:14px">✓ 当前无后台任务</div>
+        <div class="grow"></div>
+        <div class="ibtn"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></div>
+        <div class="ibtn"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4zM10 20h4"/></svg></div>
+        <div class="pill panel" style="padding-left:4px;color:var(--text)"><span class="av">S</span>Steve · 离线</div>
+        <div class="wb"><div><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></div><div><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></div><div><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></div></div>
+      </div>
+      <div id="body" style="flex:1;min-height:0;display:flex;flex-direction:column"></div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-std">
+  <div class="scroller" id="scroller">
+  <div class="std screen">
+    <div class="row">
+      <div class="hero panel strong">
+        <div><span class="chip">切换版本 ▾</span></div>
+        <div style="display:flex;align-items:center;gap:14px;margin-top:auto">
+          <div class="vicon" style="width:56px;height:56px"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg></div>
+          <div><div class="vname">1.12.2 Legacy Fabric</div><div class="muted" style="font-size:13px;margin-top:4px">fabric-loader-0.20.1-1.12.2</div></div>
+        </div>
+        <div class="muted" style="font-size:13px;margin-top:12px">0 个模组 · 12 天前玩过</div>
+        <div style="display:flex;gap:10px;margin-top:16px"><div class="btn fill">🚀 开始游戏</div><div class="btn out">⚙ 版本设置</div><div class="btn out icon">···</div></div>
+      </div>
+      <div class="side">
+        <div class="notice panel"><b>启动器公告</b><div class="muted" style="font-size:12.5px;margin-top:4px">暂无公告</div></div>
+        <div class="quick">
+          <div class="q panel">⤓ 装模组</div><div class="q panel">☰ 管理模组</div>
+          <div class="q panel">▭ 文件夹</div><div class="q panel">≡ 查看日志</div>
+        </div>
+      </div>
+    </div>
+    <div class="sect onbg"><b>最近游玩</b><span>全部存档 ›</span></div>
+    <div class="worlds" data-worlds="3"></div>
+    <div class="more onbg hint" style="position:static;transform:none"><span>向下滚动查看更多 ⌄</span></div>
+  </div>
+    <div class="below" data-below></div>
+  </div>
+</template>
+
+<template id="tpl-wp">
+  <div class="scroller" id="scroller">
+    <div class="wp screen">
+      <div class="strip panel">
+        <div class="vicon"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg></div>
+        <div style="min-width:0"><div class="vname">1.12.2 Legacy Fabric</div><div class="vsub muted">0 个模组 · 12 天前玩过</div></div>
+        <span class="chip" style="margin-left:4px">切换版本 ▾</span>
+        <div class="grow"></div>
+        <div class="ibtn tip" data-t="装模组"><svg viewBox="0 0 24 24"><path d="M12 4v11m-5-5l5 5 5-5M5 20h14"/></svg></div>
+        <div class="ibtn tip" data-t="管理模组"><svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h14"/></svg></div>
+        <div class="ibtn tip" data-t="文件夹"><svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></svg></div>
+        <div class="ibtn tip" data-t="查看日志"><svg viewBox="0 0 24 24"><path d="M6 4h12v16H6zM9 9h6M9 13h6"/></svg></div>
+        <div class="sep"></div>
+        <div class="btn out sm">版本设置</div>
+        <div class="btn out sm icon">···</div>
+      </div>
+      <div class="void"><div class="hint onbg"><span>向下滚动查看更多 ⌄</span></div></div>
+      <div class="dock panel">
+        <div class="start"><svg viewBox="0 0 24 24"><path d="M5 19c2-6 6-11 14-14-2 8-7 12-13 14z"/><path d="M9 15l-3 3"/></svg><div><b>开始游戏</b><small>1.12.2 Legacy Fabric</small></div></div>
+        <div class="worlds" data-worlds="3"></div>
+        <div class="all card"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>全部存档</div>
+      </div>
+    </div>
+    <div class="below" data-below></div>
+  </div>
+</template>
+
+<template id="tpl-mini">
+  <div class="scroller" id="scroller">
+    <div class="mini screen">
+      <div class="mdock panel">
+        <div class="vicon"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg></div>
+        <div><div class="vname">1.12.2 Legacy Fabric</div><div class="vsub muted">切换版本 ▾</div></div>
+        <div class="sep"></div>
+        <div class="ibtn tip" data-t="全部存档"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></div>
+        <div class="ibtn tip" data-t="版本设置"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3m9-9h-3M6 12H3"/></svg></div>
+        <div class="ibtn tip" data-t="更多"><svg viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></div>
+        <div class="start"><svg viewBox="0 0 24 24"><path d="M5 19c2-6 6-11 14-14-2 8-7 12-13 14z"/><path d="M9 15l-3 3"/></svg><b>开始游戏</b></div>
+      </div>
+    </div>
+    <div class="below" data-below></div>
+  </div>
+</template>
+
+<template id="tpl-below">
+  <div class="feed">
+    <div class="box panel" style="display:flex;align-items:center;gap:12px"><span style="font-size:18px">📣</span>
+      <div style="flex:1"><b style="font-size:14px">Pixel World 已更新</b><div class="muted" style="font-size:12.5px;margin-top:2px">看看这个版本新增了什么</div></div><div class="btn out sm">查看更新日志</div></div>
+    <div class="feedhead onbg"><b>Minecraft 版本动态</b><span>来自 Minecraft Wiki</span></div>
+    <div class="news panel"><div class="nimg" style="background:linear-gradient(135deg,#6a9f5b,#3e6e8e)"></div><div><b>Java 版 26.3</b><small>正式版 · 2026 年 9 月 15 日</small><p>新增生物群系与方块，优化了渲染性能，修复了 200 多个问题。</p></div></div>
+    <div class="news panel"><div class="nimg" style="background:linear-gradient(135deg,#b07a4a,#5b3b6e)"></div><div><b>Java 版 26.4 快照 26w44a</b><small>快照 · 2 周前</small><p>实验性的新功能，开启实验性玩法后可以体验。</p></div></div>
+    <div class="news panel"><div class="nimg" style="background:linear-gradient(135deg,#4a7fb0,#8eb8d8)"></div><div><b>基岩版 1.26.30</b><small>正式版 · 1 个月前</small><p>与 Java 版同步的内容更新和问题修复。</p></div></div>
+  </div>
+  <div class="side">
+    <div class="box panel"><div style="display:flex;align-items:center"><b style="font-size:14px;flex:1">当前版本</b><span style="color:var(--primary);font-size:13px">版本设置 ›</span></div>
+      <div class="kv"><span>名称</span><b>1.12.2 Legacy Fabric</b></div><div class="kv"><span>游戏版本</span><b>1.12.2</b></div>
+      <div class="kv"><span>加载器</span><b>Legacy Fabric 0.20.1</b></div><div class="kv"><span>Java</span><b>Java 8（自动）</b></div><div class="kv"><span>模组</span><b>0 个</b></div></div>
+    <div class="box panel" style="font-size:12.5px;line-height:1.7"><span class="muted">Pixel World 测试版，功能还在完善中，遇到问题请到 GitHub 反馈。<br>本软件完全免费、开源。如果你是付费获得的，请向卖家申请退款，并从 GitHub 获取正版。</span>
+      <div style="margin-top:8px;color:var(--primary);font-weight:600">反馈问题 · 获取正版</div></div>
+  </div>
+</template>
+
+<script>
+// 默认背景：用代码画的像素风景（自己画的，不涉及版权）
+function scenery(w, h) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  const sky = g.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#5b8fc9'); sky.addColorStop(.55, '#a9cbe6'); sky.addColorStop(1, '#e6d6b8');
+  g.fillStyle = sky; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#fff4c8'; g.fillRect(w * .72, h * .16, 64, 64);
+  const px = 16; let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const layer = (base, amp, col, top) => { for (let x = 0; x < w; x += px) { const y = Math.round((base + Math.sin(x / 140 + amp) * 40 + rnd() * 24) / px) * px;
+      g.fillStyle = col; g.fillRect(x, y, px, h - y); g.fillStyle = top; g.fillRect(x, y, px, px); } };
+  layer(h * .52, 1, '#6e8aa4', '#86a2bb'); layer(h * .62, 3, '#4f7a4a', '#6da35d'); layer(h * .74, 5, '#6b4a2f', '#5c9a45');
+  for (let i = 0; i < 9; i++) { const x = Math.round(rnd() * w / px) * px, y = h * .66 + rnd() * 60; g.fillStyle = '#5b3b22'; g.fillRect(x + px, y, px, px * 3); g.fillStyle = '#2f6b33'; g.fillRect(x, y - px * 2, px * 3, px * 2.5); }
+  return c.toDataURL('image/jpeg', .9);
+}
+const worldKinds = [['sky', '新的世界', '1.12.2 Legacy Fabric · 12 天前', [84, 140, 200]], ['forest', 'Demo_World', '1.20.1 Forge · 12 天前', [60, 140, 70]],
+  ['plains', '空岛生存', '1.21.4 Fabric · 1 个月前', [150, 175, 80]], ['sky', '红石实验', '1.21.4 · 2 个月前', [120, 160, 220]],
+  ['forest', '原版生存', '1.20.1 · 3 个月前', [70, 130, 80]], ['plains', '建筑世界', '1.19.2 · 半年前', [170, 160, 90]]];
+function thumb(cv, kind) {
+  cv.width = 16; cv.height = 16; const g = cv.getContext('2d');
+  g.fillStyle = { sky: '#6fa8dc', forest: '#7fb2d8', plains: '#9cc4e4' }[kind]; g.fillRect(0, 0, 16, 16);
+  g.fillStyle = kind === 'forest' ? '#2f6b33' : '#5c9a45'; g.fillRect(0, 9, 16, 7);
+  g.fillStyle = '#6b4a2f'; g.fillRect(0, 12, 16, 4);
+  if (kind === 'forest') { g.fillStyle = '#1f4f25'; g.fillRect(3, 3, 5, 6); g.fillRect(10, 4, 4, 5); }
+  if (kind === 'sky') { g.fillStyle = '#f2f2f2'; g.fillRect(2, 3, 6, 2); g.fillRect(9, 5, 5, 2); }
+}
+
+let source = scenery(1400, 900), frame = null, avgLuma = .5, hue = 150;
+let layout = 'wp', mode = 'dark';
+const win = document.getElementById('win');
+const $ = id => document.getElementById(id);
+
+// 跨区：假设屏幕是 1920×1080，窗口在屏幕上的位置（移动窗口时背景不动，像一扇看向桌面壁纸的窗）
+const SCREEN = { w: 1920, h: 1080 }, WINPOS = { x: 410, y: 190 };
+// 按「契合度」和「对齐位置」把图片画进 1100×700 的窗口，顺便算整张图的平均亮度和主色相
+function compose() {
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => {
+      const W = 1100, H = 700, iw = im.width, ih = im.height;
+      const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+      const [fx, fy] = $('focus').value.split(',').map(v => v / 100);
+      // 留白的颜色：图片平均色压暗一些（适应、居中时图片没铺满）
+      const a = document.createElement('canvas'); a.width = a.height = 1; const ag = a.getContext('2d'); ag.drawImage(im, 0, 0, 1, 1);
+      const [ar, agc, ab] = ag.getImageData(0, 0, 1, 1).data; g.fillStyle = `rgb(${ar * .45 | 0},${agc * .45 | 0},${ab * .45 | 0})`; g.fillRect(0, 0, W, H);
+      const at = (w, h) => g.drawImage(im, (W - w) * fx, (H - h) * fy, w, h);
+      switch ($('fit').value) {
+        case 'fill': { const k = Math.max(W / iw, H / ih); at(iw * k, ih * k); break; }
+        case 'fit': { const k = Math.min(W / iw, H / ih); at(iw * k, ih * k); break; }
+        case 'stretch': g.drawImage(im, 0, 0, W, H); break;
+        case 'tile': { g.fillStyle = g.createPattern(im, 'repeat'); g.fillRect(0, 0, W, H); break; }
+        case 'center': at(iw, ih); break;
+        case 'span': { const k = Math.max(SCREEN.w / iw, SCREEN.h / ih), w = iw * k, h = ih * k;
+          g.drawImage(im, (SCREEN.w - w) * fx - WINPOS.x, (SCREEN.h - h) * fy - WINPOS.y, w, h); break; }
+      }
+      const t = document.createElement('canvas'); t.width = 110; t.height = 70; const tg = t.getContext('2d'); tg.drawImage(c, 0, 0, 110, 70);
+      const d = tg.getImageData(0, 0, 110, 70).data; let sum = 0; const bins = new Array(36).fill(0);
+      for (let i = 0; i < d.length; i += 4) {
+        sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+        const r = d[i] / 255, gg = d[i + 1] / 255, b = d[i + 2] / 255, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+        if (mx - mn < .15) continue; let h = mx === r ? (gg - b) / (mx - mn) : mx === gg ? (b - r) / (mx - mn) + 2 : (r - gg) / (mx - mn) + 4;
+        h = (h * 60 + 360) % 360; bins[Math.floor(h / 10)] += mx - mn;
+      }
+      avgLuma = sum / (d.length / 4); hue = bins.indexOf(Math.max(...bins)) * 10 + 5;
+      frame = c.toDataURL('image/jpeg', .92); res();
+    };
+    im.src = source;
+  });
+}
+const hsl = (h, s, l) => `hsl(${h} ${s}% ${l}%)`;
+function applyTheme() {
+  const dark = mode === 'dark', h = hue;
+  const v = dark
+    ? { '--bg': hsl(h, 8, 7), '--text': hsl(h, 10, 90), '--muted': hsl(h, 7, 70), '--faint': hsl(h, 5, 50), '--primary': hsl(h, 55, 74), '--on-primary': hsl(h, 70, 14), '--pc': hsl(h, 45, 24), '--on-pc': hsl(h, 65, 88), '--sel': hsl(h, 32, 30) }
+    : { '--bg': hsl(h, 30, 97), '--text': hsl(h, 12, 10), '--muted': hsl(h, 7, 27), '--faint': hsl(h, 5, 45), '--primary': hsl(h, 55, 32), '--on-primary': '#fff', '--pc': hsl(h, 60, 86), '--on-pc': hsl(h, 70, 10), '--sel': hsl(h, 45, 83) };
+  for (const [k, x] of Object.entries(v)) win.style.setProperty(k, x);
+  const c = document.createElement('div'); c.style.color = dark ? hsl(h, 12, 8) : hsl(h, 30, 96); document.body.appendChild(c);
+  win.style.setProperty('--tint', getComputedStyle(c).color.match(/\d+/g).slice(0, 3).join(',')); c.remove();
+  // 背景上的文字：整张图统一黑字或白字（算上暗化层）
+  const dim = $('dim').value / 100, L = avgLuma * (1 - dim) + (dark ? 0 : 1) * dim;
+  const darkText = L > .55, glow = $('glow').checked;
+  win.style.setProperty('--fg', darkText ? '#111512' : '#f5f7f5');
+  win.style.setProperty('--fgm', darkText ? 'rgba(17,21,18,.75)' : 'rgba(245,247,245,.82)');
+  win.style.setProperty('--fgshadow', glow
+    ? (darkText ? '0 0 8px rgba(255,255,255,.75), 0 0 2px rgba(255,255,255,.6)' : '0 0 8px rgba(0,0,0,.65), 0 0 2px rgba(0,0,0,.55)')
+    : (darkText ? '0 1px 1px rgba(255,255,255,.3)' : '0 1px 1px rgba(0,0,0,.35)'));
+}
+const notes = {
+  std: '<b>标准</b>：现在的首页（没有壁纸时用）。内容集中在窗口中间，壁纸的主体容易被主卡片盖住；直接压在背景上的小标题（最近游玩、向下滚动查看更多）在花的图片上不好认。',
+  wp: '<b>壁纸</b>：设了自定义背景后默认用这个。第一屏正好是窗口的高度：顶部一条放当前版本、切换版本、四个快捷操作（图标，悬停显示名字）和版本设置；底部一条是开始游戏和最近游玩的 3 个存档；中间整块留给壁纸。往下滚动的内容和没有壁纸时完全一样（更新日志提示、Minecraft 版本动态、当前版本信息、小提示），只改第一屏；背景图片固定不动、面板跟着滚。公告和快捷操作在第一屏的顶部条里（公告可以放进顶部条，或者保留在通知铃铛里）。改变窗口大小时第一屏跟着窗口高度变。',
+  mini: '<b>极简</b>：第一屏只留底部居中一条：当前版本（点名字下面切换）、全部存档、版本设置、更多和开始游戏；往下滚动的内容同样不变。'
+};
+function worldsInto(el) {
+  const n = +el.dataset.worlds;
+  for (const [k, name, sub, [r, g, b]] of worldKinds.slice(0, n)) {
+    const w = document.createElement('div'); w.className = el.closest('.dock') ? 'wt card' : 'wt panel';
+    w.innerHTML = `<div class="disp" style="background:radial-gradient(70% 140% at 8% 50%, rgba(${r},${g},${b},.6), transparent 70%)"></div><canvas class="thumb"></canvas><div style="min-width:0"><b>${name}</b><small>${sub}</small></div>`;
+    thumb(w.querySelector('canvas'), k); el.appendChild(w);
+  }
+}
+const PAD = 40; // 留出边缘，模糊后边缘不发虚
+function glassify() {
+  win.querySelectorAll('.panel, .rail').forEach(el => {
+    const g = document.createElement('div'); g.className = 'glass';
+    Object.assign(g.style, { left: -PAD + 'px', top: -PAD + 'px', right: -PAD + 'px', bottom: -PAD + 'px', backgroundImage: `url(${frame})` });
+    const t = document.createElement('div'); t.className = 'tintl'; el.prepend(t); el.prepend(g);
+  });
+  align();
+}
+// 面板里的背景副本对齐窗口：滚动时跟着重新对齐（App 里是 _RenderGlassBackdrop 监听滚动重画）
+function align() {
+  const w = win.getBoundingClientRect(), k = w.width / 1100;
+  win.querySelectorAll('.glass').forEach(g => {
+    const r = g.parentElement.getBoundingClientRect(), x = (r.left - w.left) / k, y = (r.top - w.top) / k;
+    g.style.backgroundPosition = `${-x + PAD}px ${-y + PAD}px`;
+  });
+}
+function fit() { const s = Math.min(1, $('stage').clientWidth / 1100); win.style.transform = `scale(${s})`; $('stage').style.height = 700 * s + 'px'; }
+function render() {
+  if (!frame) return;
+  win.className = 'win ' + mode;
+  win.innerHTML = $('tpl-shell').innerHTML;
+  $('body').innerHTML = $('tpl-' + layout).innerHTML;
+  win.querySelectorAll('[data-below]').forEach(e => e.innerHTML = $('tpl-below').innerHTML);
+  win.querySelector('.bgimg').style.backgroundImage = `url(${frame})`;
+  win.querySelectorAll('[data-worlds]').forEach(worldsInto);
+  win.style.setProperty('--blur', $('blur').value + 'px');
+  win.style.setProperty('--pblur', $('pblur').value + 'px');
+  win.style.setProperty('--alpha', $('alpha').value / 100);
+  win.style.setProperty('--dim', $('dim').value / 100);
+  win.style.setProperty('--railx', $('rail').checked ? 0 : .12);
+  applyTheme();
+  fit();
+  const sc = $('scroller');
+  if (sc) {
+    // 第一屏的高度 = 滚动区域的高度（窗口高度减去顶栏）
+    sc.querySelector('.screen').style.height = sc.clientHeight + 'px';
+    sc.onscroll = align;
+    const go = () => sc.scrollTo({ top: sc.clientHeight - 8, behavior: 'smooth' });
+    sc.querySelectorAll('.hint').forEach(e => e.onclick = go);
+  }
+  glassify();
+  $('note').innerHTML = notes[layout];
+}
+function tabs(id, set) { $(id).onclick = e => { const b = e.target.closest('button'); if (!b) return;
+  $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); set(b.dataset.v); render(); }; }
+tabs('layout', v => { layout = v; }); tabs('mode', v => mode = v);
+for (const id of ['blur', 'pblur', 'alpha', 'dim']) $(id).oninput = e => { $(id + 'v').textContent = e.target.value + (id === 'alpha' || id === 'dim' ? '%' : ''); render(); };
+for (const id of ['glow', 'rail']) $(id).onchange = render;
+$('focus').onchange = $('fit').onchange = () => compose().then(render);
+$('pick').onclick = () => $('file').click();
+$('file').onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { source = r.result; compose().then(render); }; r.readAsDataURL(f); };
+addEventListener('resize', () => { fit(); render(); });
+compose().then(render);
+</script>
+</body>
+</html>

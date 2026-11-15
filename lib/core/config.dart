@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import '../app_info.dart';
 import 'ai/mcp_client.dart' show McpServerConfig, defaultMcpServers;
 import 'paths.dart';
+import 'safe_write.dart';
 
 /// 默认 JVM 参数
 const defaultJvmArgs =
@@ -145,37 +146,13 @@ class LauncherConfig extends ChangeNotifier {
     return LauncherConfig._(data);
   }
 
-  Future<void>? _saving;
-  var _dirty = false;
-
-  /// 保存排队：同一时间只写一次，写的过程中又有修改就在写完后再写一次（多次修改合并成一次）。
-  /// 以前连续修改（例如拖动滑块）会同时打开同一个文件写入，Windows 上报「文件正被使用」，还可能把配置写坏。
-  /// 先写到临时文件再替换，写到一半出错也不会留下损坏的配置
-  Future<void> _save() {
-    _dirty = true;
-    return _saving ??= _flush().whenComplete(() => _saving = null);
-  }
-
-  Future<void> _flush() async {
-    var retried = false;
-    while (_dirty) {
-      _dirty = false;
-      try {
-        await _file.parent.create(recursive: true);
-        final tmp = File('${_file.path}.tmp');
-        await tmp.writeAsString(const JsonEncoder.withIndent('  ').convert(_data), flush: true);
-        await tmp.rename(_file.path);
-        unawaited(Paths.backupConfigFile(_file));
-      } catch (e) {
-        // 保存失败（例如文件刚好被备份或杀毒软件占用）：稍等再试一次；还是失败就留到下次修改时保存，修改在内存里仍然生效
-        if (!retried) {
-          retried = true;
-          _dirty = true;
-          await Future<void>.delayed(const Duration(milliseconds: 200));
-        } else {
-          stderr.writeln('保存配置失败：$e');
-        }
-      }
+  /// 保存：排队、先写临时文件再替换（见 [writeFileSafely]）。保存失败时修改仍然在内存里生效，下次修改时再保存
+  Future<void> _save() async {
+    try {
+      await writeFileSafely(_file, utf8.encode(const JsonEncoder.withIndent('  ').convert(_data)));
+      unawaited(Paths.backupConfigFile(_file));
+    } catch (e) {
+      stderr.writeln('保存配置失败：$e');
     }
   }
 

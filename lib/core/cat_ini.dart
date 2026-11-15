@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
+
+import 'safe_write.dart';
 
 /// PCL 的 "cat ini" 格式：每行 `键:值`，没有分节。
 /// 用于 `.minecraft/PCL.ini`、旧版 `PCL/setup.ini` 与 `options.txt`。
@@ -17,7 +20,5 @@ Map<String, String> readCatIni(String file) {
 /// 修改单个键并保留其余内容与顺序
 Future<void> writeCatIni(String file, String key, String value) async {
   final map = readCatIni(file)..[key] = value;
-  final f = File(file);
-  await f.parent.create(recursive: true);
-  await f.writeAsString(map.entries.map((e) => '${e.key}:${e.value}').join('\n'));
+  await writeFileSafely(File(file), utf8.encode(map.entries.map((e) => '${e.key}:${e.value}').join('\n')));
 }

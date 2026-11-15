@@ -10,6 +10,7 @@ import '../../app_info.dart';
 import '../net_proxy.dart';
 import '../paths.dart';
 import '../secure.dart';
+import '../safe_write.dart';
 
 // MCP（Model Context Protocol）客户端：让应用内 AI 使用外部 MCP 服务提供的工具。
 // 启动器只主动连出去，不监听任何端口。支持两种服务：
@@ -145,12 +146,8 @@ abstract final class McpSecret {
   static Future<void> save(String id, String token) async {
     final f = _file(id);
     final t = token.trim();
-    if (t.isEmpty) {
-      if (f.existsSync()) await f.delete();
-      return;
-    }
-    await f.parent.create(recursive: true);
-    await f.writeAsBytes(SecureData.protect(Uint8List.fromList(utf8.encode(t))));
+    if (t.isEmpty) return deleteFileSafely(f);
+    await writeFileSafely(f, SecureData.protect(Uint8List.fromList(utf8.encode(t))));
   }
 }
 

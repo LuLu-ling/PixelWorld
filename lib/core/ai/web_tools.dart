@@ -14,6 +14,7 @@ import '../paths.dart';
 import '../secure.dart';
 import 'ai_client.dart';
 import 'ai_tools.dart';
+import '../safe_write.dart';
 
 // 联网：搜索与抓取网页。
 // 默认用内置的搜索：Exa 公开的 MCP 接口（为 AI 设计，不填 Key 也能用，opencode 也是这样做的），
@@ -63,11 +64,8 @@ abstract final class SearchKey {
   static Future<void> save(String engine, String key) async {
     final f = _file(engine);
     final k = key.trim();
-    if (k.isEmpty) {
-      if (f.existsSync()) await f.delete();
-      return;
-    }
-    await f.writeAsBytes(SecureData.protect(Uint8List.fromList(utf8.encode(k))));
+    if (k.isEmpty) return deleteFileSafely(f);
+    await writeFileSafely(f, SecureData.protect(Uint8List.fromList(utf8.encode(k))));
   }
 }
 

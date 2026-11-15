@@ -6,6 +6,7 @@ import 'package:yaml_edit/yaml_edit.dart';
 
 import '../../core/cat_ini.dart';
 import 'paths.dart';
+import '../../core/safe_write.dart';
 
 /// 实例的 Java 选择
 sealed class JavaPref {
@@ -170,8 +171,7 @@ Future<void> writeInstanceRaw(String versionDir, Map<String, Object> patch) asyn
       editor.update([e.key], e.value);
     }
   }
-  await f.parent.create(recursive: true);
-  await f.writeAsString(editor.toString());
+  await writeFileSafely(f, utf8.encode(editor.toString()));
 }
 
 Future<void> writeInstanceJava(String versionDir, JavaPref java) =>

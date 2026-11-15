@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 
 import 'paths.dart';
 import 'secure.dart';
+import 'safe_write.dart';
 
 /// 账户类型：离线、微软、外置登录（Yggdrasil API，账户密码）、外置登录（Yggdrasil Connect，OAuth 授权）
 enum AccountType { offline, microsoft, yggdrasil, yggdrasilConnect }
@@ -159,9 +160,8 @@ class AccountStore {
   }
 
   Future<void> _save() async {
-    await _file.parent.create(recursive: true);
     final text = jsonEncode([for (final a in accounts) a.toJson()]);
-    await _file.writeAsBytes(SecureData.protect(Uint8List.fromList(utf8.encode(text))));
+    await writeFileSafely(_file, SecureData.protect(Uint8List.fromList(utf8.encode(text))));
     unawaited(Paths.backupConfigFile(_file));
   }
 

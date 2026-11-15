@@ -7,6 +7,7 @@ import '../core/loaders.dart';
 import '../core/modrinth.dart';
 import '../core/task.dart';
 import '../widgets/loader_icon.dart';
+import '../widgets/app_background.dart';
 import '../core/optifine_compat.dart';
 import '../widgets/shell_layout.dart';
 import '../widgets/side_nav.dart';
@@ -173,7 +174,7 @@ class _VersionsViewState extends State<_VersionsView> {
             children: [
               SizedBox(
                 height: 40,
-                child: TextField(
+                child: GlassField(
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search, size: 20),
                     hintText: '搜索版本号',
@@ -183,14 +184,15 @@ class _VersionsViewState extends State<_VersionsView> {
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                   ),
-                  onChanged: (v) => setState(() => _query = v),
+                  child: (decoration) =>
+                      TextField(decoration: decoration, onChanged: (v) => setState(() => _query = v)),
                 ),
               ),
               const SizedBox(height: 6),
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(12)),
-                  clipBehavior: Clip.antiAlias,
+                child: GlassPanel(
+                  color: scheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
                   child: list.isEmpty
                       ? Center(
                           child: Text('没有符合条件的版本', style: TextStyle(color: scheme.onSurfaceVariant)),
@@ -204,7 +206,7 @@ class _VersionsViewState extends State<_VersionsView> {
                             final on = v == selected;
                             final latest = v.id == data.latestRelease || v.id == data.latestSnapshot;
                             return Material(
-                              color: on ? scheme.surfaceContainerHigh : Colors.transparent,
+                              color: on ? glassCardColor(context, scheme.surfaceContainerHigh) : Colors.transparent,
                               child: InkWell(
                                 onTap: () => setState(() => _selected = v),
                                 child: Container(
@@ -240,8 +242,9 @@ class _VersionsViewState extends State<_VersionsView> {
               ),
             ],
           ),
-          right: Container(
-            decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(14)),
+          right: GlassPanel(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
             child: selected == null
                 ? Center(
                     child: Text('选择左边的版本', style: TextStyle(color: scheme.onSurfaceVariant)),
@@ -541,7 +544,9 @@ class _InstallPanelState extends State<InstallPanel> {
               const SizedBox(height: 8),
               // OptiFine 附加项：整行可点
               Material(
-                color: _optifine && _canOptiFine ? scheme.secondaryContainer : scheme.surfaceContainer,
+                color: _optifine && _canOptiFine
+                    ? scheme.secondaryContainer
+                    : glassCardColor(context, scheme.surfaceContainer),
                 borderRadius: BorderRadius.circular(10),
                 clipBehavior: Clip.antiAlias,
                 child: CheckboxListTile(
@@ -648,7 +653,9 @@ class _LoaderTile extends StatelessWidget {
     return Opacity(
       opacity: enabled || loading ? 1 : .45,
       child: Material(
-        color: selected ? scheme.primaryContainer.withValues(alpha: .35) : scheme.surfaceContainer,
+        color: selected
+            ? scheme.primaryContainer.withValues(alpha: .35)
+            : glassCardColor(context, scheme.surfaceContainer),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: BorderSide(color: selected ? scheme.primary : Colors.transparent, width: 1.5),

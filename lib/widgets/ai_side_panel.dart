@@ -10,6 +10,7 @@ import '../core/ai/ai_client.dart';
 import '../core/ai/web_tools.dart';
 import '../core/instance_files.dart';
 import 'ai_settings.dart';
+import 'app_background.dart';
 import 'file_viewer.dart';
 
 /// 会修改文件的工作区工具：侧边栏「本次对话的文件」从这些调用里收集
@@ -107,7 +108,8 @@ class AiSidePanel extends StatelessWidget {
     final engine = searchEngines[cfg.aiSearchEngine]?.split('（').first ?? '内置';
 
     return Material(
-      color: theme.colorScheme.surfaceContainerLow,
+      // 启用背景图片时外面已经是毛玻璃面板，这里不再画底色
+      color: BackgroundScope.activeOf(context) != null ? Colors.transparent : theme.colorScheme.surfaceContainerLow,
       child: ListView(
         padding: const EdgeInsets.only(bottom: 16),
         children: [

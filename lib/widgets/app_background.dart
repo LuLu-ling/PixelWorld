@@ -371,6 +371,15 @@ class GlassPanel extends StatelessWidget {
     }
     final c = scope.controller;
     final scheme = Theme.of(context).colorScheme;
+    // 已经在一块毛玻璃里面：再画一次背景会和外层一模一样，看不出卡片，改成叠一层半透明的面板颜色
+    if (context.dependOnInheritedWidgetOfExactType<_InGlass>() != null) {
+      return Material(
+        color: color.withValues(alpha: c.solid ? .9 : .55),
+        shape: shape,
+        clipBehavior: clip ? Clip.antiAlias : Clip.none,
+        child: child,
+      );
+    }
     final tint = scheme.surface.withValues(alpha: c.panelAlpha(extra: extraOpacity));
     return Material(
       type: MaterialType.transparency,
@@ -382,11 +391,45 @@ class GlassPanel extends StatelessWidget {
           Positioned.fill(child: _GlassBackdrop(scope: scope)),
           Positioned.fill(child: ColoredBox(color: tint)),
           if (overlay != null) Positioned.fill(child: overlay!),
-          child,
+          _InGlass(child: child),
         ],
       ),
     );
   }
+}
+
+/// 页面顶部的搜索框：启用背景时是一条毛玻璃，否则是普通的填充输入框
+class GlassField extends StatelessWidget {
+  const GlassField({super.key, required this.decoration, required this.child});
+
+  /// 输入框原本的装饰；启用背景时去掉填充色
+  final InputDecoration decoration;
+  final Widget Function(InputDecoration decoration) child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (BackgroundScope.activeOf(context) == null) return child(decoration);
+    return GlassPanel(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(10),
+      child: child(decoration.copyWith(filled: false)),
+    );
+  }
+}
+
+/// 标记「在毛玻璃面板里面」，里面的 [GlassPanel] 不再重复画背景
+class _InGlass extends InheritedWidget {
+  const _InGlass({required super.child});
+
+  @override
+  bool updateShouldNotify(_InGlass old) => false;
+}
+
+/// 在毛玻璃面板里面的实色卡片：启用背景时改成半透明，透出面板；否则就是 [color]
+Color glassCardColor(BuildContext context, Color color) {
+  final scope = BackgroundScope.activeOf(context);
+  if (scope == null) return color;
+  return color.withValues(alpha: scope.controller.solid ? .9 : .55);
 }
 
 /// 画出面板所在位置那一块（按面板模糊处理过的）背景

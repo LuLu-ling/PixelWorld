@@ -913,7 +913,7 @@ class _DesktopHome extends StatefulWidget {
 class _DesktopHomeState extends State<_DesktopHome> {
   final _scroll = ScrollController();
 
-  static const _pad = EdgeInsets.fromLTRB(14, 0, 16, 0);
+  static const _pad = EdgeInsets.fromLTRB(12, 0, 16, 0);
   static const _gap = 14.0;
   static const _headerH = 36.0;
   static const _moreH = 34.0;
@@ -1814,32 +1814,34 @@ class _VersionInfoCard extends StatelessWidget {
         ],
       ),
     );
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Text('当前版本', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-              const Spacer(),
-              TextButton(onPressed: onSettings, child: const Text('版本设置 ›')),
-            ],
-          ),
-          row('版本', describeVersion(version), first: true),
-          FutureBuilder<int?>(
-            future: version.loader == Loader.vanilla ? Future.value(null) : _modCount(state, version),
-            builder: (context, snap) =>
-                row('模组', version.loader == Loader.vanilla ? '原版，不加载模组' : (snap.data == null ? '—' : '${snap.data} 个')),
-          ),
-          row('最近游玩', latest == null ? '还没玩过' : '${latest!.name} · ${_timeAgo(latest!.modified)}'),
-          row('版本 ID', version.id),
-        ],
+    return GlassPanel(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(14),
+      border: BorderSide(color: scheme.outlineVariant.withValues(alpha: .4)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Text('当前版本', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                const Spacer(),
+                TextButton(onPressed: onSettings, child: const Text('版本设置 ›')),
+              ],
+            ),
+            row('版本', describeVersion(version), first: true),
+            FutureBuilder<int?>(
+              future: version.loader == Loader.vanilla ? Future.value(null) : _modCount(state, version),
+              builder: (context, snap) => row(
+                '模组',
+                version.loader == Loader.vanilla ? '原版，不加载模组' : (snap.data == null ? '—' : '${snap.data} 个'),
+              ),
+            ),
+            row('最近游玩', latest == null ? '还没玩过' : '${latest!.name} · ${_timeAgo(latest!.modified)}'),
+            row('版本 ID', version.id),
+          ],
+        ),
       ),
     );
   }

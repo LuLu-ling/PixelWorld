@@ -119,17 +119,26 @@ class _SideNavTile<T> extends StatelessWidget {
 
 /// 右侧内容区（新外壳里不再画单独的底板，只负责裁剪）
 class ContentPanel extends StatelessWidget {
-  const ContentPanel({super.key, required this.child, this.glass = false, this.margin = defaultMargin});
+  const ContentPanel({
+    super.key,
+    required this.child,
+    this.glass = true,
+    this.margin = defaultMargin,
+    this.padding = defaultPadding,
+  });
 
   final Widget child;
 
-  /// 毛玻璃面板四周的留白：左边 4 加上二级菜单右边的 4，面板之间都是 8
+  /// 启用背景图片时把整块内容放在一块毛玻璃面板上（所有页面统一，里面的卡片自动变成半透明）
+  final bool glass;
+
+  /// 面板四周的留白：左边 4 加上二级菜单右边的 4，面板之间都是 8；右边和底部与窗口边缘 16
   static const defaultMargin = EdgeInsets.fromLTRB(4, 0, 16, 16);
   final EdgeInsets margin;
 
-  /// 启用背景图片时把整块内容放在一块毛玻璃面板上（内容是直接排版的文字、表单时用；
-  /// 内容本身已经是一张张卡片的页面，例如设置，不需要）
-  final bool glass;
+  /// 面板里面内容的留白（内容自己右侧、底部一般已经留了，所以这里只给左边和上边）
+  static const defaultPadding = EdgeInsets.fromLTRB(12, 10, 0, 0);
+  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
@@ -139,7 +148,7 @@ class ContentPanel extends StatelessWidget {
       child: GlassPanel(
         color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(20),
-        child: child,
+        child: Padding(padding: padding, child: child),
       ),
     );
   }

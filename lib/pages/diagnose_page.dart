@@ -93,7 +93,7 @@ class DiagnosePage extends StatelessWidget {
     final session = report.sessionId == null ? null : state.chats.byId(report.sessionId!);
 
     return Padding(
-      padding: const EdgeInsets.only(left: 12),
+      padding: const EdgeInsets.only(left: 8),
       child: ContentPanel(
         child: ListView(
           padding: const EdgeInsets.all(28),

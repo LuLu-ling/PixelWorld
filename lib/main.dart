@@ -16,6 +16,7 @@ import 'installer/installer_core.dart';
 import 'platform.dart';
 import 'shell.dart';
 import 'theme.dart';
+import 'widgets/launch_splash.dart';
 
 Future<void> main(List<String> args) async {
   // 安装包外壳与系统「应用」列表会以安装 / 卸载模式启动；这时不读写启动器的用户数据
@@ -104,7 +105,10 @@ class PclPwApp extends StatelessWidget {
           final foreground = scheme.onSurface;
           WidgetsBinding.instance.addPostFrameCallback((_) => _syncLinuxWindowTheme(dark, background, foreground));
         }
-        return AppScale(scale: state.config.uiScale, child: child!);
+        return LaunchSplash(
+          ready: state.background.ready,
+          child: AppScale(scale: state.config.uiScale, child: child!),
+        );
       },
     );
   }

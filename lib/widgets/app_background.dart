@@ -31,6 +31,9 @@ abstract final class BackgroundPrefs {
   static const themeFromImageKey = 'bgThemeFromImage';
   static const seedIndexKey = 'bgSeedIndex';
 
+  /// 设了背景图片时首页用「壁纸」排版：内容放在顶部和底部，中间留给图片
+  static const homeLayoutKey = 'bgHomeWallpaper';
+
   static const defaults = <String, dynamic>{
     imageKey: '',
     blurKey: 8.0,
@@ -40,6 +43,7 @@ abstract final class BackgroundPrefs {
     solidKey: false,
     themeFromImageKey: true,
     seedIndexKey: 0,
+    homeLayoutKey: true,
   };
 
   /// 背景图片复制到启动器自己的数据目录，原图移动或删除后仍然可用
@@ -81,6 +85,7 @@ class BackgroundController extends ChangeNotifier {
   bool get solid => _get<bool>(BackgroundPrefs.solidKey);
   bool get themeFromImage => _get<bool>(BackgroundPrefs.themeFromImageKey);
   int get seedIndex => (_get<num>(BackgroundPrefs.seedIndexKey)).toInt();
+  bool get wallpaperHome => _get<bool>(BackgroundPrefs.homeLayoutKey);
 
   /// 只在电脑上、并且已经设置并加载好背景图片时启用
   bool get active => isDesktop && _bgImage != null && _panelImage != null;

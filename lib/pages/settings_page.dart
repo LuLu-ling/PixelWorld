@@ -331,7 +331,8 @@ class _BackgroundSettings extends StatelessWidget {
             min: 0,
             max: 48,
             label: (v) => v.round().toString(),
-            onCommit: (v) => cfg.update({BackgroundPrefs.blurKey: v.roundToDouble()}),
+            onCommit: (v, {required persist}) =>
+                cfg.update({BackgroundPrefs.blurKey: v.roundToDouble()}, persist: persist),
           ),
           _PrefSlider(
             icon: Icons.blur_linear,
@@ -341,7 +342,8 @@ class _BackgroundSettings extends StatelessWidget {
             min: 0,
             max: 40,
             label: (v) => v.round().toString(),
-            onCommit: (v) => cfg.update({BackgroundPrefs.panelBlurKey: v.roundToDouble()}),
+            onCommit: (v, {required persist}) =>
+                cfg.update({BackgroundPrefs.panelBlurKey: v.roundToDouble()}, persist: persist),
           ),
           _PrefSlider(
             icon: Icons.opacity,
@@ -352,7 +354,8 @@ class _BackgroundSettings extends StatelessWidget {
             max: .95,
             label: (v) => '${(v * 100).round()}%',
             live: true,
-            onCommit: (v) => cfg.update({BackgroundPrefs.opacityKey: (v * 100).roundToDouble() / 100}),
+            onCommit: (v, {required persist}) =>
+                cfg.update({BackgroundPrefs.opacityKey: (v * 100).roundToDouble() / 100}, persist: persist),
           ),
           _PrefSlider(
             icon: Icons.gradient,
@@ -363,7 +366,16 @@ class _BackgroundSettings extends StatelessWidget {
             max: 1,
             label: (v) => '${(v * 100).round()}%',
             live: true,
-            onCommit: (v) => cfg.update({BackgroundPrefs.glowKey: (v * 100).roundToDouble() / 100}),
+            onCommit: (v, {required persist}) =>
+                cfg.update({BackgroundPrefs.glowKey: (v * 100).roundToDouble() / 100}, persist: persist),
+          ),
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            secondary: const Icon(Icons.wallpaper),
+            title: const Text('首页壁纸排版'),
+            subtitle: const Text('首页的内容放在顶部和底部，中间留给背景图片；关闭后保持原来的排版'),
+            value: bg.wallpaperHome,
+            onChanged: (v) => cfg.update({BackgroundPrefs.homeLayoutKey: v}),
           ),
           SwitchListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -401,7 +413,7 @@ class _PrefSlider extends StatefulWidget {
   final double min;
   final double max;
   final String Function(double) label;
-  final ValueChanged<double> onCommit;
+  final void Function(double value, {required bool persist}) onCommit;
   final bool live;
 
   @override
@@ -430,10 +442,11 @@ class _PrefSliderState extends State<_PrefSlider> {
                 max: widget.max,
                 onChanged: (x) {
                   setState(() => _dragging = x);
-                  if (widget.live) widget.onCommit(x);
+                  // 拖动中只更新界面，不写配置文件；松手时 onChangeEnd 再保存
+                  if (widget.live) widget.onCommit(x, persist: false);
                 },
                 onChangeEnd: (x) {
-                  widget.onCommit(x);
+                  widget.onCommit(x, persist: true);
                   setState(() => _dragging = null);
                 },
               ),

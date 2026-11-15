@@ -927,155 +927,179 @@ class _DesktopHomeState extends State<_DesktopHome> {
         // 第一屏高度 = 可见高度；主卡片那一行吃掉剩余高度，但有上下限，超出部分让内容整体垂直居中
         final foldH = math.max(box.maxHeight, 430.0);
         final topH = (foldH - _headerH - worldsH - _moreH - _gap * 2 - 16).clamp(176.0, foldH > 820 ? 380.0 : 340.0);
+        final bg = BackgroundScope.activeOf(context);
+        final wallpaper = bg != null && bg.controller.wallpaperHome;
+        void more() => _scroll.animateTo(
+          math.min(foldH, _scroll.position.maxScrollExtent),
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+        );
         return ListView(
           controller: _scroll,
           padding: _pad,
           children: [
-            SizedBox(
-              height: foldH,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    height: topH,
-                    child: AlignedSplit(
-                      gap: 12,
-                      left: _DesktopHero(
-                        state: widget.state,
-                        version: widget.version,
-                        latest: widget.latest,
-                        onLaunch: widget.onLaunch,
-                        onVersions: widget.onVersions,
-                        onSettings: widget.onSettings,
-                        onLog: widget.onLog,
-                        onFolder: widget.onFolder,
+            if (wallpaper)
+              SizedBox(
+                height: foldH,
+                child: _WallpaperFold(
+                  state: widget.state,
+                  version: widget.version,
+                  latest: widget.latest,
+                  worlds: widget.worlds,
+                  loading: widget.loading,
+                  onLaunch: widget.onLaunch,
+                  onVersions: widget.onVersions,
+                  onSettings: widget.onSettings,
+                  onLog: widget.onLog,
+                  onFolder: widget.onFolder,
+                  onInstallMods: widget.onInstallMods,
+                  onPlayWorld: widget.onPlayWorld,
+                  versionName: widget.versionName,
+                  onMore: more,
+                ),
+              )
+            else
+              SizedBox(
+                height: foldH,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: topH,
+                      child: AlignedSplit(
+                        gap: 12,
+                        left: _DesktopHero(
+                          state: widget.state,
+                          version: widget.version,
+                          latest: widget.latest,
+                          onLaunch: widget.onLaunch,
+                          onVersions: widget.onVersions,
+                          onSettings: widget.onSettings,
+                          onLog: widget.onLog,
+                          onFolder: widget.onFolder,
+                        ),
+                        right: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Expanded(child: _NoticeStrip(neutral: true)),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              height: 106,
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        Expanded(
+                                          child: _QuickButton(
+                                            icon: Icons.download_outlined,
+                                            label: '装模组',
+                                            onTap: widget.onInstallMods,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: _QuickButton(
+                                            icon: Icons.view_list_outlined,
+                                            label: '管理模组',
+                                            onTap: widget.onSettings,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Expanded(
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        Expanded(
+                                          child: _QuickButton(
+                                            icon: Icons.folder_outlined,
+                                            label: '文件夹',
+                                            onTap: widget.onFolder,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: _QuickButton(
+                                            icon: Icons.article_outlined,
+                                            label: '查看日志',
+                                            onTap: widget.onLog,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      right: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                    ),
+                    const SizedBox(height: _gap),
+                    SizedBox(
+                      height: _headerH,
+                      child: Row(
                         children: [
-                          const Expanded(child: _NoticeStrip(neutral: true)),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            height: 106,
-                            child: Column(
-                              children: [
-                                Expanded(
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      Expanded(
-                                        child: _QuickButton(
-                                          icon: Icons.download_outlined,
-                                          label: '装模组',
-                                          onTap: widget.onInstallMods,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: _QuickButton(
-                                          icon: Icons.view_list_outlined,
-                                          label: '管理模组',
-                                          onTap: widget.onSettings,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Expanded(
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      Expanded(
-                                        child: _QuickButton(
-                                          icon: Icons.folder_outlined,
-                                          label: '文件夹',
-                                          onTap: widget.onFolder,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: _QuickButton(
-                                          icon: Icons.article_outlined,
-                                          label: '查看日志',
-                                          onTap: widget.onLog,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                          OnBackground(
+                            builder: (context, fg, _) => Text(
+                              '最近游玩',
+                              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: fg),
+                            ),
+                          ),
+                          const Spacer(),
+                          OnBackground(
+                            builder: (context, fg, _) => TextButton(
+                              onPressed: widget.onSettings,
+                              style: fg == null ? null : TextButton.styleFrom(foregroundColor: fg),
+                              child: const Text('全部存档 ›'),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: _gap),
-                  SizedBox(
-                    height: _headerH,
-                    child: Row(
-                      children: [
-                        OnBackground(
-                          builder: (context, fg, _) => Text(
-                            '最近游玩',
-                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: fg),
-                          ),
-                        ),
-                        const Spacer(),
-                        OnBackground(
-                          builder: (context, fg, _) => TextButton(
-                            onPressed: widget.onSettings,
-                            style: fg == null ? null : TextButton.styleFrom(foregroundColor: fg),
-                            child: const Text('全部存档 ›'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (widget.worlds.isEmpty)
-                    widget.loading ? SizedBox(height: worldsH) : const _EmptyWorlds()
-                  else
-                    Wrap(
-                      spacing: _tileGap,
-                      runSpacing: _tileGap,
-                      children: [
-                        for (final w in shown)
-                          SizedBox(
-                            width: tileW,
-                            height: _tileH,
-                            child: _WorldTile(
-                              world: w,
-                              versionName: widget.versionName(w.versionId),
-                              onTap: w.versionId == null ? null : () => widget.state.selectVersion(w.versionId!),
-                              onPlay: () => widget.onPlayWorld(w),
+                    if (widget.worlds.isEmpty)
+                      widget.loading ? SizedBox(height: worldsH) : const _EmptyWorlds()
+                    else
+                      Wrap(
+                        spacing: _tileGap,
+                        runSpacing: _tileGap,
+                        children: [
+                          for (final w in shown)
+                            SizedBox(
+                              width: tileW,
+                              height: _tileH,
+                              child: _WorldTile(
+                                world: w,
+                                versionName: widget.versionName(w.versionId),
+                                onTap: w.versionId == null ? null : () => widget.state.selectVersion(w.versionId!),
+                                onPlay: () => widget.onPlayWorld(w),
+                              ),
                             ),
+                        ],
+                      ),
+                    const SizedBox(height: _gap),
+                    SizedBox(
+                      height: _moreH,
+                      child: Center(
+                        child: OnBackground(
+                          builder: (context, _, muted) => TextButton.icon(
+                            onPressed: more,
+                            style: TextButton.styleFrom(foregroundColor: muted ?? theme.colorScheme.onSurfaceVariant),
+                            iconAlignment: IconAlignment.end,
+                            icon: const Icon(Icons.expand_more, size: 18),
+                            label: const Text('向下滚动查看更多'),
                           ),
-                      ],
-                    ),
-                  const SizedBox(height: _gap),
-                  SizedBox(
-                    height: _moreH,
-                    child: Center(
-                      child: OnBackground(
-                        builder: (context, _, muted) => TextButton.icon(
-                          onPressed: () => _scroll.animateTo(
-                            math.min(foldH, _scroll.position.maxScrollExtent),
-                            duration: const Duration(milliseconds: 350),
-                            curve: Curves.easeOutCubic,
-                          ),
-                          style: TextButton.styleFrom(foregroundColor: muted ?? theme.colorScheme.onSurfaceVariant),
-                          iconAlignment: IconAlignment.end,
-                          icon: const Icon(Icons.expand_more, size: 18),
-                          label: const Text('向下滚动查看更多'),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             Padding(
               padding: const EdgeInsets.only(top: 6, bottom: 20),
               child: AlignedSplit(
@@ -1104,6 +1128,382 @@ class _DesktopHomeState extends State<_DesktopHome> {
           ],
         );
       },
+    );
+  }
+}
+
+/// 壁纸排版的第一屏（设了背景图片时）：顶部一条当前版本，中间留给背景图片，
+/// 底部一条是开始游戏和最近游玩的存档。往下滚动的内容和原来的排版一样
+class _WallpaperFold extends StatelessWidget {
+  const _WallpaperFold({
+    required this.state,
+    required this.version,
+    required this.latest,
+    required this.worlds,
+    required this.loading,
+    required this.onLaunch,
+    required this.onVersions,
+    required this.onSettings,
+    required this.onLog,
+    required this.onFolder,
+    required this.onInstallMods,
+    required this.onPlayWorld,
+    required this.versionName,
+    required this.onMore,
+  });
+
+  final AppState state;
+  final InstanceInfo? version;
+  final RecentWorld? latest;
+  final List<RecentWorld> worlds;
+  final bool loading;
+  final VoidCallback onLaunch;
+  final VoidCallback onVersions;
+  final VoidCallback? onSettings;
+  final VoidCallback onLog;
+  final VoidCallback? onFolder;
+  final VoidCallback onInstallMods;
+  final Future<void> Function(RecentWorld) onPlayWorld;
+  final String Function(String?) versionName;
+  final VoidCallback onMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final v = version;
+    Widget tool(IconData icon, String tip, VoidCallback? onTap) =>
+        IconButton(tooltip: tip, onPressed: onTap, icon: Icon(icon, size: 20), color: scheme.onSurfaceVariant);
+    final strip = GlassPanel(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(
+        height: 64,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              if (v != null) ...[
+                VersionIcon(info: v, versionDir: state.paths.versionDir(v.id), size: 40, radius: 11),
+                const SizedBox(width: 12),
+              ],
+              Flexible(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      v == null ? '还没有选择版本' : versionTitle(v),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    if (v == null)
+                      Text('先下载或选择一个版本', style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant))
+                    else
+                      _VersionFacts(state: state, version: v, latest: latest, color: scheme.onSurfaceVariant),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Material(
+                color: glassCardColor(context, scheme.surfaceContainerHighest),
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  onTap: onVersions,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('切换版本', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                        Icon(Icons.expand_more, size: 16, color: scheme.onSurfaceVariant),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const Spacer(),
+              tool(Icons.campaign_outlined, '启动器公告', () => showNoticesDialog(context)),
+              tool(Icons.download_outlined, '装模组', onInstallMods),
+              tool(Icons.view_list_outlined, '管理模组', onSettings),
+              tool(Icons.folder_outlined, '文件夹', onFolder),
+              tool(Icons.article_outlined, '查看日志', onLog),
+              Container(
+                width: 1,
+                height: 26,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                color: scheme.outlineVariant.withValues(alpha: .5),
+              ),
+              OutlinedButton(
+                onPressed: onSettings,
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
+                child: const Text('版本设置'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final dock = GlassPanel(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: SizedBox(
+          height: 48,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _DockLaunch(state: state, version: v, onLaunch: onLaunch),
+              const SizedBox(width: 10),
+              Expanded(
+                child: worlds.isEmpty
+                    ? Center(
+                        child: Text(
+                          loading ? '' : '还没有最近游玩的存档',
+                          style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                      )
+                    : LayoutBuilder(
+                        builder: (context, box) {
+                          // 每个存档至少 200 宽，放不下就少放几个，最多 3 个；存档不够时空位留着，卡片不会被拉宽
+                          final slots = ((box.maxWidth + 10) / 210).floor().clamp(1, 3);
+                          final n = math.min(worlds.length, slots);
+                          return Row(
+                            children: [
+                              for (var i = 0; i < slots; i++) ...[
+                                if (i > 0) const SizedBox(width: 10),
+                                Expanded(
+                                  child: i >= n
+                                      ? const SizedBox()
+                                      : _DockWorld(
+                                          world: worlds[i],
+                                          versionName: versionName(worlds[i].versionId),
+                                          onTap: worlds[i].versionId == null
+                                              ? null
+                                              : () => state.selectVersion(worlds[i].versionId!),
+                                          onPlay: () => onPlayWorld(worlds[i]),
+                                        ),
+                                ),
+                              ],
+                            ],
+                          );
+                        },
+                      ),
+              ),
+              const SizedBox(width: 10),
+              Material(
+                color: glassCardColor(context, scheme.surfaceContainer),
+                borderRadius: BorderRadius.circular(12),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onSettings,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Row(
+                      children: [
+                        Icon(Icons.grid_view_rounded, size: 18, color: scheme.onSurfaceVariant),
+                        const SizedBox(width: 6),
+                        Text('全部存档', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          strip,
+          const Spacer(),
+          Center(
+            child: OnBackground(
+              builder: (context, _, muted) => TextButton.icon(
+                onPressed: onMore,
+                style: TextButton.styleFrom(foregroundColor: muted ?? scheme.onSurfaceVariant),
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(Icons.expand_more, size: 18),
+                label: const Text('向下滚动查看更多'),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          dock,
+        ],
+      ),
+    );
+  }
+}
+
+/// 底部条的开始游戏：大一点的胶囊，下面一行是当前版本；准备中、运行中沿用主卡片的按钮
+class _DockLaunch extends StatelessWidget {
+  const _DockLaunch({required this.state, required this.version, required this.onLaunch});
+
+  final AppState state;
+  final InstanceInfo? version;
+  final VoidCallback onLaunch;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    if (state.gameState != GameState.idle) {
+      return SizedBox(
+        width: 200,
+        child: Center(
+          child: _LaunchButton(state: state, version: version, onLaunch: onLaunch),
+        ),
+      );
+    }
+    final v = version;
+    return SizedBox(
+      width: 200,
+      child: Material(
+        color: v == null ? scheme.onSurface.withValues(alpha: .12) : scheme.primaryFixed,
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: v == null ? null : onLaunch,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Row(
+              children: [
+                Icon(Icons.rocket_launch, size: 20, color: scheme.onPrimaryFixed),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '开始游戏',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: scheme.onPrimaryFixed,
+                          height: 1.2,
+                        ),
+                      ),
+                      if (v != null)
+                        Text(
+                          versionTitle(v),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.onPrimaryFixed.withValues(alpha: .75),
+                            height: 1.2,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 底部条里的存档：比首页原来的存档条矮，半透明叠在底部条上，左边一点封面色散
+class _DockWorld extends StatefulWidget {
+  const _DockWorld({required this.world, required this.versionName, required this.onTap, required this.onPlay});
+
+  final RecentWorld world;
+  final String versionName;
+  final VoidCallback? onTap;
+  final VoidCallback onPlay;
+
+  @override
+  State<_DockWorld> createState() => _DockWorldState();
+}
+
+class _DockWorldState extends State<_DockWorld> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final icon = p.join(widget.world.path, 'icon.png');
+    final glow = BackgroundScope.activeOf(context)?.controller.coverGlow ?? 0;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: FutureBuilder<CoverPalette?>(
+        future: CoverPalette.of(icon),
+        builder: (context, snap) => Material(
+          color: glassCardColor(context, _hover ? scheme.surfaceContainerHigh : scheme.surfaceContainer),
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            fit: StackFit.passthrough,
+            children: [
+              if (snap.data != null)
+                Positioned.fill(
+                  child: CoverGlow(colors: snap.data!.colors, strength: glow * (_hover ? 1.3 : 1)),
+                ),
+              InkWell(
+                onTap: widget.onTap,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    children: [
+                      CoverThumb(iconPath: icon, size: 32, radius: 7, modified: widget.world.modified),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.world.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700, height: 1.2),
+                            ),
+                            Text(
+                              [
+                                if (widget.versionName.isNotEmpty) widget.versionName,
+                                _timeAgo(widget.world.modified),
+                              ].join(' · '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant, height: 1.2),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_hover)
+                        IconButton(
+                          tooltip: '进入这个存档的版本',
+                          onPressed: widget.onPlay,
+                          style: IconButton.styleFrom(
+                            backgroundColor: scheme.primaryFixed,
+                            foregroundColor: scheme.onPrimaryFixed,
+                            minimumSize: const Size(30, 30),
+                            fixedSize: const Size(30, 30),
+                          ),
+                          icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

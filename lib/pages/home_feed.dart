@@ -8,6 +8,7 @@ import '../core/changelog.dart';
 import '../core/news.dart';
 import '../core/site_api.dart';
 import '../core/updater.dart';
+import '../widgets/app_background.dart';
 
 /// 首页提示：正在使用的版本与免费声明（参照 PCL-CE 首页的提示）
 class HomeHints extends StatelessWidget {
@@ -60,51 +61,51 @@ class _CompactHints extends StatelessWidget {
       ),
       child: Text(label),
     );
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 6, 6),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 1),
-                child: Icon(Icons.info_outline, size: 17, color: scheme.onSurfaceVariant),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  [
-                    if (showBeta) '${AppInfo.name} ${AppInfo.version} 测试版，功能还在完善中，遇到问题请到 GitHub 反馈。',
-                    '本软件完全免费、开源。如果你是付费获得的，请向卖家申请退款，并从 GitHub 获取正版。',
-                  ].join('\n'),
-                  style: style,
+    return GlassPanel(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(14),
+      border: BorderSide(color: scheme.outlineVariant.withValues(alpha: .4)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 6, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(Icons.info_outline, size: 17, color: scheme.onSurfaceVariant),
                 ),
-              ),
-              if (showBeta)
-                IconButton(
-                  tooltip: '关闭测试版提示（免费声明会保留）',
-                  onPressed: () => cfg.update({'dismissedBetaHint': AppInfo.version}),
-                  visualDensity: VisualDensity.compact,
-                  iconSize: 16,
-                  icon: Icon(Icons.close, color: scheme.onSurfaceVariant),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    [
+                      if (showBeta) '${AppInfo.name} ${AppInfo.version} 测试版，功能还在完善中，遇到问题请到 GitHub 反馈。',
+                      '本软件完全免费、开源。如果你是付费获得的，请向卖家申请退款，并从 GitHub 获取正版。',
+                    ].join('\n'),
+                    style: style,
+                  ),
                 ),
-            ],
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              if (showBeta) link('反馈问题', '${AppInfo.repoUrl}/issues'),
-              link('获取正版', '${AppInfo.repoUrl}/releases'),
-            ],
-          ),
-        ],
+                if (showBeta)
+                  IconButton(
+                    tooltip: '关闭测试版提示（免费声明会保留）',
+                    onPressed: () => cfg.update({'dismissedBetaHint': AppInfo.version}),
+                    visualDensity: VisualDensity.compact,
+                    iconSize: 16,
+                    icon: Icon(Icons.close, color: scheme.onSurfaceVariant),
+                  ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (showBeta) link('反馈问题', '${AppInfo.repoUrl}/issues'),
+                link('获取正版', '${AppInfo.repoUrl}/releases'),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -125,10 +126,11 @@ class _Hint extends StatelessWidget {
     // 主色相必须为蓝色，警示用错误色只用于图标
     final bg = scheme.secondaryContainer;
     final fg = scheme.onSecondaryContainer;
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
+    return tintedPanel(
+      context,
+      bg,
+      BorderRadius.circular(16),
+      Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
         child: Row(
           children: [
@@ -175,10 +177,11 @@ class _ChangelogHintState extends State<ChangelogHint> {
         final summary = changelogSummary(log);
         return Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: Material(
-            color: scheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
+          child: tintedPanel(
+            context,
+            scheme.secondaryContainer,
+            BorderRadius.circular(16),
+            Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -306,7 +309,8 @@ class _HomeNoticesState extends State<HomeNotices> {
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Text(
               snap.connectionState == ConnectionState.waiting ? '正在获取公告…' : '暂无公告',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           );
         }
@@ -350,10 +354,11 @@ class _NoticeCard extends StatelessWidget {
       NoticeLevel.error => (Icons.error_outline, scheme.errorContainer, scheme.onErrorContainer),
     };
     final url = notice.url;
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
+    return tintedPanel(
+      context,
+      bg,
+      BorderRadius.circular(16),
+      Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -434,14 +439,26 @@ class _VersionNewsFeedState extends State<VersionNewsFeed> {
           padding: const EdgeInsets.fromLTRB(4, 8, 4, 12),
           child: Row(
             children: [
-              Text('Minecraft 版本动态', style: theme.textTheme.titleMedium),
-              const SizedBox(width: 8),
-              Text('来自 Minecraft Wiki', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
-              const Spacer(),
-              IconButton(
-                tooltip: '刷新',
-                onPressed: () => setState(() => _future = loadVersionNews(AppScope.read(context).downloader)),
-                icon: const Icon(Icons.refresh, size: 20),
+              // 直接压在背景上：启用背景图片时统一黑字或白字
+              Expanded(
+                child: OnBackground(
+                  builder: (context, fg, muted) => Row(
+                    children: [
+                      Text('Minecraft 版本动态', style: theme.textTheme.titleMedium?.copyWith(color: fg)),
+                      const SizedBox(width: 8),
+                      Text(
+                        '来自 Minecraft Wiki',
+                        style: theme.textTheme.labelSmall?.copyWith(color: muted ?? scheme.onSurfaceVariant),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        tooltip: '刷新',
+                        onPressed: () => setState(() => _future = loadVersionNews(AppScope.read(context).downloader)),
+                        icon: Icon(Icons.refresh, size: 20, color: fg),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -452,7 +469,10 @@ class _VersionNewsFeedState extends State<VersionNewsFeed> {
             if (snap.hasError) {
               return Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text('加载失败：${errorText(snap.error!)}', style: TextStyle(color: scheme.onSurfaceVariant)),
+                child: OnBackground(
+                  builder: (context, _, muted) =>
+                      Text('加载失败：${errorText(snap.error!)}', style: TextStyle(color: muted ?? scheme.onSurfaceVariant)),
+                ),
               );
             }
             if (!snap.hasData) {
@@ -480,69 +500,71 @@ class _NewsCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final release = news.type == 'release';
     final t = news.releaseTime;
-    return Card.filled(
-      color: scheme.surfaceContainerLow,
-      margin: const EdgeInsets.only(bottom: 10),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => launchUrl(Uri.parse(news.wikiUrl)),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (news.image != null)
-              SizedBox(
-                width: 180,
-                height: 112,
-                child: Image.network(
-                  news.image!,
-                  fit: BoxFit.cover,
-                  cacheWidth: 360,
-                  errorBuilder: (_, _, _) => ColoredBox(color: scheme.surfaceContainerHighest),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GlassPanel(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: () => launchUrl(Uri.parse(news.wikiUrl)),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (news.image != null)
+                SizedBox(
+                  width: 180,
+                  height: 112,
+                  child: Image.network(
+                    news.image!,
+                    fit: BoxFit.cover,
+                    cacheWidth: 360,
+                    errorBuilder: (_, _, _) => ColoredBox(color: scheme.surfaceContainerHighest),
+                  ),
                 ),
-              ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: release ? scheme.primaryContainer : scheme.secondaryContainer,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            release ? '正式版' : '快照',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: release ? scheme.onPrimaryContainer : scheme.onSecondaryContainer,
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: release ? scheme.primaryContainer : scheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              release ? '正式版' : '快照',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: release ? scheme.onPrimaryContainer : scheme.onSecondaryContainer,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(news.id, style: theme.textTheme.titleMedium, overflow: TextOverflow.ellipsis),
-                        ),
-                        Text(
-                          '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}',
-                          style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      news.summary.isEmpty ? 'Minecraft Wiki 还没有这个版本的介绍，点击查看页面。' : news.summary,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
-                  ],
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(news.id, style: theme.textTheme.titleMedium, overflow: TextOverflow.ellipsis),
+                          ),
+                          Text(
+                            '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}',
+                            style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        news.summary.isEmpty ? 'Minecraft Wiki 还没有这个版本的介绍，点击查看页面。' : news.summary,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

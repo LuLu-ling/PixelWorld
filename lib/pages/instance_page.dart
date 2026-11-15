@@ -118,7 +118,7 @@ class _InstancePageState extends State<InstancePage> {
               )
             : child;
         return Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 16, 10),
+          padding: const EdgeInsets.fromLTRB(12, 0, 16, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

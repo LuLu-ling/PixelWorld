@@ -99,24 +99,7 @@ class _ToolsPageState extends State<ToolsPage> {
           value: current,
           onChanged: (t) => t.sub != null ? ShellNav.of(context).open(t.sub!) : setState(() => _section = t.section),
         ),
-        Expanded(
-          child: Builder(
-            builder: (context) {
-              // 错误分析、百宝箱本身是一张张卡片，直接放在背景上；其余的放在一块毛玻璃上，四周留出边距
-              final glass =
-                  section != _Section.diagnose &&
-                  section != _Section.toolbox &&
-                  BackgroundScope.activeOf(context) != null;
-              return ContentPanel(
-                glass: glass,
-                child: Padding(
-                  padding: glass ? const EdgeInsets.fromLTRB(14, 12, 0, 0) : EdgeInsets.zero,
-                  child: _content(section),
-                ),
-              );
-            },
-          ),
-        ),
+        Expanded(child: ContentPanel(child: _content(section))),
       ],
     );
   }

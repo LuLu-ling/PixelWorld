@@ -323,6 +323,28 @@ class _BackgroundSettings extends StatelessWidget {
           ),
         ),
         if (has) ...[
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+            leading: const Icon(Icons.fit_screen_outlined),
+            title: const Text('契合度'),
+            subtitle: Text(switch (bg.fit) {
+              'fit' => '适应：完整显示整张图片，空出来的地方用图片的颜色填上',
+              'stretch' => '拉伸：拉伸到窗口大小，图片可能变形',
+              'tile' => '平铺：按图片原来的大小重复铺满窗口',
+              'center' => '居中：按图片原来的大小放在窗口中间',
+              'span' => '跨区：图片铺满整个桌面（所有屏幕），窗口只显示自己所在位置的那一块，移动窗口时背景不动',
+              _ => '填充：铺满整个窗口，多出来的部分裁掉',
+            }),
+            trailing: DropdownButton<String>(
+              value: bg.fit,
+              underline: const SizedBox(),
+              borderRadius: BorderRadius.circular(12),
+              items: [
+                for (final e in BackgroundPrefs.fits.entries) DropdownMenuItem(value: e.key, child: Text(e.value)),
+              ],
+              onChanged: (v) => v == null ? null : cfg.update({BackgroundPrefs.fitKey: v}),
+            ),
+          ),
           _PrefSlider(
             icon: Icons.blur_on,
             title: '背景模糊',

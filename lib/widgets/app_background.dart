@@ -9,6 +9,8 @@ import 'package:flutter/rendering.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:nativeapi/nativeapi.dart' as native;
+
 import '../core/config.dart';
 import '../core/paths.dart';
 import '../platform.dart';
@@ -37,6 +39,10 @@ abstract final class BackgroundPrefs {
   /// 背景暗化：背景图片上压一层颜色的浓度（深色压黑、浅色压白），0～0.7；小于 0 表示用默认值
   static const dimKey = 'bgDim';
 
+  /// 契合度：填充 fill、适应 fit、拉伸 stretch、平铺 tile、居中 center、跨区 span（和 Windows 桌面壁纸一样）
+  static const fitKey = 'bgFit';
+  static const fits = {'fill': '填充', 'fit': '适应', 'stretch': '拉伸', 'tile': '平铺', 'center': '居中', 'span': '跨区'};
+
   static const defaults = <String, dynamic>{
     imageKey: '',
     blurKey: 8.0,
@@ -48,6 +54,7 @@ abstract final class BackgroundPrefs {
     seedIndexKey: 0,
     homeLayoutKey: true,
     dimKey: -1.0,
+    fitKey: 'fill',
   };
 
   /// 背景图片复制到启动器自己的数据目录，原图移动或删除后仍然可用
@@ -73,6 +80,17 @@ class BackgroundController extends ChangeNotifier {
   ui.Image? _panelImage;
   ByteData? _luma;
   static const _lumaW = 64, _lumaH = 40;
+
+  /// 原图的像素尺寸（处理时会缩小，居中、平铺要按原图大小画）
+  Size _sourceSize = Size.zero;
+
+  /// 图片的平均颜色：适应、居中时图片没铺满，空白处用它压暗后的颜色
+  Color _average = Colors.black;
+
+  /// 跨区用：整个桌面（所有屏幕合起来）和窗口在桌面上的位置，系统坐标；窗口移动时更新
+  final span = ValueNotifier<({Rect desktop, Rect window})?>(null);
+  native.Window? _spanWindow;
+  native.ListenerId? _spanListener;
   List<Color> _candidates = const [];
 
   String _loadedPath = '';
@@ -85,12 +103,17 @@ class BackgroundController extends ChangeNotifier {
   double get blur => (_get<num>(BackgroundPrefs.blurKey)).toDouble();
   double get panelBlur => (_get<num>(BackgroundPrefs.panelBlurKey)).toDouble();
   double get opacity => (_get<num>(BackgroundPrefs.opacityKey)).toDouble();
+  String get fit {
+    final v = _get<Object?>(BackgroundPrefs.fitKey);
+    return BackgroundPrefs.fits.containsKey(v) ? v as String : 'fill';
+  }
 
   /// 背景暗化的浓度；没有调过时用默认值（深色 35%、浅色 10%，和以前一样）
   double dimFor(Brightness b) {
     final v = (_get<num>(BackgroundPrefs.dimKey)).toDouble();
     return v < 0 ? (b == Brightness.dark ? .35 : .10) : v.clamp(0.0, .7);
   }
+
   double get coverGlow => (_get<num>(BackgroundPrefs.glowKey)).toDouble();
   bool get solid => _get<bool>(BackgroundPrefs.solidKey);
   bool get themeFromImage => _get<bool>(BackgroundPrefs.themeFromImageKey);
@@ -99,6 +122,10 @@ class BackgroundController extends ChangeNotifier {
 
   /// 只在电脑上、并且已经设置并加载好背景图片时启用
   bool get active => isDesktop && _bgImage != null && _panelImage != null;
+
+  /// 第一次加载背景（以及从背景取的主题色）已经完成；启动画面等到这时再淡出，避免先闪一下没有背景的界面
+  bool get ready => _ready;
+  bool _ready = false;
 
   ui.Image? get backgroundImage => _bgImage;
   ui.Image? get panelImage => _panelImage;
@@ -116,6 +143,7 @@ class BackgroundController extends ChangeNotifier {
   double panelAlpha({double extra = 0}) => solid ? .94 : (opacity + extra).clamp(0.0, 1.0);
 
   void _sync() {
+    _trackSpan(isDesktop && fit == 'span' && imagePath.isNotEmpty);
     final path = isDesktop ? imagePath : '';
     if (path != _loadedPath || blur != _loadedBlur || panelBlur != _loadedPanelBlur) {
       unawaited(_load(path));
@@ -135,15 +163,17 @@ class BackgroundController extends ChangeNotifier {
       _loadedPath = path;
       _loadedBlur = blurNow;
       _loadedPanelBlur = panelBlurNow;
+      _ready = true;
       notifyListeners();
       return;
     }
     try {
       if (path != _loadedPath || _image == null) {
         final bytes = await File(path).readAsBytes();
-        final image = await _decode(bytes);
+        final (image, source) = await _decode(bytes);
         if (gen != _generation) return;
         _image = image;
+        _sourceSize = source;
         _candidates = await _extractCandidates(image);
       }
       final image = _image!;
@@ -156,6 +186,7 @@ class BackgroundController extends ChangeNotifier {
       _panelImage = panel;
       _luma = luma;
       _avgLuma = null;
+      _average = _averageColor(luma) ?? Colors.black;
       _loadedPath = path;
       _loadedBlur = blurNow;
       _loadedPanelBlur = panelBlurNow;
@@ -166,19 +197,136 @@ class BackgroundController extends ChangeNotifier {
       _candidates = const [];
       _loadedPath = path;
     }
+    _ready = true;
     notifyListeners();
   }
 
-  /// 解码并缩小到最长边 [_workingSize]
-  static Future<ui.Image> _decode(Uint8List bytes) async {
+  /// 解码并缩小到最长边 [_workingSize]；同时返回原图尺寸
+  static Future<(ui.Image, Size)> _decode(Uint8List bytes) async {
     final probe = await ui.instantiateImageCodec(bytes);
     final frame = await probe.getNextFrame();
     final w = frame.image.width, h = frame.image.height;
+    final source = Size(w.toDouble(), h.toDouble());
     final k = math.min(1.0, _workingSize / math.max(w, h));
-    if (k >= 1) return frame.image;
+    if (k >= 1) return (frame.image, source);
     frame.image.dispose();
     final codec = await ui.instantiateImageCodec(bytes, targetWidth: (w * k).round(), targetHeight: (h * k).round());
-    return (await codec.getNextFrame()).image;
+    return ((await codec.getNextFrame()).image, source);
+  }
+
+  static Color? _averageColor(ByteData? data) {
+    if (data == null) return null;
+    var r = 0, g = 0, b = 0;
+    final n = data.lengthInBytes ~/ 4;
+    for (var i = 0; i < n; i++) {
+      r += data.getUint8(i * 4);
+      g += data.getUint8(i * 4 + 1);
+      b += data.getUint8(i * 4 + 2);
+    }
+    return Color.fromARGB(255, r ~/ n, g ~/ n, b ~/ n);
+  }
+
+  // ---------- 契合度 ----------
+
+  /// 按「契合度」把背景图片 [image]（原图缩小、模糊后的版本）画进窗口。
+  /// [window] 是窗口大小，[origin] 是窗口左上角在 [canvas] 上的位置（面板只画自己那块时为负数），
+  /// [dpr] 用来把原图像素换算成界面尺寸（居中、平铺按原图大小显示）
+  void paintImage(Canvas canvas, ui.Image image, Size window, Offset origin, double dpr) {
+    final paint = Paint()..filterQuality = FilterQuality.medium;
+    final src = Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble());
+    final frame = origin & window;
+    final natural = _sourceSize.isEmpty ? Size(src.width, src.height) : _sourceSize / dpr;
+    void at(Rect dst) => canvas.drawImageRect(image, src, dst.shift(origin), paint);
+    Rect centered(Size s) =>
+        Rect.fromLTWH((window.width - s.width) / 2, (window.height - s.height) / 2, s.width, s.height);
+    switch (fit) {
+      case 'fit':
+        canvas.drawRect(frame, Paint()..color = Color.lerp(_average, Colors.black, .45)!);
+        final k = math.min(window.width / src.width, window.height / src.height);
+        at(centered(Size(src.width * k, src.height * k)));
+      case 'stretch':
+        at(Offset.zero & window);
+      case 'center':
+        canvas.drawRect(frame, Paint()..color = Color.lerp(_average, Colors.black, .45)!);
+        at(centered(natural));
+      case 'tile':
+        // 从窗口左上角开始，按原图大小重复铺满
+        final m = Matrix4.identity()
+          ..translateByDouble(origin.dx, origin.dy, 0, 1)
+          ..scaleByDouble(natural.width / src.width, natural.height / src.height, 1, 1);
+        canvas.drawRect(
+          frame,
+          Paint()
+            ..filterQuality = FilterQuality.medium
+            ..shader = ImageShader(image, TileMode.repeated, TileMode.repeated, m.storage),
+        );
+      case 'span':
+        final g = span.value;
+        if (g == null || g.window.isEmpty) {
+          at(coverRect(image, window));
+          break;
+        }
+        // 系统坐标换算成界面坐标：图片铺满整个桌面，窗口只显示自己所在的那一块
+        final k = window.width / g.window.width;
+        final desk = Rect.fromLTWH(
+          (g.desktop.left - g.window.left) * k,
+          (g.desktop.top - g.window.top) * k,
+          g.desktop.width * k,
+          g.desktop.height * k,
+        );
+        final c = coverRect(image, desk.size);
+        at(c.shift(desk.topLeft));
+      default:
+        at(coverRect(image, window));
+    }
+  }
+
+  /// 跨区：监听窗口移动、缩放，记下窗口和整个桌面的位置
+  void _trackSpan(bool on) {
+    if (!on) {
+      if (_spanWindow != null && _spanListener != null) _spanWindow!.removeListener(_spanListener!);
+      _spanWindow = null;
+      _spanListener = null;
+      span.value = null;
+      return;
+    }
+    if (_spanWindow != null) return;
+    try {
+      final w = native.WindowManager.instance.getCurrent();
+      if (w == null) return;
+      _spanWindow = w;
+      _updateSpan();
+      _spanListener = w.addListener((e) {
+        if (e is native.WindowMovedEvent ||
+            e is native.WindowResizedEvent ||
+            e is native.WindowMaximizedEvent ||
+            e is native.WindowRestoredEvent ||
+            e is native.WindowEnteredFullScreenEvent ||
+            e is native.WindowExitedFullScreenEvent) {
+          _updateSpan();
+        }
+      });
+    } catch (_) {
+      // 取不到窗口位置（例如 Linux Wayland）：跨区按填充显示
+      span.value = null;
+    }
+  }
+
+  void _updateSpan() {
+    final w = _spanWindow;
+    if (w == null) return;
+    try {
+      final b = w.bounds;
+      final win = Rect.fromLTWH(b.x, b.y, b.width, b.height);
+      Rect? desk;
+      for (final d in native.DisplayManager.instance.getAll()) {
+        final r = Rect.fromLTWH(d.position.x, d.position.y, d.size.width, d.size.height);
+        desk = desk == null ? r : desk.expandToInclude(r);
+      }
+      span.value = desk == null || desk.isEmpty ? null : (desktop: desk, window: win);
+    } catch (_) {
+      span.value = null;
+    }
   }
 
   static Future<ui.Image> _blurred(ui.Image src, double sigma) async {
@@ -294,6 +442,8 @@ class BackgroundController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _trackSpan(false);
+    span.dispose();
     config.removeListener(_sync);
     super.dispose();
   }
@@ -332,7 +482,12 @@ class BackgroundLayer extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return RepaintBoundary(
       child: CustomPaint(
-        painter: _CoverPainter(scope.controller.backgroundImage!),
+        painter: _CoverPainter(
+          scope.controller,
+          scope.controller.backgroundImage!,
+          scope.controller.fit,
+          MediaQuery.devicePixelRatioOf(context),
+        ),
         foregroundPainter: _DimPainter(
           (dark ? Colors.black : Colors.white).withValues(
             alpha: scope.controller.dimFor(dark ? Brightness.dark : Brightness.light),
@@ -345,23 +500,18 @@ class BackgroundLayer extends StatelessWidget {
 }
 
 class _CoverPainter extends CustomPainter {
-  _CoverPainter(this.image);
+  _CoverPainter(this.controller, this.image, this.fit, this.dpr) : super(repaint: controller.span);
 
+  final BackgroundController controller;
   final ui.Image image;
+  final String fit;
+  final double dpr;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final src = Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble());
-    canvas.drawImageRect(
-      image,
-      src,
-      BackgroundController.coverRect(image, size),
-      Paint()..filterQuality = FilterQuality.medium,
-    );
-  }
+  void paint(Canvas canvas, Size size) => controller.paintImage(canvas, image, size, Offset.zero, dpr);
 
   @override
-  bool shouldRepaint(_CoverPainter old) => old.image != image;
+  bool shouldRepaint(_CoverPainter old) => old.image != image || old.fit != fit || old.dpr != dpr;
 }
 
 class _DimPainter extends CustomPainter {
@@ -462,6 +612,19 @@ class _InGlass extends InheritedWidget {
   bool updateShouldNotify(_InGlass old) => false;
 }
 
+/// 带颜色的提示卡（公告、更新日志等）：启用背景时是毛玻璃上叠一层半透明的 [color]，否则是实色
+Widget tintedPanel(BuildContext context, Color color, BorderRadius radius, Widget child) {
+  if (BackgroundScope.activeOf(context) == null) {
+    return Material(color: color, borderRadius: radius, child: child);
+  }
+  return GlassPanel(
+    color: color,
+    borderRadius: radius,
+    overlay: ColoredBox(color: color.withValues(alpha: .45)),
+    child: child,
+  );
+}
+
 /// 在毛玻璃面板里面的实色卡片：启用背景时改成半透明，透出面板；否则就是 [color]
 Color glassCardColor(BuildContext context, Color color) {
   final scope = BackgroundScope.activeOf(context);
@@ -476,24 +639,38 @@ class _GlassBackdrop extends LeafRenderObjectWidget {
   final BackgroundScope scope;
 
   @override
-  RenderObject createRenderObject(BuildContext context) =>
-      _RenderGlassBackdrop(scope.controller.panelImage!, scope.rootKey, Scrollable.maybeOf(context)?.position);
+  RenderObject createRenderObject(BuildContext context) => _RenderGlassBackdrop(
+    scope.controller,
+    scope.controller.panelImage!,
+    scope.rootKey,
+    Scrollable.maybeOf(context)?.position,
+  )..look = (scope.controller.fit, MediaQuery.devicePixelRatioOf(context));
 
   @override
   void updateRenderObject(BuildContext context, _RenderGlassBackdrop render) => render
     ..image = scope.controller.panelImage!
     ..rootKey = scope.rootKey
-    ..scroll = Scrollable.maybeOf(context)?.position;
+    ..scroll = Scrollable.maybeOf(context)?.position
+    ..look = (scope.controller.fit, MediaQuery.devicePixelRatioOf(context));
 }
 
 class _RenderGlassBackdrop extends RenderBox {
-  _RenderGlassBackdrop(this._image, this.rootKey, ScrollPosition? scroll) {
+  _RenderGlassBackdrop(this.controller, this._image, this.rootKey, ScrollPosition? scroll) {
     this.scroll = scroll;
   }
 
+  final BackgroundController controller;
   ui.Image _image;
   GlobalKey rootKey;
   ScrollPosition? _scroll;
+  (String, double) _look = ('fill', 1);
+
+  /// 契合度和设备像素比：变了要重画
+  set look((String, double) v) {
+    if (v == _look) return;
+    _look = v;
+    markNeedsPaint();
+  }
 
   set image(ui.Image v) {
     if (v == _image) return;
@@ -513,11 +690,13 @@ class _RenderGlassBackdrop extends RenderBox {
   void attach(PipelineOwner owner) {
     super.attach(owner);
     _scroll?.addListener(markNeedsPaint);
+    controller.span.addListener(markNeedsPaint);
   }
 
   @override
   void detach() {
     _scroll?.removeListener(markNeedsPaint);
+    controller.span.removeListener(markNeedsPaint);
     super.detach();
   }
 
@@ -532,16 +711,10 @@ class _RenderGlassBackdrop extends RenderBox {
     final root = rootKey.currentContext?.findRenderObject() as RenderBox?;
     if (root == null || !root.attached) return;
     final origin = localToGlobal(Offset.zero, ancestor: root);
-    final cover = BackgroundController.coverRect(_image, root.size);
     final canvas = context.canvas;
     canvas.save();
     canvas.clipRect(offset & size);
-    canvas.drawImageRect(
-      _image,
-      Rect.fromLTWH(0, 0, _image.width.toDouble(), _image.height.toDouble()),
-      cover.shift(offset - origin),
-      Paint()..filterQuality = FilterQuality.medium,
-    );
+    controller.paintImage(canvas, _image, root.size, offset - origin, _look.$2);
     canvas.restore();
   }
 }

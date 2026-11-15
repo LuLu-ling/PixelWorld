@@ -20,7 +20,7 @@ class TasksPage extends StatelessWidget {
     final tasks = state.tasks;
     final finished = tasks.where((t) => t.state != TaskState.running).length;
     return Padding(
-      padding: const EdgeInsets.only(left: 12),
+      padding: const EdgeInsets.only(left: 8),
       child: ContentPanel(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

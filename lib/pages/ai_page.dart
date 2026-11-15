@@ -131,7 +131,7 @@ class _AiPageState extends State<AiPage> {
               _SessionList(chats: chats),
               Expanded(
                 child: ContentPanel(
-                  glass: true,
+                  padding: EdgeInsets.zero,
                   // 右边还有侧边栏时，面板之间同样留 8
                   margin: wide && open ? const EdgeInsets.fromLTRB(4, 0, 4, 16) : ContentPanel.defaultMargin,
                   child: _ChatView(

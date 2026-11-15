@@ -12,6 +12,7 @@ import '../shell.dart';
 import '../widgets/loader_label.dart';
 import 'file_manager_page.dart';
 import '../widgets/side_nav.dart';
+import '../widgets/app_background.dart';
 import 'instance_page.dart' show instanceSectionRequest;
 
 /// 版本选择：左侧游戏文件夹，右侧该文件夹中的版本（PCL 的布局）
@@ -85,43 +86,45 @@ class VersionsPage extends StatelessWidget {
       children: [
         SizedBox(
           width: 260,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Text('游戏文件夹', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
-              ),
-              for (final f in list)
+          child: _FolderColumn(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+              children: [
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Material(
-                    color: p.normalize(f.path) == current ? scheme.secondaryContainer : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.folder_outlined),
-                      title: Text(f.name, overflow: TextOverflow.ellipsis),
-                      subtitle: Text(f.path, overflow: TextOverflow.ellipsis, maxLines: 1),
-                      onTap: () => state.selectFolder(f.path),
-                      trailing: f.custom && state.config.gameFolders.any((x) => x.path == f.path)
-                          ? IconButton(
-                              tooltip: '从列表移除（不会删除文件）',
-                              icon: const Icon(Icons.close, size: 18),
-                              onPressed: () => _removeFolder(context, f),
-                            )
-                          : null,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Text('游戏文件夹', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                ),
+                for (final f in list)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Material(
+                      color: p.normalize(f.path) == current ? scheme.secondaryContainer : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                      clipBehavior: Clip.antiAlias,
+                      child: ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.folder_outlined),
+                        title: Text(f.name, overflow: TextOverflow.ellipsis),
+                        subtitle: Text(f.path, overflow: TextOverflow.ellipsis, maxLines: 1),
+                        onTap: () => state.selectFolder(f.path),
+                        trailing: f.custom && state.config.gameFolders.any((x) => x.path == f.path)
+                            ? IconButton(
+                                tooltip: '从列表移除（不会删除文件）',
+                                icon: const Icon(Icons.close, size: 18),
+                                onPressed: () => _removeFolder(context, f),
+                              )
+                            : null,
+                      ),
                     ),
                   ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _addFolder(context),
+                  icon: const Icon(Icons.create_new_folder_outlined),
+                  label: const Text('添加文件夹'),
                 ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () => _addFolder(context),
-                icon: const Icon(Icons.create_new_folder_outlined),
-                label: const Text('添加文件夹'),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         Expanded(
@@ -182,6 +185,26 @@ class VersionsPage extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 左边的游戏文件夹列表：启用背景图片时放在一块毛玻璃上（和设置页的二级菜单一样）
+class _FolderColumn extends StatelessWidget {
+  const _FolderColumn({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (BackgroundScope.activeOf(context) == null) return child;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 4, 16),
+      child: GlassPanel(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        child: child,
+      ),
     );
   }
 }

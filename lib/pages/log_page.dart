@@ -35,7 +35,7 @@ class _LogPageState extends State<LogPage> {
     final state = AppScope.of(context);
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(left: 12),
+      padding: const EdgeInsets.only(left: 8),
       child: ContentPanel(
         child: Column(
           children: [

@@ -66,7 +66,7 @@ class _DownloadPageState extends State<DownloadPage> {
   Widget build(BuildContext context) {
     final resource = _resources[_tab];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 16, 12),
+      padding: const EdgeInsets.fromLTRB(12, 0, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

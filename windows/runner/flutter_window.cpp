@@ -1,8 +1,46 @@
 #include "flutter_window.h"
 
+#include <commctrl.h>
+
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+
+#pragma comment(lib, "comctl32.lib")
+
+namespace {
+
+// Only expose the Flutter accessibility tree while a screen reader is running.
+//
+// The engine's UIA/MSAA hit testing (FlutterPlatformNodeDelegate::HitTestSync)
+// dereferences a null delegate when a child node disappears while the
+// semantics tree is changing, which crashes the whole app. Tools that probe
+// the element under the mouse all the time (word-lookup translators, touch
+// keyboard, remote desktop) trigger it while a slider is dragged or the
+// wallpaper is changed. They don't need our tree, so without a screen reader
+// they get the default result for a plain window; Narrator, NVDA and other
+// screen readers still get the full tree.
+bool ScreenReaderOn() {
+  BOOL on = FALSE;
+  return SystemParametersInfo(SPI_GETSCREENREADER, 0, &on, 0) && on;
+}
+
+LRESULT CALLBACK ViewSubclassProc(HWND hwnd, UINT message, WPARAM wparam,
+                                  LPARAM lparam, UINT_PTR id, DWORD_PTR) {
+  switch (message) {
+    case WM_GETOBJECT:
+      if (!ScreenReaderOn()) {
+        return DefWindowProc(hwnd, message, wparam, lparam);
+      }
+      break;
+    case WM_NCDESTROY:
+      RemoveWindowSubclass(hwnd, ViewSubclassProc, id);
+      break;
+  }
+  return DefSubclassProc(hwnd, message, wparam, lparam);
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -26,6 +64,8 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  SetWindowSubclass(flutter_controller_->view()->GetNativeWindow(),
+                    ViewSubclassProc, 1, 0);
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();

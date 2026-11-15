@@ -59,6 +59,8 @@ class _DocsPageState extends State<DocsPage> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
                 child: DropdownButton<int>(
+                  // 鼠标选完后不保留焦点高亮（否则会留一块灰底）
+                  focusColor: Colors.transparent,
                   value: _index,
                   isExpanded: true,
                   items: [

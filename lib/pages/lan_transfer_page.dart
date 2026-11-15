@@ -226,6 +226,8 @@ class _LanTransferPageState extends State<LanTransferPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               DropdownButton<InstanceInfo>(
+                // 鼠标选完后不保留焦点高亮（否则会留一块灰底）
+                focusColor: Colors.transparent,
                 isExpanded: true,
                 value: chosen,
                 items: [for (final v in versions) DropdownMenuItem(value: v, child: Text(v.id))],
@@ -425,6 +427,8 @@ class _LanTransferPageState extends State<LanTransferPage> {
                     const Text('还没有可以发送的版本')
                   else
                     DropdownButton<InstanceInfo>(
+                      // 鼠标选完后不保留焦点高亮（否则会留一块灰底）
+                      focusColor: Colors.transparent,
                       isExpanded: true,
                       value: _version,
                       items: [for (final v in state.versions) DropdownMenuItem(value: v, child: Text(v.id))],

@@ -33,9 +33,6 @@ abstract final class BackgroundPrefs {
   static const themeFromImageKey = 'bgThemeFromImage';
   static const seedIndexKey = 'bgSeedIndex';
 
-  /// 设了背景图片时首页用「壁纸」排版：内容放在顶部和底部，中间留给图片
-  static const homeLayoutKey = 'bgHomeWallpaper';
-
   /// 背景暗化：背景图片上压一层颜色的浓度（深色压黑、浅色压白），0～0.7；小于 0 表示用默认值
   static const dimKey = 'bgDim';
 
@@ -52,7 +49,6 @@ abstract final class BackgroundPrefs {
     solidKey: false,
     themeFromImageKey: true,
     seedIndexKey: 0,
-    homeLayoutKey: true,
     dimKey: -1.0,
     fitKey: 'fill',
   };
@@ -118,7 +114,6 @@ class BackgroundController extends ChangeNotifier {
   bool get solid => _get<bool>(BackgroundPrefs.solidKey);
   bool get themeFromImage => _get<bool>(BackgroundPrefs.themeFromImageKey);
   int get seedIndex => (_get<num>(BackgroundPrefs.seedIndexKey)).toInt();
-  bool get wallpaperHome => _get<bool>(BackgroundPrefs.homeLayoutKey);
 
   /// 只在电脑上、并且已经设置并加载好背景图片时启用
   bool get active => isDesktop && _bgImage != null && _panelImage != null;
@@ -430,7 +425,8 @@ class BackgroundController extends ChangeNotifier {
     final target = p.join(dir.path, 'background-${DateTime.now().millisecondsSinceEpoch}$ext');
     await File(source).copy(target);
     final old = imagePath;
-    await config.update({BackgroundPrefs.imageKey: target, BackgroundPrefs.seedIndexKey: 0});
+    // 选了背景图片时首页自动换成「上下」布局，把中间留给图片（之后可以在设置里改回来）
+    await config.update({BackgroundPrefs.imageKey: target, BackgroundPrefs.seedIndexKey: 0, 'homeLayout': 'split'});
     if (old.isNotEmpty && p.isWithin(dir.path, old)) await File(old).delete().catchError((_) => File(old));
   }
 

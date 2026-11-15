@@ -9,6 +9,7 @@ import '../core/instance_files.dart';
 import '../core/paths.dart';
 import '../pages/file_manager_page.dart';
 import '../platform.dart';
+import 'maintenance_actions.dart';
 import 'settings_group.dart';
 
 String get _internalGameDir => p.join(Paths.appData, '.minecraft');
@@ -68,7 +69,7 @@ Future<void> changeStorage(BuildContext context, {required bool toShared}) async
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('移动游戏文件'),
-        content: Text('把现在游戏文件夹中的版本、存档与资源移到新位置吗？\n\n$from\n→ $to'),
+        content: Text('把现在游戏文件夹中的实例、存档与资源移到新位置吗？\n\n$from\n→ $to'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('只切换，不移动')),
@@ -194,9 +195,7 @@ class GameStorageSection extends StatelessWidget {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 leading: const Icon(Icons.smartphone),
                 title: const Text('存放位置'),
-                subtitle: Text(
-                  shared ? '手机存储：卸载启动器后仍然保留' : '应用内部：卸载启动器时会一起删除，建议移到手机存储',
-                ),
+                subtitle: Text(shared ? '手机存储：卸载启动器后仍然保留' : '应用内部：卸载启动器时会一起删除，建议移到手机存储'),
                 trailing: SegmentedButton<bool>(
                   segments: const [
                     ButtonSegment(value: true, label: Text('手机存储')),
@@ -206,6 +205,18 @@ class GameStorageSection extends StatelessWidget {
                   onSelectionChanged: (s) => changeStorage(context, toShared: s.first),
                 ),
               ),
+          ],
+        ),
+        SettingsGroup(
+          title: '维护',
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              leading: const Icon(Icons.cleaning_services_outlined),
+              title: const Text('清理游戏垃圾'),
+              subtitle: const Text('删除日志、崩溃报告与解压出的本地库，不影响存档和模组'),
+              trailing: FilledButton.tonal(onPressed: () => cleanGameJunk(context), child: const Text('清理')),
+            ),
           ],
         ),
         if (!isDesktop)

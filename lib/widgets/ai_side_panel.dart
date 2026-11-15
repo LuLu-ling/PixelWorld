@@ -125,7 +125,7 @@ class AiSidePanel extends StatelessWidget {
               trailing: ai.ready ? ai.host : '设置',
               onTap: () => showAiSettingsDialog(context),
             ),
-            row(Icons.sports_esports_outlined, state.selectedVersion?.id ?? '没有选择版本', trailing: '当前版本'),
+            row(Icons.sports_esports_outlined, state.selectedVersion?.id ?? '没有选择实例', trailing: '当前实例'),
             row(
               Icons.folder_special_outlined,
               'AI 工作区',

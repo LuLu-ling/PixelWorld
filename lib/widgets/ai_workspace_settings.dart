@@ -103,7 +103,7 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('AI 工作区'),
-          subtitle: const Text('AI 有一个自己的文件夹可以随意读写，并能查看当前版本的游戏文件（只读）'),
+          subtitle: const Text('AI 有一个自己的文件夹可以随意读写，并能查看当前实例的游戏文件（只读）'),
           value: cfg.aiWorkspace,
           onChanged: (v) => cfg.update({'aiWorkspace': v}),
         ),

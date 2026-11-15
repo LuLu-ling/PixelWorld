@@ -284,7 +284,7 @@ class _Tag extends StatelessWidget {
   }
 }
 
-/// 安装 Minecraft：选择加载器（不兼容的灰掉并写明原因）、加载器版本、OptiFine 和版本名称
+/// 安装 Minecraft 为一个新实例：选择加载器（不兼容的灰掉并写明原因）、加载器版本、OptiFine 和实例名称
 class InstallPanel extends StatefulWidget {
   const InstallPanel({super.key, required this.version, this.preset});
 
@@ -488,13 +488,27 @@ class _InstallPanelState extends State<InstallPanel> {
                 child: TextField(
                   controller: _name,
                   decoration: InputDecoration(
-                    labelText: '名称',
+                    labelText: '实例名称',
                     hintText: _defaultName,
                     floatingLabelBehavior: FloatingLabelBehavior.always,
                     isDense: true,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
+              ),
+              // 同一个游戏版本可以装多个实例：已经装过时说明这次是再装一个独立的
+              Builder(
+                builder: (context) {
+                  final same = AppScope.of(context).versions.where((v) => v.gameVersion == widget.version.id).length;
+                  if (same == 0) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      '已经有 $same 个 ${widget.version.id} 的实例；这次会再装一个独立的实例，存档和模组互不影响',
+                      style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 10),
               LayoutBuilder(

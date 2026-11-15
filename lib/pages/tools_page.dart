@@ -11,19 +11,15 @@ import '../app_scope.dart';
 import '../core/crash.dart';
 import '../core/task.dart';
 import '../core/toolbox.dart';
-import '../widgets/format.dart';
 import '../widgets/settings_group.dart';
-import '../shell.dart';
 import '../platform.dart';
 import '../widgets/side_nav.dart';
 import '../widgets/app_background.dart';
 import 'diagnose_page.dart';
-import 'docs_page.dart';
 import 'file_manager_page.dart';
 import 'lan_transfer_page.dart';
-import 'versions_page.dart';
 
-enum _Section { lobby, transfer, diagnose, toolbox, download, skin, server, achievement, docs }
+enum _Section { lobby, transfer, diagnose, luck, download, skin, server, achievement }
 
 /// 工具。桌面：左侧二级菜单 + 右侧内容（鼠标操作，列表比卡片合适）；
 /// 手机：大块按钮（每块带一句说明），点开进入对应工具，左上角返回
@@ -35,39 +31,58 @@ class ToolsPage extends StatefulWidget {
 }
 
 class _Tool {
-  const _Tool(this.section, this.title, this.hint, this.icon, {this.sub});
+  const _Tool(this.section, this.title, this.hint, this.icon);
 
-  final _Section? section;
+  final _Section section;
   final String title;
   final String hint;
   final IconData icon;
-
-  /// 进入外壳的子页面（任务历史）而不是工具页内的分类
-  final SubPage? sub;
 }
+
+/// 从别的页面跳到工具的某一项（值为 _Section 的名字，例如 transfer），打开后清空
+final toolsSectionRequest = ValueNotifier<String?>(null);
 
 class _ToolsPageState extends State<ToolsPage> {
   _Section? _section;
 
+  @override
+  void initState() {
+    super.initState();
+    toolsSectionRequest.addListener(_onRequest);
+    _onRequest();
+  }
+
+  @override
+  void dispose() {
+    toolsSectionRequest.removeListener(_onRequest);
+    super.dispose();
+  }
+
+  void _onRequest() {
+    final s = _Section.values.asNameMap()[toolsSectionRequest.value];
+    if (s == null) return;
+    toolsSectionRequest.value = null;
+    if (mounted) setState(() => _section = s);
+  }
+
+  // 任务历史在顶栏的任务面板里；清理游戏垃圾、桌面快捷方式、使用文档在设置里
   static const _groups = [
     (
-      '游戏',
+      '联机',
       [
-        _Tool(_Section.transfer, '局域网互传', '在两台设备之间传模组、存档、整个版本', Icons.swap_horiz),
-        _Tool(_Section.diagnose, '错误分析', '查看日志，自动找出崩溃原因', Icons.troubleshoot),
-        _Tool(_Section.download, '自定义下载', '按链接下载文件到指定位置', Icons.download_for_offline_outlined),
-        _Tool(_Section.skin, '皮肤与头像', '查看和下载正版玩家的皮肤', Icons.face_outlined),
+        _Tool(_Section.transfer, '局域网互传', '在两台设备之间传模组、存档、整个实例', Icons.swap_horiz),
         _Tool(_Section.server, '服务器查询', '查询服务器在线人数和延迟', Icons.dns_outlined),
-        _Tool(_Section.achievement, '成就图片', '生成自定义的成就弹窗图片', Icons.emoji_events_outlined),
+        _Tool(_Section.lobby, '联机大厅', '规划中', Icons.lan_outlined),
       ],
     ),
+    ('排错', [_Tool(_Section.diagnose, '错误分析', '查看日志，自动找出崩溃原因', Icons.troubleshoot)]),
+    ('实用', [_Tool(_Section.download, '自定义下载', '按链接下载文件到指定位置', Icons.download_for_offline_outlined)]),
     (
-      '其他',
+      '趣味',
       [
-        _Tool(null, '任务历史', '下载与安装记录', Icons.history, sub: SubPage.tasks),
-        _Tool(_Section.toolbox, '百宝箱', '今日人品、随机种子等小工具', Icons.handyman_outlined),
-        _Tool(_Section.docs, '使用文档', '在启动器里阅读官网文档', Icons.menu_book_outlined),
-        _Tool(_Section.lobby, '联机大厅', '规划中', Icons.lan_outlined),
+        _Tool(_Section.skin, '皮肤与头像', '查看和下载正版玩家的皮肤', Icons.face_outlined),
+        _Tool(_Section.achievement, '成就图片', '生成自定义的成就弹窗图片', Icons.emoji_events_outlined),
+        _Tool(_Section.luck, '今日人品', '看看今天的运气，每人每天固定', Icons.auto_awesome_outlined),
       ],
     ),
   ];
@@ -76,15 +91,14 @@ class _ToolsPageState extends State<ToolsPage> {
     _Section.lobby => const _Lobby(),
     _Section.transfer => const LanTransferPage(),
     _Section.diagnose => const _Diagnose(),
-    _Section.toolbox => const _Toolbox(),
+    _Section.luck => const _Luck(),
     _Section.download => const _CustomDownload(),
     _Section.skin => const _SkinTools(),
     _Section.server => const _ServerQuery(),
     _Section.achievement => const _Achievement(),
-    _Section.docs => const DocsPage(),
   };
 
-  /// 桌面：和设置页一样的左侧分组菜单；「任务历史」打开外壳的子页面，不改变当前选中项
+  /// 桌面：和设置页一样的左侧分组菜单
   Widget _desktop(BuildContext context) {
     final section = _section ?? _Section.transfer;
     final current = _groups.expand((g) => g.$2).firstWhere((t) => t.section == section);
@@ -97,7 +111,7 @@ class _ToolsPageState extends State<ToolsPage> {
               SideNavGroup(title, [for (final t in tools) SideNavItem(t, t.title, t.icon)]),
           ],
           value: current,
-          onChanged: (t) => t.sub != null ? ShellNav.of(context).open(t.sub!) : setState(() => _section = t.section),
+          onChanged: (t) => setState(() => _section = t.section),
         ),
         Expanded(child: ContentPanel(child: _content(section))),
       ],
@@ -150,11 +164,7 @@ class _ToolsPageState extends State<ToolsPage> {
                   for (final t in tools)
                     SizedBox(
                       width: w,
-                      child: _ToolTile(
-                        tool: t,
-                        onTap: () =>
-                            t.sub != null ? ShellNav.of(context).open(t.sub!) : setState(() => _section = t.section),
-                      ),
+                      child: _ToolTile(tool: t, onTap: () => setState(() => _section = t.section)),
                     ),
                 ],
               );
@@ -338,89 +348,47 @@ class _Diagnose extends StatelessWidget {
   }
 }
 
-// ---------- 百宝箱 ----------
+// ---------- 今日人品 ----------
 
-class _Toolbox extends StatelessWidget {
-  const _Toolbox();
-
-  Future<void> _clean(BuildContext context) async {
-    final state = AppScope.read(context);
-    final folders = VersionsPage.folders(state.config).map((f) => f.path).toList();
-    final junk = findGameJunk(folders);
-    final size = junk.fold<int>(0, (s, e) => s + sizeOf(e));
-    if (junk.isEmpty) return toast(context, '没有需要清理的文件');
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.cleaning_services_outlined),
-        title: const Text('清理游戏垃圾'),
-        content: Text(
-          '将删除 ${junk.length} 项，共 ${formatSize(size)}：\n'
-          '游戏文件夹与各版本文件夹中的日志（logs、*.log）、崩溃报告（crash-reports、hs_err_pid*）'
-          '与解压出的本地库（natives，启动时会重新生成）。\n\n存档、模组与设置不会被删除。',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('清理')),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    final failed = await deleteAll(junk);
-    if (context.mounted) {
-      toast(context, failed == 0 ? '已清理 ${formatSize(size)}' : '已清理，$failed 项正在被使用，没有删除');
-    }
-  }
-
-  Future<void> _luck(BuildContext context) async {
-    final state = AppScope.read(context);
-    final name = state.selectedAccount?.name ?? '玩家';
-    final v = luckToday(name);
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.auto_awesome_outlined),
-        title: Text('$name 的今日人品'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('$v', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Text(luckComment(v)),
-          ],
-        ),
-        actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('好'))],
-      ),
-    );
-  }
-
-  Future<void> _shortcut(BuildContext context) async {
-    try {
-      final path = await createDesktopShortcut();
-      if (context.mounted) toast(context, '已创建 $path');
-    } catch (e) {
-      if (context.mounted) toast(context, errorText(e));
-    }
-  }
+class _Luck extends StatelessWidget {
+  const _Luck();
 
   @override
   Widget build(BuildContext context) {
-    final count = AppScope.of(context).config.launchCount;
-    Widget tool(IconData icon, String title, String subtitle, String action, VoidCallback? onTap) => ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      leading: Icon(icon),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      trailing: onTap == null ? null : FilledButton.tonal(onPressed: onTap, child: Text(action)),
-    );
+    final state = AppScope.of(context);
+    final theme = Theme.of(context);
+    final name = state.selectedAccount?.name ?? '玩家';
+    final v = luckToday(name);
     return _page([
       SettingsGroup(
-        title: '百宝箱',
+        title: '今日人品',
         children: [
-          tool(Icons.cleaning_services_outlined, '清理游戏垃圾', '删除日志、崩溃报告与解压出的本地库，不影响存档和模组', '清理', () => _clean(context)),
-          tool(Icons.auto_awesome_outlined, '今日人品', '看看今天的运气，每人每天固定', '查看', () => _luck(context)),
-          if (Platform.isWindows) tool(Icons.shortcut, '创建桌面快捷方式', '在桌面创建启动器的快捷方式', '创建', () => _shortcut(context)),
-          tool(Icons.rocket_launch_outlined, '启动次数', '已经通过启动器启动了 $count 次游戏', '', null),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Column(
+              children: [
+                Text('$name 的今日人品', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                const SizedBox(height: 4),
+                Text(
+                  '$v',
+                  style: theme.textTheme.displayMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(luckComment(v)),
+                const SizedBox(height: 2),
+                Text('每人每天固定', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            leading: const Icon(Icons.rocket_launch_outlined),
+            title: const Text('启动次数'),
+            subtitle: Text('已经通过启动器启动了 ${state.config.launchCount} 次游戏'),
+          ),
         ],
       ),
     ]);

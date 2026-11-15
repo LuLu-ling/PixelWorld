@@ -40,10 +40,10 @@ enum MainPage { home, download, settings, tools, ai, files }
 enum SubPage { versions, log, instance, tasks, diagnose }
 
 const _subTitles = {
-  SubPage.versions: '版本选择',
+  SubPage.versions: '实例',
   SubPage.log: '游戏日志',
-  SubPage.instance: '版本详情',
-  SubPage.tasks: '任务历史',
+  SubPage.instance: '实例详情',
+  SubPage.tasks: '任务',
   SubPage.diagnose: '错误分析',
 };
 
@@ -383,10 +383,14 @@ class _TopBarState extends State<_TopBar> {
     // 启用背景图片时 fg、muted 是统一的黑字或白字，要显式写进字体样式（主题字体自带颜色会盖掉外层的默认颜色）
     Widget title(Color? fg, Color? muted) {
       if (sub != null) {
-        final text = sub == SubPage.instance ? '版本详情' : _subTitles[sub]!;
+        final text = sub == SubPage.instance ? '实例详情' : _subTitles[sub]!;
         return Row(
           children: [
-            IconButton(tooltip: '返回', onPressed: widget.onBack, icon: Icon(Icons.arrow_back, size: 20, color: fg)),
+            IconButton(
+              tooltip: '返回',
+              onPressed: widget.onBack,
+              icon: Icon(Icons.arrow_back, size: 20, color: fg),
+            ),
             const SizedBox(width: 2),
             Flexible(
               child: Text(
@@ -445,7 +449,7 @@ class _TopBarState extends State<_TopBar> {
             _TasksPill(key: _tasksKey, width: tight ? 168 : (compact ? 200 : 236)),
             const SizedBox(width: 4),
             IconButton(
-              tooltip: '版本选择',
+              tooltip: '实例列表',
               onPressed: () => ShellNav.of(context).open(SubPage.versions),
               icon: const Icon(Icons.search, size: 21),
             ),

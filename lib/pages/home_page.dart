@@ -126,10 +126,13 @@ class _HomePageState extends State<HomePage> {
             onManageMods: version == null ? null : () => _openInstance('mods'),
             onLog: () => ShellNav.of(context).open(SubPage.log),
             onFolder: version == null ? null : _openFolder,
-            onInstallMods: () {
-              downloadTabRequest.value = 'mods';
-              ShellNav.of(context).goMain(MainPage.download);
-            },
+            // 装模组：打开当前实例的模组页，直接进入「添加模组」（只显示适配这个实例的模组）
+            onInstallMods: version == null
+                ? () {
+                    downloadTabRequest.value = 'mods';
+                    ShellNav.of(context).goMain(MainPage.download);
+                  }
+                : () => _openInstance('add-mods'),
             onPlayWorld: _playWorld,
             versionName: (id) => _versionName(state, id),
           );
@@ -151,10 +154,12 @@ class _HomePageState extends State<HomePage> {
                   onFolder: version == null ? null : _openFolder,
                 ),
                 right: _SidePanel(
-                  onInstallMods: () {
-                    downloadTabRequest.value = 'mods';
-                    ShellNav.of(context).goMain(MainPage.download);
-                  },
+                  onInstallMods: version == null
+                      ? () {
+                          downloadTabRequest.value = 'mods';
+                          ShellNav.of(context).goMain(MainPage.download);
+                        }
+                      : () => _openInstance('add-mods'),
                   onManageMods: version == null ? null : () => _openInstance('mods'),
                   onFolder: version == null ? null : _openFolder,
                   onLog: () => ShellNav.of(context).open(SubPage.log),
@@ -279,7 +284,7 @@ class _HeroCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '切换版本',
+                            '切换实例',
                             style: theme.textTheme.labelMedium?.copyWith(color: white.withValues(alpha: .8)),
                           ),
                           Icon(Icons.expand_more, size: 16, color: white.withValues(alpha: .8)),
@@ -292,7 +297,7 @@ class _HeroCard extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.only(right: v == null ? 0 : 76),
                   child: Text(
-                    v == null ? '还没有选择版本' : versionTitle(v),
+                    v == null ? '还没有选择实例' : versionTitle(v),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.headlineSmall?.copyWith(color: white, fontWeight: FontWeight.w800),
@@ -314,7 +319,7 @@ class _HeroCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 if (v == null)
                   Text(
-                    '先下载或选择一个版本，准备好就开始',
+                    '先安装或选择一个实例，准备好就开始',
                     style: theme.textTheme.bodySmall?.copyWith(color: white.withValues(alpha: .75)),
                   )
                 else
@@ -333,7 +338,7 @@ class _HeroCard extends StatelessWidget {
                         minimumSize: const Size(0, 44),
                       ),
                       icon: const Icon(Icons.tune, size: 18),
-                      label: const Text('版本设置'),
+                      label: const Text('实例设置'),
                     ),
                     const SizedBox(width: 8),
                     PopupMenuButton<String>(
@@ -344,8 +349,8 @@ class _HeroCard extends StatelessWidget {
                         if (value == 'folder') onFolder?.call();
                       },
                       itemBuilder: (context) => [
-                        const PopupMenuItem(value: 'versions', child: Text('版本选择')),
-                        PopupMenuItem(value: 'folder', enabled: onFolder != null, child: const Text('打开版本文件夹')),
+                        const PopupMenuItem(value: 'versions', child: Text('实例列表')),
+                        PopupMenuItem(value: 'folder', enabled: onFolder != null, child: const Text('打开实例文件夹')),
                         const PopupMenuItem(value: 'log', child: Text('游戏日志')),
                       ],
                       child: Container(
@@ -372,7 +377,8 @@ class _HeroCard extends StatelessWidget {
 
 /// 「12 个模组 · Zink 渲染 · 14 小时前玩过」
 /// 版本 mods 文件夹里的 jar 数量；读不到时为 null
-Future<int?> _modCount(AppState state, InstanceInfo version) async {
+/// 实例 mods 文件夹里的模组数（读不到时为 null）
+Future<int?> instanceModCount(AppState state, InstanceInfo version) async {
   try {
     final dir = Directory(p.join(await state.gameDirOf(version), 'mods'));
     if (!dir.existsSync()) return 0;
@@ -402,7 +408,7 @@ class _VersionFacts extends StatelessWidget {
       if (pref != 'auto') renderer = androidRenderers[pref]?.split('（').first;
     }
     return FutureBuilder<int?>(
-      future: version.loader == Loader.vanilla ? Future.value(null) : _modCount(state, version),
+      future: version.loader == Loader.vanilla ? Future.value(null) : instanceModCount(state, version),
       builder: (context, snap) {
         final parts = [
           if (snap.data != null) '${snap.data} 个模组',
@@ -818,7 +824,7 @@ class _WorldCard extends StatelessWidget {
                 right: 8,
                 top: 46,
                 child: IconButton.filled(
-                  tooltip: '进入这个存档的版本',
+                  tooltip: '切换到这个存档所在的实例',
                   onPressed: onPlay,
                   style: IconButton.styleFrom(minimumSize: const Size(40, 40), fixedSize: const Size(40, 40)),
                   icon: const Icon(Icons.rocket_launch, size: 19),
@@ -943,8 +949,7 @@ class _DesktopHomeState extends State<_DesktopHome> {
         // 第一屏高度 = 可见高度；主卡片那一行吃掉剩余高度，但有上下限，超出部分让内容整体垂直居中
         final foldH = math.max(box.maxHeight, 430.0);
         final topH = (foldH - _headerH - worldsH - _moreH - _gap * 2 - 16).clamp(176.0, foldH > 820 ? 380.0 : 340.0);
-        final bg = BackgroundScope.activeOf(context);
-        final wallpaper = bg != null && bg.controller.wallpaperHome;
+        final layout = cfg.homeLayout;
         void more() => _scroll.animateTo(
           math.min(foldH, _scroll.position.maxScrollExtent),
           duration: const Duration(milliseconds: 350),
@@ -954,7 +959,25 @@ class _DesktopHomeState extends State<_DesktopHome> {
           controller: _scroll,
           padding: _pad,
           children: [
-            if (wallpaper)
+            if (layout == 'minimal')
+              SizedBox(
+                height: foldH,
+                child: _MinimalFold(
+                  state: widget.state,
+                  version: widget.version,
+                  latest: widget.latest,
+                  onLaunch: widget.onLaunch,
+                  onVersions: widget.onVersions,
+                  onSettings: widget.onSettings,
+                  onSaves: widget.onSaves,
+                  onManageMods: widget.onManageMods,
+                  onLog: widget.onLog,
+                  onFolder: widget.onFolder,
+                  onInstallMods: widget.onInstallMods,
+                  onMore: more,
+                ),
+              )
+            else if (layout == 'split')
               SizedBox(
                 height: foldH,
                 child: _WallpaperFold(
@@ -1222,13 +1245,13 @@ class _WallpaperFold extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      v == null ? '还没有选择版本' : versionTitle(v),
+                      v == null ? '还没有选择实例' : versionTitle(v),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     if (v == null)
-                      Text('先下载或选择一个版本', style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant))
+                      Text('先安装或选择一个实例', style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant))
                     else
                       _VersionFacts(state: state, version: v, latest: latest, color: scheme.onSurfaceVariant),
                   ],
@@ -1239,14 +1262,15 @@ class _WallpaperFold extends StatelessWidget {
                 color: glassCardColor(context, scheme.surfaceContainerHighest),
                 borderRadius: BorderRadius.circular(8),
                 child: InkWell(
-                  onTap: onVersions,
+                  onTap: () {},
+                  onTapUp: (d) => showInstanceMenu(context, state, onVersions, at: d.globalPosition),
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('切换版本', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                        Text('切换实例', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
                         Icon(Icons.expand_more, size: 16, color: scheme.onSurfaceVariant),
                       ],
                     ),
@@ -1268,7 +1292,7 @@ class _WallpaperFold extends StatelessWidget {
               OutlinedButton(
                 onPressed: onSettings,
                 style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
-                child: const Text('版本设置'),
+                child: const Text('实例设置'),
               ),
             ],
           ),
@@ -1368,6 +1392,140 @@ class _WallpaperFold extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           dock,
+        ],
+      ),
+    );
+  }
+}
+
+/// 极简布局的第一屏：只在底部居中留一条——当前实例（点名字切换）、全部存档、实例设置、更多和开始游戏。
+/// 往下滚动的内容和其他布局一样
+class _MinimalFold extends StatelessWidget {
+  const _MinimalFold({
+    required this.state,
+    required this.version,
+    required this.latest,
+    required this.onLaunch,
+    required this.onVersions,
+    required this.onSettings,
+    required this.onSaves,
+    required this.onManageMods,
+    required this.onLog,
+    required this.onFolder,
+    required this.onInstallMods,
+    required this.onMore,
+  });
+
+  final AppState state;
+  final InstanceInfo? version;
+  final RecentWorld? latest;
+  final VoidCallback onLaunch;
+  final VoidCallback onVersions;
+  final VoidCallback? onSettings;
+  final VoidCallback? onSaves;
+  final VoidCallback? onManageMods;
+  final VoidCallback onLog;
+  final VoidCallback? onFolder;
+  final VoidCallback onInstallMods;
+  final VoidCallback onMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final v = version;
+    Widget tool(IconData icon, String tip, VoidCallback? onTap) =>
+        IconButton(tooltip: tip, onPressed: onTap, icon: Icon(icon, size: 20), color: scheme.onSurfaceVariant);
+    final bar = GlassPanel(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(32),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        child: SizedBox(
+          height: 48,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (v != null) ...[
+                VersionIcon(info: v, versionDir: state.paths.versionDir(v.id), size: 40, radius: 12),
+                const SizedBox(width: 12),
+              ],
+              // 名字和下面的「切换」一起点，打开实例选择
+              InkWell(
+                onTap: () {},
+                onTapUp: (d) => showInstanceMenu(context, state, onVersions, at: d.globalPosition),
+                borderRadius: BorderRadius.circular(8),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 240),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          v == null ? '还没有选择实例' : versionTitle(v),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('切换实例', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                            Icon(Icons.expand_more, size: 14, color: scheme.onSurfaceVariant),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 26,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                color: scheme.outlineVariant.withValues(alpha: .5),
+              ),
+              tool(Icons.grid_view_rounded, '全部存档', onSaves),
+              tool(Icons.tune, '实例设置', onSettings),
+              PopupMenuButton<VoidCallback?>(
+                tooltip: '更多',
+                icon: Icon(Icons.more_horiz, size: 20, color: scheme.onSurfaceVariant),
+                onSelected: (f) => f?.call(),
+                itemBuilder: (context) => [
+                  PopupMenuItem(value: onInstallMods, child: const Text('装模组')),
+                  PopupMenuItem(value: onManageMods, child: const Text('管理模组')),
+                  PopupMenuItem(value: onFolder, child: const Text('打开文件夹')),
+                  PopupMenuItem(value: onLog, child: const Text('查看日志')),
+                  PopupMenuItem(value: () => showNoticesDialog(context), child: const Text('启动器公告')),
+                ],
+              ),
+              const SizedBox(width: 8),
+              _DockLaunch(state: state, version: v, onLaunch: onLaunch),
+            ],
+          ),
+        ),
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        children: [
+          const Spacer(),
+          Center(
+            child: OnBackground(
+              builder: (context, _, muted) => TextButton.icon(
+                onPressed: onMore,
+                style: TextButton.styleFrom(foregroundColor: muted ?? scheme.onSurfaceVariant),
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(Icons.expand_more, size: 18),
+                label: const Text('向下滚动查看更多'),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          bar,
         ],
       ),
     );
@@ -1515,7 +1673,7 @@ class _DockWorldState extends State<_DockWorld> {
                       ),
                       if (_hover)
                         IconButton(
-                          tooltip: '进入这个存档的版本',
+                          tooltip: '切换到这个存档所在的实例',
                           onPressed: widget.onPlay,
                           style: IconButton.styleFrom(
                             backgroundColor: scheme.primaryFixed,
@@ -1580,14 +1738,15 @@ class _DesktopHero extends StatelessWidget {
               color: scheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
               child: InkWell(
-                onTap: onVersions,
+                onTap: () {},
+                onTapUp: (d) => showInstanceMenu(context, state, onVersions, at: d.globalPosition),
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('切换版本', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                      Text('切换实例', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
                       Icon(Icons.expand_more, size: 16, color: scheme.onSurfaceVariant),
                     ],
                   ),
@@ -1606,7 +1765,7 @@ class _DesktopHero extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        v == null ? '还没有选择版本' : versionTitle(v),
+                        v == null ? '还没有选择实例' : versionTitle(v),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -1628,7 +1787,7 @@ class _DesktopHero extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             if (v == null)
-              Text('先下载或选择一个版本，准备好就开始', style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant))
+              Text('先安装或选择一个实例，准备好就开始', style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant))
             else
               _VersionFacts(state: state, version: v, latest: latest, color: scheme.onSurfaceVariant),
             const SizedBox(height: 14),
@@ -1640,7 +1799,7 @@ class _DesktopHero extends StatelessWidget {
                   onPressed: onSettings,
                   style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
                   icon: const Icon(Icons.tune, size: 18),
-                  label: const Text('版本设置'),
+                  label: const Text('实例设置'),
                 ),
                 const SizedBox(width: 8),
                 PopupMenuButton<String>(
@@ -1651,8 +1810,8 @@ class _DesktopHero extends StatelessWidget {
                     if (value == 'folder') onFolder?.call();
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'versions', child: Text('版本选择')),
-                    PopupMenuItem(value: 'folder', enabled: onFolder != null, child: const Text('打开版本文件夹')),
+                    const PopupMenuItem(value: 'versions', child: Text('实例列表')),
+                    PopupMenuItem(value: 'folder', enabled: onFolder != null, child: const Text('打开实例文件夹')),
                     const PopupMenuItem(value: 'log', child: Text('游戏日志')),
                   ],
                   child: Container(
@@ -1762,7 +1921,7 @@ class _WorldTileState extends State<_WorldTile> {
                       ),
                     ),
                     IconButton(
-                      tooltip: '进入这个存档的版本',
+                      tooltip: '切换到这个存档所在的实例',
                       onPressed: widget.onPlay,
                       style: IconButton.styleFrom(
                         backgroundColor: _hover ? scheme.primaryFixed : scheme.onSurface.withValues(alpha: .06),
@@ -1828,24 +1987,96 @@ class _VersionInfoCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text('当前版本', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                Text('当前实例', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                 const Spacer(),
-                TextButton(onPressed: onSettings, child: const Text('版本设置 ›')),
+                TextButton(onPressed: onSettings, child: const Text('实例设置 ›')),
               ],
             ),
-            row('版本', describeVersion(version), first: true),
+            row('类型', describeVersion(version), first: true),
             FutureBuilder<int?>(
-              future: version.loader == Loader.vanilla ? Future.value(null) : _modCount(state, version),
+              future: version.loader == Loader.vanilla ? Future.value(null) : instanceModCount(state, version),
               builder: (context, snap) => row(
                 '模组',
                 version.loader == Loader.vanilla ? '原版，不加载模组' : (snap.data == null ? '—' : '${snap.data} 个'),
               ),
             ),
             row('最近游玩', latest == null ? '还没玩过' : '${latest!.name} · ${_timeAgo(latest!.modified)}'),
-            row('版本 ID', version.id),
+            row('实例 ID', version.id),
           ],
         ),
       ),
     );
   }
+}
+
+/// 「切换实例」下拉：列出所有实例用来快速切换（打勾的是当前实例），最下面是「管理全部实例」（打开实例列表）。
+/// 菜单出现在点击的位置 [at]
+Future<void> showInstanceMenu(BuildContext context, AppState state, VoidCallback onManage, {required Offset at}) async {
+  // 不会和实例名重复（实例名不能包含 /）
+  const manage = '//manage';
+  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+  if (overlay == null) return onManage();
+  // 菜单从点击的位置弹出（靠近窗口底部时自动往上）
+  final local = overlay.globalToLocal(at);
+  final position = RelativeRect.fromRect(local & const Size(1, 1), Offset.zero & overlay.size);
+  final theme = Theme.of(context);
+  final scheme = theme.colorScheme;
+  final current = state.selectedVersion?.id;
+  // 名字相同的实例（例如装了两个 1.20.1 Fabric）在副标题里带上文件夹名区分
+  final titles = <String, int>{};
+  for (final v in state.versions) {
+    titles.update(versionTitle(v), (n) => n + 1, ifAbsent: () => 1);
+  }
+  String subtitle(InstanceInfo v) {
+    final t = versionTitle(v);
+    return titles[t]! > 1 && t != v.id ? '${describeVersion(v)} · ${v.id}' : describeVersion(v);
+  }
+
+  final pick = await showMenu<String>(
+    context: context,
+    position: position,
+    constraints: const BoxConstraints(minWidth: 280, maxWidth: 380, maxHeight: 460),
+    items: [
+      // 「管理全部实例」放在最上面，实例很多时不用滚到底
+      const PopupMenuItem(
+        value: manage,
+        child: Row(
+          children: [
+            SizedBox(width: 24, child: Icon(Icons.view_list_outlined, size: 18)),
+            SizedBox(width: 8),
+            Expanded(child: Text('管理全部实例')),
+            Icon(Icons.chevron_right, size: 18),
+          ],
+        ),
+      ),
+      const PopupMenuDivider(),
+      for (final v in state.versions)
+        PopupMenuItem(
+          value: v.id,
+          child: Row(
+            children: [
+              SizedBox(width: 24, child: v.id == current ? Icon(Icons.check, size: 18, color: scheme.primary) : null),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(versionTitle(v), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      subtitle(v),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+    ],
+  );
+  if (pick == null) return;
+  if (pick == manage) return onManage();
+  if (pick != current) await state.selectVersion(pick);
 }

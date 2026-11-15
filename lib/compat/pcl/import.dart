@@ -316,7 +316,7 @@ Future<PclImportResult> importFromPcl(
     // 本地配置（需要 PCL 所在目录）
     if (pclDir != null) {
       final indie = _num(local['LaunchArgumentIndieV2']);
-      if (indie != null && indie >= 0 && indie <= 4) take('isolationMode', indie, '版本隔离');
+      if (indie != null && indie >= 0 && indie <= 4) take('isolationMode', indie, '实例隔离');
       final ramType = _num(local['LaunchRamType']);
       if (ramType != null) take('memoryMode', ramType == 1 ? 'custom' : 'auto', '内存模式');
       take('memoryTick', _num(local['LaunchRamCustom']), '自定义内存');
@@ -331,7 +331,7 @@ Future<PclImportResult> importFromPcl(
       take('windowWidth', _num(local['LaunchArgumentWindowWidth']), '窗口宽度');
       take('windowHeight', _num(local['LaunchArgumentWindowHeight']), '窗口高度');
     } else {
-      result.warnings.add('内存、JVM 参数、版本隔离等设置保存在 PCL-CE 程序目录中，选择该目录后才能导入');
+      result.warnings.add('内存、JVM 参数、实例隔离等设置保存在 PCL-CE 程序目录中，选择该目录后才能导入');
     }
   }
 

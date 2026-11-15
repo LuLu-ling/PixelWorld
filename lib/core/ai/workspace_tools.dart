@@ -188,7 +188,7 @@ List<AiToolDef> workspaceTools(AppState state) {
           for (final r in all)
             '${r.id}：${r.label}（${r.writable ? '可读写' : '只读'}${switch (r.kind) {
               RootKind.workspace => '，你自己的工作区',
-              RootKind.game => '，当前版本的游戏目录',
+              RootKind.game => '，当前实例的游戏目录',
               RootKind.downloads => '，系统下载目录',
               RootKind.user => '，用户添加的文件夹',
             }}）',

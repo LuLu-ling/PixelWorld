@@ -54,7 +54,7 @@ Future<List<AgentRoot>> agentRoots(AppState state) async {
     try {
       final dir = _real(await state.gameDirOf(v));
       if (dir != null) {
-        roots.add(AgentRoot(id: 'game', label: '当前版本（${v.id}）', path: dir, writable: false, kind: RootKind.game));
+        roots.add(AgentRoot(id: 'game', label: '当前实例（${v.id}）', path: dir, writable: false, kind: RootKind.game));
       }
     } catch (_) {}
   }

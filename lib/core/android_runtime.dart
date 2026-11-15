@@ -558,14 +558,14 @@ Future<JavaInfo> ensureAndroidJava(
       throw Exception('$where指定的 Java 没有安装：$home。请在设置的 Java 页面下载，或改为自动选择');
     }
     if (info.major < required) {
-      throw Exception('$where指定的是 Java ${info.major}，这个版本至少需要 Java $required。请重新选择 Java，或改为自动选择');
+      throw Exception('$where指定的是 Java ${info.major}，这个实例至少需要 Java $required。请重新选择 Java，或改为自动选择');
     }
     return info;
   }
 
   switch (pref) {
     case JavaExist(:final path) when path.isNotEmpty:
-      return chosen(path, '版本设置中');
+      return chosen(path, '实例设置中');
     case JavaGlobal() when globalJava.isNotEmpty:
       return chosen(globalJava, '全局设置中');
     default:

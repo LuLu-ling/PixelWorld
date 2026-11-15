@@ -157,7 +157,7 @@ Future<CrashReport> collectCrash(GameRun run, List<String> output) async {
   return CrashReport(
     title: run.versionId,
     environment: [
-      '版本：${run.versionId}（${run.description}）',
+      '实例：${run.versionId}（${run.description}）',
       if (run.loaderLibs.isNotEmpty) '加载器：${run.loaderLibs.join('，')}',
       'Java：${run.javaMajor}（${r.apply(run.javaPath)}）',
       '分配内存：${run.memoryGb.toStringAsFixed(1)} GB',
@@ -317,21 +317,21 @@ List<Finding> analyzeLogs(String text) {
       Finding(
         'Java 版本过低',
         '需要 Java ${int.parse(version[1]!) - 44} 或更高，当前 Java 只支持到 Java ${int.parse(version[2]!) - 44}。'
-            '请在版本设置中选择更新的 Java。',
+            '请在实例设置中选择更新的 Java。',
         grep(RegExp('UnsupportedClassVersionError')),
       ),
     );
   } else {
-    rule(RegExp('UnsupportedClassVersionError'), 'Java 版本过低', '有模组或游戏文件需要更新的 Java，请在版本设置中选择更新的 Java。');
+    rule(RegExp('UnsupportedClassVersionError'), 'Java 版本过低', '有模组或游戏文件需要更新的 Java，请在实例设置中选择更新的 Java。');
   }
   rule(
     RegExp(r'AppClassLoader cannot be cast to (class )?java\.net\.URLClassLoader'),
     '需要 Java 8',
-    '旧版 Forge（1.12.2 及更早）只能在 Java 8 上运行，请在版本设置中选择 Java 8。',
+    '旧版 Forge（1.12.2 及更早）只能在 Java 8 上运行，请在实例设置中选择 Java 8。',
   );
 
   // 内存
-  rule(RegExp(r'java\.lang\.OutOfMemoryError'), '内存不足', '游戏可用的内存不够。可以在版本设置中加大内存，或减少模组、光影与高清材质。');
+  rule(RegExp(r'java\.lang\.OutOfMemoryError'), '内存不足', '游戏可用的内存不够。可以在实例设置中加大内存，或减少模组、光影与高清材质。');
   rule(
     RegExp(r'Could not reserve enough space|Initial heap size set to a larger value|Invalid maximum heap size'),
     '内存设置无效',

@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import '../app_scope.dart';
 import '../core/android_storage.dart';
 import '../core/config.dart';
+import '../core/instance.dart';
 import '../core/loader_names.dart';
 import '../core/paths.dart';
 import '../shell.dart';
@@ -13,6 +14,8 @@ import '../widgets/loader_label.dart';
 import 'file_manager_page.dart';
 import '../widgets/side_nav.dart';
 import '../widgets/app_background.dart';
+import 'download_page.dart' show downloadTabRequest;
+import 'home_page.dart' show instanceModCount;
 import 'instance_page.dart' show instanceSectionRequest;
 
 /// 版本选择：左侧游戏文件夹，右侧该文件夹中的版本（PCL 的布局）
@@ -134,7 +137,7 @@ class VersionsPage extends StatelessWidget {
                 : state.versions.isEmpty
                 ? Center(
                     child: Text(
-                      '这个文件夹中还没有版本',
+                      '这个文件夹中还没有实例',
                       style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   )
@@ -143,7 +146,16 @@ class VersionsPage extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Expanded(child: Text('${state.versions.length} 个版本', style: theme.textTheme.titleSmall)),
+                          Expanded(child: Text('${state.versions.length} 个实例', style: theme.textTheme.titleSmall)),
+                          FilledButton.tonalIcon(
+                            onPressed: () {
+                              downloadTabRequest.value = 'versions';
+                              ShellNav.of(context).goMain(MainPage.download);
+                            },
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('新建实例'),
+                          ),
+                          const SizedBox(width: 4),
                           IconButton(tooltip: '刷新', onPressed: state.refreshVersions, icon: const Icon(Icons.refresh)),
                         ],
                       ),
@@ -158,13 +170,18 @@ class VersionsPage extends StatelessWidget {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                             leading: versionIcon(v, color: scheme.primary),
                             title: Text(v.id),
-                            subtitle: Text(describeVersion(v)),
+                            // 同一个游戏版本可以装多个实例，带上模组数方便区分
+                            subtitle: FutureBuilder<int?>(
+                              future: v.loader == Loader.vanilla ? Future.value(null) : instanceModCount(state, v),
+                              builder: (context, snap) =>
+                                  Text([describeVersion(v), if (snap.data != null) '${snap.data} 个模组'].join(' · ')),
+                            ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 if (v.id == state.config.selectedVersion) const Icon(Icons.check),
                                 IconButton(
-                                  tooltip: '版本设置',
+                                  tooltip: '实例设置',
                                   icon: const Icon(Icons.settings_outlined),
                                   onPressed: () {
                                     state.instanceId = v.id;

@@ -58,7 +58,7 @@ class DialogLaunchPrompts implements LaunchPrompts {
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.warning_amber_rounded),
         title: const Text('Java 版本可能不兼容'),
-        content: SizedBox(width: 400, child: Text('$message\n\n可以在版本设置中把 Java 改为 Java 8 或自动选择。')),
+        content: SizedBox(width: 400, child: Text('$message\n\n可以在实例设置中把 Java 改为 Java 8 或自动选择。')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('返回')),
           FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('仍然启动')),

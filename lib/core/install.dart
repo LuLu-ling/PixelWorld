@@ -45,7 +45,7 @@ Future<VersionJson> ensureVersionFiles(
     items.add(DownloadItem(url: lib.url, path: lib.path, sha1: lib.sha1, size: lib.size));
   }
   if (missingLocal.isNotEmpty) {
-    throw Exception('缺少由安装器生成的文件：${missingLocal.take(3).join('、')}，请重新安装这个版本');
+    throw Exception('缺少由安装器生成的文件：${missingLocal.take(3).join('、')}，请重新安装这个实例');
   }
 
   // 日志配置（修复 Log4Shell）
@@ -175,9 +175,9 @@ Future<({List<RemoteVersion> list, String latestRelease, String latestSnapshot})
 String checkVersionName(GamePaths g, String name) {
   final n = name.trim();
   if (n.isEmpty || n.length > 64 || RegExp(r'[\/:*?"<>|]').hasMatch(n) || n == '.' || n == '..') {
-    throw Exception(r'版本名称不能为空，且不能包含 \ / : * ? " < > |');
+    throw Exception(r'实例名称不能为空，且不能包含 \ / : * ? " < > |');
   }
-  if (Directory(g.versionDir(n)).existsSync()) throw Exception('已存在名为 $n 的版本');
+  if (Directory(g.versionDir(n)).existsSync()) throw Exception('已存在名为 $n 的实例');
   return n;
 }
 

@@ -277,7 +277,7 @@ Future<JavaInfo> _describe(String path) async {
 /// Java 9 起不再是，游戏会在加载时崩溃
 String? javaTooNewWarning(VersionJson v, int javaMajor) {
   if (v.mainClass == 'net.minecraft.launchwrapper.Launch' && javaMajor > 8) {
-    return '这个版本通过 LaunchWrapper 启动（Forge 1.12.2 及更早、OptiFine、LiteLoader 等），'
+    return '这个实例通过 LaunchWrapper 启动（Forge 1.12.2 及更早、OptiFine、LiteLoader 等），'
         '只能在 Java 8 上运行，使用 Java $javaMajor 很可能在加载时崩溃。';
   }
   return null;
@@ -310,16 +310,16 @@ Future<JavaInfo> ensureJava(VersionJson v, JavaPref pref, String globalJava, Dow
     }
     final info = await _describe(path);
     if (info.major < major) {
-      throw Exception('$where指定的是 Java ${info.major}，这个版本至少需要 Java $major。请重新选择 Java，或改为自动选择');
+      throw Exception('$where指定的是 Java ${info.major}，这个实例至少需要 Java $major。请重新选择 Java，或改为自动选择');
     }
     return info;
   }
 
   switch (pref) {
     case JavaExist(:final path) when path.isNotEmpty:
-      return chosen(path, '版本设置中');
+      return chosen(path, '实例设置中');
     case JavaRelative(:final path) when path.isNotEmpty:
-      return chosen(p.normalize(p.join(Paths.launcherDir, path)), '版本设置中');
+      return chosen(p.normalize(p.join(Paths.launcherDir, path)), '实例设置中');
     case JavaGlobal() when globalJava.isNotEmpty:
       return chosen(globalJava, '全局设置中');
     default:

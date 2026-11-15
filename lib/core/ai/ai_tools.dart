@@ -89,8 +89,8 @@ class AiToolbox {
     AiToolDef(
       spec: AiTool('list_versions', '列出当前游戏文件夹中已安装的所有版本，以及当前选择的版本。', _schema({})),
       kind: ToolKind.read,
-      label: '查看版本列表',
-      prepare: (_) async => ToolPlan('查看版本列表', _listVersions),
+      label: '查看实例列表',
+      prepare: (_) async => ToolPlan('查看实例列表', _listVersions),
     ),
     AiToolDef(
       spec: AiTool(
@@ -99,7 +99,7 @@ class AiToolbox {
         _schema({'version': _versionParam}, ['version']),
       ),
       kind: ToolKind.read,
-      label: '查看版本信息',
+      label: '查看实例信息',
       prepare: (a) async {
         final v = _version(a);
         return ToolPlan('查看 ${v.id} 的信息', () => _versionInfo(v));
@@ -252,16 +252,16 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.write,
-      label: '安装游戏版本',
+      label: '安装新实例',
       prepare: _prepareInstall,
     ),
     AiToolDef(
       spec: AiTool('select_version', '把启动页当前选择的版本切换为指定的已安装版本。', _schema({'version': _versionParam}, ['version'])),
       kind: ToolKind.write,
-      label: '切换版本',
+      label: '切换实例',
       prepare: (a) async {
         final v = _version(a);
-        return ToolPlan('把当前版本切换为 ${v.id}', () async {
+        return ToolPlan('把当前实例切换为 ${v.id}', () async {
           await state.selectVersion(v.id);
           return '已切换为 ${v.id}';
         }, details: ['${v.id}（${describeVersion(v)}）']);
@@ -398,7 +398,7 @@ class AiToolbox {
             ].join('；');
           },
           details: [
-            '版本：${v.id}',
+            '实例：${v.id}',
             '文件：${rv.fileName}（${_size(rv.fileSize)}），放进 ${type == ResourceType.datapack ? 'saves/$world/datapacks' : type.folder}',
             '来源：Modrinth',
             ?note,
@@ -431,7 +431,7 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.write,
-      label: '设置版本的 Java',
+      label: '设置实例的 Java',
       prepare: (a) async {
         final v = _version(a);
         final arg = '${a['java'] ?? ''}'.trim();
@@ -454,7 +454,7 @@ class AiToolbox {
         return ToolPlan('把 ${v.id} 的 Java 改为$label', () async {
           await writeInstanceJava(state.paths.versionDir(v.id), pref);
           return '已把 ${v.id} 的 Java 设为$label';
-        }, details: ['版本：${v.id}', '原来：$old', '改为：$label']);
+        }, details: ['实例：${v.id}', '原来：$old', '改为：$label']);
       },
     ),
     AiToolDef(
@@ -474,7 +474,7 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.write,
-      label: '设置版本的内存',
+      label: '设置实例的内存',
       prepare: (a) async {
         final v = _version(a);
         final mode = '${a['mode'] ?? ''}';
@@ -507,7 +507,7 @@ class AiToolbox {
             return '已把 ${v.id} 的内存设为$label';
           },
           details: [
-            '版本：${v.id}',
+            '实例：${v.id}',
             '原来：${_memoryLabel(s)}',
             '改为：$label',
             '系统内存：共 ${mem.total.toStringAsFixed(1)} GB，当前空闲 ${mem.free.toStringAsFixed(1)} GB',
@@ -594,7 +594,7 @@ class AiToolbox {
             return '已修改 $rel，原文件已备份到 ${p.basename(zip)}';
           },
           details: [
-            '版本：${v.id}',
+            '实例：${v.id}',
             for (final e in edits) ...[
               for (final l in clip(e.old).split('\n')) '- $l',
               for (final l in clip(e.now).split('\n')) '+ $l',
@@ -626,7 +626,7 @@ class AiToolbox {
           '安装模组 ${mv.name}',
           () => _install(v, mv),
           details: [
-            '版本：${v.id}',
+            '实例：${v.id}',
             '文件：${mv.fileName}（${_size(mv.fileSize)}）',
             '来源：Modrinth',
             if (mv.requires.isNotEmpty) '会同时安装必需的前置模组',
@@ -664,7 +664,7 @@ class AiToolbox {
             await setModEnabled(f, enabled);
           }
           return '已${enabled ? '启用' : '禁用'}：${files.map((f) => f.name).join('、')}';
-        }, details: ['版本：${v.id}', for (final f in files) f.name]);
+        }, details: ['实例：${v.id}', for (final f in files) f.name]);
       },
     ),
     AiToolDef(
@@ -694,7 +694,7 @@ class AiToolbox {
         return ToolPlan('备份 ${paths.length} 项', () async {
           final zip = await _backup(v, dir, paths, '${a['label'] ?? ''}');
           return '已备份到 ${p.basename(zip)}';
-        }, details: ['版本：${v.id}', ...paths, '大小约 ${_size(size)}，保存到游戏文件夹的 backups 中']);
+        }, details: ['实例：${v.id}', ...paths, '大小约 ${_size(size)}，保存到游戏文件夹的 backups 中']);
       },
     ),
     AiToolDef(
@@ -733,7 +733,7 @@ class AiToolbox {
             await moveToTrash(_inside(dir, rel));
           }
           return '已移到回收站：${paths.join('、')}';
-        }, details: ['版本：${v.id}', for (final rel in paths) '$rel（${_size(_sizeOf(p.join(dir, rel)))}）']);
+        }, details: ['实例：${v.id}', for (final rel in paths) '$rel（${_size(_sizeOf(p.join(dir, rel)))}）']);
       },
     ),
     AiToolDef(
@@ -765,7 +765,7 @@ class AiToolbox {
           await moveToTrash(old.path);
           final r = await _install(v, mv);
           return '旧文件已备份到 ${p.basename(zip)} 并移到回收站。$r';
-        }, details: ['版本：${v.id}', '旧文件：${old.name}', '新文件：${mv.fileName}（${mv.name}，来自 Modrinth）', '旧文件会先备份，再移到回收站']);
+        }, details: ['实例：${v.id}', '旧文件：${old.name}', '新文件：${mv.fileName}（${mv.name}，来自 Modrinth）', '旧文件会先备份，再移到回收站']);
       },
     ),
     AiToolDef(
@@ -804,7 +804,7 @@ class AiToolbox {
           '从备份 $name 恢复',
           () => _restore(v, dir, zip, check),
           details: [
-            '版本：${v.id}',
+            '实例：${v.id}',
             '将恢复：${check.paths.join('、')}（${check.files} 个文件，${_size(check.bytes)}）',
             if (!check.signed) '注意：这是旧版 Pixel World 创建的备份，没有签名，无法确认内容未被修改过',
             '先解压到临时文件夹并校验，成功后才把当前的对应内容备份并移到回收站',
@@ -928,14 +928,14 @@ class AiToolbox {
           name: name,
           optifine: optifine,
         );
-        return '已安装为 $id，并已设为当前选择的版本';
+        return '已安装为 $id，并已设为当前选择的实例';
       },
       details: [
         'Minecraft $game（${rv.type == 'release' ? '正式版' : rv.type}）',
         if (kind != null) loaderComponent(kind, game, loaderVersion),
         if (optifine != null)
           '${loaderComponent(LoaderKind.optifine, game, optifine)}（${optiFineNote(loaderOfKind(kind), null)}）',
-        '版本名称：$shown',
+        '实例名称：$shown',
         '从${state.config.downloadSource == 'bmclapi' ? ' BMCLAPI 镜像' : '官方源'}下载，可能需要几分钟；进度可以在任务页查看',
       ],
     );
@@ -1125,7 +1125,7 @@ class AiToolbox {
     final id = '${a['version'] ?? ''}'.trim();
     final v = state.instance(id);
     if (v == null) {
-      throw ToolError('找不到版本「$id」。已安装的版本：${state.versions.map((v) => v.id).join('、')}');
+      throw ToolError('找不到实例「$id」。已安装的实例：${state.versions.map((v) => v.id).join('、')}');
     }
     return v;
   }
@@ -1234,7 +1234,7 @@ class AiToolbox {
   // ---------- 只读操作 ----------
 
   Future<String> _listVersions() async {
-    if (state.versions.isEmpty) return '当前游戏文件夹中没有已安装的版本';
+    if (state.versions.isEmpty) return '当前游戏文件夹中没有已安装的实例';
     return [
       for (final v in state.versions)
         '- ${v.id}：${describeVersion(v)}${v.id == state.config.selectedVersion ? '（当前选择）' : ''}',
@@ -1264,9 +1264,9 @@ class AiToolbox {
       JavaExist(:final path) || JavaRelative(:final path) => path,
     };
     return [
-      '版本：${v.id}（${describeVersion(v)}）',
+      '实例：${v.id}（${describeVersion(v)}）',
       '运行目录：${dir == state.paths.root ? '游戏文件夹根目录（未隔离）' : 'versions/${v.id}（已隔离）'}',
-      'Java：${state.redactor().apply(java)}（这个版本需要 Java $required 或更高）',
+      'Java：${state.redactor().apply(java)}（这个实例需要 Java $required 或更高）',
       if (tooNew != null) '注意：$tooNew',
       '内存：${switch (s.memoryMode) {
         'custom' => '自定义',
@@ -1276,7 +1276,7 @@ class AiToolbox {
       if (v.modable)
         '模组：${mods.where((m) => !m.disabled).length} 个启用，${mods.where((m) => m.disabled).length} 个禁用'
       else
-        '这个版本没有模组加载器',
+        '这个实例没有模组加载器',
       '存档：${worlds.isEmpty ? '无' : worlds.join('、')}',
     ].join('\n');
   }

@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>功能结构模型</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0d0b0a; color: #ece3dc;
+    font-family: system-ui, "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", sans-serif; }
+  .page { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 16px 28px; }
+  .bar { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; align-items: center; }
+  .bar button, .jump button { border: 1px solid #4a3d33; background: #1d1714; color: #f0d9c4; border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+  .bar button.on { background: #6b3f17; border-color: #a2622a; }
+  .jump { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 1100px; }
+  .jump button { font-size: 12.5px; padding: 5px 12px; }
+  .jump b { color: #ffb77c; margin-right: 4px; }
+  .note { color: #8c7f75; font-size: 12.5px; text-align: center; max-width: 1000px; line-height: 1.7; }
+  .stage { width: min(1100px, 100%); }
+
+  /* ---------- 窗口：1100×700 逻辑像素，整体缩放 ---------- */
+  .win { position: relative; width: 1100px; height: 700px; border-radius: 10px; overflow: hidden; transform-origin: top left;
+    box-shadow: 0 0 0 1px #2c2420, 0 30px 80px rgba(0,0,0,.6); font-size: 14px; }
+  .wall { position: absolute; inset: -20px; filter: blur(6px);
+    background:
+      radial-gradient(40% 50% at 22% 30%, #c4472c 0%, transparent 70%),
+      radial-gradient(35% 45% at 75% 25%, #e0a24a 0%, transparent 70%),
+      radial-gradient(45% 55% at 60% 80%, #7a2a2a 0%, transparent 70%),
+      radial-gradient(30% 40% at 15% 85%, #3b2a5a 0%, transparent 70%),
+      linear-gradient(135deg, #3a1a14, #1c120f); }
+  .dim { position: absolute; inset: 0; background: rgba(0,0,0,.35); }
+  .app { position: absolute; inset: 0; display: flex; }
+  .glass { background: rgba(32, 25, 21, .66); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+  .card { background: rgba(18, 14, 12, .55); box-shadow: inset 0 0 0 1px rgba(255,255,255,.05); border-radius: 12px; }
+  .muted { color: #b5a79c; } .faint { color: #8a7d73; } .small { font-size: 12.5px; }
+  svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  .rail { width: 76px; flex: none; display: flex; flex-direction: column; align-items: center; padding: 10px 0; gap: 6px; background: rgba(20,16,14,.55); }
+  .logo { width: 30px; height: 30px; border-radius: 8px; background: #2b7bf0; margin-bottom: 14px; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 800; }
+  .nav { width: 64px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; color: #c9b9ad; cursor: pointer; padding: 2px 0; }
+  .nav .ic { width: 46px; height: 28px; border-radius: 14px; display: grid; place-items: center; }
+  .nav.on .ic { background: #f2a03a; color: #2a1606; } .nav.on { color: #fff; font-weight: 600; }
+
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .top { height: 52px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 0 0 14px; }
+  .top .title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .top .title .back { cursor: pointer; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 15px; }
+  .top .title .back:hover { background: rgba(255,255,255,.08); }
+  .grow { flex: 1; }
+  .taskpill { height: 32px; border-radius: 8px; display: flex; align-items: center; gap: 8px; padding: 0 12px; font-size: 13px; cursor: pointer; width: 210px; }
+  .ib { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 17px; color: #d8c8bb; cursor: pointer; }
+  .acct { height: 32px; border-radius: 8px; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 6px; font-size: 13px; }
+  .av { width: 22px; height: 22px; border-radius: 6px; background: #f2a03a; color: #2a1606; display: grid; place-items: center; font-weight: 800; font-size: 12px; }
+  .wb { display: flex; height: 100%; } .wb div { width: 44px; display: grid; place-items: center; color: #b5a79c; } .wb svg { width: 13px; height: 13px; stroke-width: 1.4; }
+  .body { flex: 1; min-height: 0; position: relative; padding: 0 16px 16px 12px; display: flex; gap: 8px; }
+  .scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.2) transparent; }
+
+  .btn { height: 36px; border-radius: 18px; padding: 0 16px; display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; cursor: pointer; white-space: nowrap; border: 0; font-family: inherit; }
+  .btn.fill { background: #ffb77c; color: #3a1d06; font-weight: 700; }
+  .btn.tonal { background: rgba(242,160,58,.22); color: #ffd2a8; }
+  .btn.out { background: transparent; box-shadow: inset 0 0 0 1px rgba(255,200,150,.35); color: #ffd2a8; }
+  .btn.sm { height: 30px; padding: 0 12px; font-size: 12.5px; }
+  .btn svg { width: 17px; height: 17px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 12px; border-radius: 8px; font-size: 12.5px; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+  .chip.on { background: rgba(242,160,58,.25); box-shadow: inset 0 0 0 1px rgba(242,160,58,.6); color: #ffd2a8; }
+  .vic { width: 40px; height: 40px; border-radius: 11px; background: #f2a03a; color: #2a1606; display: grid; place-items: center; flex: none; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .hint { font-size: 12px; color: #b5a79c; }
+
+  /* 侧边分组导航（工具、设置） */
+  .side { width: 160px; flex: none; border-radius: 16px; padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .side .gt { font-size: 12px; color: #a99a8e; padding: 8px 10px 4px; }
+  .side .it { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px; border-radius: 19px; cursor: pointer; font-size: 13.5px; }
+  .side .it svg { width: 17px; height: 17px; }
+  .side .it.on { background: rgba(242,160,58,.28); color: #ffe0c2; font-weight: 600; }
+  .side .it:hover:not(.on) { background: rgba(255,255,255,.05); }
+  .content { flex: 1; min-width: 0; border-radius: 16px; padding: 16px 18px; }
+  .sect { font-size: 13px; color: #c9b9ad; margin: 14px 2px 8px; } .sect:first-child { margin-top: 0; }
+  .li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+  .li + .li { border-top: 1px solid rgba(255,255,255,.06); }
+  .li .t { font-size: 14px; } .li .s { font-size: 12.5px; color: #b5a79c; margin-top: 2px; }
+  .li .grow > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sel { height: 34px; border-radius: 8px; padding: 0 10px; display: inline-flex; align-items: center; gap: 8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); font-size: 13px; cursor: pointer; }
+  .seg { display: inline-flex; border-radius: 17px; box-shadow: inset 0 0 0 1px rgba(255,200,150,.35); overflow: hidden; }
+  .seg span { padding: 6px 14px; font-size: 12.5px; cursor: pointer; } .seg span.on { background: rgba(242,160,58,.3); color: #ffe0c2; }
+  .sw { width: 40px; height: 22px; border-radius: 11px; background: rgba(255,255,255,.18); position: relative; cursor: pointer; flex: none; }
+  .sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 8px; background: #ccc; transition: .15s; }
+  .sw.on { background: #f2a03a; } .sw.on::after { left: 21px; background: #3a1d06; }
+  .tabs { display: flex; gap: 2px; padding: 0 10px; border-radius: 14px; height: 40px; align-items: stretch; flex: none; }
+  .tabs span { display: flex; align-items: center; padding: 0 12px; font-size: 13.5px; cursor: pointer; color: #d1c2b6; border-bottom: 2px solid transparent; }
+  .tabs span.on { color: #fff; font-weight: 600; border-bottom-color: #ffb77c; }
+  .new { font-size: 11px; background: #f2a03a; color: #2a1606; border-radius: 6px; padding: 1px 6px; margin-left: 6px; font-weight: 700; }
+  .banner { border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; background: rgba(242,160,58,.18); box-shadow: inset 0 0 0 1px rgba(242,160,58,.45); font-size: 13px; }
+  .input { height: 40px; border-radius: 10px; display: flex; align-items: center; gap: 8px; padding: 0 12px; color: #b5a79c; font-size: 13.5px; }
+  .pic { width: 44px; height: 44px; border-radius: 9px; flex: none; }
+
+  /* 首页（壁纸排版） */
+  .strip { height: 64px; border-radius: 16px; display: flex; align-items: center; gap: 10px; padding: 0 12px; flex: none; position: relative; }
+  .dock { border-radius: 18px; padding: 8px; display: flex; gap: 10px; flex: none; }
+  .start { width: 200px; height: 48px; border-radius: 24px; background: #ffd9bb; color: #3a1d06; display: flex; align-items: center; gap: 12px; padding: 0 20px; cursor: pointer; flex: none; }
+  .start b { display: block; font-size: 15px; line-height: 1.2; } .start small { display: block; font-size: 11.5px; opacity: .75; }
+  .wt { height: 48px; border-radius: 12px; display: flex; align-items: center; gap: 10px; padding: 0 10px; flex: 1; min-width: 0; cursor: pointer; }
+  .wt b { font-size: 13px; display: block; } .wt small { font-size: 11.5px; color: #b5a79c; }
+  .thumb { width: 32px; height: 32px; border-radius: 7px; background: linear-gradient(#6fae4f 50%, #7a5233 50%); flex: none; }
+
+  /* 浮层 */
+  .menu { position: absolute; z-index: 20; border-radius: 12px; padding: 6px; min-width: 260px; background: rgba(40,31,26,.97); box-shadow: 0 12px 40px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.08); }
+  .menu .mi { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .menu .mi:hover { background: rgba(255,255,255,.07); }
+  .menu hr { border: 0; border-top: 1px solid rgba(255,255,255,.08); margin: 4px 2px; }
+  .menu .mh { font-size: 12px; color: #a99a8e; padding: 6px 10px 2px; }
+  .bar2 { height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; margin-top: 6px; } .bar2 i { display: block; height: 100%; background: #ffb77c; }
+  .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.45); z-index: 30; display: grid; place-items: center; }
+  .dialog { width: 460px; border-radius: 22px; padding: 22px 24px 18px; background: #2a211c; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  .dialog h3 { margin: 0 0 6px; font-size: 18px; } .dialog .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+  .field { border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); padding: 8px 12px; margin-top: 12px; }
+  .field small { display: block; font-size: 11.5px; color: #b5a79c; } .field input { all: unset; width: 100%; font-size: 14px; color: #fff; }
+  .toast { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); background: #f4e3d6; color: #2a1606; border-radius: 10px; padding: 10px 16px; font-size: 13px; z-index: 40; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+
+  /* 标出改动 */
+  .mark .chg { outline: 2px dashed #5fd3ff; outline-offset: 2px; }
+  .mark .chg-t { position: relative; }
+  .mark .chg-t::after { content: "改"; position: absolute; top: -7px; right: -7px; font-size: 10px; background: #5fd3ff; color: #00222e; border-radius: 6px; padding: 0 4px; font-weight: 700; line-height: 15px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="bar">
+    <button id="markBtn" class="on" onclick="toggleMark()">标出改动</button>
+    <button onclick="crash()">模拟游戏崩溃</button>
+    <button onclick="resetAll()">重置</button>
+  </div>
+  <div class="jump" id="jump"></div>
+  <div class="stage" id="stage"><div class="win mark" id="win">
+    <div class="wall"></div><div class="dim"></div>
+    <div class="app">
+      <div class="rail glass" id="rail"></div>
+      <div class="main"><div class="top" id="top"></div><div class="body" id="body"></div></div>
+    </div>
+    <div id="layer"></div>
+  </div></div>
+  <div class="note" id="note"></div>
+</div>
+<script>
+// ---------------- 图标 ----------------
+const P = {
+  rocket: 'M5 15c-1 1-1.5 3.5-1.5 4.5 1 0 3.5-.5 4.5-1.5M9 15l-3-3 3-5c2-3 6-4.5 10-4.5 0 4-1.5 8-4.5 10l-5 3zM14.5 9.5a1 1 0 100-.01',
+  down: 'M12 4v11M7 10l5 5 5-5M5 20h14', tools: 'M14.7 6.3a4 4 0 00-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 005.4-5.4l-2.4 2.4-2.4-.6-.6-2.4z',
+  gear: 'M12 9a3 3 0 100 6 3 3 0 000-6zM19 12l2-1-1-3-2 .3-1.2-1.2.3-2-3-1-1 2h-2l-1-2-3 1 .3 2L6.2 8.3 4.3 8l-1 3 2 1v0l-2 1 1 3 2-.3 1.2 1.2-.3 2 3 1 1-2h2l1 2 3-1-.3-2 1.2-1.2 2 .3 1-3z',
+  chat: 'M4 5h16v11H9l-5 4z', back: 'M19 12H5M11 6l-6 6 6 6', check: 'M5 12l5 5 9-10', search: 'M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-4-4',
+  bell: 'M6 16V11a6 6 0 0112 0v5l2 2H4zM10 20a2 2 0 004 0', folder: 'M3 6h6l2 2h10v11H3z', list: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01',
+  plus: 'M12 5v14M5 12h14', trash: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13', chev: 'M6 9l6 6 6-6', right: 'M9 6l6 6-6 6',
+  swap: 'M4 8h14l-4-4M20 16H6l4 4', bug: 'M9 7a3 3 0 016 0M7 10h10v5a5 5 0 01-10 0zM3 12h4M17 12h4M4 7l3 3M20 7l-3 3M4 19l3-3M20 19l-3-3',
+  server: 'M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01', lobby: 'M12 3v4M5 21v-4h14v4M12 7a3 3 0 100 6 3 3 0 000-6zM5 17a7 7 0 0114 0',
+  trophy: 'M8 4h8v5a4 4 0 01-8 0zM8 6H5a3 3 0 003 4M16 6h3a3 3 0 01-3 4M12 13v4M8 20h8', face: 'M12 3a9 9 0 100 18 9 9 0 000-18zM9 10h.01M15 10h.01M8.5 14.5a4 4 0 007 0',
+  history: 'M4 12a8 8 0 108-8 8 8 0 00-6 2.7M4 4v4h4M12 8v4l3 2', book: 'M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2zM4 19V5', broom: 'M14 4l6 6M12 6l6 6-7 7H5v-6z',
+  link: 'M10 14a4 4 0 006 0l3-3a4 4 0 00-6-6l-1 1M14 10a4 4 0 00-6 0l-3 3a4 4 0 006 6l1-1', heart: 'M12 20s-7-4.5-7-10a4 4 0 017-2.5A4 4 0 0119 10c0 5.5-7 10-7 10z',
+  play: 'M7 5l12 7-12 7z', image: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01', puzzle: 'M10 4h4v3a1.5 1.5 0 003 0V4h3v6h-3a1.5 1.5 0 000 3h3v7h-6v-3a1.5 1.5 0 00-3 0v3H4v-7h3a1.5 1.5 0 000-3H4V4z',
+  cube: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5', send: 'M4 12l16-8-6 16-3-7z', dice: 'M5 5h14v14H5zM9 9h.01M15 15h.01M15 9h.01M9 15h.01',
+  info: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 11v6M12 7h.01', x: 'M6 6l12 12M18 6L6 18', refresh: 'M20 12a8 8 0 11-2.3-5.7M20 4v4h-4',
+  shortcut: 'M5 5h14v14H5zM9 15l6-6M10 9h5v5', upload: 'M12 20V9M7 14l5-5 5 5M5 4h14', palette: 'M12 3a9 9 0 000 18c1.5 0 2-1 2-2s-1-1.5-1-2.5 1-1.5 2-1.5h2a4 4 0 004-4c0-4.5-4-8-9-8zM7.5 11h.01M10 7h.01M15 7h.01',
+  java: 'M7 18h10M8 21h8M9 4c2 2-2 3 0 6M13 3c2 3-2 4 0 7M5 13h12v2a4 4 0 01-4 4h-4a4 4 0 01-4-4zM17 13h1a2 2 0 010 4h-1',
+  sliders: 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4', sparkle: 'M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z', globe: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18',
+  dl2: 'M12 3v10M8 9l4 4 4-4M4 15v4h16v-4', star: 'M12 4l2.5 5 5.5.8-4 3.9.9 5.5L12 16.6 7.1 19.2 8 13.7 4 9.8 9.5 9z', cam: 'M4 8h4l2-2h4l2 2h4v11H4zM12 11a3 3 0 100 6 3 3 0 000-6z',
+  more: 'M6 12h.01M12 12h.01M18 12h.01', min: 'M5 12h14', max: 'M6 6h12v12H6z', mega: 'M4 10v4h3l7 4V6l-7 4zM18 9a4 4 0 010 6', log: 'M6 3h9l4 4v14H6zM9 12h7M9 16h7M9 8h3',
+};
+const ic = (n, s) => `<svg viewBox="0 0 24 24"${s ? ` style="width:${s}px;height:${s}px"` : ''}><path d="${P[n]}"/></svg>`;
+
+// ---------------- 数据 ----------------
+const LOADER = { fabric: 'Fabric', lfabric: 'Legacy Fabric', forge: 'Forge', neo: 'NeoForge', vanilla: '原版' };
+function seed() {
+  return {
+    instances: [
+      { id: 'fabric-loader-0.20.1-1.12.2', loader: 'lfabric', game: '1.12.2', mods: 0, played: '12 天前', folder: 0 },
+      { id: '1.20.1 生存', loader: 'fabric', game: '1.20.1', mods: 4, played: '2 天前', folder: 0 },
+      { id: '1.20.1 建筑', loader: 'fabric', game: '1.20.1', mods: 2, played: '3 周前', folder: 0 },
+      { id: '1.20.1-forge-47.4.28', loader: 'forge', game: '1.20.1', mods: 5, played: '1 个月前', folder: 0 },
+      { id: '26.3', loader: 'vanilla', game: '26.3', mods: 0, played: '从未', folder: 0 },
+      { id: '1.21.1 NeoForge', loader: 'neo', game: '1.21.1', mods: 3, played: '5 天前', folder: 1 },
+    ],
+    current: 1,
+    modFiles: {},
+    tasksRunning: [],
+    history: [
+      { t: '安装 1.20.1 建筑', s: '完成 · 3 周前' }, { t: '下载 Sodium', s: '完成 · 3 周前' }, { t: '安装 1.21.1 NeoForge', s: '完成 · 5 天前' },
+    ],
+  };
+}
+const MODS = [
+  ['Sodium', '大幅提升渲染性能', '#2d7d46'], ['Iris Shaders', '光影加载器，兼容 Sodium', '#5b4fc9'], ['Lithium', '优化游戏逻辑与服务端性能', '#2a8fa8'],
+  ['Mod Menu', '在游戏里查看和配置模组', '#c27a2c'], ['JourneyMap', '实时小地图与世界地图', '#3f6fb0'], ['Xaero\'s Minimap', '轻量小地图', '#7d5b3a'],
+  ['Create', '机械动力：齿轮、传送带与自动化', '#a8642a'], ['AppleSkin', '显示食物的饱和度', '#b8333a'],
+];
+const PACKS = { 模组: MODS, 资源包: [['Faithful 32x', '经典高清材质', '#6c8f3a'], ['Fresh Animations', '生物动画增强', '#3a7f8f'], ['Default Dark Mode', '深色界面', '#333']],
+  光影: [['Complementary Reimagined', '均衡的画质与性能', '#3a5a9f'], ['BSL Shaders', '经典光影', '#9f6a3a'], ['Sildur\'s Vibrant', '低配友好', '#5a9f3a']],
+  数据包: [['Terralith', '新的地形生成', '#4f8f5f'], ['Incendium', '下界改造', '#9f3a2a']] };
+const WORLDS = ['生存一周目', 'Demo_World', '空岛', '红石实验'];
+const SERVERS = [['Hypixel', 'mc.hypixel.net', '在线 42,318 · 168 ms'], ['朋友的服务器', '192.168.31.20:25565', '在线 3/20 · 2 ms'], ['花雨庭', 'mc.hypixel.cn', '无法连接']];
+
+let S, nav, stack, menu, dialog, toastTimer, lanPreset;
+function resetAll() {
+  S = seed(); stack = []; menu = null; dialog = null; lanPreset = null;
+  nav = { page: 'home' };
+  render();
+}
+const cur = () => S.instances[S.current];
+const inst = (i) => S.instances[i];
+const desc = (x) => `${LOADER[x.loader]} · 游戏版本 ${x.game}`;
+const modsOf = (i) => (S.modFiles[i] ??= Array.from({ length: Math.min(inst(i).mods, 6) }, (_, k) => ({ name: MODS[(k + i) % MODS.length][0], on: true })));
+
+// ---------------- 导航 ----------------
+function go(n, push = true) { if (push) stack.push(nav); nav = n; menu = null; render(); }
+function back() { if (stack.length) { nav = stack.pop(); menu = null; render(); } }
+function root(page, extra = {}) { stack = []; nav = { page, ...extra }; menu = null; render(); }
+function toast(t) { const l = document.getElementById('layer'); l.querySelector('.toast')?.remove(); l.insertAdjacentHTML('beforeend', `<div class="toast">${t}</div>`); clearTimeout(toastTimer); toastTimer = setTimeout(() => l.querySelector('.toast')?.remove(), 2600); }
+function toggleMark() { document.getElementById('win').classList.toggle('mark'); document.getElementById('markBtn').classList.toggle('on'); }
+
+const RAIL = [['home', 'rocket', '启动'], ['download', 'down', '下载'], ['tools', 'tools', '工具'], ['settings', 'gear', '设置'], ['ai', 'chat', 'AI']];
+const railOf = { home: 'home', instances: 'home', detail: 'home', add: 'home', download: 'download', tools: 'tools', settings: 'settings', ai: 'ai', history: '' };
+const TITLE = { instances: '实例', detail: '实例详情', add: '添加资源', download: '下载', tools: '工具', settings: '设置', ai: 'AI 助手', history: '任务历史' };
+
+function render() {
+  document.getElementById('rail').innerHTML = `<div class="logo">PW</div>` + RAIL.map(([k, i, t]) =>
+    `<div class="nav ${railOf[nav.page] === k ? 'on' : ''}" onclick="root('${k}')"><div class="ic">${ic(i)}</div>${t}</div>`).join('');
+  const running = S.tasksRunning.length;
+  document.getElementById('top').innerHTML = `
+    <div class="title">${stack.length ? `<span class="back" onclick="back()">${ic('back')}</span>` : ''}${nav.page === 'home' ? '下午好，Steve <span class="faint small" style="font-weight:400">准备好冒险了吗？</span>' : TITLE[nav.page]}</div>
+    <div class="grow"></div>
+    <div class="taskpill glass" onclick="openMenu('tasks', event)">${running ? ic('dl2', 16) + `正在进行 ${running} 个任务` : ic('check', 16) + '当前无后台任务'}<span class="grow"></span>${ic('right', 14)}</div>
+    <div class="ib">${ic('search', 18)}</div><div class="ib">${ic('bell', 18)}</div>
+    <div class="acct glass"><span class="av">S</span>Steve · 离线</div>
+    <div class="wb"><div>${ic('min')}</div><div>${ic('max')}</div><div>${ic('x')}</div></div>`;
+  const b = document.getElementById('body');
+  b.innerHTML = (PAGES[nav.page] || (() => ''))();
+  renderLayer();
+  renderJump();
+}
+
+// ---------------- 首页 ----------------
+const PAGES = {};
+PAGES.home = () => {
+  const c = cur();
+  return `<div style="flex:1;display:flex;flex-direction:column;gap:12px;min-width:0">
+    <div class="strip glass">
+      <div class="vic">${ic('cube')}</div>
+      <div style="min-width:0;max-width:280px"><div style="font-weight:800;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.id}</div><div class="small muted">${LOADER[c.loader]} ${c.game} · ${c.mods} 个模组 · ${c.played}玩过</div></div>
+      <span class="btn sm out chg chg-t" onclick="openMenu('switch', event)">切换实例 ${ic('chev', 14)}</span>
+      <div class="grow"></div>
+      <span class="ib" title="装模组" onclick="openAdd(S.current,'模组')">${ic('dl2', 18)}</span>
+      <span class="ib" title="管理模组" onclick="openDetail(S.current,'mods')">${ic('list', 18)}</span>
+      <span class="ib" title="文件夹">${ic('folder', 18)}</span>
+      <span class="ib" title="日志">${ic('log', 18)}</span>
+      <span class="btn out chg-t" onclick="openDetail(S.current,'setup')">实例设置</span>
+    </div>
+    <div class="grow"></div>
+    <div class="dock glass">
+      <div class="start" onclick="launch()">${ic('rocket', 22)}<div><b>开始游戏</b><small>${c.id}</small></div></div>
+      ${WORLDS.slice(0, 2).map(w => `<div class="wt card" onclick="toast('进入存档 ${w}（示意）')"><div class="thumb"></div><div><b>${w}</b><small>${c.game} ${LOADER[c.loader]} · 2 天前</small></div></div>`).join('')}
+      <div class="wt card" style="flex:none;width:110px;justify-content:center" onclick="openDetail(S.current,'saves')">${ic('list', 16)}全部存档</div>
+    </div></div>`;
+};
+
+// ---------------- 实例列表 ----------------
+PAGES.instances = () => {
+  const f = nav.folder ?? 0;
+  const list = S.instances.map((x, i) => [x, i]).filter(([x]) => x.folder === f);
+  return `<div class="side glass" style="width:220px">
+      <div class="gt">游戏文件夹</div>
+      ${['PixelsWorld', '启动器默认文件夹'].map((n, k) => `<div class="it ${k === f ? 'on' : ''}" onclick="nav.folder=${k};render()">${ic('folder', 17)}${n}</div>`).join('')}
+      <div style="padding:10px 4px"><span class="btn sm out">${ic('plus', 15)}添加文件夹</span></div>
+    </div>
+    <div class="content glass scroll">
+      <div class="row" style="margin-bottom:12px"><b class="chg-t">${list.length} 个实例</b><span class="grow"></span>
+        <span class="btn sm tonal chg chg-t" onclick="root('download',{tab:'游戏版本'})">${ic('plus', 15)}新建实例</span>
+        <span class="btn sm out">${ic('upload', 15)}导入</span><span class="ib">${ic('refresh', 18)}</span></div>
+      ${list.map(([x, i]) => `<div class="li card" style="margin-bottom:8px;cursor:pointer;${i === S.current ? 'background:rgba(242,160,58,.25)' : ''}" onclick="setCurrent(${i})">
+        <div class="vic" style="width:34px;height:34px;border-radius:9px">${ic('cube', 18)}</div>
+        <div class="grow"><div class="t">${x.id}</div><div class="s">${desc(x)} · <span class="chg">${x.mods} 个模组 · ${x.played}玩过</span></div></div>
+        ${i === S.current ? ic('check') : ''}
+        <span class="ib" title="实例设置" onclick="event.stopPropagation();openDetail(${i},'setup')">${ic('gear', 18)}</span>
+        <span class="ib" title="详情" onclick="event.stopPropagation();openDetail(${i},'overview')">${ic('right', 18)}</span></div>`).join('')}
+      <div class="hint" style="margin-top:6px">同一个游戏版本可以装多个实例（例如「1.20.1 生存」和「1.20.1 建筑」），用名称、模组数和最后游玩时间区分。点一行设为当前实例。</div>
+    </div>`;
+};
+function setCurrent(i) { S.current = i; toast(`已切换到 ${inst(i).id}`); render(); }
+
+// ---------------- 实例详情 ----------------
+const TABS = [['mods', '模组'], ['saves', '存档'], ['resourcepacks', '资源包'], ['shaderpacks', '光影'], ['screenshots', '截图'], ['schematics', '投影'], ['servers', '服务器'], ['setup', '实例设置'], ['overview', '概览']];
+function openDetail(i, tab) { go({ page: 'detail', i, tab }); }
+PAGES.detail = () => {
+  const x = inst(nav.i);
+  return `<div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0">
+    <div class="glass row" style="border-radius:16px;padding:10px 12px">
+      <div class="vic">${ic('cube')}</div><div class="grow"><div style="font-weight:800;font-size:17px">${x.id}</div><div class="small muted chg-t">${desc(x)}</div></div>
+      <span class="btn out">${ic('folder', 16)}打开文件夹</span><span class="btn fill" onclick="launch(${nav.i})">${ic('rocket', 16)}开始游戏</span></div>
+    <div class="tabs glass">${TABS.map(([k, t]) => `<span class="${nav.tab === k ? 'on' : ''} ${k === 'setup' ? 'chg-t' : ''}" onclick="nav.tab='${k}';render()">${t}</span>`).join('')}</div>
+    <div class="content glass scroll">${(DT[nav.tab] || DT.overview)(x, nav.i)}</div></div>`;
+};
+const DT = {};
+DT.mods = (x, i) => {
+  const files = modsOf(i);
+  return `<div class="row" style="margin-bottom:12px"><b>${files.length} 个模组</b><span class="grow"></span>
+    <span class="btn sm fill chg chg-t" onclick="openAdd(${i},'模组')">${ic('plus', 15)}添加模组</span>
+    ${x.loader !== 'vanilla' ? `<span class="btn sm out">添加 OptiFine</span>` : ''}<span class="btn sm out">${ic('folder', 15)}打开文件夹</span></div>
+    ${files.length ? `<div class="card">${files.map((f, k) => `<div class="li"><div class="pic" style="width:34px;height:34px;background:${(MODS.find(m => m[0] === f.name) || [, , '#555'])[2]}"></div>
+      <div class="grow"><div class="t">${f.name}${f.fresh ? '<span class="new">新</span>' : ''}</div><div class="s">${f.name.toLowerCase().replace(/\W+/g, '-')}-${x.game}.jar</div></div>
+      <div class="sw ${f.on ? 'on' : ''}" onclick="modsOf(${i})[${k}].on=!modsOf(${i})[${k}].on;render()"></div></div>`).join('')}</div>`
+      : `<div class="card" style="padding:28px;text-align:center" class="muted">还没有模组。点「添加模组」，会自动只显示适配 ${x.game} ${LOADER[x.loader]} 的模组。</div>`}`;
+};
+const packTab = (kind) => (x, i) => `<div class="row" style="margin-bottom:12px"><b>${kind}</b><span class="grow"></span>
+  <span class="btn sm fill chg chg-t" onclick="openAdd(${i},'${kind}')">${ic('plus', 15)}添加${kind}</span><span class="btn sm out">${ic('folder', 15)}打开文件夹</span></div>
+  <div class="card">${PACKS[kind].slice(0, 2).map(p => `<div class="li"><div class="pic" style="width:34px;height:34px;background:${p[2]}"></div><div class="grow"><div class="t">${p[0]}</div><div class="s">${p[1]}</div></div></div>`).join('')}</div>`;
+DT.resourcepacks = packTab('资源包'); DT.shaderpacks = packTab('光影');
+DT.saves = (x, i) => `<div class="row" style="margin-bottom:12px"><b>${WORLDS.length} 个存档</b><span class="grow"></span>
+  <span class="btn sm out">${ic('upload', 15)}导入存档</span><span class="btn sm out">${ic('folder', 15)}打开文件夹</span></div>
+  <div class="card">${WORLDS.map(w => `<div class="li"><div class="thumb" style="width:40px;height:40px"></div><div class="grow"><div class="t">${w}</div><div class="s">生存 · 2 天前 · 48 MB</div></div>
+  <span class="btn sm out">${ic('play', 14)}进入</span><span class="btn sm tonal chg chg-t" onclick="sendLan(${i},'存档','${w}')">${ic('send', 14)}发送</span></div>`).join('')}</div>`;
+DT.screenshots = () => `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">${Array.from({ length: 8 }, (_, k) => `<div class="card" style="aspect-ratio:16/9;background:linear-gradient(${k * 40}deg,#3a5a7a,#6a8a4a)"></div>`).join('')}</div>`;
+DT.schematics = () => `<div class="card" style="padding:28px;text-align:center">没有投影文件</div>`;
+DT.servers = () => `<div class="row" style="margin-bottom:12px"><b>服务器</b><span class="grow"></span><span class="btn sm out">${ic('refresh', 15)}刷新</span></div>
+  <div class="card">${SERVERS.map(s => `<div class="li"><div class="pic" style="width:34px;height:34px;background:#4a5a6a"></div><div class="grow"><div class="t">${s[0]}</div><div class="s">${s[1]}</div></div>
+  <span class="small chg chg-t" style="color:${s[2].startsWith('无法') ? '#e88' : '#9fd8a8'}">${s[2]}</span></div>`).join('')}</div>
+  <div class="hint" style="margin-top:8px">在线人数和延迟直接显示在这里，不用再去「工具 → 服务器查询」。</div>`;
+DT.setup = (x) => {
+  const row = (icn, t, s, right) => `<div class="li">${ic(icn)}<div class="grow"><div class="t">${t}</div><div class="s">${s}</div></div>${right}</div>`;
+  const seg = (on) => `<span class="seg">${['跟随全局', '自动', '自定义'].map(o => `<span class="${o === on ? 'on' : ''}">${o}</span>`).join('')}</span>`;
+  return `<div class="sect">启动</div><div class="card">
+    ${row('folder', '实例隔离', '<span class="chg chg-t">跟随全局（可装模组的实例开启隔离）</span>', `<span class="sel">跟随全局 ${ic('chev', 14)}</span>`)}
+    ${row('java', 'Java', '<span class="chg chg-t">跟随全局：自动选择（这个实例会用 Java 8）</span>', seg('跟随全局'))}
+    ${row('sliders', '游戏内存', '<span class="chg chg-t">跟随全局：自动分配（约 4 GB）</span>', seg('跟随全局'))}
+    ${row('image', '窗口大小', '跟随全局：默认', seg('跟随全局'))}</div>
+    <div class="hint" style="margin-top:8px">选「跟随全局」时，直接写出全局现在的值，不用再去设置页对照。</div>`;
+};
+DT.overview = (x, i) => `<div class="card" style="padding:12px 16px;display:grid;grid-template-columns:110px 1fr;gap:8px;font-size:13.5px">
+  <span class="muted">加载器</span><span>${LOADER[x.loader]}</span><span class="muted">游戏版本</span><span>${x.game}</span>
+  <span class="muted chg-t">实例隔离</span><span>已开启</span><span class="muted">运行目录</span><span class="small">D:\\PixelsWorld\\.minecraft\\versions\\${x.id}</span></div>
+  <div class="sect">快捷方式</div><div class="row" style="flex-wrap:wrap;gap:8px">${['实例文件夹', '存档文件夹', '模组文件夹', '资源包文件夹', '截图文件夹'].map(t => `<span class="btn sm out ${t === '实例文件夹' ? 'chg-t' : ''}">${ic('folder', 15)}${t}</span>`).join('')}</div>
+  <div class="sect">管理</div><div class="card">
+  <div class="li">${ic('send')}<div class="grow"><div class="t">发送这个实例</div><div class="s">通过局域网把整个实例（含模组、配置、存档）传到另一台设备</div></div><span class="btn sm tonal chg chg-t" onclick="sendLan(${i},'整个实例')">发送</span></div>
+  <div class="li">${ic('trash')}<div class="grow"><div class="t chg-t">删除这个实例</div><div class="s">移到回收站；开启实例隔离时，其中的存档和模组也会一并删除</div></div><span class="btn sm out" style="color:#f4a0a0">删除</span></div></div>`;
+
+// ---------------- 添加资源（锁定目标实例） ----------------
+function openAdd(i, kind) { go({ page: 'add', i, kind, q: '' }); }
+PAGES.add = () => {
+  const x = inst(nav.i), kind = nav.kind;
+  const items = PACKS[kind];
+  const installed = new Set(modsOf(nav.i).map(f => f.name));
+  return `<div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0">
+    <div class="banner chg">${ic('link', 18)}<div class="grow">正在为 <b>${x.id}</b> 添加${kind} · 只显示适配 <b>${x.game} ${LOADER[x.loader]}</b> 的${kind}，点「安装」直接装进这个实例，前置一起装好</div>
+      <span class="btn sm out" onclick="root('download',{tab:'${kind}'})">改为普通浏览</span></div>
+    <div class="row" style="gap:8px"><div class="input glass grow">${ic('search', 18)}在 Modrinth 搜索${kind}</div><span class="sel glass">排序 相关性 ${ic('chev', 14)}</span></div>
+    <div class="scroll" style="flex:1;display:flex;flex-direction:column;gap:8px">
+    ${items.map(m => { const done = installed.has(m[0]); return `<div class="li glass" style="border-radius:14px"><div class="pic" style="background:${m[2]}"></div>
+      <div class="grow"><div class="t">${m[0]}</div><div class="s">${m[1]}</div><div class="small faint" style="margin-top:4px">适配 ${x.game} · ${LOADER[x.loader]} · 下载 1,203 万</div></div>
+      ${done ? `<span class="btn sm out">${ic('check', 14)}已安装</span>` : `<span class="btn sm fill" onclick="installTo(${nav.i},'${m[0].replace(/'/g, "\\'")}','${kind}')">安装</span>`}</div>`; }).join('')}
+    </div></div>`;
+};
+function installTo(i, name, kind) {
+  const x = inst(i);
+  S.tasksRunning.push({ t: `安装 ${name} 到 ${x.id}`, p: 30 });
+  if (kind === '模组') { modsOf(i).push({ name, on: true, fresh: true }); x.mods++; }
+  const extra = name === 'Sodium' || name === 'Iris Shaders' ? '（含前置 Fabric API）' : '';
+  toast(`正在安装 ${name} 到 ${x.id}${extra}`);
+  render();
+  setTimeout(() => { const t = S.tasksRunning.shift(); if (t) S.history.unshift({ t: t.t, s: '完成 · 刚刚' }); render(); }, 1800);
+}
+
+// ---------------- 下载 ----------------
+const DL_TABS = ['游戏版本', '模组', '整合包', '资源包', '光影', '数据包', '收藏'];
+PAGES.download = () => {
+  const tab = nav.tab || '游戏版本';
+  const head = `<div class="tabs glass">${DL_TABS.map(t => `<span class="${t === tab ? 'on' : ''}" onclick="nav.tab='${t}';nav.res=null;render()">${t}</span>`).join('')}</div>`;
+  let inner;
+  if (tab === '游戏版本') {
+    inner = `<div class="content glass scroll"><div class="row" style="margin-bottom:10px"><b>安装新实例</b><span class="hint">选一个游戏版本，装成一个新的实例。同一个游戏版本可以装多次</span></div>
+      <div class="card">${[['26.3', '最新快照', '2026-11-03'], ['1.21.4', '最新正式版', '2024-12-03'], ['1.21.1', '正式版', '2024-08-08'], ['1.20.1', '正式版', '2023-06-12'], ['1.12.2', '正式版', '2017-09-18']].map(v =>
+        `<div class="li" style="cursor:pointer" onclick="newInstance('${v[0]}')">${ic('cube')}<div class="grow"><div class="t">${v[0]}</div><div class="s">${v[1]} · ${v[2]}</div></div>${ic('right', 18)}</div>`).join('')}</div></div>`;
+  } else if (nav.res) {
+    const m = (PACKS[tab] || MODS).find(m => m[0] === nav.res) || MODS[0];
+    inner = `<div class="content glass scroll"><div class="row"><span class="ib" onclick="nav.res=null;render()">${ic('back')}</span><div class="pic" style="background:${m[2]}"></div><div class="grow"><div style="font-size:18px;font-weight:700">${m[0]}</div><div class="small muted">${m[1]}</div></div></div>
+      <div class="card row" style="padding:12px;margin-top:14px"><span class="small muted">安装到</span><span class="sel" onclick="openMenu('target',event)">${cur().id} ${ic('chev', 14)}</span><span class="hint">先挑资源，再选实例</span></div>
+      <div class="card" style="margin-top:10px">${['0.6.1', '0.6.0', '0.5.11'].map(v => `<div class="li"><div class="grow"><div class="t">${m[0].replace(/\W/g, '')}-${v}.jar</div><div class="s">正式 · ${LOADER[cur().loader]} · ${cur().game}</div></div><span class="btn sm tonal" onclick="installTo(S.current,'${m[0].replace(/'/g, "\\'")}','${tab}')">安装</span></div>`).join('')}</div></div>`;
+  } else if (tab === '收藏') {
+    inner = `<div class="content glass"><div class="card" style="padding:28px;text-align:center">还没有收藏</div></div>`;
+  } else {
+    const items = PACKS[tab] || MODS;
+    inner = `<div class="row" style="gap:8px"><div class="input glass grow">${ic('search', 18)}在 Modrinth 搜索${tab}</div><span class="chip on glass">${ic('check', 14)}适配 ${cur().id}</span><span class="sel glass">排序 相关性 ${ic('chev', 14)}</span></div>
+      <div class="scroll" style="flex:1;display:flex;flex-direction:column;gap:8px">${items.map(m => `<div class="li glass" style="border-radius:14px;cursor:pointer" onclick="nav.res='${m[0].replace(/'/g, "\\'")}';render()"><div class="pic" style="background:${m[2]}"></div><div class="grow"><div class="t">${m[0]}</div><div class="s">${m[1]}</div></div>${ic('heart', 18)}</div>`).join('')}</div>`;
+  }
+  return `<div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0">${head}${inner}</div>`;
+};
+function newInstance(game) { dialog = { kind: 'new', game, loader: 'fabric' }; renderLayer(); }
+
+// ---------------- 工具 ----------------
+const TOOLS = [
+  ['联机', [['lan', 'swap', '局域网互传'], ['server', 'server', '服务器查询'], ['lobby', 'lobby', '联机大厅']]],
+  ['排错', [['diag', 'bug', '错误分析']]],
+  ['实用', [['dl', 'dl2', '自定义下载']]],
+  ['趣味', [['skin', 'face', '皮肤与头像'], ['ach', 'trophy', '成就图片'], ['luck', 'dice', '今日人品']]],
+];
+PAGES.tools = () => {
+  const sec = nav.sec || 'lan';
+  return `<div class="side glass">${TOOLS.map(([g, items]) => `<div class="gt chg-t" style="display:inline-block">${g}</div>${items.map(([k, i, t]) =>
+    `<div class="it ${k === sec ? 'on' : ''} ${k === 'luck' ? 'chg' : ''}" onclick="nav.sec='${k}';render()">${ic(i, 17)}${t}</div>`).join('')}`).join('')}</div>
+    <div class="content glass scroll">${(TP[sec] || (() => ''))()}</div>`;
+};
+const TP = {};
+TP.lan = () => {
+  const pre = lanPreset;
+  const insId = pre ? inst(pre.i).id : cur().id;
+  const whole = pre?.what === '整个实例';
+  const chips = ['模组', '模组配置', '存档', '资源包', '光影包', '游戏设置', '截图'];
+  const onSet = pre?.what === '存档' ? ['存档'] : ['模组', '模组配置', '存档'];
+  return `${pre ? `<div class="banner" style="margin-bottom:12px">${ic('info', 18)}<div class="grow">从实例详情过来，已选好：${insId} · ${pre.what}${pre.world ? `「${pre.world}」` : ''}</div></div>` : ''}
+    <div class="hint" style="margin-bottom:10px">在同一个局域网中的两台设备之间传输实例、模组、配置和存档。</div>
+    <div class="sect">接收</div><div class="card" style="padding:14px"><div class="small muted" style="margin-bottom:10px">开始接收后，在另一台设备上输入下面显示的地址和配对码。</div><span class="btn fill">${ic('dl2', 16)}开始接收</span></div>
+    <div class="sect">发送</div><div class="card" style="padding:14px">
+      <span class="sel chg-t" style="width:100%;justify-content:space-between">${insId}${ic('chev', 14)}</span>
+      <div style="margin:12px 0 8px"><span class="seg"><span class="${whole ? '' : 'on'}">选择内容</span><span class="${whole ? 'on' : ''} chg-t">整个实例</span></span></div>
+      ${whole ? '<div class="small muted">对方会得到一个完整的新实例。</div>' : `<div class="row" style="flex-wrap:wrap;gap:6px">${chips.map(c => `<span class="chip ${onSet.includes(c) ? 'on' : ''}">${c}${c === '存档' && pre?.world ? `：${pre.world}` : ''}</span>`).join('')}</div>`}
+      <div class="row" style="margin-top:14px;gap:10px"><div class="field grow" style="margin:0"><small>对方地址</small><input></div><div class="field" style="margin:0;width:180px"><small>配对码</small><input></div></div>
+      <div style="margin-top:12px"><span class="btn fill">${ic('send', 16)}发送</span></div></div>`;
+};
+TP.server = () => `<div class="row"><div class="field grow" style="margin:0"><small>服务器地址</small><input value="mc.hypixel.net"></div><span class="btn fill">查询</span></div>
+  <div class="hint" style="margin-top:10px">实例里已添加的服务器，在「实例详情 → 服务器」直接显示在线人数和延迟。</div>`;
+TP.lobby = () => `<div class="card" style="padding:30px;text-align:center">${ic('lobby', 32)}<div style="margin-top:8px">联机大厅（开发中）</div></div>`;
+TP.diag = () => {
+  const r = nav.diag;
+  return `${r ? `<div class="banner" style="margin-bottom:12px;background:rgba(220,80,60,.18);box-shadow:inset 0 0 0 1px rgba(220,80,60,.5)">${ic('bug', 18)}<div class="grow"><b>内存不足</b>（最近一次游戏：${cur().id}）<div class="small muted">游戏可用的内存不够。可以加大内存，或减少模组、光影与高清材质。</div></div>
+    <span class="btn sm fill chg chg-t" onclick="openDetail(S.current,'setup')">去实例设置</span><span class="btn sm out" onclick="askAI()">问 AI</span></div>` : ''}
+    <div class="card">${[['history', '最近一次游戏', '分析本次打开启动器后最近一次运行的游戏', '分析'], ['log', '日志文件', '选择崩溃报告或日志文件', '选择'], ['list', '粘贴日志', '粘贴别人发给你的崩溃报告或日志', '粘贴']].map(t =>
+    `<div class="li">${ic(t[0])}<div class="grow"><div class="t">${t[1]}</div><div class="s">${t[2]}</div></div><span class="btn sm tonal" onclick="nav.diag=1;render()">${t[3]}</span></div>`).join('')}</div>`;
+};
+TP.dl = () => `<div class="field" style="margin-top:0"><small>下载地址</small><input placeholder="https://"></div><div class="row" style="margin-top:12px"><span class="small muted grow">保存位置：开始下载时选择</span><span class="btn fill">${ic('dl2', 16)}开始下载</span></div>`;
+TP.skin = () => `<div class="row"><div class="field grow" style="margin:0"><small>正版玩家名</small><input value="Notch"></div><span class="btn fill">获取</span></div><div class="hint" style="margin-top:10px">查看和下载其他正版玩家的皮肤与头像。</div>`;
+TP.ach = () => `<div class="field" style="margin-top:0"><small>标题</small><input value="进度达成！"></div><div class="field"><small>内容</small><input value="钻石！"></div><div style="margin-top:12px"><span class="btn fill">生成</span></div>`;
+TP.luck = () => `<div class="card" style="padding:26px;text-align:center"><div class="muted">Steve 的今日人品</div><div style="font-size:56px;font-weight:800;color:#ffb77c">87</div><div class="small muted">每人每天固定</div></div>
+  <div class="card li chg" style="margin-top:10px">${ic('rocket')}<div class="grow"><div class="t">启动次数</div><div class="s">已经通过启动器启动了 128 次游戏</div></div></div>
+  <div class="hint" style="margin-top:8px">原来的「百宝箱」拆掉：今日人品、启动次数放这里；清理游戏垃圾去「设置 → 游戏管理」；桌面快捷方式去「设置 → 其他」。</div>`;
+
+// ---------------- 设置 ----------------
+const SETS = [
+  ['游戏', [['launch', 'rocket', '启动'], ['java', 'java', 'Java'], ['manage', 'folder', '游戏管理']]],
+  ['启动器', [['look', 'palette', '个性化'], ['other', 'sliders', '其他']]],
+  ['AI', [['model', 'sparkle', '模型与接口'], ['aitools', 'puzzle', '工具与服务'], ['ws', 'globe', '工作区与联网']]],
+  ['关于', [['about', 'info', '关于与致谢'], ['docs', 'book', '使用文档']]],
+];
+PAGES.settings = () => {
+  const sec = nav.sec || 'launch';
+  return `<div class="side glass">${SETS.map(([g, items]) => `<div class="gt">${g}</div>${items.map(([k, i, t]) =>
+    `<div class="it ${k === sec ? 'on' : ''} ${k === 'docs' ? 'chg' : ''}" onclick="nav.sec='${k}';render()">${ic(i, 17)}${t}</div>`).join('')}`).join('')}</div>
+    <div class="content glass scroll">${(SP[sec] || SP.stub)()}</div>`;
+};
+const SP = {};
+const srow = (icn, t, s, right, chg) => `<div class="li ${chg ? 'chg' : ''}">${ic(icn)}<div class="grow"><div class="t ${chg ? 'chg-t' : ''}" style="display:inline-block">${t}</div><div class="s">${s}</div></div>${right}</div>`;
+SP.launch = () => `<div class="sect">启动</div><div class="card">
+  ${srow('folder', '实例隔离', '每个实例使用自己的游戏目录（存档、模组、配置互不影响）', `<span class="sel" onclick="openMenu('iso',event)">可装模组的实例 ${ic('chev', 14)}</span>`, 1)}
+  ${srow('sliders', '游戏内存', '自动分配（约 4 GB）', `<span class="seg"><span class="on">自动</span><span>自定义</span></span>`)}
+  ${srow('image', '窗口大小', '默认', `<span class="sel">默认 ${ic('chev', 14)}</span>`)}</div>
+  <div class="hint" style="margin-top:8px">这里是全局设置；每个实例可以在「实例设置」里单独改，或者跟随这里。</div>`;
+SP.java = () => `<div class="sect">Java</div><div class="card">${srow('java', 'Java', '自动选择：按实例的游戏版本挑合适的 Java', `<span class="sel">自动 ${ic('chev', 14)}</span>`)}</div>`;
+SP.manage = () => `<div class="sect">游戏文件夹</div><div class="card">${srow('folder', '游戏文件夹', 'D:\\PixelsWorld\\.minecraft 等 2 个', `<span class="btn sm tonal">管理</span>`)}</div>
+  <div class="sect">维护</div><div class="card">${srow('broom', '清理游戏垃圾', '删除日志、崩溃报告与解压出的本地库，不影响存档和模组；当前约 1.2 GB', `<span class="btn sm tonal" onclick="toast('已清理 1.2 GB')">清理</span>`, 1)}</div>`;
+SP.look = () => `<div class="sect">个性化</div><div class="card">${srow('palette', '颜色模式', '启动器界面的明暗模式', `<span class="seg"><span>跟随系统</span><span>浅色</span><span class="on">深色</span></span>`)}
+  ${srow('image', '背景图片', '显示在整个窗口后面，界面面板会变成毛玻璃', `<span class="btn sm tonal">换一张…</span>`)}</div>`;
+SP.other = () => `<div class="sect">更新</div><div class="card">${srow('refresh', '更新通道', '正式版最稳定；Nightly 为 main 分支的每次更新', `<span class="sel">正式版 ${ic('chev', 14)}</span>`)}</div>
+  <div class="sect">系统</div><div class="card">${srow('shortcut', '创建桌面快捷方式', '在桌面创建启动器的快捷方式', `<span class="btn sm tonal" onclick="toast('已创建')">创建</span>`, 1)}</div>`;
+SP.docs = () => `<div class="row" style="gap:12px;align-items:flex-start"><div class="card" style="width:170px;padding:8px">${['快速开始', '实例与游戏版本', '模组与资源', '联机', '常见问题'].map((t, k) => `<div class="li" style="padding:8px 10px;${k === 1 ? 'color:#ffd2a8;font-weight:600' : ''}">${t}</div>`).join('')}</div>
+  <div class="grow card" style="padding:16px 18px;line-height:1.8;font-size:13.5px"><b style="font-size:16px">实例与游戏版本</b><br><b>游戏版本</b>是 Minecraft 本身的版本号，例如 1.20.1。<br><b>实例</b>是你装好的一份游戏：一个游戏版本 + 加载器 + 自己的模组、存档和设置。同一个游戏版本可以装多个实例，例如「1.20.1 生存」和「1.20.1 建筑」互不影响。</div></div>
+  <div class="hint" style="margin-top:8px">使用文档从「工具」移到这里。</div>`;
+SP.stub = () => `<div class="card" style="padding:28px;text-align:center" class="muted">（这一页内容不变）</div>`;
+PAGES.ai = () => `<div class="content glass" style="display:flex;flex-direction:column">
+  <div class="grow scroll">${nav.ask ? `<div style="display:flex;justify-content:flex-end"><div class="card" style="padding:10px 14px;max-width:70%;background:rgba(242,160,58,.25)">游戏崩溃了，帮我看看是什么原因<div class="small muted chg chg-t" style="margin-top:6px;display:inline-block">📎 已附带：${cur().id} 的崩溃报告与最近日志</div></div></div>
+  <div class="card" style="padding:10px 14px;max-width:75%;margin-top:10px">看了崩溃报告，是<b>内存不足</b>（java.lang.OutOfMemoryError）。这个实例装了 ${cur().mods} 个模组，当前分配约 2 GB，建议在实例设置里把内存改为 6 GB……</div>` : `<div class="muted" style="text-align:center;margin-top:120px">有什么可以帮你？</div>`}</div>
+  <div class="input card" style="margin-top:10px">输入问题…</div></div>`;
+PAGES.history = () => `<div class="content glass scroll"><div class="card">${S.history.map(h => `<div class="li">${ic('history')}<div class="grow"><div class="t">${h.t}</div><div class="s">${h.s}</div></div></div>`).join('')}</div>
+  <div class="hint" style="margin-top:8px">原来在「工具 → 任务历史」，现在从顶栏的任务面板进来。</div></div>`;
+
+// ---------------- 动作 ----------------
+function sendLan(i, what, world) { lanPreset = { i, what, world }; go({ page: 'tools', sec: 'lan' }); }
+function launch(i) { if (i != null) S.current = i; toast(`正在启动 ${cur().id}…（示意）`); render(); }
+function crash() { dialog = { kind: 'crash' }; renderLayer(); }
+function askAI() { dialog = null; root('ai', { ask: 1 }); }
+function openMenu(kind, ev) { menu = menu?.kind === kind ? null : { kind }; ev?.stopPropagation(); renderLayer(); }
+
+function renderLayer() {
+  const l = document.getElementById('layer');
+  const keepToast = l.querySelector('.toast')?.outerHTML || '';
+  let h = '';
+  if (menu?.kind === 'switch') {
+    h += `<div class="menu" style="left:250px;top:110px"><div class="mh">切换当前实例</div>${S.instances.map((x, i) => `<div class="mi" onclick="menu=null;setCurrent(${i})">${i === S.current ? ic('check', 16) : '<span style="width:16px"></span>'}<div class="grow"><div>${x.id}</div><div class="small faint">${LOADER[x.loader]} ${x.game} · ${x.mods} 个模组</div></div></div>`).join('')}
+      <hr><div class="mi chg" onclick="go({page:'instances'})">${ic('list', 16)}管理全部实例<span class="grow"></span>${ic('right', 14)}</div></div>`;
+  }
+  if (menu?.kind === 'tasks') {
+    h += `<div class="menu" style="right:240px;top:50px;width:320px"><div class="mh">正在进行</div>${S.tasksRunning.length ? S.tasksRunning.map(t => `<div class="mi" style="display:block">${t.t}<div class="bar2"><i style="width:${t.p}%"></i></div></div>`).join('') : '<div class="mi faint">没有正在进行的任务</div>'}
+      <hr><div class="mh chg-t" style="display:inline-block">最近完成</div>${S.history.slice(0, 3).map(t => `<div class="mi">${ic('check', 16)}<div class="grow"><div>${t.t}</div><div class="small faint">${t.s}</div></div></div>`).join('')}
+      <hr><div class="mi chg" onclick="go({page:'history'})">${ic('history', 16)}查看全部历史<span class="grow"></span>${ic('right', 14)}</div></div>`;
+  }
+  if (menu?.kind === 'target') {
+    h += `<div class="menu" style="left:300px;top:250px"><div class="mh">安装到</div>${S.instances.map((x, i) => `<div class="mi" onclick="menu=null;S.current=${i};render()">${i === S.current ? ic('check', 16) : '<span style="width:16px"></span>'}${x.id}<span class="grow"></span><span class="small faint">${x.game}</span></div>`).join('')}</div>`;
+  }
+  if (menu?.kind === 'iso') {
+    h += `<div class="menu chg" style="right:40px;top:180px">${['关闭', '可装模组的实例', '非正式版', '可装模组的实例与非正式版', '所有实例'].map(o => `<div class="mi" onclick="menu=null;renderLayer()">${o === '可装模组的实例' ? ic('check', 16) : '<span style="width:16px"></span>'}${o}</div>`).join('')}</div>`;
+  }
+  if (dialog?.kind === 'new') {
+    const d = dialog, name = `${d.game}-${LOADER[d.loader].replace(/\s/g, '')}`;
+    const dup = S.instances.some(x => x.game === d.game && x.loader === d.loader);
+    h += `<div class="scrim" onclick="if(event.target===this){dialog=null;renderLayer()}"><div class="dialog"><h3 class="chg-t" style="display:inline-block">安装新实例</h3>
+      <div class="small muted">游戏版本 ${d.game}</div>
+      <div style="margin-top:14px" class="seg">${['vanilla', 'fabric', 'forge', 'neo'].map(k => `<span class="${k === d.loader ? 'on' : ''}" onclick="dialog.loader='${k}';renderLayer()">${LOADER[k]}</span>`).join('')}</div>
+      <div class="field"><small>实例名称</small><input id="nm" value="${dup ? name + ' (2)' : name}"></div>
+      ${dup ? `<div class="small chg" style="margin-top:8px;color:#ffd2a8">已经有一个 ${d.game} ${LOADER[d.loader]} 的实例，这会再装一个独立的实例，存档和模组互不影响。</div>` : ''}
+      <div class="acts"><span class="btn out" onclick="dialog=null;renderLayer()">取消</span><span class="btn fill" onclick="doNew()">安装</span></div></div></div>`;
+  }
+  if (dialog?.kind === 'crash') {
+    h += `<div class="scrim"><div class="dialog"><h3>游戏崩溃了</h3><div class="small muted">${cur().id} · 退出代码 -1</div>
+      <div class="card" style="padding:10px 12px;margin-top:12px;font-size:13px">${ic('bug', 16)} 可能的原因：<b>内存不足</b><div class="small muted" style="margin-top:4px">游戏可用的内存不够，可以在实例设置里加大内存。</div></div>
+      <div class="acts"><span class="btn out" onclick="dialog=null;renderLayer()">关闭</span><span class="btn out">查看日志</span>
+      <span class="btn tonal chg chg-t" onclick="dialog=null;root('tools',{sec:'diag',diag:1})">详细分析</span><span class="btn fill chg chg-t" onclick="askAI()">${ic('sparkle', 16)}问 AI</span></div></div></div>`;
+  }
+  l.innerHTML = h + keepToast;
+}
+function doNew() {
+  const d = dialog, name = document.getElementById('nm').value.trim() || d.game;
+  S.instances.push({ id: name, loader: d.loader, game: d.game, mods: 0, played: '从未', folder: 0 });
+  S.tasksRunning.push({ t: `安装 ${name}`, p: 45 });
+  dialog = null; toast(`开始安装 ${name}，进度见顶栏任务面板`); render();
+  setTimeout(() => { const t = S.tasksRunning.shift(); if (t) S.history.unshift({ t: t.t, s: '完成 · 刚刚' }); toast(`${name} 安装完成，可以在「实例」里找到`); render(); }, 2500);
+}
+document.addEventListener('click', (e) => { if (menu && !e.target.closest('.menu')) { menu = null; renderLayer(); } });
+
+// ---------------- 改动导览 ----------------
+const JUMPS = [
+  ['1', '名词：实例 / 游戏版本', () => root('home')],
+  ['2', '切换实例 → 管理全部实例', () => { root('home'); setTimeout(() => openMenu('switch'), 0); }],
+  ['2', '实例列表', () => root('home') || go({ page: 'instances' })],
+  ['2', '实例详情（中心）', () => root('home') || openDetail(S.current, 'overview')],
+  ['3', '工具页重新分组', () => root('tools')],
+  ['3', '任务历史 → 顶栏任务面板', () => { root('home'); setTimeout(() => openMenu('tasks'), 0); }],
+  ['3', '清理垃圾 → 设置', () => root('settings', { sec: 'manage' })],
+  ['3', '使用文档 → 设置', () => root('settings', { sec: 'docs' })],
+  ['3', '崩溃提示直达分析 / AI', () => crash()],
+  ['3', '存档直接发送', () => root('home') || openDetail(S.current, 'saves')],
+  ['4', '实例里添加模组', () => root('home') || openDetail(S.current, 'mods')],
+  ['6', '跟随全局显示当前值', () => root('home') || openDetail(S.current, 'setup')],
+];
+function renderJump() {
+  document.getElementById('jump').innerHTML = JUMPS.map((j, k) => `<button onclick="JUMPS[${k}][2]()"><b>${j[0]}</b>${j[1]}</button>`).join('');
+}
+document.getElementById('note').innerHTML = `上面的按钮直接跳到每处改动；窗口里可以随便点（侧栏、标签、按钮、下拉都能用）。<b>蓝色虚线</b>标的是改动的地方。数字对应讨论里的条目：1 名词、2 实例中心、3 工具页整理、4 实例里加模组、6 全局与实例设置。`;
+
+// ---------------- 缩放 ----------------
+function fit() { const w = document.getElementById('stage').clientWidth, k = Math.min(1, w / 1100); const win = document.getElementById('win'); win.style.transform = `scale(${k})`; document.getElementById('stage').style.height = 700 * k + 'px'; }
+addEventListener('resize', fit);
+resetAll(); fit();
+</script>
+</body>
+</html>

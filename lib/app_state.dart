@@ -350,7 +350,7 @@ class AppState extends ChangeNotifier {
 
   /// 删除版本文件夹（移到回收站）
   Future<void> deleteVersion(String id) async {
-    if (id.isEmpty || id.contains('..') || RegExp(r'[\\/]').hasMatch(id)) throw Exception('非法版本号');
+    if (id.isEmpty || id.contains('..') || RegExp(r'[\\/]').hasMatch(id)) throw Exception('实例名称不合法');
     await moveToTrash(paths.versionDir(id));
     if (config.selectedVersion == id) await config.update({'selectedVersion': ''});
     await refreshVersions();
@@ -436,7 +436,7 @@ class AppState extends ChangeNotifier {
   }) async {
     if (gameState != GameState.idle) throw Exception('游戏已在运行');
     final id = config.selectedVersion;
-    if (id.isEmpty) throw Exception('请先选择一个游戏版本');
+    if (id.isEmpty) throw Exception('请先选择一个实例');
     var acc = selectedAccount;
     if (acc == null) throw Exception('请先添加一个账户');
 
@@ -476,7 +476,7 @@ class AppState extends ChangeNotifier {
         return false;
       }
       if (!identical(auth.account, acc)) acc = await accounts.upsert(auth.account);
-      t.setStage('分析版本');
+      t.setStage('分析实例');
       final info = await analyzeInstance(g, id);
       final inst = readInstanceSettings(g.versionDir(id));
       // 首次启动时决定并记录版本隔离

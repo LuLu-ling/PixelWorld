@@ -2,7 +2,10 @@ import 'dart:io';
 import 'dart:ui' show PlatformDispatcher;
 
 import '../core/android_storage.dart';
+import 'download_page.dart' show downloadTabRequest;
+import 'lan_transfer_page.dart' show openLanTransfer;
 import 'file_manager_page.dart';
+import 'resources.dart';
 
 import 'package:flutter/material.dart';
 
@@ -18,11 +21,13 @@ import '../core/instance_config.dart';
 import '../core/instance_files.dart';
 import '../core/java.dart';
 import '../core/memory.dart';
+import '../core/modrinth.dart' show ResourceType;
 import '../shell.dart';
 import '../core/extra_loaders.dart';
 import '../core/loader_names.dart';
 import '../core/loaders.dart';
 import '../core/optifine_compat.dart';
+import '../core/toolbox.dart' show ServerStatus, queryServer;
 import '../widgets/format.dart';
 import '../widgets/loader_icon.dart';
 import '../widgets/settings_group.dart';
@@ -39,8 +44,16 @@ const _folders = {
   _Section.schematics: InstanceFolder.schematics,
 };
 
-/// 打开版本详情时要先显示的标签（例如首页「全部存档」打开存档页），打开后清空
+/// 打开实例详情时要先显示的标签（例如首页「全部存档」打开存档页），打开后清空。
+/// add-mods 表示打开模组页并直接进入「添加模组」
 final instanceSectionRequest = ValueNotifier<String?>(null);
+
+/// 这些标签可以「添加」：在实例里直接浏览 Modrinth，只显示适配这个实例的资源
+const _addable = {
+  _Section.mods: ResourceType.mod,
+  _Section.resourcepacks: ResourceType.resourcepack,
+  _Section.shaderpacks: ResourceType.shader,
+};
 
 /// 版本详情：顶部是封面、名称和常用操作，下面一排标签（模组、存档、资源包……、设置、概览）
 class InstancePage extends StatefulWidget {
@@ -53,12 +66,30 @@ class InstancePage extends StatefulWidget {
 class _InstancePageState extends State<InstancePage> {
   _Section? _section;
 
+  /// 正在「添加」资源（显示锁定到这个实例的资源浏览）
+  ResourceType? _adding;
+
   @override
   void initState() {
     super.initState();
     final want = instanceSectionRequest.value;
     instanceSectionRequest.value = null;
-    if (want != null) _section = _Section.values.where((s) => s.name == want).firstOrNull;
+    if (want == 'add-mods') {
+      _section = _Section.mods;
+      _adding = ResourceType.mod;
+    } else if (want != null) {
+      _section = _Section.values.where((s) => s.name == want).firstOrNull;
+    }
+  }
+
+  /// 改为普通浏览：到下载页的对应分类（适配当前实例的筛选仍然可以开关）
+  void _unlock(ResourceType type) {
+    downloadTabRequest.value = switch (type) {
+      ResourceType.resourcepack => 'resourcePacks',
+      ResourceType.shader => 'shaders',
+      _ => 'mods',
+    };
+    ShellNav.of(context).goMain(MainPage.download);
   }
 
   Future<void> _launch(InstanceInfo info) async {
@@ -87,7 +118,7 @@ class _InstancePageState extends State<InstancePage> {
     final state = AppScope.of(context);
     final info = state.instance(state.instanceId);
     if (info == null) {
-      return const Center(child: Text('这个版本已不存在'));
+      return const Center(child: Text('这个实例已不存在'));
     }
     final tabs = <(_Section, String)>[
       // 与 PCL 一样，没有加载器的版本不显示模组
@@ -98,7 +129,7 @@ class _InstancePageState extends State<InstancePage> {
       (_Section.screenshots, '截图'),
       (_Section.schematics, '投影'),
       (_Section.servers, '服务器'),
-      (_Section.setup, '版本设置'),
+      (_Section.setup, '实例设置'),
       (_Section.overview, '概览'),
     ];
     final section = tabs.any((t) => t.$1 == _section) ? _section! : tabs.first.$1;
@@ -197,19 +228,56 @@ class _InstancePageState extends State<InstancePage> {
                 const EdgeInsets.all(10),
               ),
               SizedBox(height: glass ? 8 : 4),
-              PageTabs<_Section>(tabs: tabs, value: section, onChanged: (s) => setState(() => _section = s)),
+              PageTabs<_Section>(
+                tabs: tabs,
+                value: section,
+                onChanged: (s) => setState(() {
+                  _section = s;
+                  _adding = null;
+                }),
+              ),
               SizedBox(height: glass ? 8 : 6),
               Expanded(
                 child: panel(
                   dir == null
                       ? const Center(child: CircularProgressIndicator())
+                      : _adding != null && _addable[section] == _adding
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () => setState(() => _adding = null),
+                                icon: const Icon(Icons.arrow_back, size: 18),
+                                label: Text('返回${folder!.label}列表'),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Expanded(
+                              child: ResourceBrowser(
+                                key: ValueKey('add-${info.id}-$section'),
+                                type: _adding!,
+                                target: info.id,
+                                onUnlock: () => _unlock(_adding!),
+                              ),
+                            ),
+                          ],
+                        )
                       : KeyedSubtree(
                           key: ValueKey('${info.id}-$section'),
                           child: switch (section) {
                             _Section.overview => _Overview(info: info, gameDir: dir),
                             _Section.setup => _Setup(info: info),
                             _Section.servers => _Servers(gameDir: dir),
-                            _ => _Files(info: info, gameDir: dir, folder: folder!),
+                            _ => _Files(
+                              info: info,
+                              gameDir: dir,
+                              folder: folder!,
+                              onAdd: _addable[section] == null || (section == _Section.mods && !info.modable)
+                                  ? null
+                                  : () => setState(() => _adding = _addable[section]),
+                            ),
                           },
                         ),
                   const EdgeInsets.fromLTRB(12, 10, 12, 4),
@@ -237,7 +305,7 @@ class _Overview extends StatelessWidget {
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.delete_outline),
         title: Text('删除 ${info.id}？'),
-        content: const Text('版本文件夹会移到回收站。开启版本隔离时，其中的存档和模组也会一并删除。'),
+        content: const Text('实例文件夹会移到回收站。开启实例隔离时，其中的存档和模组也会一并删除。'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
           FilledButton(
@@ -289,11 +357,11 @@ class _Overview extends StatelessWidget {
             ),
             if (current)
               Chip(
-                label: const Text('当前版本'),
+                label: const Text('当前实例'),
                 avatar: Icon(Icons.check, color: scheme.primary),
               )
             else
-              FilledButton.tonal(onPressed: () => state.selectVersion(info.id), child: const Text('设为当前版本')),
+              FilledButton.tonal(onPressed: () => state.selectVersion(info.id), child: const Text('设为当前实例')),
           ],
         ),
         const SizedBox(height: 16),
@@ -306,7 +374,7 @@ class _Overview extends StatelessWidget {
               children: [
                 row('类型', describeVersion(info)),
                 row('游戏版本', info.gameVersion),
-                row('版本隔离', info.isolation == null ? '首次启动时决定' : (info.isolation! ? '已开启' : '已关闭')),
+                row('实例隔离', info.isolation == null ? '首次启动时决定' : (info.isolation! ? '已开启' : '已关闭')),
                 row('运行目录', gameDir),
                 // 加载器版本文件里的时间是加载器的构建时间，只对原版显示
                 if (info.releaseTime != null && info.loader == Loader.vanilla)
@@ -325,7 +393,7 @@ class _Overview extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: () => openInFileManager(versionDir),
               icon: const Icon(Icons.folder_open),
-              label: const Text('版本文件夹'),
+              label: const Text('实例文件夹'),
             ),
             for (final f in [
               InstanceFolder.saves,
@@ -346,16 +414,30 @@ class _Overview extends StatelessWidget {
         Card.filled(
           color: scheme.surfaceContainerLow,
           margin: EdgeInsets.zero,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            leading: Icon(Icons.delete_outline, color: scheme.error),
-            title: const Text('删除这个版本'),
-            subtitle: const Text('移到回收站；开启版本隔离时，其中的存档和模组也会一并删除'),
-            trailing: OutlinedButton(
-              style: OutlinedButton.styleFrom(foregroundColor: scheme.error),
-              onPressed: () => _delete(context),
-              child: const Text('删除'),
-            ),
+          child: Column(
+            children: [
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                leading: const Icon(Icons.send_outlined),
+                title: const Text('发送这个实例'),
+                subtitle: const Text('通过局域网把整个实例传到另一台设备'),
+                trailing: FilledButton.tonal(
+                  onPressed: () => openLanTransfer(context, instance: info.id, whole: true),
+                  child: const Text('发送'),
+                ),
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                leading: Icon(Icons.delete_outline, color: scheme.error),
+                title: const Text('删除这个实例'),
+                subtitle: const Text('移到回收站；开启实例隔离时，其中的存档和模组也会一并删除'),
+                trailing: OutlinedButton(
+                  style: OutlinedButton.styleFrom(foregroundColor: scheme.error),
+                  onPressed: () => _delete(context),
+                  child: const Text('删除'),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -450,7 +532,7 @@ class _SetupState extends State<_Setup> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '这些设置保存在版本文件夹的 PCL/config.v1.yml 中，与 PCL-CE 互通',
+                  '这些设置保存在实例文件夹的 PCL/config.v1.yml 中，与 PCL-CE 互通',
                   style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                 ),
               ),
@@ -463,9 +545,9 @@ class _SetupState extends State<_Setup> {
             ListTile(
               contentPadding: pad,
               leading: const Icon(Icons.call_split),
-              title: const Text('版本隔离'),
+              title: const Text('实例隔离'),
               subtitle: Text(
-                _s.isolation == null ? '尚未决定：首次启动时按全局策略「${isolationModes[cfg.isolationMode]}」决定，之后固定' : '运行目录为版本文件夹',
+                _s.isolation == null ? '尚未决定：首次启动时按全局策略「${isolationModes[cfg.isolationMode]}」决定，之后固定' : '运行目录为实例文件夹',
               ),
               trailing: SegmentedButton<bool>(
                 emptySelectionAllowed: true,
@@ -481,6 +563,14 @@ class _SetupState extends State<_Setup> {
               contentPadding: pad,
               leading: const Icon(Icons.coffee_outlined),
               title: const Text('Java'),
+              // 跟随全局时写出全局现在的选择，不用再去设置页对照
+              subtitle: _javaKey == 'global'
+                  ? Text(
+                      '跟随全局：${cfg.javaPath.isEmpty ? '自动选择' : cfg.javaPath}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  : null,
               trailing: DropdownMenu<String>(
                 key: ValueKey(_javaKey + _javas.length.toString()),
                 width: 320,
@@ -525,6 +615,13 @@ class _SetupState extends State<_Setup> {
               contentPadding: pad,
               leading: const Icon(Icons.memory_outlined),
               title: const Text('分配方式'),
+              subtitle: _s.memoryMode == 'global'
+                  ? Text(
+                      cfg.memoryMode == 'custom'
+                          ? '跟随全局：自定义 ${ramFromTick(cfg.memoryTick).toStringAsFixed(1)} GB'
+                          : '跟随全局：自动分配',
+                    )
+                  : null,
               trailing: SegmentedButton<String>(
                 segments: const [
                   ButtonSegment(value: 'global', label: Text('跟随全局')),
@@ -671,11 +768,14 @@ class _InstanceTextRowState extends State<_InstanceTextRow> {
 // ---------- 资源文件夹 ----------
 
 class _Files extends StatefulWidget {
-  const _Files({required this.info, required this.gameDir, required this.folder});
+  const _Files({required this.info, required this.gameDir, required this.folder, this.onAdd});
 
   final InstanceInfo info;
   final String gameDir;
   final InstanceFolder folder;
+
+  /// 「添加模组 / 资源包 / 光影」：在这个实例里浏览 Modrinth
+  final VoidCallback? onAdd;
 
   @override
   State<_Files> createState() => _FilesState();
@@ -744,6 +844,24 @@ class _FilesState extends State<_Files> {
                     onChanged: (v) => setState(() => _query = v),
                   ),
                 ),
+              if (widget.folder == InstanceFolder.saves && _files.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                FilledButton.tonalIcon(
+                  onPressed: () => openLanTransfer(context, instance: widget.info.id, items: {'saves'}),
+                  icon: const Icon(Icons.send_outlined, size: 18),
+                  label: const Text('发送存档'),
+                ),
+                const SizedBox(width: 4),
+              ],
+              if (widget.onAdd != null) ...[
+                const SizedBox(width: 8),
+                FilledButton.tonalIcon(
+                  onPressed: widget.onAdd,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: Text('添加${widget.folder.label}'),
+                ),
+                const SizedBox(width: 4),
+              ],
               if (isMods && canAddOptiFine(widget.info.loader))
                 TextButton.icon(
                   onPressed: () async {
@@ -880,9 +998,51 @@ class _Servers extends StatelessWidget {
               leading: Icon(Icons.dns_outlined, color: scheme.primary),
               title: Text(s.name),
               subtitle: Text(s.address),
+              // 直接显示在线人数和延迟，不用再去「工具 → 服务器查询」
+              trailing: _ServerPing(address: s.address),
             ),
           ),
       ],
+    );
+  }
+}
+
+/// 服务器列表里的一行：查询在线人数和延迟
+class _ServerPing extends StatefulWidget {
+  const _ServerPing({required this.address});
+
+  final String address;
+
+  @override
+  State<_ServerPing> createState() => _ServerPingState();
+}
+
+class _ServerPingState extends State<_ServerPing> {
+  late Future<ServerStatus> _status = queryServer(widget.address);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return FutureBuilder<ServerStatus>(
+      future: _status,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2));
+        }
+        final s = snap.data;
+        return InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => setState(() => _status = queryServer(widget.address)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Text(
+              s == null ? '无法连接' : '在线 ${s.online}/${s.max} · ${s.latency} ms',
+              style: theme.textTheme.labelMedium?.copyWith(color: s == null ? scheme.error : scheme.primary),
+            ),
+          ),
+        );
+      },
     );
   }
 }

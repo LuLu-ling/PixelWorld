@@ -7,6 +7,7 @@ import '../app_info.dart';
 import 'file_manager_page.dart' show pickFile;
 import '../widgets/app_background.dart';
 import '../app_scope.dart';
+import '../core/config.dart' show homeLayouts;
 import '../platform.dart';
 import '../widgets/theme_color_dialog.dart';
 import '../widgets/settings_group.dart';
@@ -14,9 +15,10 @@ import '../widgets/side_nav.dart';
 import '../widgets/ai_settings.dart';
 import '../widgets/ai_workspace_settings.dart';
 import '../widgets/storage_location.dart';
+import 'docs_page.dart';
 import 'settings_sections.dart';
 
-enum _Section { launch, java, manage, appearance, misc, ai, aiTools, aiWorkspace, about }
+enum _Section { launch, java, manage, appearance, misc, ai, aiTools, aiWorkspace, about, docs }
 
 /// 从别的页面跳到设置的某个小节（值为小节名，例如 ai、aiTools、aiWorkspace），见 ShellNav.openSettings
 final settingsSectionRequest = ValueNotifier<String?>(null);
@@ -80,7 +82,10 @@ class _SettingsPageState extends State<SettingsPage> {
       SideNavItem(_Section.aiTools, '工具与服务', Icons.extension_outlined),
       SideNavItem(_Section.aiWorkspace, '工作区与联网', Icons.travel_explore),
     ]),
-    SideNavGroup('关于', [SideNavItem(_Section.about, '关于与致谢', Icons.info_outline)]),
+    SideNavGroup('关于', [
+      SideNavItem(_Section.about, '关于与致谢', Icons.info_outline),
+      SideNavItem(_Section.docs, '使用文档', Icons.menu_book_outlined),
+    ]),
   ];
 
   @override
@@ -106,6 +111,7 @@ class _SettingsPageState extends State<SettingsPage> {
               _Section.aiTools => _aiPage('工具与服务', null, const AiToolsSettings()),
               _Section.aiWorkspace => _aiPage('工作区与联网', null, const AiWorkspaceSettings()),
               _Section.about => const _AboutSection(),
+              _Section.docs => const DocsPage(),
             },
           ),
         ),
@@ -180,6 +186,25 @@ class _AppearanceSection extends StatelessWidget {
         SettingsGroup(
           title: '首页',
           children: [
+            if (isDesktop)
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                leading: const Icon(Icons.dashboard_outlined),
+                title: const Text('首页布局'),
+                subtitle: Text(switch (cfg.homeLayout) {
+                  'split' => '上下：当前实例在顶部，开始游戏和存档在底部，中间留给背景；选背景图片时自动切到这个布局',
+                  'minimal' => '极简：只在底部留一条，放当前实例和开始游戏',
+                  _ => '标准：大卡片、公告与快捷按钮、最近游玩',
+                }),
+                trailing: DropdownButton<String>(
+                  focusColor: Colors.transparent,
+                  value: cfg.homeLayout,
+                  underline: const SizedBox.shrink(),
+                  borderRadius: BorderRadius.circular(12),
+                  items: [for (final e in homeLayouts.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
+                  onChanged: (v) => v == null ? null : cfg.update({'homeLayout': v}),
+                ),
+              ),
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               secondary: const Icon(Icons.info_outline),
@@ -408,14 +433,6 @@ class _BackgroundSettings extends StatelessWidget {
             live: true,
             onCommit: (v, {required persist}) =>
                 cfg.update({BackgroundPrefs.glowKey: (v * 100).roundToDouble() / 100}, persist: persist),
-          ),
-          SwitchListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            secondary: const Icon(Icons.wallpaper),
-            title: const Text('首页壁纸排版'),
-            subtitle: const Text('首页的内容放在顶部和底部，中间留给背景图片；关闭后保持原来的排版'),
-            value: bg.wallpaperHome,
-            onChanged: (v) => cfg.update({BackgroundPrefs.homeLayoutKey: v}),
           ),
           SwitchListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),

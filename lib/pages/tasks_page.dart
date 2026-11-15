@@ -48,7 +48,7 @@ class TasksPage extends StatelessWidget {
             Expanded(
               child: tasks.isEmpty
                   ? Center(
-                      child: Text('还没有任务。安装版本、下载资源或启动游戏时会显示在这里', style: TextStyle(color: scheme.onSurfaceVariant)),
+                      child: Text('还没有任务。安装实例、下载资源或启动游戏时会显示在这里', style: TextStyle(color: scheme.onSurfaceVariant)),
                     )
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),

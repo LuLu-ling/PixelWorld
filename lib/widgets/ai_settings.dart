@@ -323,7 +323,7 @@ class AiToolsSettings extends StatelessWidget {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('允许 AI 使用工具'),
-          subtitle: const Text('查看版本、模组与日志，安装或禁用模组，联网搜索，以及下面的 MCP 服务；会修改内容的操作都需要你确认'),
+          subtitle: const Text('查看实例、模组与日志，安装或禁用模组，联网搜索，以及下面的 MCP 服务；会修改内容的操作都需要你确认'),
           value: cfg.aiTools,
           onChanged: (v) => cfg.update({'aiTools': v}),
         ),
@@ -331,7 +331,7 @@ class AiToolsSettings extends StatelessWidget {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('查看类操作也需要确认'),
-            subtitle: const Text('关闭时，AI 查看版本、模组、文件与日志不需要确认'),
+            subtitle: const Text('关闭时，AI 查看实例、模组、文件与日志不需要确认'),
             value: cfg.aiConfirmRead,
             onChanged: (v) => cfg.update({'aiConfirmRead': v}),
           ),

@@ -18,8 +18,8 @@ const defaultJvmArgs =
 const pclDefaultJvmArgs = defaultJvmArgs;
 
 /// 版本隔离默认策略：
-/// 0 关闭 / 1 仅隔离可安装 Mod 的版本 / 2 仅隔离非正式版 / 3 隔离非正式版与可安装 Mod 的版本 / 4 隔离所有版本
-const isolationModes = {0: '关闭', 1: '隔离可安装 Mod 的版本', 2: '隔离非正式版', 3: '隔离可安装 Mod 的版本与非正式版', 4: '隔离所有版本'};
+/// 0 关闭 / 1 仅隔离可安装模组的实例 / 2 仅隔离非正式版 / 3 隔离非正式版与可安装 Mod 的版本 / 4 隔离所有版本
+const isolationModes = {0: '关闭', 1: '隔离可安装模组的实例', 2: '隔离非正式版', 3: '隔离可安装模组的实例与非正式版', 4: '隔离所有实例'};
 
 class GameFolder {
   GameFolder({required this.name, required this.path, required this.custom});
@@ -37,6 +37,9 @@ class GameFolder {
 }
 
 /// 启动器全局设置，保存在应用数据目录的 config.json
+/// 首页布局，见 [LauncherConfig.homeLayout]
+const homeLayouts = {'standard': '标准', 'split': '上下', 'minimal': '极简'};
+
 class LauncherConfig extends ChangeNotifier {
   LauncherConfig._(this._data);
 
@@ -229,6 +232,17 @@ class LauncherConfig extends ChangeNotifier {
   bool get hintBuy => _get('hintBuy');
   bool get homeHints => _get('homeHints');
   bool get homeNews => _get('homeNews');
+
+  /// 电脑上首页第一屏的布局（和有没有背景图片无关，选背景图片时自动切到「上下」）：
+  /// standard 标准、split 上下（内容在顶部和底部，中间留给背景）、minimal 极简（只有底部一条）。
+  /// 以前的版本只有「设了背景图片时用上下排版」的开关（bgHomeWallpaper），没选过时按它推算
+  String get homeLayout {
+    final v = _data['homeLayout'];
+    if (homeLayouts.containsKey(v)) return v as String;
+    final hasImage = '${_data['bgImage'] ?? ''}'.isNotEmpty;
+    return hasImage && _data['bgHomeWallpaper'] != false ? 'split' : 'standard';
+  }
+
   String get aiProvider => _get('aiProvider');
   String get aiBaseUrl => _get('aiBaseUrl');
   String get aiModel => _get('aiModel');

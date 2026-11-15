@@ -113,7 +113,7 @@ class TransferManifest {
     final files = j['files'];
     if (version is! String || items is! List || files is! Map) throw TransferException('传输清单无效');
     splitRelative(version); // 版本名只能是一级合法的文件夹名
-    if (version.contains('/') || version.contains('\\')) throw TransferException('版本名无效：$version');
+    if (version.contains('/') || version.contains('\\')) throw TransferException('实例名无效：$version');
     final parents = (j['parents'] as List? ?? const []).whereType<String>().toList();
     for (final id in parents) {
       if (splitRelative(id).length != 1 || id == version) throw TransferException('依赖版本名无效：$id');
@@ -359,12 +359,12 @@ Future<String> importTransferVersion(
   String gameRoot, {
   void Function(int total, int done)? onProgress,
 }) async {
-  if (!m.wholeVersion) throw TransferException('这个传输包不是整个版本');
+  if (!m.wholeVersion) throw TransferException('这个传输包不是整个实例');
   final id = m.version;
   final versions = p.join(gameRoot, 'versions');
   final dest = p.join(versions, id);
   if (FileSystemEntity.typeSync(dest, followLinks: false) != FileSystemEntityType.notFound) {
-    throw TransferException('已经有名为「$id」的版本，请先在版本设置里重命名或删除它');
+    throw TransferException('已经有名为「$id」的实例，请先在实例设置里重命名或删除它');
   }
   final staging = p.join(versions, '.pclpw-import-${_stamp()}');
   try {
@@ -394,7 +394,7 @@ Future<String?> importTransferFiles(
   required String backupDir,
   void Function(int total, int done)? onProgress,
 }) async {
-  if (m.wholeVersion) throw TransferException('这个传输包是整个版本，请导入为新版本');
+  if (m.wholeVersion) throw TransferException('这个传输包是整个实例，请导入为新实例');
   final staging = p.join(gameDir, '.pclpw-import-${_stamp()}');
   String? backup;
   try {

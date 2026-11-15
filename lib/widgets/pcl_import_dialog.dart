@@ -92,7 +92,7 @@ class _PclImportDialogState extends State<_PclImportDialog> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '版本独立设置无需导入，两者直接共用。',
+                    '实例独立设置无需导入，两者直接共用。',
                     style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 12),

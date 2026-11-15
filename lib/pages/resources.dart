@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_scope.dart';
+import '../app_state.dart' show AppState;
 import '../core/instance.dart';
 import '../core/instance_files.dart';
 import '../core/modrinth.dart';
@@ -13,9 +14,15 @@ import '../widgets/app_background.dart';
 
 /// 社区资源（Modrinth）：搜索列表，点击进入详情
 class ResourceBrowser extends StatefulWidget {
-  const ResourceBrowser({super.key, required this.type});
+  const ResourceBrowser({super.key, required this.type, this.target, this.onUnlock});
 
   final ResourceType type;
+
+  /// 从实例详情「添加」进来时锁定的实例：只显示适配它的资源，安装时直接装进它
+  final String? target;
+
+  /// 锁定时「改为普通浏览」
+  final VoidCallback? onUnlock;
 
   @override
   State<ResourceBrowser> createState() => _ResourceBrowserState();
@@ -47,9 +54,13 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
     super.dispose();
   }
 
+  /// 适配哪个实例：锁定的实例，否则是当前实例
+  InstanceInfo? _fitTarget(AppState state) =>
+      widget.target != null ? state.instance(widget.target!) : state.selectedVersion;
+
   Future<void> _search({bool more = false}) async {
     final state = AppScope.read(context);
-    final current = state.selectedVersion;
+    final current = _fitTarget(state);
     final gen = ++_generation;
     setState(() {
       _loading = true;
@@ -58,7 +69,7 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
     });
     try {
       final loaders = current == null ? const <String>[] : modrinthLoaders(current.loader);
-      final fit = _fitCurrent && current != null && widget.type != ResourceType.modpack;
+      final fit = (_fitCurrent || widget.target != null) && current != null && widget.type != ResourceType.modpack;
       final r = await Modrinth.search(
         type: widget.type,
         query: _query.text.trim(),
@@ -96,14 +107,42 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
   @override
   Widget build(BuildContext context) {
     if (_open != null) {
-      return ResourceDetail(hit: _open!, onBack: () => setState(() => _open = null));
+      return ResourceDetail(hit: _open!, target: widget.target, onBack: () => setState(() => _open = null));
     }
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final current = AppScope.of(context).selectedVersion;
+    final current = _fitTarget(AppScope.of(context));
+    final locked = widget.target != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (locked && current != null) ...[
+          tintedPanel(
+            context,
+            scheme.primaryContainer,
+            BorderRadius.circular(12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+              child: Row(
+                children: [
+                  Icon(Icons.link, size: 18, color: scheme.onPrimaryContainer),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '正在为 ${current.id} 添加${widget.type.label} · 只显示适配 ${current.gameVersion} 的${widget.type.label}，'
+                      '安装时直接装进这个实例',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onPrimaryContainer),
+                    ),
+                  ),
+                  if (widget.onUnlock != null) TextButton(onPressed: widget.onUnlock, child: const Text('改为普通浏览')),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         // 一行：搜索、适配当前版本、排序、（整合包）从文件安装。分类名已经在顶部标签里
         SizedBox(
           height: 40,
@@ -124,7 +163,7 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
                       TextField(controller: _query, decoration: decoration, onSubmitted: (_) => _search()),
                 ),
               ),
-              if (current != null && widget.type != ResourceType.modpack) ...[
+              if (!locked && current != null && widget.type != ResourceType.modpack) ...[
                 const SizedBox(width: 8),
                 GlassPanel(
                   color: Colors.transparent,
@@ -383,10 +422,13 @@ class _Stat extends StatelessWidget {
 
 /// 资源详情：选择要安装到的游戏版本，列出兼容的文件
 class ResourceDetail extends StatefulWidget {
-  const ResourceDetail({super.key, required this.hit, required this.onBack});
+  const ResourceDetail({super.key, required this.hit, required this.onBack, this.target});
 
   final ResourceHit hit;
   final VoidCallback onBack;
+
+  /// 锁定的安装目标（从实例详情添加时），不再让用户选
+  final String? target;
 
   @override
   State<ResourceDetail> createState() => _ResourceDetailState();
@@ -418,6 +460,7 @@ class _ResourceDetailState extends State<ResourceDetail> {
   /// 默认安装目标：当前版本；模组则优先选择装了加载器的版本；整合包不需要目标版本
   String _defaultInstance() {
     if (_type == ResourceType.modpack) return '';
+    if (widget.target != null) return widget.target!;
     final state = AppScope.read(context);
     final selected = state.selectedVersion;
     if (_type != ResourceType.mod || (selected != null && modrinthLoaders(selected.loader).isNotEmpty)) {
@@ -453,7 +496,7 @@ class _ResourceDetailState extends State<ResourceDetail> {
 
   String? _warning(InstanceInfo? inst) {
     if (_type == ResourceType.modpack) return null;
-    if (inst == null) return '还没有安装任何游戏版本';
+    if (inst == null) return '还没有安装任何实例';
     if (_type == ResourceType.mod && modrinthLoaders(inst.loader).isEmpty) return '${inst.id} 没有安装模组加载器，模组不会生效';
     if (_type == ResourceType.datapack && _worlds.isEmpty) return '${inst.id} 还没有存档，请先进入游戏创建一个世界';
     return null;
@@ -565,7 +608,9 @@ class _ResourceDetailState extends State<ResourceDetail> {
                     runSpacing: 12,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      if (_type != ResourceType.modpack)
+                      if (_type != ResourceType.modpack && widget.target != null)
+                        Chip(avatar: const Icon(Icons.link, size: 18), label: Text('安装到 ${widget.target}'))
+                      else if (_type != ResourceType.modpack)
                         DropdownMenu<String>(
                           width: 320,
                           label: const Text('安装到'),
@@ -580,7 +625,7 @@ class _ResourceDetailState extends State<ResourceDetail> {
                           },
                         )
                       else
-                        Chip(avatar: const Icon(Icons.inventory_2_outlined, size: 18), label: const Text('将安装为新的独立版本')),
+                        Chip(avatar: const Icon(Icons.inventory_2_outlined, size: 18), label: const Text('将安装为新的实例')),
                       if (_type == ResourceType.datapack && _worlds.isNotEmpty)
                         DropdownMenu<String>(
                           key: ValueKey(_instanceId),

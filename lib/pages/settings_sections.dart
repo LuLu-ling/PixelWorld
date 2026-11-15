@@ -2,6 +2,7 @@ import 'dart:io';
 
 import '../core/android_storage.dart';
 import 'file_manager_page.dart';
+
 import 'package:flutter/material.dart';
 
 import '../app_info.dart';
@@ -15,6 +16,7 @@ import '../core/task.dart';
 import '../core/updater.dart';
 import '../platform.dart';
 import '../widgets/format.dart';
+import '../widgets/maintenance_actions.dart';
 import '../widgets/pcl_import_dialog.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/update_dialog.dart';
@@ -255,7 +257,7 @@ class _RendererRowState extends State<_RendererRow> {
           Text(androidRendererHints[pref] ?? ''),
           if (gpu != null) Text('显卡：$gpu'),
           if (pref == 'auto' && auto != null) Text('当前会使用：${androidRenderers[auto.renderer]}（${auto.reason}）'),
-          const Text('可以在版本设置里为单个版本另选渲染器'),
+          const Text('可以在实例设置里为单个实例另选渲染器'),
         ],
       ),
       trailing: DropdownMenu<String>(
@@ -288,8 +290,8 @@ class LaunchSection extends StatelessWidget {
           children: [
             _SelectRow<int>(
               icon: Icons.call_split,
-              title: '版本隔离',
-              subtitle: '新版本首次启动时按此规则决定，之后在版本设置中单独修改',
+              title: '实例隔离',
+              subtitle: '新实例首次启动时按此规则决定，之后在实例设置中单独修改',
               value: cfg.isolationMode,
               options: isolationModes,
               onChanged: (v) => set({'isolationMode': v}),
@@ -382,7 +384,7 @@ class LaunchSection extends StatelessWidget {
             _SwitchRow(
               icon: Icons.translate,
               title: '自动设置游戏语言',
-              subtitle: '新版本或没有存档时，把游戏语言设为与启动器一致',
+              subtitle: '新实例或没有存档时，把游戏语言设为与启动器一致',
               value: cfg.autoGameLanguage,
               onChanged: (v) => set({'autoGameLanguage': v}),
             ),
@@ -610,7 +612,7 @@ class _JavaSectionState extends State<JavaSection> {
             ],
           ),
           Text(
-            '版本设置里可以为单个版本指定 Java，优先于这里的设置。',
+            '实例设置里可以为单个实例指定 Java，优先于这里的设置。',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
@@ -669,11 +671,27 @@ class MiscSection extends StatelessWidget {
               contentPadding: _rowPadding,
               leading: const Icon(Icons.move_down),
               title: const Text('从 PCL-CE 导入'),
-              subtitle: const Text('导入启动设置、游戏文件夹与账户；版本独立设置两者直接共用'),
+              subtitle: const Text('导入启动设置、游戏文件夹与账户；实例独立设置两者直接共用'),
               trailing: FilledButton.tonal(onPressed: () => showPclImport(context), child: const Text('导入')),
             ),
           ],
         ),
+        if (Platform.isWindows)
+          SettingsGroup(
+            title: '系统',
+            children: [
+              ListTile(
+                contentPadding: _rowPadding,
+                leading: const Icon(Icons.shortcut),
+                title: const Text('创建桌面快捷方式'),
+                subtitle: const Text('在桌面创建启动器的快捷方式'),
+                trailing: FilledButton.tonal(
+                  onPressed: () => createShortcutWithToast(context),
+                  child: const Text('创建'),
+                ),
+              ),
+            ],
+          ),
         SettingsGroup(
           title: '下载',
           children: [
@@ -774,7 +792,7 @@ class _AndroidJavaSectionState extends State<_AndroidJavaSection> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('删除 Java $major？'),
-        content: const Text('之后需要时会重新下载。指定使用它的版本要重新选择 Java，或改为自动选择。'),
+        content: const Text('之后需要时会重新下载。指定使用它的实例要重新选择 Java，或改为自动选择。'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
           FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('删除')),
@@ -852,7 +870,7 @@ class _AndroidJavaSectionState extends State<_AndroidJavaSection> {
           ),
           Text(
             '安卓版 Java 来自 AngelAuraMC 的 OpenJDK 构建（GPLv2 + Classpath Exception）。'
-            '版本设置里可以为单个版本指定 Java，优先于这里的设置。',
+            '实例设置里可以为单个实例指定 Java，优先于这里的设置。',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],

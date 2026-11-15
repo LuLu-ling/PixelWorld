@@ -380,18 +380,19 @@ class _TopBarState extends State<_TopBar> {
     final scheme = theme.colorScheme;
     final state = AppScope.of(context);
     final sub = widget.sub;
-    Widget title(Color? muted) {
+    // 启用背景图片时 fg、muted 是统一的黑字或白字，要显式写进字体样式（主题字体自带颜色会盖掉外层的默认颜色）
+    Widget title(Color? fg, Color? muted) {
       if (sub != null) {
         final text = sub == SubPage.instance ? '版本详情' : _subTitles[sub]!;
         return Row(
           children: [
-            IconButton(tooltip: '返回', onPressed: widget.onBack, icon: const Icon(Icons.arrow_back, size: 20)),
+            IconButton(tooltip: '返回', onPressed: widget.onBack, icon: Icon(Icons.arrow_back, size: 20, color: fg)),
             const SizedBox(width: 2),
             Flexible(
               child: Text(
                 text,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: fg),
               ),
             ),
           ],
@@ -413,12 +414,12 @@ class _TopBarState extends State<_TopBar> {
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleMedium,
+          style: theme.textTheme.titleMedium?.copyWith(color: fg),
         );
       } else {
         return Text(
           _mainTitles[widget.page]!,
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: fg),
         );
       }
     }
@@ -426,7 +427,7 @@ class _TopBarState extends State<_TopBar> {
     // 桌面端：标题区域拖动窗口
     Widget titleArea = Align(
       alignment: Alignment.centerLeft,
-      child: OnBackground(builder: (context, fg, muted) => title(muted)),
+      child: OnBackground(builder: (context, fg, muted) => title(fg, muted)),
     );
     if (isDesktop && !Platform.isLinux) titleArea = DragToMoveArea(child: SizedBox.expand(child: titleArea));
 

@@ -17,7 +17,7 @@ import '../platform.dart';
 // - 背景图片按「背景模糊」整体模糊一次；
 // - 每个面板自己画一份与窗口对齐的背景，用「面板模糊」单独模糊（与背景模糊互不影响），再叠一层主题色；
 // - 两种模糊都在换图或改参数时预先算好，绘制时只是贴图，开销很小；
-// - 直接放在背景上的文字按后面背景的亮度自动用黑字或白字。
+// - 直接放在背景上的文字按整张背景图片的亮度统一用黑字或白字（同一屏颜色一致）。
 // 手机上不启用，保持实色界面。
 
 /// 背景相关的设置（保存在 config 里）
@@ -140,6 +140,7 @@ class BackgroundController extends ChangeNotifier {
       _bgImage = bg;
       _panelImage = panel;
       _luma = luma;
+      _avgLuma = null;
       _loadedPath = path;
       _loadedBlur = blurNow;
       _loadedPanelBlur = panelBlurNow;
@@ -221,6 +222,23 @@ class BackgroundController extends ChangeNotifier {
   }
 
   /// [rect]（窗口坐标）后面背景的平均亮度，0～1；没有背景时为 null
+  /// 整张背景图片的平均亮度（0～1）。直接显示在背景上的文字统一按它选黑字或白字，
+  /// 不再每处单独取样，避免同一屏上有的黑有的白
+  double? get averageLuminance {
+    final luma = _luma;
+    if (luma == null) return null;
+    if (_avgLuma != null) return _avgLuma;
+    var sum = 0.0;
+    final n = _lumaW * _lumaH;
+    for (var i = 0; i < n; i++) {
+      final o = i * 4;
+      sum += (0.2126 * luma.getUint8(o) + 0.7152 * luma.getUint8(o + 1) + 0.0722 * luma.getUint8(o + 2)) / 255;
+    }
+    return _avgLuma = sum / n;
+  }
+
+  double? _avgLuma;
+
   double? luminanceAt(Rect rect, Size window) {
     final luma = _luma, bg = _bgImage;
     if (luma == null || bg == null || window.isEmpty) return null;
@@ -509,66 +527,26 @@ class _RenderGlassBackdrop extends RenderBox {
   }
 }
 
-/// 直接放在背景上的内容（问候、小标题）：按后面背景的亮度给出黑字或白字；
+/// 直接放在背景上的内容（问候、小标题）：按整张背景图片的亮度统一给出黑字或白字；
 /// 没有启用背景时 [builder] 收到 null，用原来的颜色
-class OnBackground extends StatefulWidget {
+class OnBackground extends StatelessWidget {
   const OnBackground({super.key, required this.builder});
 
   /// [foreground] 主要文字颜色，[muted] 次要文字颜色
   final Widget Function(BuildContext context, Color? foreground, Color? muted) builder;
 
   @override
-  State<OnBackground> createState() => _OnBackgroundState();
-}
-
-class _OnBackgroundState extends State<OnBackground> {
-  bool? _darkText;
-  ScrollPosition? _scroll;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final s = Scrollable.maybeOf(context)?.position;
-    if (s != _scroll) {
-      _scroll?.removeListener(_schedule);
-      _scroll = s?..addListener(_schedule);
-    }
-    _schedule();
-  }
-
-  @override
-  void dispose() {
-    _scroll?.removeListener(_schedule);
-    super.dispose();
-  }
-
-  void _schedule() => WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
-
-  void _measure() {
-    if (!mounted) return;
-    final scope = BackgroundScope.activeOf(context);
-    final box = context.findRenderObject() as RenderBox?;
-    final root = scope?.root;
-    if (scope == null || box == null || root == null || !box.hasSize || !box.attached) return;
-    final topLeft = box.localToGlobal(Offset.zero, ancestor: root);
-    final l0 = scope.controller.luminanceAt(topLeft & box.size, root.size);
-    if (l0 == null) return;
-    // 算上背景层上压的那层颜色
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final l = dark ? l0 * .65 : l0 * .9 + .1;
-    final darkText = l > .55;
-    if (darkText != _darkText) setState(() => _darkText = darkText);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final active = BackgroundScope.activeOf(context) != null;
-    if (active) _schedule();
-    if (!active || _darkText == null) return widget.builder(context, null, null);
-    final fg = _darkText! ? const Color(0xFF111512) : const Color(0xFFF5F7F5);
-    final muted = fg.withValues(alpha: _darkText! ? .72 : .78);
+    final scope = BackgroundScope.activeOf(context);
+    final l0 = scope?.controller.averageLuminance;
+    if (scope == null || l0 == null) return builder(context, null, null);
+    // 算上背景层上压的那层颜色
+    final l = Theme.of(context).brightness == Brightness.dark ? l0 * .65 : l0 * .9 + .1;
+    final darkText = l > .55;
+    final fg = darkText ? const Color(0xFF111512) : const Color(0xFFF5F7F5);
+    final muted = fg.withValues(alpha: darkText ? .72 : .78);
     final shadow = Shadow(
-      color: _darkText! ? Colors.white.withValues(alpha: .3) : Colors.black.withValues(alpha: .35),
+      color: darkText ? Colors.white.withValues(alpha: .3) : Colors.black.withValues(alpha: .35),
       offset: const Offset(0, 1),
       blurRadius: 1,
     );
@@ -576,7 +554,7 @@ class _OnBackgroundState extends State<OnBackground> {
       style: TextStyle(color: fg, shadows: [shadow]),
       child: IconTheme.merge(
         data: IconThemeData(color: fg),
-        child: widget.builder(context, fg, muted),
+        child: builder(context, fg, muted),
       ),
     );
   }

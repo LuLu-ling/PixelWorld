@@ -308,25 +308,17 @@ class _BackgroundSettings extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   child: Image.file(
                     File(path),
-                    width: 120,
-                    height: 68,
+                    width: 96,
+                    height: 54,
                     fit: BoxFit.cover,
                     cacheWidth: 240,
-                    errorBuilder: (_, _, _) => Container(width: 120, height: 68, color: scheme.surfaceContainerHighest),
+                    errorBuilder: (_, _, _) => Container(width: 96, height: 54, color: scheme.surfaceContainerHighest),
                   ),
                 ),
               const SizedBox(width: 12),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  FilledButton.tonal(onPressed: () => _pick(context), child: Text(has ? '换一张…' : '选择图片…')),
-                  if (has) ...[
-                    const SizedBox(height: 6),
-                    OutlinedButton(onPressed: bg.clearImage, child: const Text('移除')),
-                  ],
-                ],
-              ),
+              // 按钮横着排，不超出这一行的高度
+              FilledButton.tonal(onPressed: () => _pick(context), child: Text(has ? '换一张…' : '选择图片…')),
+              if (has) ...[const SizedBox(width: 8), OutlinedButton(onPressed: bg.clearImage, child: const Text('移除'))],
             ],
           ),
         ),

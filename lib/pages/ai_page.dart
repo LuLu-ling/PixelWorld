@@ -132,6 +132,8 @@ class _AiPageState extends State<AiPage> {
               Expanded(
                 child: ContentPanel(
                   glass: true,
+                  // 右边还有侧边栏时，面板之间同样留 8
+                  margin: wide && open ? const EdgeInsets.fromLTRB(4, 0, 4, 16) : ContentPanel.defaultMargin,
                   child: _ChatView(
                     key: ValueKey(chats.currentId),
                     chats: chats,
@@ -143,7 +145,9 @@ class _AiPageState extends State<AiPage> {
               ),
               if (wide && open)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 0, 16, 16),
+                  padding: BackgroundScope.activeOf(context) != null
+                      ? const EdgeInsets.fromLTRB(4, 0, 16, 16)
+                      : const EdgeInsets.fromLTRB(8, 0, 12, 12),
                   child: GlassPanel(
                     color: Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(16),
@@ -329,9 +333,9 @@ class _SessionList extends StatelessWidget {
     );
     if (!glass) return SizedBox(width: 200, child: column);
     return SizedBox(
-      width: 212,
+      width: 216,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 0, 16),
+        padding: const EdgeInsets.fromLTRB(12, 0, 4, 16),
         child: GlassPanel(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(20), child: column),
       ),
     );

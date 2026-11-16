@@ -14,7 +14,8 @@ const agreementVersion = 1;
 /// 返回 true 表示已经同意，可以继续后面的首次运行流程
 Future<bool> ensureAgreement(BuildContext context) async {
   final config = AppScope.read(context).config;
-  if (config.agreementVersion >= agreementVersion) return true;
+  // 全新安装在首次设置里同意（见 oobe.dart）
+  if (config.agreementVersion >= agreementVersion || !config.oobeDone) return true;
   final updated = config.agreementVersion > 0;
   final ok = await showDialog<bool>(
     context: context,
@@ -90,7 +91,7 @@ class _AgreementDialog extends StatelessWidget {
                   Flexible(
                     child: SizedBox(
                       height: 420,
-                      child: TabBarView(children: const [_LegalText('terms'), _LegalText('privacy')]),
+                      child: TabBarView(children: const [LegalText('terms'), LegalText('privacy')]),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -114,9 +115,9 @@ class _AgreementDialog extends StatelessWidget {
   }
 }
 
-/// 打包在启动器里的协议正文（`assets/legal/<name>.md`），没网也能看
-class _LegalText extends StatelessWidget {
-  const _LegalText(this.name);
+/// 打包在启动器里的协议正文（对话框和首次设置都用；对话框和首次设置都用）（`assets/legal/<name>.md`），没网也能看
+class LegalText extends StatelessWidget {
+  const LegalText(this.name, {super.key});
 
   final String name;
 
@@ -126,8 +127,8 @@ class _LegalText extends StatelessWidget {
       future: rootBundle.loadString('assets/legal/$name.md'),
       builder: (context, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-        // 标题和生效日期在对话框里已经有了，去掉第一行的大标题
-        final text = snap.data!.replaceFirst(RegExp(r'^# .*\n+'), '');
+        // 标题在外面已经有了，去掉第一行的大标题（文件可能是 CRLF 换行）
+        final text = snap.data!.replaceFirst(RegExp(r'^# [^\n]*\n\s*'), '');
         return Markdown(
           data: text,
           padding: const EdgeInsets.fromLTRB(4, 12, 12, 12),

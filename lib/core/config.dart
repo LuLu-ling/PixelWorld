@@ -113,6 +113,7 @@ class LauncherConfig extends ChangeNotifier {
     'storageAsked': false,
     // 新手教程看过了（第一次打开时自动出现一次）
     'tourSeen': false,
+    'oobeDone': false,
     // 已经同意的用户协议与隐私说明版本（0 表示还没同意过）
     'agreementVersion': 0,
     // 安卓：游戏的渲染分辨率相对屏幕分辨率的比例（代替桌面端的窗口大小）
@@ -144,7 +145,11 @@ class LauncherConfig extends ChangeNotifier {
     try {
       if (_file.existsSync()) {
         final saved = jsonDecode(_file.readAsStringSync());
-        if (saved is Map<String, dynamic>) data.addAll(saved);
+        if (saved is Map<String, dynamic>) {
+          data.addAll(saved);
+          // 有首次设置之前就在用的老用户：不再走首次设置（协议更新时仍然单独确认）
+          if (!saved.containsKey('oobeDone')) data['oobeDone'] = true;
+        }
         // 旧配置里的版本类型是旧品牌名，读取时迁移
         if (data['versionType'] == 'PCL.PW') data['versionType'] = 'Pixel World';
       }
@@ -186,6 +191,9 @@ class LauncherConfig extends ChangeNotifier {
   String get dismissedBetaHint => _get('dismissedBetaHint');
   bool get storageAsked => _get('storageAsked');
   bool get tourSeen => _get('tourSeen');
+
+  /// 走完了首次设置（全新安装第一次打开时全屏显示）
+  bool get oobeDone => _get('oobeDone');
   int get agreementVersion => ((_data['agreementVersion'] as num?) ?? 0).toInt();
 
   /// 界面缩放，0 为自动

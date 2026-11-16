@@ -5,10 +5,13 @@ import '../core/network_check.dart';
 /// 网络检测：同时测各项服务，一行一项显示结果，最后说明「自动选择」会用哪个下载源。
 /// 用于首次设置和「设置 → 下载」
 class NetworkCheckPanel extends StatefulWidget {
-  const NetworkCheckPanel({super.key, this.autoStart = true, this.onDone});
+  const NetworkCheckPanel({super.key, this.autoStart = true, this.compact = false, this.onDone});
 
   /// 显示时立即开始检测
   final bool autoStart;
+
+  /// 紧凑样式（首次设置）：一排小格，只显示名称和结果
+  final bool compact;
 
   /// 检测完成（[preferMirror] 为自动选择的结果）
   final void Function(bool preferMirror)? onDone;
@@ -51,6 +54,7 @@ class _NetworkCheckPanelState extends State<NetworkCheckPanel> {
     final official = _results[officialProbe.id];
     final mirror = _results[mirrorProbe.id];
     final failed = _results.values.where((r) => !r.ok).length;
+    if (widget.compact) return _compact(theme, failed);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -97,6 +101,120 @@ class _NetworkCheckPanelState extends State<NetworkCheckPanel> {
         ),
       ],
     );
+  }
+
+  static const _short = {
+    'official': '官方源',
+    'bmclapi': 'BMCLAPI',
+    'microsoft': '微软登录',
+    'modrinth': 'Modrinth',
+    'update': '启动器更新',
+  };
+
+  Widget _compact(ThemeData theme, int failed) {
+    final scheme = theme.colorScheme;
+    final done = !_running && _results.length == netTargets.length;
+    final small = theme.textTheme.bodySmall!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Text('网络检测', style: small.copyWith(color: scheme.onSurfaceVariant)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                !done
+                    ? '检测中，最多 8 秒'
+                    : failed == 0
+                    ? '全部正常'
+                    : '有 $failed 项连接失败，相关功能可能用不了',
+                overflow: TextOverflow.ellipsis,
+                style: small.copyWith(color: failed > 0 && done ? scheme.error : scheme.outline),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _running ? null : _run,
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('重新检测'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        LayoutBuilder(
+          builder: (context, c) {
+            final wide = c.maxWidth >= 600;
+            final cols = c.maxWidth >= 440 ? 5 : 3;
+            const gap = 8.0;
+            final w = (c.maxWidth - gap * (cols - 1)) / cols;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [for (final t in netTargets) SizedBox(width: w, child: _tile(theme, t, _results[t.id], wide))],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _tile(ThemeData theme, NetTarget t, NetResult? r, bool wide) {
+    final scheme = theme.colorScheme;
+    final small = theme.textTheme.bodySmall!;
+    final value = r == null
+        ? (_running ? '检测中…' : '')
+        : !r.ok
+        ? '连接失败'
+        : wide
+        ? describeNet(r)
+        : describeNet(r).replaceFirst(' · ', '\n');
+    // 窄的时候结果占两行，各格一样高
+    final shown = wide || value.contains('\n') ? value : '$value\n';
+    final tile = Container(
+      padding: EdgeInsets.symmetric(horizontal: wide ? 12 : 9, vertical: wide ? 10 : 7),
+      decoration: BoxDecoration(color: scheme.surfaceContainer, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SizedBox.square(
+                dimension: 14,
+                child: r == null
+                    ? (_running ? const CircularProgressIndicator(strokeWidth: 1.6) : null)
+                    : Icon(r.ok ? Icons.check : Icons.close, size: 14, color: r.ok ? scheme.primary : scheme.error),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  wide ? t.name : _short[t.id] ?? t.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: small.copyWith(fontWeight: FontWeight.w600, color: scheme.onSurface),
+                ),
+              ),
+            ],
+          ),
+          if (wide)
+            Text(
+              t.purpose,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: small.copyWith(color: scheme.outline, fontSize: 11),
+            ),
+          const SizedBox(height: 3),
+          Text(
+            shown,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: small.copyWith(color: r?.ok == false ? scheme.error : scheme.onSurfaceVariant, fontSize: 11.5),
+          ),
+        ],
+      ),
+    );
+    return r != null && !r.ok ? Tooltip(message: describeNet(r), child: tile) : tile;
   }
 
   Widget _status(ColorScheme scheme, NetResult? r) {

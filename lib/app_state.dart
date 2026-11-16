@@ -18,6 +18,8 @@ import 'core/ai/mcp_hub.dart';
 import 'widgets/app_background.dart';
 import 'compat/pcl/paths.dart';
 import 'core/config.dart';
+import 'core/i18n/app_language.dart';
+import 'core/i18n/config_language_store.dart';
 import 'core/android_runtime.dart';
 import 'core/version.dart' show VersionJson, needsAppleSiliconGlfw;
 import 'core/crash.dart';
@@ -75,6 +77,9 @@ class AppState extends ChangeNotifier {
 
   final LauncherConfig config;
   final AccountStore accounts;
+
+  /// 界面语言（界面只依赖 [LanguageStore]，在这里决定保存在配置里）
+  late final LanguageStore language = ConfigLanguageStore(config);
 
   GamePaths get paths => GamePaths(config.gameDir);
 

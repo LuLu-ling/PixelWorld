@@ -1,0 +1,20 @@
+{
+  "@@locale": "en_GB",
+  "@@comment": "Only the entries that differ from US English; everything else falls back to app_en.arb",
+
+  "windowMinimize": "Minimise",
+  "windowMaximize": "Maximise",
+  "settingsAppearance": "Personalisation",
+  "colorMode": "Colour mode",
+  "themeColor": "Theme colour",
+  "themeColorAuto": "Follow background: colours are picked from the background image with Material Design 3 and update when the image changes",
+  "themeColorManual": "A full light and dark palette is generated from the theme colour with Material Design 3",
+  "bgFitCenter": "Centre",
+  "bgFitFitHint": "Fit: shows the whole image and fills the gaps with its colours",
+  "bgFitCenterHint": "Centre: places the image at its original size in the middle of the window",
+  "bgGlowHint": "How far the colours taken from cover art spread out on recently played cards",
+  "aboutSourceHint": "Pixel World is open source under the Apache-2.0 licence",
+  "aboutMaterialHint": "Design language and colour algorithm",
+  "gameWindowMaximized": "Maximised",
+  "afterLaunchMinimize": "Minimise, restore when the game exits"
+}

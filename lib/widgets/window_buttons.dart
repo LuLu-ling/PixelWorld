@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../l10n/l10n.dart';
+
 enum _Glyph { minimize, maximize, restore, close }
 
 /// Windows 风格的窗口按钮。三个图标画在同样大小的 10×10 格子里，视觉大小一致。
@@ -42,18 +44,29 @@ class _WindowButtonsState extends State<WindowButtons> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Button(height: widget.height, glyph: _Glyph.minimize, tooltip: '最小化', onTap: _window.minimize),
+        _Button(
+          height: widget.height,
+          glyph: _Glyph.minimize,
+          tooltip: context.l10n.windowMinimize,
+          onTap: _window.minimize,
+        ),
         if (widget.showMaximize)
           // 悬停时弹出 Windows 11 的贴靠布局
           MaximizeButtonArea(
             child: _Button(
               height: widget.height,
               glyph: _maximized ? _Glyph.restore : _Glyph.maximize,
-              tooltip: _maximized ? '还原' : '最大化',
+              tooltip: _maximized ? context.l10n.windowRestore : context.l10n.windowMaximize,
               onTap: () => _maximized ? _window.unmaximize() : _window.maximize(),
             ),
           ),
-        _Button(height: widget.height, glyph: _Glyph.close, tooltip: '关闭', onTap: () => _window.close(), danger: true),
+        _Button(
+          height: widget.height,
+          glyph: _Glyph.close,
+          tooltip: context.l10n.windowClose,
+          onTap: () => _window.close(),
+          danger: true,
+        ),
       ],
     );
   }

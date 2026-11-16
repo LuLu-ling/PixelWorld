@@ -13,6 +13,7 @@ import 'core/instance_files.dart';
 import 'pages/file_manager_page.dart';
 import 'installer/installer_app.dart';
 import 'installer/installer_core.dart';
+import 'l10n/l10n.dart';
 import 'platform.dart';
 import 'shell.dart';
 import 'theme.dart';
@@ -98,6 +99,11 @@ class PclPwApp extends StatelessWidget {
       theme: buildTheme(Brightness.light, seed: state.background.themeSeed ?? Color(state.config.themeColor)),
       darkTheme: buildTheme(Brightness.dark, seed: state.background.themeSeed ?? Color(state.config.themeColor)),
       themeMode: themeModeOf(state.config.themeMode),
+      // 界面语言：选了具体语言时用它，跟随系统时按系统语言归到支持的语言之一
+      locale: state.language.current.locale,
+      supportedLocales: AppL10n.supportedLocales,
+      localizationsDelegates: AppL10n.delegates,
+      localeListResolutionCallback: AppL10n.resolve,
       home: const Shell(),
       builder: (context, child) {
         if (Platform.isLinux) {

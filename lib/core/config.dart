@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import '../app_info.dart';
 import 'ai/mcp_client.dart' show McpServerConfig, defaultMcpServers;
+import 'i18n/app_language.dart';
 import 'paths.dart';
 import 'safe_write.dart';
 
@@ -17,9 +18,9 @@ const defaultJvmArgs =
 /// 旧版启动器的默认参数名，保留给已有配置重置逻辑使用
 const pclDefaultJvmArgs = defaultJvmArgs;
 
-/// 版本隔离默认策略：
+/// 版本隔离默认策略（isolationMode）：
 /// 0 关闭 / 1 仅隔离可安装模组的实例 / 2 仅隔离非正式版 / 3 隔离非正式版与可安装 Mod 的版本 / 4 隔离所有版本
-const isolationModes = {0: '关闭', 1: '隔离可安装模组的实例', 2: '隔离非正式版', 3: '隔离可安装模组的实例与非正式版', 4: '隔离所有实例'};
+const isolationModes = [0, 1, 2, 3, 4];
 
 class GameFolder {
   GameFolder({required this.name, required this.path, required this.custom});
@@ -38,7 +39,7 @@ class GameFolder {
 
 /// 启动器全局设置，保存在应用数据目录的 config.json
 /// 首页布局，见 [LauncherConfig.homeLayout]
-const homeLayouts = {'standard': '标准', 'split': '上下', 'minimal': '极简'};
+const homeLayouts = ['standard', 'split', 'minimal'];
 
 class LauncherConfig extends ChangeNotifier {
   LauncherConfig._(this._data);
@@ -69,6 +70,8 @@ class LauncherConfig extends ChangeNotifier {
     'downloadSource': Platform.localeName.startsWith('zh') ? 'bmclapi' : 'official',
     'concurrency': 16,
     'themeMode': 'system',
+    // 界面语言（AppLanguage.tag），默认跟随系统
+    languageKey: 'system',
     // 主题色种子，按 MD3 生成整套浅色/深色配色
     'themeColor': 0xFF2F6B4F,
     'selectedVersion': '',
@@ -131,6 +134,8 @@ class LauncherConfig extends ChangeNotifier {
     // 桌面首页提示卡里「测试版」那一句关闭时的版本
     'dismissedBetaHint': '',
   };
+
+  static const languageKey = 'language';
 
   static File get _file => File(p.join(Paths.configDir, 'config.json'));
 
@@ -211,6 +216,7 @@ class LauncherConfig extends ChangeNotifier {
   String get downloadSource => _get('downloadSource');
   int get concurrency => (_data['concurrency'] as num).toInt();
   String get themeMode => _get('themeMode');
+  AppLanguage get language => AppLanguage.parse(_data[languageKey]);
   int get themeColor => (_data['themeColor'] as num?)?.toInt() ?? 0xFF2F6B4F;
   String get selectedVersion => _get('selectedVersion');
   String get selectedAccount => _get('selectedAccount');
@@ -238,7 +244,7 @@ class LauncherConfig extends ChangeNotifier {
   /// 以前的版本只有「设了背景图片时用上下排版」的开关（bgHomeWallpaper），没选过时按它推算
   String get homeLayout {
     final v = _data['homeLayout'];
-    if (homeLayouts.containsKey(v)) return v as String;
+    if (homeLayouts.contains(v)) return v as String;
     final hasImage = '${_data['bgImage'] ?? ''}'.isNotEmpty;
     return hasImage && _data['bgHomeWallpaper'] != false ? 'split' : 'standard';
   }

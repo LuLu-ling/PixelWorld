@@ -11,6 +11,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # 界面多语言（lib/l10n，由 flutter gen-l10n 按 l10n.yaml 生成）
+  flutter_localizations:
+    sdk: flutter
+  intl: any
 
   window_manager: ^0.6.0
   # 窗口位置与屏幕信息（背景「跨区」）；window_manager 底层就是它，版本跟着走
@@ -40,6 +44,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true
 
   # 图标源图在 assets/icon/source/，只供 tool/icons/make_icons.py 生成图标用，不打包
   assets:

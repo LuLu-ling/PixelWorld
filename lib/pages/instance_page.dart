@@ -15,7 +15,6 @@ import '../widgets/app_background.dart';
 import '../widgets/version_icon.dart';
 import '../widgets/launch_dialogs.dart';
 import '../core/android_runtime.dart';
-import '../core/config.dart';
 import '../core/instance.dart';
 import '../core/instance_config.dart';
 import '../core/instance_files.dart';
@@ -28,6 +27,7 @@ import '../core/loader_names.dart';
 import '../core/loaders.dart';
 import '../core/optifine_compat.dart';
 import '../core/toolbox.dart' show ServerStatus, queryServer;
+import '../l10n/l10n.dart';
 import '../widgets/format.dart';
 import '../widgets/loader_icon.dart';
 import '../widgets/settings_group.dart';
@@ -547,7 +547,9 @@ class _SetupState extends State<_Setup> {
               leading: const Icon(Icons.call_split),
               title: const Text('实例隔离'),
               subtitle: Text(
-                _s.isolation == null ? '尚未决定：首次启动时按全局策略「${isolationModes[cfg.isolationMode]}」决定，之后固定' : '运行目录为实例文件夹',
+                _s.isolation == null
+                    ? '尚未决定：首次启动时按全局策略「${context.l10n.isolationMode(cfg.isolationMode)}」决定，之后固定'
+                    : '运行目录为实例文件夹',
               ),
               trailing: SegmentedButton<bool>(
                 emptySelectionAllowed: true,

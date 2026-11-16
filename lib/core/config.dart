@@ -66,7 +66,8 @@ class LauncherConfig extends ChangeNotifier {
     'processPriority': 'normal',
     'autoGameLanguage': true,
     'gpuPreference': true,
-    'downloadSource': Platform.localeName.startsWith('zh') ? 'bmclapi' : 'official',
+    // auto：测速选官方源或 BMCLAPI，失败时互相回退
+    'downloadSource': 'auto',
     'concurrency': 16,
     'themeMode': 'system',
     // 主题色种子，按 MD3 生成整套浅色/深色配色

@@ -321,13 +321,13 @@ class AiToolbox {
             'items': {'type': 'string'},
             'description': '多个项目 ID 或 slug（一次比较多个，最多 10 个）',
           },
-            'version': {'type': 'string', 'description': '可选：已安装的版本名称，按它的游戏版本和加载器筛选'},
-            'game_version': {'type': 'string', 'description': '可选：游戏版本，例如 1.21.1；不需要先安装这个版本'},
-            'loader': {
-              'type': 'string',
-              'enum': ['fabric', 'forge', 'neoforge', 'quilt'],
-              'description': '可选：模组加载器（只对模组有效）',
-            },
+          'version': {'type': 'string', 'description': '可选：已安装的版本名称，按它的游戏版本和加载器筛选'},
+          'game_version': {'type': 'string', 'description': '可选：游戏版本，例如 1.21.1；不需要先安装这个版本'},
+          'loader': {
+            'type': 'string',
+            'enum': ['fabric', 'forge', 'neoforge', 'quilt'],
+            'description': '可选：模组加载器（只对模组有效）',
+          },
         }),
       ),
       kind: ToolKind.read,
@@ -343,8 +343,7 @@ class AiToolbox {
         if (ids.length == 1) return ToolPlan('查看 Modrinth 项目 ${ids.first}', () => _projectInfo(ids.first, f));
         return ToolPlan('比较 ${ids.length} 个 Modrinth 项目', () async {
           final rows = await Future.wait([
-            for (final id in ids)
-              _projectInfo(id, f, brief: true).catchError((Object e) => '- $id：查询失败（$e）'),
+            for (final id in ids) _projectInfo(id, f, brief: true).catchError((Object e) => '- $id：查询失败（$e）'),
           ]);
           return rows.join('\n');
         });
@@ -821,9 +820,18 @@ class AiToolbox {
   static bool _isWorkspace(AiToolDef t) => t.spec.name.startsWith('ws_');
   static bool _isWeb(AiToolDef t) => t.spec.name.startsWith('web_') || t.spec.name == 'mcwiki_search';
 
-  List<AiToolDef> get gameDefs => [for (final t in all) if (!_isWorkspace(t) && !_isWeb(t)) t];
-  List<AiToolDef> get workspaceDefs => [for (final t in all) if (_isWorkspace(t)) t];
-  List<AiToolDef> get webDefs => [for (final t in all) if (_isWeb(t)) t];
+  List<AiToolDef> get gameDefs => [
+    for (final t in all)
+      if (!_isWorkspace(t) && !_isWeb(t)) t,
+  ];
+  List<AiToolDef> get workspaceDefs => [
+    for (final t in all)
+      if (_isWorkspace(t)) t,
+  ];
+  List<AiToolDef> get webDefs => [
+    for (final t in all)
+      if (_isWeb(t)) t,
+  ];
 
   // ---------- 安装游戏 ----------
 
@@ -936,7 +944,7 @@ class AiToolbox {
         if (optifine != null)
           '${loaderComponent(LoaderKind.optifine, game, optifine)}（${optiFineNote(loaderOfKind(kind), null)}）',
         '实例名称：$shown',
-        '从${state.config.downloadSource == 'bmclapi' ? ' BMCLAPI 镜像' : '官方源'}下载，可能需要几分钟；进度可以在任务页查看',
+        '从${state.downloader.useMirror ? ' BMCLAPI 镜像' : '官方源'}下载，可能需要几分钟；进度可以在任务页查看',
       ],
     );
   }
@@ -998,7 +1006,9 @@ class AiToolbox {
       final list = await Modrinth.versions(project, gameVersion: f.gameVersion);
       // 模组按加载器筛选；光影、资源包等不区分加载器
       final compatible = list
-          .where((x) => f.loaders.isEmpty || x.loaders.any(f.loaders.contains) || !x.loaders.any(_modLoaderTags.contains))
+          .where(
+            (x) => f.loaders.isEmpty || x.loaders.any(f.loaders.contains) || !x.loaders.any(_modLoaderTags.contains),
+          )
           .toList();
       String describe(ResourceVersion x) =>
           '${x.versionNumber}（${x.type}，${x.loaders.join('/')}，版本 ID ${x.id}'

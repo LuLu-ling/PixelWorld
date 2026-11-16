@@ -207,14 +207,21 @@ class _OobePageState extends State<OobePage> {
       },
       child: Scaffold(
         backgroundColor: scheme.surface,
+        // 挖孔在左边时侧栏底色铺到挖孔那一侧（侧栏自己留出位置），在右边时内容让开
         body: SafeArea(
+          left: false,
           right: false,
           bottom: false,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               side,
-              Expanded(child: content),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: MediaQuery.paddingOf(context).right),
+                  child: content,
+                ),
+              ),
             ],
           ),
         ),
@@ -868,12 +875,13 @@ class _Side extends StatelessWidget {
           ),
       ],
     );
+    final cutout = MediaQuery.paddingOf(context).left;
     return Container(
-      width: compact ? 190 : 240,
+      width: (compact ? 190 : 240) + cutout,
       color: scheme.surfaceContainerLow,
       padding: compact
-          ? const EdgeInsets.fromLTRB(14, 14, 10, 10)
-          : EdgeInsets.fromLTRB(20, Platform.isMacOS ? 44 : 24, 16, 18),
+          ? EdgeInsets.fromLTRB(14 + cutout, 14, 10, 10)
+          : EdgeInsets.fromLTRB(20 + cutout, Platform.isMacOS ? 44 : 24, 16, 18),
       child: body,
     );
   }

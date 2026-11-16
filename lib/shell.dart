@@ -33,6 +33,7 @@ import 'pages/settings_page.dart';
 import 'pages/tasks_page.dart';
 import 'pages/tools_page.dart';
 import 'pages/versions_page.dart';
+import 'widgets/mac_traffic_lights.dart';
 
 export 'widgets/shell_layout.dart' show AlignedSplit;
 
@@ -267,7 +268,7 @@ class _Rail extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final inset = MediaQuery.paddingOf(context).left;
-    // macOS 的红绿灯由原生代码挪到侧栏里水平居中、与顶栏中线对齐（macos/Runner/MainFlutterWindow.swift）：
+    // macOS 的红绿灯由原生代码挪到侧栏里水平居中、与顶栏中线对齐（MacTrafficLightsAnchor 告诉原生代码侧栏的实际宽度）：
     // 侧栏加宽到能完整容纳它们，图标从它们下面留出空隙再开始
     final top = Platform.isMacOS ? 64.0 : 10.0;
     final width = Platform.isMacOS ? 84.0 : 76.0;
@@ -281,24 +282,27 @@ class _Rail extends StatelessWidget {
         onTap: () => onMain(p),
       ),
     );
-    return GlassPanel(
-      color: scheme.surfaceContainerLow,
-      extraOpacity: .08,
-      child: Container(
-        width: width + inset,
-        padding: EdgeInsets.fromLTRB(inset, top, 0, 10),
-        child: Column(
-          children: [
-            const AppLogo(size: 36),
-            const SizedBox(height: 10),
-            item(MainPage.home, Icons.rocket_launch_outlined, Icons.rocket_launch, '启动'),
-            item(MainPage.download, Icons.download_outlined, Icons.download, '下载'),
-            item(MainPage.tools, Icons.construction_outlined, Icons.construction, '工具'),
-            // 手机上的内置文件管理器（电脑上打开文件夹用系统的资源管理器）
-            if (!isDesktop) item(MainPage.files, Icons.folder_outlined, Icons.folder, '文件'),
-            item(MainPage.settings, Icons.settings_outlined, Icons.settings, '设置'),
-            item(MainPage.ai, Icons.chat_bubble_outline, Icons.chat_bubble, 'AI'),
-          ],
+    return MacTrafficLightsAnchor(
+      topBarHeight: 56,
+      child: GlassPanel(
+        color: scheme.surfaceContainerLow,
+        extraOpacity: .08,
+        child: Container(
+          width: width + inset,
+          padding: EdgeInsets.fromLTRB(inset, top, 0, 10),
+          child: Column(
+            children: [
+              const AppLogo(size: 36),
+              const SizedBox(height: 10),
+              item(MainPage.home, Icons.rocket_launch_outlined, Icons.rocket_launch, '启动'),
+              item(MainPage.download, Icons.download_outlined, Icons.download, '下载'),
+              item(MainPage.tools, Icons.construction_outlined, Icons.construction, '工具'),
+              // 手机上的内置文件管理器（电脑上打开文件夹用系统的资源管理器）
+              if (!isDesktop) item(MainPage.files, Icons.folder_outlined, Icons.folder, '文件'),
+              item(MainPage.settings, Icons.settings_outlined, Icons.settings, '设置'),
+              item(MainPage.ai, Icons.chat_bubble_outline, Icons.chat_bubble, 'AI'),
+            ],
+          ),
         ),
       ),
     );

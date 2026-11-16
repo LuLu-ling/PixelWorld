@@ -2,10 +2,12 @@ import Cocoa
 import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
-  /// 红绿灯在侧栏里水平居中（侧栏宽 84，三个按钮连同间距约 54），
-  /// 垂直方向与 56 高的顶栏中线对齐（见 lib/shell.dart 的 _Rail 与 _TopBar）
-  private let trafficLightsLeft: CGFloat = 15
-  private let trafficLightsCenterY: CGFloat = 28
+  /// 侧栏在窗口里的左边位置和宽度、顶栏中线的 y（窗口坐标，单位 pt，从上往下算）。
+  /// 由 Flutter 按实际界面缩放发过来（lib/widgets/mac_traffic_lights.dart），收到之前用默认值：
+  /// 侧栏宽 84、顶栏高 56（见 lib/shell.dart 的 _Rail 与 _TopBar）
+  private var railLeft: CGFloat = 0
+  private var railWidth: CGFloat = 84
+  private var trafficLightsCenterY: CGFloat = 28
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -20,6 +22,23 @@ class MainFlutterWindow: NSWindow {
     self.titlebarAppearsTransparent = true
     self.titleVisibility = .hidden
     self.styleMask.insert(.fullSizeContentView)
+
+    let channel = FlutterMethodChannel(
+      name: "pclpw/window", binaryMessenger: flutterViewController.engine.binaryMessenger)
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "setTrafficLights", let self = self,
+        let args = call.arguments as? [String: Any]
+      else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      func value(_ key: String) -> CGFloat? { (args[key] as? NSNumber).map { CGFloat($0.doubleValue) } }
+      if let v = value("railLeft") { self.railLeft = v }
+      if let v = value("railWidth"), v > 0 { self.railWidth = v }
+      if let v = value("centerY"), v > 0 { self.trafficLightsCenterY = v }
+      self.layoutTrafficLights()
+      result(nil)
+    }
 
     // 系统在窗口缩放、进出全屏、切换焦点时会把按钮放回默认位置，每次都重新摆一次
     let center = NotificationCenter.default
@@ -62,10 +81,13 @@ class MainFlutterWindow: NSWindow {
     rect.origin.y = frame.height - containerHeight
     container.frame = rect
 
+    // 三个按钮连同间距的总宽度（不同系统版本按钮大小不同，按实际大小算），在侧栏里水平居中
     let spacing = miniaturize.frame.origin.x - close.frame.origin.x
+    let span = spacing * 2 + zoom.frame.width
+    let left = railLeft + max(6, (railWidth - span) / 2)
     for (i, button) in [close, miniaturize, zoom].enumerated() {
       button.setFrameOrigin(
-        NSPoint(x: trafficLightsLeft + CGFloat(i) * spacing, y: (containerHeight - buttonHeight) / 2))
+        NSPoint(x: left + CGFloat(i) * spacing, y: (containerHeight - buttonHeight) / 2))
     }
   }
 }

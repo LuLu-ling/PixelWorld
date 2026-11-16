@@ -112,6 +112,8 @@ class LauncherConfig extends ChangeNotifier {
     'storageAsked': false,
     // 新手教程看过了（第一次打开时自动出现一次）
     'tourSeen': false,
+    // 已经同意的用户协议与隐私说明版本（0 表示还没同意过）
+    'agreementVersion': 0,
     // 安卓：游戏的渲染分辨率相对屏幕分辨率的比例（代替桌面端的窗口大小）
     'renderScale': 1.0,
     // 安卓：渲染器（见 android_runtime.dart 的 androidRenderers），版本设置可以单独覆盖
@@ -183,6 +185,7 @@ class LauncherConfig extends ChangeNotifier {
   String get dismissedBetaHint => _get('dismissedBetaHint');
   bool get storageAsked => _get('storageAsked');
   bool get tourSeen => _get('tourSeen');
+  int get agreementVersion => ((_data['agreementVersion'] as num?) ?? 0).toInt();
 
   /// 界面缩放，0 为自动
   double get uiScale => ((_data['uiScale'] as num?) ?? 0).toDouble();

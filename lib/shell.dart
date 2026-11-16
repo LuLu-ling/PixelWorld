@@ -11,6 +11,7 @@ import 'app_state.dart';
 import 'core/crash.dart';
 import 'platform.dart';
 import 'widgets/accounts_dialog.dart';
+import 'widgets/agreement_dialog.dart';
 import 'widgets/app_background.dart';
 import 'widgets/app_logo.dart';
 import 'widgets/device_status.dart';
@@ -122,6 +123,9 @@ class _ShellState extends State<Shell> {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final ctx = _navKey.currentContext;
         if (ctx == null || !ctx.mounted) return;
+        // 先请用户同意用户协议与隐私说明（不同意会退出），再问存储位置、开始新手教程
+        await ensureAgreement(ctx);
+        if (!ctx.mounted) return;
         await askStorageOnFirstRun(ctx);
         // 第一次打开：等启动画面淡出后开始新手教程
         await Future<void>.delayed(const Duration(milliseconds: 1200));
@@ -130,8 +134,11 @@ class _ShellState extends State<Shell> {
       });
       // 启动后稍等一会再检查更新，不和首次运行的提示抢
       Future<void>.delayed(const Duration(seconds: 5), () async {
-        // 第一次打开还没看完新手教程、或者教程正在进行：等它结束再弹更新提示
-        while (tourRunning.value || mounted && !AppScope.read(context).config.tourSeen) {
+        // 还没同意用户协议、第一次打开还没看完新手教程、或者教程正在进行：等它们结束再弹更新提示
+        while (tourRunning.value ||
+            mounted &&
+                (AppScope.read(context).config.agreementVersion < agreementVersion ||
+                    !AppScope.read(context).config.tourSeen)) {
           await Future<void>.delayed(const Duration(seconds: 1));
         }
         final ctx = _navKey.currentContext;

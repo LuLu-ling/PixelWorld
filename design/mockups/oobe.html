@@ -68,7 +68,7 @@
   .frame.phone .lead { margin-bottom: 12px; font-size: 12.5px; }
   .foot { flex: none; display: flex; align-items: center; gap: 10px; padding: 14px 56px 22px 48px; border-top: 1px solid var(--line); }
   .frame.phone .foot { padding: 8px 28px 10px 26px; }
-  .foot .grow { flex: 1; }
+  .foot .grow, .gtitle .grow { flex: 1; }
   .foot .hint { color: var(--faint); font-size: 12px; }
   .progress { height: 3px; background: var(--surface-2); border-radius: 2px; overflow: hidden; margin-bottom: 20px; display: none; }
   .progress i { display: block; height: 100%; background: var(--primary); transition: width .25s; }
@@ -117,6 +117,23 @@
   .frame.phone .sw { width: 22px; height: 22px; }
   .sw.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
   .gtitle { font-size: 12.5px; color: var(--muted); margin: 0 2px 8px; }
+  .gtitle.flex { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .frame.phone .gtitle.flex { margin-top: 10px; margin-bottom: 6px; }
+  .gtitle .btn { height: 26px; padding: 0 10px; font-size: 12px; }
+  /* 网络检测：紧凑小格 */
+  .netgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .nt { border-radius: 12px; background: var(--surface); padding: 10px 12px; line-height: 1.35; min-width: 0; }
+  .frame.phone .nt { padding: 7px 9px; border-radius: 10px; }
+  .nt .h { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .frame.phone .nt .h { font-size: 11.5px; }
+  .nt .h svg { width: 14px; height: 14px; color: var(--primary); flex: none; }
+  .nt .h .spin { width: 12px; height: 12px; flex: none; }
+  .nt .d { color: var(--faint); font-size: 11.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nt .v { color: var(--muted); font-size: 12px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .frame.phone .nt .d { display: none; }
+  .frame.phone .nt .v { font-size: 11px; margin-top: 2px; }
+  .netnote { color: var(--muted); font-size: 12.5px; margin: 10px 2px 0; }
+  .frame.phone .netnote { font-size: 11.5px; margin-top: 8px; }
 
   /* 首页布局小预览 */
   .lay { border-radius: 14px; background: var(--surface); padding: 10px; cursor: pointer; border: 1.5px solid transparent; }
@@ -332,23 +349,24 @@ function body() {
     case 4: {
       if (!S.net && !S.netRunning) setTimeout(runNet, 0);
       const done = S.net && !S.netRunning;
-      const rows = NET.map((n, i) => {
+      const tiles = NET.map((n, i) => {
         const r = S.net && S.net[i];
-        const st = r ? `<span style="color:var(--primary)">${svg('check')}</span>` : '<span class="spin"></span>';
-        return `<div class="row"><span style="width:22px;display:grid;place-items:center">${st}</span><div class="rt">${n[0]}<div class="s">${n[1]}</div></div><span style="color:var(--muted);font-size:12.5px">${r ? r[2] : '检测中…'}</span></div>`;
+        const st = r ? svg('check') : '<span class="spin"></span>';
+        const v = r ? (phone ? r[2].replace(' · ', '<br>') : r[2]) : '检测中…';
+        return `<div class="nt"><div class="h">${st}${phone ? n[0].replace('Mojang ', '').replace(' 镜像', '').replace('Microsoft ', '微软').replace('Pixel World ', '启动器') : n[0]}</div><div class="d">${n[1]}</div><div class="v">${v}</div></div>`;
       }).join('');
       return `
       <h1>网络</h1>
-      <p class="lead">正在检测各项服务能不能连上、有多快，并据此选择下载源。</p>
-      <div class="group">${rows}
-        <div class="row" style="min-height:44px"><div class="rt" style="color:var(--muted);font-size:12.5px">${done ? '官方源更快，「自动选择」会优先使用官方源，失败时自动换 BMCLAPI 镜像' : '最多 8 秒'}</div>
-          <button class="btn text" data-act="renet" ${S.netRunning ? 'disabled' : ''}>重新检测</button></div>
-      </div>
+      <p class="lead">选择从哪里下载游戏文件。下面会自动检测各项服务的连接情况。</p>
       <div class="gtitle">下载源</div>
       <div class="opts cols3">
-        ${[['auto', '自动选择', done ? '当前：官方源' : '测速后决定', '推荐'], ['bmclapi', 'BMCLAPI 镜像', '国内一般更快', ''], ['official', '官方源', '只用官方服务器', '']].map(([k, t, sub, tag]) => `
+        ${[['auto', '自动选择', done ? '测速结果：官方源更快' : '测速后决定', '推荐'], ['bmclapi', 'BMCLAPI 镜像', '国内一般更快', ''], ['official', '官方源', '只用官方服务器', '']].map(([k, t, sub, tag]) => `
           <div class="opt ${S.source === k ? 'on' : ''}" data-source="${k}"><div class="t">${t}${tag ? ` <span class="tag">${tag}</span>` : ''}</div><div class="s">${sub}</div></div>`).join('')}
-      </div>`;
+      </div>
+      <div class="gtitle flex">网络检测<span style="color:var(--faint)">${done ? '· 全部正常' : '· 检测中，最多 8 秒'}</span><span class="grow"></span>
+        <button class="btn text" data-act="renet" ${S.netRunning ? 'disabled' : ''}>重新检测</button></div>
+      <div class="netgrid">${tiles}</div>
+      ${done && !phone ? '<p class="netnote">「自动选择」会优先用更快的一边，失败时自动换另一边。</p>' : ''}`;
     }
     case 5: return `
       <h1>添加账户</h1>

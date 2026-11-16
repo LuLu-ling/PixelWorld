@@ -7,6 +7,7 @@ import '../app_scope.dart';
 import '../core/task.dart';
 import '../widgets/side_nav.dart';
 import '../widgets/task_steps.dart';
+import '../l10n/l10n.dart';
 
 /// 任务管理：安装、下载与启动的进度、详细日志和错误
 class TasksPage extends StatelessWidget {
@@ -29,10 +30,10 @@ class TasksPage extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(24, 16, 16, 8),
               child: Row(
                 children: [
-                  Text('任务', style: theme.textTheme.headlineSmall),
+                  Text(context.l10n.subTasks, style: theme.textTheme.headlineSmall),
                   const SizedBox(width: 12),
                   Text(
-                    '${state.runningTasks.length} 个进行中',
+                    context.l10n.tasksProgress(state.runningTasks.length),
                     style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                   const Spacer(),
@@ -40,7 +41,7 @@ class TasksPage extends StatelessWidget {
                     TextButton.icon(
                       onPressed: state.clearFinishedTasks,
                       icon: const Icon(Icons.clear_all),
-                      label: const Text('清除已结束的任务'),
+                      label: Text(context.l10n.tasksClearFinishedTasks),
                     ),
                 ],
               ),
@@ -48,7 +49,10 @@ class TasksPage extends StatelessWidget {
             Expanded(
               child: tasks.isEmpty
                   ? Center(
-                      child: Text('还没有任务。安装实例、下载资源或启动游戏时会显示在这里', style: TextStyle(color: scheme.onSurfaceVariant)),
+                      child: Text(
+                        context.l10n.tasksNoTasksYetInstalling,
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
                     )
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
@@ -96,8 +100,8 @@ class _TaskCardState extends State<_TaskCard> {
     super.dispose();
   }
 
-  static String _duration(Duration d) =>
-      d.inMinutes > 0 ? '${d.inMinutes} 分 ${d.inSeconds % 60} 秒' : '${d.inSeconds} 秒';
+  static String _duration(AppLocalizations l, Duration d) =>
+      d.inMinutes > 0 ? l.tasksMinS(d.inMinutes, d.inSeconds % 60) : l.tasksS(d.inSeconds);
 
   @override
   Widget build(BuildContext context) {
@@ -108,10 +112,14 @@ class _TaskCardState extends State<_TaskCard> {
       builder: (context, _) {
         final t = widget.task;
         final (icon, color, label) = switch (t.state) {
-          TaskState.running => (Icons.downloading, scheme.primary, t.cancelled ? '正在中断' : '进行中'),
-          TaskState.success => (Icons.check_circle, scheme.primary, '已完成'),
-          TaskState.failed => (Icons.error, scheme.error, '失败'),
-          TaskState.cancelled => (Icons.stop_circle_outlined, scheme.tertiary, '已中断'),
+          TaskState.running => (
+            Icons.downloading,
+            scheme.primary,
+            t.cancelled ? context.l10n.tasksCanceling : context.l10n.tasksProgress2,
+          ),
+          TaskState.success => (Icons.check_circle, scheme.primary, context.l10n.tasksCompleted),
+          TaskState.failed => (Icons.error, scheme.error, context.l10n.tasksFailed),
+          TaskState.cancelled => (Icons.stop_circle_outlined, scheme.tertiary, context.l10n.tasksCanceled),
         };
         return Card.filled(
           color: scheme.surfaceContainerLow,
@@ -135,20 +143,20 @@ class _TaskCardState extends State<_TaskCard> {
                             child: Text(t.title, style: theme.textTheme.titleMedium, overflow: TextOverflow.ellipsis),
                           ),
                           Text(
-                            '$label · ${_duration(t.elapsed)}',
+                            '$label · ${_duration(context.l10n, t.elapsed)}',
                             style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
                           ),
                           if (t.state == TaskState.running && t.canCancel)
                             TextButton.icon(
                               onPressed: t.cancelled ? null : () => AppScope.read(context).cancelTask(t),
                               icon: const Icon(Icons.stop_circle_outlined, size: 18),
-                              label: Text(t.cancelled ? '中断中…' : '中断'),
+                              label: Text(t.cancelled ? context.l10n.tasksCanceling2 : context.l10n.tasksCancel),
                             ),
                           if (t.state == TaskState.failed && t.retry != null)
-                            TextButton(onPressed: t.retry, child: const Text('重试')),
+                            TextButton(onPressed: t.retry, child: Text(context.l10n.deviceLoginDialogRetry)),
                           if (t.state != TaskState.running)
                             IconButton(
-                              tooltip: '移除',
+                              tooltip: context.l10n.bgImageRemove,
                               onPressed: () => AppScope.read(context).removeTask(t),
                               icon: const Icon(Icons.close, size: 18),
                             ),
@@ -165,7 +173,7 @@ class _TaskCardState extends State<_TaskCard> {
                             ),
                             if (t.total > 0)
                               Text(
-                                '${t.countText}（${((t.fraction ?? 0) * 100).toStringAsFixed(0)}%）',
+                                '${t.countText}${context.l10n.commonParenthesized('${((t.fraction ?? 0) * 100).toStringAsFixed(0)}%')}',
                                 style: theme.textTheme.labelMedium,
                               ),
                           ],
@@ -234,11 +242,11 @@ class _Log extends StatelessWidget {
             right: 4,
             top: 4,
             child: IconButton(
-              tooltip: '复制日志',
+              tooltip: context.l10n.tasksCopyLog,
               icon: const Icon(Icons.copy_all_outlined, size: 18),
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: lines.join('\n')));
-                toast(context, '已复制日志');
+                toast(context, context.l10n.commonLogCopied);
               },
             ),
           ),

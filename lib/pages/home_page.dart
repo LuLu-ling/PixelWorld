@@ -26,6 +26,7 @@ import '../widgets/version_icon.dart';
 import 'download_page.dart';
 import 'home_feed.dart';
 import 'instance_page.dart' show instanceSectionRequest;
+import '../l10n/l10n.dart';
 
 /// 启动页：左边是当前版本（背景取自存档封面的颜色），右边是公告和常用操作，下面是最近游玩。
 /// 左右分界线对齐顶栏「后台任务」的右边缘。
@@ -69,7 +70,7 @@ class _HomePageState extends State<HomePage> {
         screenSize: (width: screen.width.round(), height: screen.height.round()),
       );
     } catch (e) {
-      if (mounted) toast(context, '启动失败：${errorText(e)}');
+      if (mounted) toast(context, context.l10n.homeCouldntLaunch(errorText(e)));
     }
   }
 
@@ -98,7 +99,7 @@ class _HomePageState extends State<HomePage> {
     try {
       await openInFileManager(await state.gameDirOf(version));
     } catch (e) {
-      if (mounted) toast(context, '打不开文件夹：${errorText(e)}');
+      if (mounted) toast(context, context.l10n.homeCantOpenFolder(errorText(e)));
     }
   }
 
@@ -174,11 +175,14 @@ class _HomePageState extends State<HomePage> {
               height: 36,
               child: Row(
                 children: [
-                  Text('最近游玩', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    context.l10n.homeRecentlyPlayed,
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   const Spacer(),
                   TextButton(
                     onPressed: version == null ? null : () => _openInstance('saves'),
-                    child: const Text('全部存档 ›'),
+                    child: Text(context.l10n.homeAllWorlds),
                   ),
                 ],
               ),
@@ -218,13 +222,13 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-String _timeAgo(DateTime time) {
+String _timeAgo(AppLocalizations l, DateTime time) {
   final d = DateTime.now().difference(time);
-  if (d.inMinutes < 1) return '刚刚';
-  if (d.inHours < 1) return '${d.inMinutes} 分钟前';
-  if (d.inDays < 1) return '${d.inHours} 小时前';
-  if (d.inDays < 30) return '${d.inDays} 天前';
-  return '${time.month}月${time.day}日';
+  if (d.inMinutes < 1) return l.formatJustNow;
+  if (d.inHours < 1) return l.homeOtherMinutesAgo(d.inMinutes);
+  if (d.inDays < 1) return l.formatOtherHoursAgo(d.inHours);
+  if (d.inDays < 30) return l.formatOtherDaysAgo(d.inDays);
+  return l.homeMonthDay(time.month, time.day);
 }
 
 /// 当前版本：背景是这个版本最近存档封面的主色，右上角是封面小图
@@ -288,7 +292,7 @@ class _HeroCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '切换实例',
+                            context.l10n.tourSwitchInstance,
                             style: theme.textTheme.labelMedium?.copyWith(color: white.withValues(alpha: .8)),
                           ),
                           TourTarget(
@@ -305,7 +309,7 @@ class _HeroCard extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.only(right: v == null ? 0 : 76),
                   child: Text(
-                    v == null ? '还没有选择实例' : versionTitle(v),
+                    v == null ? context.l10n.homeNoInstanceSelected : versionTitle(v),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.headlineSmall?.copyWith(color: white, fontWeight: FontWeight.w800),
@@ -327,7 +331,7 @@ class _HeroCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 if (v == null)
                   Text(
-                    '先安装或选择一个实例，准备好就开始',
+                    context.l10n.homeInstallChooseInstanceFirst,
                     style: theme.textTheme.bodySmall?.copyWith(color: white.withValues(alpha: .75)),
                   )
                 else
@@ -346,20 +350,28 @@ class _HeroCard extends StatelessWidget {
                         minimumSize: const Size(0, 44),
                       ),
                       icon: const Icon(Icons.tune, size: 18),
-                      label: const TourTarget(id: 'home.settings', inkWell: true, child: Text('实例设置')),
+                      label: TourTarget(
+                        id: 'home.settings',
+                        inkWell: true,
+                        child: Text(context.l10n.tourInstanceSettings),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     PopupMenuButton<String>(
-                      tooltip: '更多',
+                      tooltip: context.l10n.homeMore,
                       onSelected: (value) {
                         if (value == 'versions') onVersions();
                         if (value == 'log') onLog();
                         if (value == 'folder') onFolder?.call();
                       },
                       itemBuilder: (context) => [
-                        const PopupMenuItem(value: 'versions', child: Text('实例列表')),
-                        PopupMenuItem(value: 'folder', enabled: onFolder != null, child: const Text('打开实例文件夹')),
-                        const PopupMenuItem(value: 'log', child: Text('游戏日志')),
+                        PopupMenuItem(value: 'versions', child: Text(context.l10n.tooltipInstances)),
+                        PopupMenuItem(
+                          value: 'folder',
+                          enabled: onFolder != null,
+                          child: Text(context.l10n.homeOpenInstanceFolder),
+                        ),
+                        PopupMenuItem(value: 'log', child: Text(context.l10n.subLog)),
                       ],
                       child: Container(
                         width: 44,
@@ -413,15 +425,15 @@ class _VersionFacts extends StatelessWidget {
     if (Platform.isAndroid) {
       final inst = readInstanceSettings(state.paths.versionDir(version.id)).renderer;
       final pref = inst.isNotEmpty ? inst : state.config.androidRenderer;
-      if (pref != 'auto') renderer = androidRenderers[pref]?.split('（').first;
+      if (pref != 'auto') renderer = androidRenderers[pref]?.split(RegExp(r'（| \(')).first;
     }
     return FutureBuilder<int?>(
       future: version.loader == Loader.vanilla ? Future.value(null) : instanceModCount(state, version),
       builder: (context, snap) {
         final parts = [
-          if (snap.data != null) '${snap.data} 个模组',
-          ?renderer == null ? null : '$renderer 渲染',
-          if (latest != null) '${_timeAgo(latest!.modified)}玩过',
+          if (snap.data != null) context.l10n.commonModCount(snap.data ?? 0),
+          ?renderer == null ? null : context.l10n.homeRenderer(renderer),
+          if (latest != null) context.l10n.homePlayed(_timeAgo(context.l10n, latest!.modified)),
           if (snap.data == null && renderer == null && latest == null) describeVersion(version),
         ];
         return Text(
@@ -492,11 +504,11 @@ class _LaunchButton extends StatelessWidget {
             onPressed: state.resumeGame,
             style: FilledButton.styleFrom(minimumSize: const Size(130, 44)),
             icon: const Icon(Icons.sports_esports, size: 19),
-            label: const Text('返回游戏'),
+            label: Text(context.l10n.homeBackGame),
           ),
           const SizedBox(width: 8),
           IconButton.filled(
-            tooltip: '结束游戏',
+            tooltip: context.l10n.commonStopGame,
             onPressed: state.killGame,
             style: IconButton.styleFrom(
               backgroundColor: scheme.error,
@@ -521,7 +533,11 @@ class _LaunchButton extends StatelessWidget {
         textStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
       icon: Icon(running ? Icons.stop : Icons.rocket_launch, size: 19),
-      label: TourTarget(id: 'home.launch', inkWell: true, child: Text(running ? '结束游戏' : '开始游戏')),
+      label: TourTarget(
+        id: 'home.launch',
+        inkWell: true,
+        child: Text(running ? context.l10n.commonStopGame : context.l10n.tourPlay),
+      ),
     );
   }
 }
@@ -559,11 +575,19 @@ class _SidePanel extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(
-                        child: _QuickButton(icon: Icons.download_outlined, label: '装模组', onTap: onInstallMods),
+                        child: _QuickButton(
+                          icon: Icons.download_outlined,
+                          label: context.l10n.homeAddMods,
+                          onTap: onInstallMods,
+                        ),
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: _QuickButton(icon: Icons.view_list_outlined, label: '管理模组', onTap: onManageMods),
+                        child: _QuickButton(
+                          icon: Icons.view_list_outlined,
+                          label: context.l10n.homeManageMods,
+                          onTap: onManageMods,
+                        ),
                       ),
                     ],
                   ),
@@ -574,11 +598,19 @@ class _SidePanel extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(
-                        child: _QuickButton(icon: Icons.folder_outlined, label: '文件夹', onTap: onFolder),
+                        child: _QuickButton(
+                          icon: Icons.folder_outlined,
+                          label: context.l10n.homeFolder,
+                          onTap: onFolder,
+                        ),
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: _QuickButton(icon: Icons.article_outlined, label: '查看日志', onTap: onLog),
+                        child: _QuickButton(
+                          icon: Icons.article_outlined,
+                          label: context.l10n.commonViewLog,
+                          onTap: onLog,
+                        ),
                       ),
                     ],
                   ),
@@ -666,9 +698,11 @@ class _NoticeStripState extends State<_NoticeStrip> {
               ),
             )
             .firstOrNull;
-        final title = notice?.title ?? '启动器公告';
+        final title = notice?.title ?? context.l10n.homeLauncherAnnouncements;
         final body = notice == null
-            ? (snap.connectionState == ConnectionState.waiting ? '正在获取…' : '暂无公告')
+            ? (snap.connectionState == ConnectionState.waiting
+                  ? context.l10n.homeLoading
+                  : context.l10n.commonNoAnnouncements)
             : notice.body.replaceAll(RegExp(r'[#*_`>\[\]]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
         if (widget.neutral) return _neutral(context, title, body);
         return Material(
@@ -696,7 +730,7 @@ class _NoticeStripState extends State<_NoticeStrip> {
                         ),
                       ),
                       Text(
-                        '查看 ›',
+                        context.l10n.homeView,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: scheme.onPrimaryContainer.withValues(alpha: .8),
                         ),
@@ -747,7 +781,7 @@ extension on _NoticeStripState {
                       style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
                     ),
                   ),
-                  Text('查看 ›', style: theme.textTheme.labelSmall?.copyWith(color: scheme.primary)),
+                  Text(context.l10n.homeView, style: theme.textTheme.labelSmall?.copyWith(color: scheme.primary)),
                 ],
               ),
               const SizedBox(height: 6),
@@ -818,7 +852,7 @@ class _WorldCard extends StatelessWidget {
                           style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         Text(
-                          [if (versionName.isNotEmpty) versionName, _timeAgo(world.modified)].join(' · '),
+                          [if (versionName.isNotEmpty) versionName, _timeAgo(context.l10n, world.modified)].join(' · '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
@@ -832,7 +866,7 @@ class _WorldCard extends StatelessWidget {
                 right: 8,
                 top: 46,
                 child: IconButton.filled(
-                  tooltip: '切换到这个存档所在的实例',
+                  tooltip: context.l10n.homeSwitchInstanceWorld,
                   onPressed: onPlay,
                   style: IconButton.styleFrom(minimumSize: const Size(40, 40), fixedSize: const Size(40, 40)),
                   icon: const Icon(Icons.rocket_launch, size: 19),
@@ -865,7 +899,7 @@ class _EmptyWorlds extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                '开始一次游戏后，最近的存档会出现在这里。',
+                context.l10n.homeYourRecentWorldsWill,
                 style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ),
@@ -1044,7 +1078,7 @@ class _DesktopHomeState extends State<_DesktopHome> {
                                         Expanded(
                                           child: _QuickButton(
                                             icon: Icons.download_outlined,
-                                            label: '装模组',
+                                            label: context.l10n.homeAddMods,
                                             onTap: widget.onInstallMods,
                                           ),
                                         ),
@@ -1052,7 +1086,7 @@ class _DesktopHomeState extends State<_DesktopHome> {
                                         Expanded(
                                           child: _QuickButton(
                                             icon: Icons.view_list_outlined,
-                                            label: '管理模组',
+                                            label: context.l10n.homeManageMods,
                                             onTap: widget.onManageMods,
                                           ),
                                         ),
@@ -1067,7 +1101,7 @@ class _DesktopHomeState extends State<_DesktopHome> {
                                         Expanded(
                                           child: _QuickButton(
                                             icon: Icons.folder_outlined,
-                                            label: '文件夹',
+                                            label: context.l10n.homeFolder,
                                             onTap: widget.onFolder,
                                           ),
                                         ),
@@ -1075,7 +1109,7 @@ class _DesktopHomeState extends State<_DesktopHome> {
                                         Expanded(
                                           child: _QuickButton(
                                             icon: Icons.article_outlined,
-                                            label: '查看日志',
+                                            label: context.l10n.commonViewLog,
                                             onTap: widget.onLog,
                                           ),
                                         ),
@@ -1096,7 +1130,7 @@ class _DesktopHomeState extends State<_DesktopHome> {
                         children: [
                           OnBackground(
                             builder: (context, fg, _) => Text(
-                              '最近游玩',
+                              context.l10n.homeRecentlyPlayed,
                               style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: fg),
                             ),
                           ),
@@ -1105,7 +1139,7 @@ class _DesktopHomeState extends State<_DesktopHome> {
                             builder: (context, fg, _) => TextButton(
                               onPressed: widget.onSaves,
                               style: fg == null ? null : TextButton.styleFrom(foregroundColor: fg),
-                              child: const Text('全部存档 ›'),
+                              child: Text(context.l10n.homeAllWorlds),
                             ),
                           ),
                         ],
@@ -1141,7 +1175,7 @@ class _DesktopHomeState extends State<_DesktopHome> {
                             style: TextButton.styleFrom(foregroundColor: muted ?? theme.colorScheme.onSurfaceVariant),
                             iconAlignment: IconAlignment.end,
                             icon: const Icon(Icons.expand_more, size: 18),
-                            label: Text(isDesktop ? '向下滚动查看更多' : '上滑查看更多'),
+                            label: Text(isDesktop ? context.l10n.homeScrollDownMore : context.l10n.homeSwipeUpMore),
                           ),
                         ),
                       ),
@@ -1253,13 +1287,16 @@ class _WallpaperFold extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      v == null ? '还没有选择实例' : versionTitle(v),
+                      v == null ? context.l10n.homeNoInstanceSelected : versionTitle(v),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     if (v == null)
-                      Text('先安装或选择一个实例', style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant))
+                      Text(
+                        context.l10n.homeInstallChooseInstanceFirst2,
+                        style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                      )
                     else
                       _VersionFacts(state: state, version: v, latest: latest, color: scheme.onSurfaceVariant),
                   ],
@@ -1282,7 +1319,7 @@ class _WallpaperFold extends StatelessWidget {
                           id: 'home.switch',
                           inkWell: true,
                           child: Text(
-                            '切换实例',
+                            context.l10n.tourSwitchInstance,
                             style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
                           ),
                         ),
@@ -1293,11 +1330,11 @@ class _WallpaperFold extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              tool(Icons.campaign_outlined, '启动器公告', () => showNoticesDialog(context)),
-              tool(Icons.download_outlined, '装模组', onInstallMods),
-              tool(Icons.view_list_outlined, '管理模组', onManageMods),
-              tool(Icons.folder_outlined, '文件夹', onFolder),
-              tool(Icons.article_outlined, '查看日志', onLog),
+              tool(Icons.campaign_outlined, context.l10n.homeLauncherAnnouncements, () => showNoticesDialog(context)),
+              tool(Icons.download_outlined, context.l10n.homeAddMods, onInstallMods),
+              tool(Icons.view_list_outlined, context.l10n.homeManageMods, onManageMods),
+              tool(Icons.folder_outlined, context.l10n.homeFolder, onFolder),
+              tool(Icons.article_outlined, context.l10n.commonViewLog, onLog),
               Container(
                 width: 1,
                 height: 26,
@@ -1307,7 +1344,7 @@ class _WallpaperFold extends StatelessWidget {
               OutlinedButton(
                 onPressed: onSettings,
                 style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
-                child: const TourTarget(id: 'home.settings', inkWell: true, child: Text('实例设置')),
+                child: TourTarget(id: 'home.settings', inkWell: true, child: Text(context.l10n.tourInstanceSettings)),
               ),
             ],
           ),
@@ -1331,7 +1368,7 @@ class _WallpaperFold extends StatelessWidget {
                 child: worlds.isEmpty
                     ? Center(
                         child: Text(
-                          loading ? '' : '还没有最近游玩的存档',
+                          loading ? '' : context.l10n.homeNoRecentlyPlayedWorlds,
                           style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                       )
@@ -1375,7 +1412,10 @@ class _WallpaperFold extends StatelessWidget {
                       children: [
                         Icon(Icons.grid_view_rounded, size: 18, color: scheme.onSurfaceVariant),
                         const SizedBox(width: 6),
-                        Text('全部存档', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                        Text(
+                          context.l10n.homeAllWorlds2,
+                          style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
                       ],
                     ),
                   ),
@@ -1401,7 +1441,7 @@ class _WallpaperFold extends StatelessWidget {
                 style: TextButton.styleFrom(foregroundColor: muted ?? scheme.onSurfaceVariant),
                 iconAlignment: IconAlignment.end,
                 icon: const Icon(Icons.expand_more, size: 18),
-                label: Text(isDesktop ? '向下滚动查看更多' : '上滑查看更多'),
+                label: Text(isDesktop ? context.l10n.homeScrollDownMore : context.l10n.homeSwipeUpMore),
               ),
             ),
           ),
@@ -1479,7 +1519,7 @@ class _MinimalFold extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          v == null ? '还没有选择实例' : versionTitle(v),
+                          v == null ? context.l10n.homeNoInstanceSelected : versionTitle(v),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -1491,7 +1531,7 @@ class _MinimalFold extends StatelessWidget {
                               id: 'home.switch',
                               inkWell: true,
                               child: Text(
-                                '切换实例',
+                                context.l10n.tourSwitchInstance,
                                 style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
                               ),
                             ),
@@ -1509,18 +1549,21 @@ class _MinimalFold extends StatelessWidget {
                 margin: const EdgeInsets.symmetric(horizontal: 8),
                 color: scheme.outlineVariant.withValues(alpha: .5),
               ),
-              tool(Icons.grid_view_rounded, '全部存档', onSaves),
-              TourTarget(id: 'home.settings', child: tool(Icons.tune, '实例设置', onSettings)),
+              tool(Icons.grid_view_rounded, context.l10n.homeAllWorlds2, onSaves),
+              TourTarget(id: 'home.settings', child: tool(Icons.tune, context.l10n.tourInstanceSettings, onSettings)),
               PopupMenuButton<VoidCallback?>(
-                tooltip: '更多',
+                tooltip: context.l10n.homeMore,
                 icon: Icon(Icons.more_horiz, size: 20, color: scheme.onSurfaceVariant),
                 onSelected: (f) => f?.call(),
                 itemBuilder: (context) => [
-                  PopupMenuItem(value: onInstallMods, child: const Text('装模组')),
-                  PopupMenuItem(value: onManageMods, child: const Text('管理模组')),
-                  PopupMenuItem(value: onFolder, child: const Text('打开文件夹')),
-                  PopupMenuItem(value: onLog, child: const Text('查看日志')),
-                  PopupMenuItem(value: () => showNoticesDialog(context), child: const Text('启动器公告')),
+                  PopupMenuItem(value: onInstallMods, child: Text(context.l10n.homeAddMods)),
+                  PopupMenuItem(value: onManageMods, child: Text(context.l10n.homeManageMods)),
+                  PopupMenuItem(value: onFolder, child: Text(context.l10n.homeOpenFolder)),
+                  PopupMenuItem(value: onLog, child: Text(context.l10n.commonViewLog)),
+                  PopupMenuItem(
+                    value: () => showNoticesDialog(context),
+                    child: Text(context.l10n.homeLauncherAnnouncements),
+                  ),
                 ],
               ),
               const SizedBox(width: 8),
@@ -1542,7 +1585,7 @@ class _MinimalFold extends StatelessWidget {
                 style: TextButton.styleFrom(foregroundColor: muted ?? scheme.onSurfaceVariant),
                 iconAlignment: IconAlignment.end,
                 icon: const Icon(Icons.expand_more, size: 18),
-                label: Text(isDesktop ? '向下滚动查看更多' : '上滑查看更多'),
+                label: Text(isDesktop ? context.l10n.homeScrollDownMore : context.l10n.homeSwipeUpMore),
               ),
             ),
           ),
@@ -1599,7 +1642,7 @@ class _DockLaunch extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '开始游戏',
+                        context.l10n.tourPlay,
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: scheme.onPrimaryFixed,
@@ -1688,7 +1731,7 @@ class _DockWorldState extends State<_DockWorld> {
                             Text(
                               [
                                 if (widget.versionName.isNotEmpty) widget.versionName,
-                                _timeAgo(widget.world.modified),
+                                _timeAgo(context.l10n, widget.world.modified),
                               ].join(' · '),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1699,7 +1742,7 @@ class _DockWorldState extends State<_DockWorld> {
                       ),
                       if (_hover)
                         IconButton(
-                          tooltip: '切换到这个存档所在的实例',
+                          tooltip: context.l10n.homeSwitchInstanceWorld,
                           onPressed: widget.onPlay,
                           style: IconButton.styleFrom(
                             backgroundColor: scheme.primaryFixed,
@@ -1776,7 +1819,7 @@ class _DesktopHero extends StatelessWidget {
                         id: 'home.switch',
                         inkWell: true,
                         child: Text(
-                          '切换实例',
+                          context.l10n.tourSwitchInstance,
                           style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                       ),
@@ -1798,7 +1841,7 @@ class _DesktopHero extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        v == null ? '还没有选择实例' : versionTitle(v),
+                        v == null ? context.l10n.homeNoInstanceSelected : versionTitle(v),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -1820,7 +1863,10 @@ class _DesktopHero extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             if (v == null)
-              Text('先安装或选择一个实例，准备好就开始', style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant))
+              Text(
+                context.l10n.homeInstallChooseInstanceFirst,
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              )
             else
               _VersionFacts(state: state, version: v, latest: latest, color: scheme.onSurfaceVariant),
             const SizedBox(height: 14),
@@ -1832,20 +1878,24 @@ class _DesktopHero extends StatelessWidget {
                   onPressed: onSettings,
                   style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
                   icon: const Icon(Icons.tune, size: 18),
-                  label: const TourTarget(id: 'home.settings', inkWell: true, child: Text('实例设置')),
+                  label: TourTarget(id: 'home.settings', inkWell: true, child: Text(context.l10n.tourInstanceSettings)),
                 ),
                 const SizedBox(width: 8),
                 PopupMenuButton<String>(
-                  tooltip: '更多',
+                  tooltip: context.l10n.homeMore,
                   onSelected: (value) {
                     if (value == 'versions') onVersions();
                     if (value == 'log') onLog();
                     if (value == 'folder') onFolder?.call();
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'versions', child: Text('实例列表')),
-                    PopupMenuItem(value: 'folder', enabled: onFolder != null, child: const Text('打开实例文件夹')),
-                    const PopupMenuItem(value: 'log', child: Text('游戏日志')),
+                    PopupMenuItem(value: 'versions', child: Text(context.l10n.tooltipInstances)),
+                    PopupMenuItem(
+                      value: 'folder',
+                      enabled: onFolder != null,
+                      child: Text(context.l10n.homeOpenInstanceFolder),
+                    ),
+                    PopupMenuItem(value: 'log', child: Text(context.l10n.subLog)),
                   ],
                   child: Container(
                     width: 44,
@@ -1944,7 +1994,7 @@ class _WorldTileState extends State<_WorldTile> {
                           Text(
                             [
                               if (widget.versionName.isNotEmpty) widget.versionName,
-                              _timeAgo(widget.world.modified),
+                              _timeAgo(context.l10n, widget.world.modified),
                             ].join(' · '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1954,7 +2004,7 @@ class _WorldTileState extends State<_WorldTile> {
                       ),
                     ),
                     IconButton(
-                      tooltip: '切换到这个存档所在的实例',
+                      tooltip: context.l10n.homeSwitchInstanceWorld,
                       onPressed: widget.onPlay,
                       style: IconButton.styleFrom(
                         backgroundColor: _hover ? scheme.primaryFixed : scheme.onSurface.withValues(alpha: .06),
@@ -2020,21 +2070,31 @@ class _VersionInfoCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text('当前实例', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                Text(
+                  context.l10n.homeCurrentInstance,
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
                 const Spacer(),
-                TextButton(onPressed: onSettings, child: const Text('实例设置 ›')),
+                TextButton(onPressed: onSettings, child: Text(context.l10n.homeInstanceSettings)),
               ],
             ),
-            row('类型', describeVersion(version), first: true),
+            row(context.l10n.homeType, describeVersion(version), first: true),
             FutureBuilder<int?>(
               future: version.loader == Loader.vanilla ? Future.value(null) : instanceModCount(state, version),
               builder: (context, snap) => row(
-                '模组',
-                version.loader == Loader.vanilla ? '原版，不加载模组' : (snap.data == null ? '—' : '${snap.data} 个'),
+                context.l10n.homeMods,
+                version.loader == Loader.vanilla
+                    ? context.l10n.homeVanillaNoMods
+                    : (snap.data == null ? '—' : context.l10n.homeModCountValue(snap.data ?? '')),
               ),
             ),
-            row('最近游玩', latest == null ? '还没玩过' : '${latest!.name} · ${_timeAgo(latest!.modified)}'),
-            row('实例 ID', version.id),
+            row(
+              context.l10n.homeRecentlyPlayed,
+              latest == null
+                  ? context.l10n.homeNotPlayedYet
+                  : '${latest!.name} · ${_timeAgo(context.l10n, latest!.modified)}',
+            ),
+            row(context.l10n.homeInstanceID, version.id),
           ],
         ),
       ),
@@ -2071,13 +2131,13 @@ Future<void> showInstanceMenu(BuildContext context, AppState state, VoidCallback
     constraints: const BoxConstraints(minWidth: 280, maxWidth: 380, maxHeight: 460),
     items: [
       // 「管理全部实例」放在最上面，实例很多时不用滚到底
-      const PopupMenuItem(
+      PopupMenuItem(
         value: manage,
         child: Row(
           children: [
             SizedBox(width: 24, child: Icon(Icons.view_list_outlined, size: 18)),
             SizedBox(width: 8),
-            Expanded(child: Text('管理全部实例')),
+            Expanded(child: Text(context.l10n.homeManageAllInstances)),
             Icon(Icons.chevron_right, size: 18),
           ],
         ),

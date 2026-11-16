@@ -2,15 +2,13 @@ import 'accounts.dart';
 import 'auth/auth.dart';
 import 'auth/http_json.dart';
 import 'auth/oauth.dart';
+import 'i18n/strings.dart';
 
 const _msAuth = 'https://login.microsoftonline.com/consumers/oauth2/v2.0';
 const _scope = 'XboxLive.signin offline_access';
 
-OAuthClient _oauth(String clientId) => OAuthClient(
-  clientId: clientId.trim(),
-  deviceEndpoint: '$_msAuth/devicecode',
-  tokenEndpoint: '$_msAuth/token',
-);
+OAuthClient _oauth(String clientId) =>
+    OAuthClient(clientId: clientId.trim(), deviceEndpoint: '$_msAuth/devicecode', tokenEndpoint: '$_msAuth/token');
 
 Future<(int, Map<String, dynamic>)> _request(String method, String url, {Object? json, String? bearer}) async {
   final r = await requestJson(method, url, json: json, bearer: bearer);
@@ -21,20 +19,16 @@ Future<(int, Map<String, dynamic>)> _request(String method, String url, {Object?
 Never _xboxError(int status, Map<String, dynamic> data, String url) {
   switch (data['XErr']) {
     case 2148916233:
-      throw Exception('该微软账户尚未创建 Xbox 档案');
+      throw Exception(tr.microsoftMicrosoftAccountDoesntHave);
     case 2148916238:
-      throw Exception('未成年账户需要加入家庭组后才能登录');
+      throw Exception(tr.microsoftUnderageAccountsNeedJoin);
   }
   final reason = '${data['errorMessage'] ?? data['error_description'] ?? data['Message'] ?? data['error'] ?? ''}'
       .trim();
   if (reason.contains('Invalid app registration')) {
-    throw Exception(
-      'Minecraft 拒绝了这个 Azure 应用（$status Invalid app registration）。'
-      '新应用需要先通过 Mojang 的审核（https://aka.ms/mce-reviewappid），'
-      '审核通过后要用同一个 Client ID 重新登录；刚通过时可能要等一段时间才生效',
-    );
+    throw Exception(tr.microsoftMinecraftRejectedAzureApp(status));
   }
-  throw Exception('请求失败（$status）：$url${reason.isEmpty ? '' : '\n$reason'}');
+  throw Exception(tr.microsoftRequestFailed(status, url, reason.isEmpty ? '' : '\n$reason'));
 }
 
 Future<Map<String, dynamic>> _postJson(String url, Object body) async {
@@ -68,10 +62,10 @@ Future<Account> _minecraftFromMs(String msAccess, String msRefresh) async {
     'https://api.minecraftservices.com/minecraft/profile',
     bearer: mcToken,
   );
-  if (status == 404) throw Exception('该账户没有购买 Minecraft: Java Edition');
+  if (status == 404) throw Exception(tr.microsoftAccountDoesntOwnMinecraft);
   if (status >= 400) {
     final reason = '${profile['errorMessage'] ?? profile['error'] ?? ''}'.trim();
-    throw Exception('获取档案失败（$status）${reason.isEmpty ? '' : '：$reason'}');
+    throw Exception(tr.microsoftCouldntGetProfile(status, reason.isEmpty ? '' : '${tr.commonColon}$reason'));
   }
   return Account(
     id: newId(),
@@ -97,7 +91,7 @@ class MicrosoftLogin implements LoginCommand {
 
   @override
   Future<Account> execute() async {
-    if (clientId.trim().isEmpty) throw Exception('请先在「设置 - 其他」中填写 Azure 应用 Client ID');
+    if (clientId.trim().isEmpty) throw Exception(tr.microsoftSetAzureAppClient);
     final t = await _oauth(clientId).deviceLogin(_scope, onCode, cancelled: () => _cancelled);
     return _minecraftFromMs(t.accessToken, '${t.refreshToken}');
   }
@@ -120,7 +114,7 @@ Future<Account> refreshIfNeeded(Account acc, String clientId) async {
   if (acc.type != AccountType.microsoft || expiresAt > DateTime.now().millisecondsSinceEpoch + 5 * 60000) return acc;
   // 从 PCL-CE 导入的令牌无法用本启动器的 Client ID 刷新
   if (acc.importedLegacy) {
-    final expired = Exception('账户 ${acc.name} 的登录已过期（导入自 PCL-CE，无法续期），请使用微软登录重新添加');
+    final expired = Exception(tr.microsoftSignAccountHasExpired(acc.name));
     if (acc.expiresAt != null) throw expired;
     // 没有记录过期时间：向档案接口确认令牌是否仍然有效；网络问题时照常启动
     final int status;
@@ -136,8 +130,8 @@ Future<Account> refreshIfNeeded(Account acc, String clientId) async {
     if (status == 401 || status == 403) throw expired;
     return acc;
   }
-  if (clientId.trim().isEmpty || acc.refreshToken == null) throw Exception('微软账户已过期，请重新登录');
+  if (clientId.trim().isEmpty || acc.refreshToken == null) throw Exception(tr.microsoftMicrosoftAccountHasExpired);
   final t = await _oauth(clientId).refresh(acc.refreshToken!, scope: _scope);
-  if (t == null) throw Exception('微软账户已过期，请重新登录');
+  if (t == null) throw Exception(tr.microsoftMicrosoftAccountHasExpired);
   return (await _minecraftFromMs(t.accessToken, t.refreshToken ?? acc.refreshToken!)).copyWith(id: acc.id);
 }

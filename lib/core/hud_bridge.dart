@@ -11,6 +11,7 @@ import 'ai/ai_client.dart';
 import 'ai/ai_tools.dart';
 import 'config.dart';
 import 'paths.dart';
+import 'i18n/strings.dart';
 
 /// 游戏内叠加层与启动器之间的 AI 桥。
 ///
@@ -128,11 +129,15 @@ class HudSession {
     final id = (msg['id'] as num?)?.toInt() ?? 0;
     switch ('${msg['type']}') {
       case 'list':
-        send({'type': 'list', 'id': id, 'sessions': [for (final s in chats.sessions) _summary(s)]});
+        send({
+          'type': 'list',
+          'id': id,
+          'sessions': [for (final s in chats.sessions) _summary(s)],
+        });
       case 'load':
         final s = chats.byId('${msg['session']}');
         if (s == null) {
-          send({'type': 'error', 'id': id, 'message': '这个对话已经不存在了。'});
+          send({'type': 'error', 'id': id, 'message': tr.hudBridgeConversationNoLongerExists});
         } else {
           send({'type': 'load', 'id': id, 'session': _detail(s)});
           // 启动器里正在回答这个对话：接着把回答转发给游戏
@@ -164,30 +169,24 @@ class HudSession {
   void _ask(int id, Map<String, dynamic> msg) {
     final text = '${msg['text'] ?? ''}'.trim();
     if (text.isEmpty) {
-      send({'type': 'error', 'id': id, 'message': '问题不能为空。'});
+      send({'type': 'error', 'id': id, 'message': tr.hudBridgeQuestionCantEmpty});
       return;
     }
     final ai = settings();
     if (!ai.ready) {
-      send({'type': 'error', 'id': id, 'message': '还没有配置 AI。请回到启动器，在「设置 → AI」里填写接口、模型和 API Key。'});
+      send({'type': 'error', 'id': id, 'message': tr.hudBridgeAIIsntSetUp});
       return;
     }
     final existing = msg['session'] == null ? null : chats.byId('${msg['session']}');
     if (existing != null && chats.isBusy(existing.id)) {
-      send({'type': 'error', 'id': id, 'message': '这个对话还在回答，请稍等一下。'});
+      send({'type': 'error', 'id': id, 'message': tr.hudBridgeConversationStillBeingAnswered});
       return;
     }
     var context = '${msg['context'] ?? ''}';
     if (context.length > HudBridge.maxContext) context = context.substring(0, HudBridge.maxContext);
     final question = text.length > HudBridge.maxQuestion ? text.substring(0, HudBridge.maxQuestion) : text;
 
-    final s = chats.send(
-      existing,
-      question,
-      ai,
-      systemExtra: '$hudPrompt\n\n# 当前环境\n$context',
-      focus: false,
-    );
+    final s = chats.send(existing, question, ai, systemExtra: '$hudPrompt\n\n# 当前环境\n$context', focus: false);
     send({'type': 'start', 'id': id, 'session': s.id, 'title': s.title});
     _watch(id, s, s.messages.length - 1);
   }
@@ -266,7 +265,7 @@ class HudSession {
     for (final c in _open(s, userIndex)) {
       final p = chats.pendingOf(c.id);
       final label = p?.plan?.title ?? chats.hub?.find(c.name)?.label ?? c.name;
-      return p != null && p.waiting ? '等待确认：$label' : '正在执行：$label';
+      return p != null && p.waiting ? tr.hudBridgeWaitingConfirmation(label) : tr.hudBridgeRunning(label);
     }
     return null;
   }
@@ -336,16 +335,17 @@ ChatSession? legacySession(Map raw) {
   final id = '${raw['id'] ?? ''}'.trim();
   return ChatSession(
     id: id.isEmpty ? newId() : 'game-$id',
-    title: title.isEmpty || title == '新对话' ? ChatStore.titleFrom(messages.first.content) : title,
+    title: title.isEmpty || title == tr.aiNewChat ? ChatStore.titleFrom(messages.first.content) : title,
     created: updated,
     updated: updated,
     messages: messages,
   );
 }
 
-const hudPrompt = '''
+String get hudPrompt =>
+    '''
 # 游戏内叠加层
-这条消息是用户在游戏里通过叠加层发的。请用简体中文，先给结论，尽量简短（一般不超过 300 字）。
+这条消息是用户在游戏里通过叠加层发的。请用${tr.aiReplyLanguage}，先给结论，尽量简短（一般不超过 300 字）。
 可以使用启动器操作。需要确认的操作会在游戏内窗口和启动器里同时显示确认卡片，用户在任意一边确认即可；不要让用户去运行命令。
 游戏正在运行，执行修改后要明确告诉用户什么时候生效：
 - 光影包、资源包：放好后在游戏里的「视频设置 → 光影包」或「选项 → 资源包」里选择即可立即生效（资源包也可以按 F3 + T 重新加载）；

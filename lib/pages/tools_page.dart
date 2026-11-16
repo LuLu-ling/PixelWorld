@@ -18,6 +18,8 @@ import '../widgets/app_background.dart';
 import 'diagnose_page.dart';
 import 'file_manager_page.dart';
 import 'lan_transfer_page.dart';
+import '../l10n/l10n.dart';
+import '../core/i18n/strings.dart';
 
 enum _Section { lobby, transfer, diagnose, luck, download, skin, server, achievement }
 
@@ -66,23 +68,38 @@ class _ToolsPageState extends State<ToolsPage> {
   }
 
   // 任务历史在顶栏的任务面板里；清理游戏垃圾、桌面快捷方式、使用文档在设置里
-  static const _groups = [
+  static List<(String, List<_Tool>)> _groups(AppLocalizations l) => [
     (
-      '联机',
+      l.toolsMultiplayer,
       [
-        _Tool(_Section.transfer, '局域网互传', '在两台设备之间传模组、存档、整个实例', Icons.swap_horiz),
-        _Tool(_Section.server, '服务器查询', '查询服务器在线人数和延迟', Icons.dns_outlined),
-        _Tool(_Section.lobby, '联机大厅', '规划中', Icons.lan_outlined),
+        _Tool(_Section.transfer, l.toolsLANTransfer, l.toolsSendModsWorldsWhole, Icons.swap_horiz),
+        _Tool(_Section.server, l.toolsServerLookup, l.toolsCheckServersPlayerCount, Icons.dns_outlined),
+        _Tool(_Section.lobby, l.toolsMultiplayerLobby, l.toolsPlanned, Icons.lan_outlined),
       ],
     ),
-    ('排错', [_Tool(_Section.diagnose, '错误分析', '查看日志，自动找出崩溃原因', Icons.troubleshoot)]),
-    ('实用', [_Tool(_Section.download, '自定义下载', '按链接下载文件到指定位置', Icons.download_for_offline_outlined)]),
+    (l.toolsTroubleshooting, [_Tool(_Section.diagnose, l.subDiagnose, l.toolsReadLogsFindCause, Icons.troubleshoot)]),
     (
-      '趣味',
+      l.toolsUtilities,
       [
-        _Tool(_Section.skin, '皮肤与头像', '查看和下载正版玩家的皮肤', Icons.face_outlined),
-        _Tool(_Section.achievement, '成就图片', '生成自定义的成就弹窗图片', Icons.emoji_events_outlined),
-        _Tool(_Section.luck, '今日人品', '看看今天的运气，每人每天固定', Icons.auto_awesome_outlined),
+        _Tool(
+          _Section.download,
+          l.toolsCustomDownload,
+          l.toolsDownloadFileFromLink,
+          Icons.download_for_offline_outlined,
+        ),
+      ],
+    ),
+    (
+      l.toolsFun,
+      [
+        _Tool(_Section.skin, l.toolsSkinsAvatars, l.toolsViewDownloadMinecraftPlayers, Icons.face_outlined),
+        _Tool(
+          _Section.achievement,
+          l.toolsAchievementImage,
+          l.toolsMakeCustomAchievementToast,
+          Icons.emoji_events_outlined,
+        ),
+        _Tool(_Section.luck, l.toolsTodaysLuck, l.toolsSeeHowLuckyYou, Icons.auto_awesome_outlined),
       ],
     ),
   ];
@@ -101,13 +118,13 @@ class _ToolsPageState extends State<ToolsPage> {
   /// 桌面：和设置页一样的左侧分组菜单
   Widget _desktop(BuildContext context) {
     final section = _section ?? _Section.transfer;
-    final current = _groups.expand((g) => g.$2).firstWhere((t) => t.section == section);
+    final current = _groups(context.l10n).expand((g) => g.$2).firstWhere((t) => t.section == section);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SideNav<_Tool>(
           groups: [
-            for (final (title, tools) in _groups)
+            for (final (title, tools) in _groups(context.l10n))
               SideNavGroup(title, [for (final t in tools) SideNavItem(t, t.title, t.icon)]),
           ],
           value: current,
@@ -124,7 +141,7 @@ class _ToolsPageState extends State<ToolsPage> {
     final theme = Theme.of(context);
     final section = _section;
     if (section != null) {
-      final tool = _groups.expand((g) => g.$2).firstWhere((t) => t.section == section);
+      final tool = _groups(context.l10n).expand((g) => g.$2).firstWhere((t) => t.section == section);
       return Padding(
         padding: const EdgeInsets.only(left: 6),
         child: Column(
@@ -133,7 +150,7 @@ class _ToolsPageState extends State<ToolsPage> {
             Row(
               children: [
                 IconButton(
-                  tooltip: '返回工具',
+                  tooltip: context.l10n.toolsBackTools,
                   onPressed: () => setState(() => _section = null),
                   icon: const Icon(Icons.arrow_back),
                 ),
@@ -148,7 +165,7 @@ class _ToolsPageState extends State<ToolsPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 0, 16, 16),
       children: [
-        for (final (title, tools) in _groups) ...[
+        for (final (title, tools) in _groups(context.l10n)) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(2, 4, 2, 8),
             child: Text(title, style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
@@ -232,12 +249,8 @@ class _ToolTile extends StatelessWidget {
 Widget _page(List<Widget> children) => ListView(padding: const EdgeInsets.fromLTRB(6, 2, 16, 16), children: children);
 
 /// 选择保存位置：桌面端系统对话框，手机上内置文件管理器
-Future<String?> _saveAs(
-  BuildContext context,
-  String name, {
-  String label = 'PNG 图片',
-  List<String> ext = const ['png'],
-}) => pickSavePath(context, name, extensions: ext, label: label);
+Future<String?> _saveAs(BuildContext context, String name, {String? label, List<String> ext = const ['png']}) =>
+    pickSavePath(context, name, extensions: ext, label: label ?? context.l10n.toolsPNGImage);
 
 // ---------- 联机大厅（规划中） ----------
 
@@ -253,10 +266,10 @@ class _Lobby extends StatelessWidget {
         children: [
           Icon(Icons.lan_outlined, size: 48, color: theme.colorScheme.primary),
           const SizedBox(height: 16),
-          Text('联机大厅', style: theme.textTheme.titleLarge),
+          Text(context.l10n.toolsMultiplayerLobby, style: theme.textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
-            '让几位玩家组成虚拟局域网一起游戏，正在规划中',
+            context.l10n.toolsLetsFewPlayersForm,
             style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
         ],
@@ -273,14 +286,14 @@ class _Diagnose extends StatelessWidget {
   Future<void> _lastRun(BuildContext context) async {
     final report = await AppScope.read(context).analyzeLastRun();
     if (!context.mounted) return;
-    if (report == null) return toast(context, '本次打开启动器后还没有启动过游戏');
+    if (report == null) return toast(context, context.l10n.toolsNoGameHasBeen);
     openDiagnosis(context, report);
   }
 
   Future<void> _file(BuildContext context) async {
     final path = await pickFile(
       context,
-      label: '日志',
+      label: context.l10n.toolsLog,
       extensions: const ['log', 'txt'],
       start: Platform.isAndroid ? AppScope.read(context).config.gameDir : null,
     );
@@ -291,7 +304,7 @@ class _Diagnose extends StatelessWidget {
   }
 
   void _open(BuildContext context, String name, String text) {
-    if (text.trim().isEmpty) return toast(context, '内容为空');
+    if (text.trim().isEmpty) return toast(context, context.l10n.toolsEmpty);
     openDiagnosis(context, reportFromText(name, text, AppScope.read(context).redactor()));
   }
 
@@ -300,7 +313,7 @@ class _Diagnose extends StatelessWidget {
     final text = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('粘贴日志'),
+        title: Text(context.l10n.toolsPasteLog),
         content: SizedBox(
           width: 640,
           child: TextField(
@@ -308,17 +321,20 @@ class _Diagnose extends StatelessWidget {
             autofocus: true,
             minLines: 12,
             maxLines: 20,
-            decoration: const InputDecoration(hintText: '粘贴崩溃报告或日志内容', border: OutlineInputBorder()),
+            decoration: InputDecoration(
+              hintText: context.l10n.toolsPasteCrashReportLog,
+              border: const OutlineInputBorder(),
+            ),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, ctrl.text), child: const Text('分析')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(context, ctrl.text), child: Text(context.l10n.toolsAnalyze)),
         ],
       ),
     );
     ctrl.dispose();
-    if (text != null && context.mounted) _open(context, '粘贴的日志', text);
+    if (text != null && context.mounted) _open(context, context.l10n.toolsPastedLog, text);
   }
 
   @override
@@ -332,16 +348,33 @@ class _Diagnose extends StatelessWidget {
     );
     return _page([
       SettingsGroup(
-        title: '错误分析',
+        title: context.l10n.subDiagnose,
         children: [
-          tool(Icons.history, '最近一次游戏', '分析本次打开启动器后最近一次运行的游戏', '分析', () => _lastRun(context)),
-          tool(Icons.description_outlined, '日志文件', '选择崩溃报告（crash-reports）或日志文件（logs）', '选择', () => _file(context)),
-          tool(Icons.content_paste, '粘贴日志', '粘贴别人发给你的崩溃报告或日志', '粘贴', () => _paste(context)),
+          tool(
+            Icons.history,
+            context.l10n.toolsLastGame,
+            context.l10n.toolsAnalyzeMostRecentGame,
+            context.l10n.toolsAnalyze,
+            () => _lastRun(context),
+          ),
+          tool(
+            Icons.description_outlined,
+            context.l10n.toolsLogFile,
+            context.l10n.toolsChooseCrashReportCrash,
+            context.l10n.commonChoose,
+            () => _file(context),
+          ),
+          tool(
+            Icons.content_paste,
+            context.l10n.toolsPasteLog,
+            context.l10n.toolsPasteCrashReportLog2,
+            context.l10n.toolsPaste,
+            () => _paste(context),
+          ),
         ],
       ),
       Text(
-        '启动器先用本地规则匹配常见问题；在「设置 → AI 排障」填写自己的 AI 服务后，还可以让 AI 分析日志。'
-        '游戏崩溃时会自动弹出提示。',
+        context.l10n.toolsLauncherFirstMatchesCommon,
         style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
     ]);
@@ -357,17 +390,17 @@ class _Luck extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final theme = Theme.of(context);
-    final name = state.selectedAccount?.name ?? '玩家';
+    final name = state.selectedAccount?.name ?? context.l10n.toolsPlayer;
     final v = luckToday(name);
     return _page([
       SettingsGroup(
-        title: '今日人品',
+        title: context.l10n.toolsTodaysLuck,
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: Column(
               children: [
-                Text('$name 的今日人品', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                Text(context.l10n.toolsSLuckToday(name), style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 4),
                 Text(
                   '$v',
@@ -379,15 +412,18 @@ class _Luck extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(luckComment(v)),
                 const SizedBox(height: 2),
-                Text('每人每天固定', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                Text(
+                  context.l10n.toolsFixedEachPlayerEach,
+                  style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
               ],
             ),
           ),
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             leading: const Icon(Icons.rocket_launch_outlined),
-            title: const Text('启动次数'),
-            subtitle: Text('已经通过启动器启动了 ${state.config.launchCount} 次游戏'),
+            title: Text(context.l10n.toolsLaunchCount),
+            subtitle: Text(context.l10n.toolsYouveLaunchedGameTimes(state.config.launchCount)),
           ),
         ],
       ),
@@ -420,20 +456,20 @@ class _CustomDownloadState extends State<_CustomDownload> {
   Future<void> _start() async {
     final url = _url.text.trim();
     var dir = _dir;
-    dir ??= await pickFolder(context, confirm: '保存到');
+    dir ??= await pickFolder(context, confirm: context.l10n.toolsSave);
     if (dir == null || !mounted) return;
     setState(() => _dir = dir);
     final name = _name.text.trim().isEmpty ? fileNameFromUrl(url) : _name.text.trim();
     final path = p.join(dir, name);
     final state = AppScope.read(context);
     final existed = File(path).existsSync();
-    final t = TaskProgress('下载 $name', steps: const ['下载'], canCancel: true);
+    final t = TaskProgress(context.l10n.toolsDownload(name), steps: [context.l10n.commonDownload], canCancel: true);
     if (!existed) t.registerCleanupPath(path);
     try {
       await state.track(t, () => downloadToFile(url, path, t));
       if (mounted) setState(() => _saved = path);
     } catch (e) {
-      if (mounted) toast(context, '下载失败：${errorText(e)}');
+      if (mounted) toast(context, context.l10n.toolsDownloadFailed(errorText(e)));
     }
   }
 
@@ -441,20 +477,27 @@ class _CustomDownloadState extends State<_CustomDownload> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return _page([
-      Text('自定义下载', style: theme.textTheme.headlineSmall),
+      Text(context.l10n.toolsCustomDownload, style: theme.textTheme.headlineSmall),
       const SizedBox(height: 4),
-      Text('下载任意文件，进度显示在任务页', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+      Text(
+        context.l10n.toolsDownloadAnyFileProgress,
+        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+      ),
       const SizedBox(height: 20),
       TextField(
         controller: _url,
-        decoration: const InputDecoration(labelText: '下载地址', hintText: 'https://', border: OutlineInputBorder()),
+        decoration: InputDecoration(
+          labelText: context.l10n.toolsDownloadURL,
+          hintText: 'https://',
+          border: const OutlineInputBorder(),
+        ),
         onChanged: (_) => setState(() {}),
       ),
       const SizedBox(height: 12),
       TextField(
         controller: _name,
         decoration: InputDecoration(
-          labelText: '文件名（可选）',
+          labelText: context.l10n.toolsFileNameOptional,
           hintText: _url.text.trim().isEmpty ? null : fileNameFromUrl(_url.text),
           border: const OutlineInputBorder(),
         ),
@@ -462,13 +505,18 @@ class _CustomDownloadState extends State<_CustomDownload> {
       const SizedBox(height: 12),
       Row(
         children: [
-          Expanded(child: Text(_dir == null ? '保存位置：开始下载时选择' : '保存位置：$_dir', overflow: TextOverflow.ellipsis)),
+          Expanded(
+            child: Text(
+              _dir == null ? context.l10n.toolsSaveLocationChosenWhen : context.l10n.toolsSaveLocation(_dir ?? ''),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           TextButton(
             onPressed: () async {
               final d = await pickFolder(context);
               if (d != null) setState(() => _dir = d);
             },
-            child: const Text('选择'),
+            child: Text(context.l10n.commonChoose),
           ),
         ],
       ),
@@ -478,14 +526,14 @@ class _CustomDownloadState extends State<_CustomDownload> {
           FilledButton.icon(
             onPressed: _url.text.trim().isEmpty ? null : _start,
             icon: const Icon(Icons.download),
-            label: const Text('开始下载'),
+            label: Text(context.l10n.toolsStartDownload),
           ),
           if (_saved != null) ...[
             const SizedBox(width: 12),
             TextButton.icon(
               onPressed: () => Process.start(Platform.isWindows ? 'explorer.exe' : 'open', [p.dirname(_saved!)]),
               icon: const Icon(Icons.folder_open),
-              label: const Text('打开文件夹'),
+              label: Text(context.l10n.homeOpenFolder),
             ),
           ],
         ],
@@ -551,8 +599,8 @@ class _SkinToolsState extends State<_SkinTools> {
 
   Future<void> _pickLocal() async {
     final f = await openFile(
-      acceptedTypeGroups: const [
-        XTypeGroup(label: '皮肤图片', extensions: ['png']),
+      acceptedTypeGroups: [
+        XTypeGroup(label: context.l10n.toolsSkinImage, extensions: const ['png']),
       ],
     );
     if (f == null) return;
@@ -568,7 +616,7 @@ class _SkinToolsState extends State<_SkinTools> {
     final path = await _saveAs(context, '${s.name}.png');
     if (path == null) return;
     await File(path).writeAsBytes(s.png);
-    if (mounted) toast(context, '已保存 $path');
+    if (mounted) toast(context, context.l10n.toolsSaved(path));
   }
 
   Future<void> _saveHead() async {
@@ -577,7 +625,7 @@ class _SkinToolsState extends State<_SkinTools> {
     final path = await _saveAs(context, '${_skin?.name ?? 'Head'}-$_size.png');
     if (path == null) return;
     await File(path).writeAsBytes(png);
-    if (mounted) toast(context, '已保存 $path');
+    if (mounted) toast(context, context.l10n.toolsSaved(path));
   }
 
   @override
@@ -585,19 +633,22 @@ class _SkinToolsState extends State<_SkinTools> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return _page([
-      Text('正版皮肤', style: theme.textTheme.headlineSmall),
+      Text(context.l10n.toolsPlayerSkins, style: theme.textTheme.headlineSmall),
       const SizedBox(height: 16),
       Row(
         children: [
           Expanded(
             child: TextField(
               controller: _player,
-              decoration: const InputDecoration(labelText: '正版玩家名', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                labelText: context.l10n.toolsMinecraftPlayerName,
+                border: const OutlineInputBorder(),
+              ),
               onSubmitted: (_) => _fetch(),
             ),
           ),
           const SizedBox(width: 12),
-          FilledButton(onPressed: _busy ? null : _fetch, child: const Text('获取')),
+          FilledButton(onPressed: _busy ? null : _fetch, child: Text(context.l10n.toolsGet)),
         ],
       ),
       if (_skin != null) ...[
@@ -609,16 +660,18 @@ class _SkinToolsState extends State<_SkinTools> {
             contentPadding: const EdgeInsets.all(12),
             leading: Image.memory(_skin!.png, width: 64, height: 64, filterQuality: FilterQuality.none),
             title: Text(_skin!.name),
-            subtitle: Text('${_skin!.slim ? 'Alex 模型（细手臂）' : 'Steve 模型'} · ${_skin!.uuid}'),
-            trailing: FilledButton.tonal(onPressed: _saveSkin, child: const Text('保存皮肤')),
+            subtitle: Text(
+              '${_skin!.slim ? context.l10n.toolsAlexModelSlimArms : context.l10n.toolsSteveModel} · ${_skin!.uuid}',
+            ),
+            trailing: FilledButton.tonal(onPressed: _saveSkin, child: Text(context.l10n.toolsSaveSkin)),
           ),
         ),
       ],
       const SizedBox(height: 32),
-      Text('头像生成', style: theme.textTheme.headlineSmall),
+      Text(context.l10n.toolsAvatarMaker, style: theme.textTheme.headlineSmall),
       const SizedBox(height: 4),
       Text(
-        '从皮肤截取头部（含帽子层）并放大，可用上面获取的正版皮肤或本地皮肤文件',
+        context.l10n.toolsCropsHeadHatLayer,
         style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
       ),
       const SizedBox(height: 16),
@@ -630,7 +683,9 @@ class _SkinToolsState extends State<_SkinTools> {
           OutlinedButton.icon(
             onPressed: _pickLocal,
             icon: const Icon(Icons.image_outlined),
-            label: Text(_localName == null ? '选择本地皮肤' : '本地：$_localName'),
+            label: Text(
+              _localName == null ? context.l10n.toolsChooseLocalSkin : context.l10n.toolsLocal(_localName ?? ''),
+            ),
           ),
           SegmentedButton<int>(
             segments: const [
@@ -665,12 +720,12 @@ class _SkinToolsState extends State<_SkinTools> {
             FilledButton.icon(
               onPressed: _saveHead,
               icon: const Icon(Icons.save_alt),
-              label: Text('保存 $_size×$_size 头像'),
+              label: Text(context.l10n.toolsSaveAvatar(_size)),
             ),
           ],
         )
       else
-        Text('先获取正版皮肤或选择本地皮肤', style: TextStyle(color: scheme.onSurfaceVariant)),
+        Text(context.l10n.toolsFetchPlayersSkinChoose, style: TextStyle(color: scheme.onSurfaceVariant)),
     ]);
   }
 }
@@ -704,23 +759,23 @@ class _ServerQueryState extends State<_ServerQuery> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return _page([
-      Text('服务器查询', style: theme.textTheme.headlineSmall),
+      Text(context.l10n.toolsServerLookup, style: theme.textTheme.headlineSmall),
       const SizedBox(height: 16),
       Row(
         children: [
           Expanded(
             child: TextField(
               controller: _address,
-              decoration: const InputDecoration(
-                labelText: '服务器地址',
-                hintText: 'mc.example.com 或 1.2.3.4:25565',
+              decoration: InputDecoration(
+                labelText: context.l10n.toolsServerAddress,
+                hintText: context.l10n.toolsMcExampleCom1,
                 border: OutlineInputBorder(),
               ),
               onSubmitted: (_) => _query(),
             ),
           ),
           const SizedBox(width: 12),
-          FilledButton(onPressed: _query, child: const Text('查询')),
+          FilledButton(onPressed: _query, child: Text(context.l10n.toolsLookUp)),
         ],
       ),
       const SizedBox(height: 16),
@@ -757,7 +812,7 @@ class _ServerQueryState extends State<_ServerQuery> {
                         children: [
                           Text(s.motd.isEmpty ? _address.text.trim() : s.motd, style: theme.textTheme.titleMedium),
                           const SizedBox(height: 6),
-                          Text('在线 ${s.online} / ${s.max} · ${s.version} · 延迟 ${s.latency} ms'),
+                          Text(context.l10n.toolsOnlineMsLatency(s.online, s.max, s.version, s.latency)),
                         ],
                       ),
                     ),
@@ -782,7 +837,7 @@ class _Achievement extends StatefulWidget {
 
 class _AchievementState extends State<_Achievement> {
   final _block = TextEditingController(text: 'diamond');
-  final _title = TextEditingController(text: '获得成就！');
+  final _title = TextEditingController(text: tr.toolsAchievementGet);
   final _line1 = TextEditingController();
   final _line2 = TextEditingController();
   Uint8List? _png;
@@ -804,7 +859,9 @@ class _AchievementState extends State<_Achievement> {
   Future<void> _generate() async {
     setState(() => _busy = true);
     try {
-      if (_title.text.trim().isEmpty || _line1.text.trim().isEmpty) throw Exception('请填写标题和第一行文字');
+      if (_title.text.trim().isEmpty || _line1.text.trim().isEmpty) {
+        throw Exception(context.l10n.toolsFillTitleFirstLine);
+      }
       Uint8List png;
       var local = false;
       try {
@@ -829,7 +886,7 @@ class _AchievementState extends State<_Achievement> {
     final path = await _saveAs(context, '${_title.text.trim().isEmpty ? 'achievement' : _title.text.trim()}.png');
     if (path == null) return;
     await File(path).writeAsBytes(_png!);
-    if (mounted) toast(context, '已保存 $path');
+    if (mounted) toast(context, context.l10n.toolsSaved(path));
   }
 
   @override
@@ -838,25 +895,27 @@ class _AchievementState extends State<_Achievement> {
     InputDecoration deco(String label, [String? hint]) =>
         InputDecoration(labelText: label, hintText: hint, border: const OutlineInputBorder());
     return _page([
-      Text('成就图片', style: theme.textTheme.headlineSmall),
+      Text(context.l10n.toolsAchievementImage, style: theme.textTheme.headlineSmall),
       const SizedBox(height: 4),
       Text(
-        '生成 Minecraft 风格的成就提示图片。优先由第三方服务 minecraft-api.com 生成（填写的文字会发送给它）；'
-        '该服务拒绝请求时在本地绘制，本地绘制使用系统字体和你选择的图标',
+        context.l10n.toolsMakesMinecraftStyleAchievement,
         style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
       ),
       const SizedBox(height: 20),
       Row(
         children: [
           Expanded(
-            child: TextField(controller: _block, decoration: deco('物品 ID（在线生成）', '例如 diamond、grass、golden_apple')),
+            child: TextField(
+              controller: _block,
+              decoration: deco(context.l10n.toolsItemIDOnline, context.l10n.toolsEGDiamondGrass),
+            ),
           ),
           const SizedBox(width: 12),
           OutlinedButton.icon(
             onPressed: () async {
               final f = await openFile(
-                acceptedTypeGroups: const [
-                  XTypeGroup(label: '图标', extensions: ['png']),
+                acceptedTypeGroups: [
+                  XTypeGroup(label: context.l10n.toolsIcon, extensions: const ['png']),
                 ],
               );
               if (f == null) return;
@@ -867,23 +926,23 @@ class _AchievementState extends State<_Achievement> {
               });
             },
             icon: const Icon(Icons.image_outlined),
-            label: Text(_iconName == null ? '图标（本地绘制）' : _iconName!),
+            label: Text(_iconName == null ? context.l10n.toolsIconLocalDrawing : _iconName!),
           ),
         ],
       ),
       const SizedBox(height: 12),
-      TextField(controller: _title, decoration: deco('标题')),
+      TextField(controller: _title, decoration: deco(context.l10n.toolsTitle)),
       const SizedBox(height: 12),
-      TextField(controller: _line1, decoration: deco('第一行')),
+      TextField(controller: _line1, decoration: deco(context.l10n.toolsFirstLine)),
       const SizedBox(height: 12),
-      TextField(controller: _line2, decoration: deco('第二行（可选）')),
+      TextField(controller: _line2, decoration: deco(context.l10n.toolsSecondLineOptional)),
       const SizedBox(height: 16),
       Row(
         children: [
-          FilledButton(onPressed: _busy ? null : _generate, child: const Text('生成')),
+          FilledButton(onPressed: _busy ? null : _generate, child: Text(context.l10n.toolsGenerate)),
           if (_png != null) ...[
             const SizedBox(width: 12),
-            FilledButton.tonal(onPressed: _save, child: const Text('保存图片')),
+            FilledButton.tonal(onPressed: _save, child: Text(context.l10n.toolsSaveImage)),
           ],
         ],
       ),
@@ -892,7 +951,10 @@ class _AchievementState extends State<_Achievement> {
         if (_local)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text('在线服务不可用，以下为本地绘制', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+            child: Text(
+              context.l10n.toolsOnlineServiceIsntAvailable,
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
           ),
         Align(
           alignment: Alignment.centerLeft,

@@ -5,6 +5,7 @@ import '../core/auth/auth.dart';
 import '../core/auth/yggdrasil.dart';
 import '../core/auth/yggdrasil_connect.dart';
 import 'device_login_dialog.dart';
+import '../l10n/l10n.dart';
 
 /// 外置登录：先填写或选择验证服务器地址，再登录。内置支持 Yggdrasil Connect 的站点默认 OAuth 授权登录，
 /// 可以和账户密码登录来回切换；其他地址只能账户密码登录（Yggdrasil API）。[run] 默认为 AppState.login
@@ -47,7 +48,7 @@ class _AddressDialogState extends State<_AddressDialog> {
     final address = _address.text.trim();
     return AlertDialog(
       icon: const Icon(Icons.dns_outlined),
-      title: const Text('外置登录'),
+      title: Text(context.l10n.oobeExternalSign),
       content: SizedBox(
         width: 400,
         child: DropdownMenu<String>(
@@ -55,8 +56,8 @@ class _AddressDialogState extends State<_AddressDialog> {
           requestFocusOnTap: true,
           enableFilter: true,
           expandedInsets: EdgeInsets.zero,
-          label: const Text('验证服务器地址'),
-          hintText: '输入地址，或从列表中选择',
+          label: Text(context.l10n.yggdrasilLoginDialogAuthenticationServerAddress),
+          hintText: context.l10n.yggdrasilLoginDialogEnterAddressPickOne,
           dropdownMenuEntries: [
             for (final site in YggdrasilConnect.builtInClientIds.keys)
               DropdownMenuEntry(value: site, label: site, trailingIcon: const Text('OAuth')),
@@ -64,10 +65,10 @@ class _AddressDialogState extends State<_AddressDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel)),
         FilledButton(
           onPressed: address.isEmpty ? null : () => Navigator.pop(context, address),
-          child: const Text('下一步'),
+          child: Text(context.l10n.commonNext),
         ),
       ],
     );
@@ -131,7 +132,7 @@ class _LoginDialogState extends State<_LoginDialog> {
   Future<GameProfile?> _chooseProfile(List<GameProfile> profiles) => showDialog<GameProfile>(
     context: context,
     builder: (context) => SimpleDialog(
-      title: const Text('选择角色'),
+      title: Text(context.l10n.yggdrasilLoginDialogChooseProfile),
       children: [
         for (final p in profiles) SimpleDialogOption(onPressed: () => Navigator.pop(context, p), child: Text(p.name)),
       ],
@@ -143,26 +144,33 @@ class _LoginDialogState extends State<_LoginDialog> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        '验证服务器：${widget.server}',
+        context.l10n.yggdrasilLoginDialogAuthenticationServer(widget.server),
         style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
       ),
       if (widget.server.toLowerCase().startsWith('http://')) ...[
         const SizedBox(height: 4),
-        Text('这个地址没有加密，密码会以明文传输', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error)),
+        Text(
+          context.l10n.yggdrasilLoginDialogAddressIsntEncryptedYour,
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+        ),
       ],
       const SizedBox(height: 16),
       TextField(
         controller: _username,
         enabled: !_busy,
         autofocus: widget.site == null,
-        decoration: const InputDecoration(labelText: '账户', hintText: '邮箱或用户名', border: OutlineInputBorder()),
+        decoration: InputDecoration(
+          labelText: context.l10n.oobeAccount,
+          hintText: context.l10n.yggdrasilLoginDialogEmailUsername,
+          border: const OutlineInputBorder(),
+        ),
       ),
       const SizedBox(height: 12),
       TextField(
         controller: _password,
         enabled: !_busy,
         obscureText: true,
-        decoration: const InputDecoration(labelText: '密码', border: OutlineInputBorder()),
+        decoration: InputDecoration(labelText: context.l10n.commonPassword, border: const OutlineInputBorder()),
         onSubmitted: (_) => _submit(),
       ),
       if (_error != null) ...[
@@ -178,7 +186,7 @@ class _LoginDialogState extends State<_LoginDialog> {
     final site = widget.site;
     return AlertDialog(
       icon: const Icon(Icons.dns_outlined),
-      title: Text(site ?? '账户密码登录'),
+      title: Text(site ?? context.l10n.yggdrasilLoginDialogPasswordSign),
       content: SizedBox(
         width: 400,
         child: site == null
@@ -187,9 +195,17 @@ class _LoginDialogState extends State<_LoginDialog> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(value: true, icon: Icon(Icons.open_in_browser), label: Text('OAuth 授权')),
-                      ButtonSegment(value: false, icon: Icon(Icons.password), label: Text('账户密码')),
+                    segments: [
+                      ButtonSegment(
+                        value: true,
+                        icon: const Icon(Icons.open_in_browser),
+                        label: Text(context.l10n.yggdrasilLoginDialogOAuthAuthorization),
+                      ),
+                      ButtonSegment(
+                        value: false,
+                        icon: const Icon(Icons.password),
+                        label: Text(context.l10n.yggdrasilLoginDialogAccountPassword),
+                      ),
                     ],
                     selected: {_oauth},
                     onSelectionChanged: (s) => setState(() => _oauth = s.first),
@@ -202,8 +218,8 @@ class _LoginDialogState extends State<_LoginDialog> {
                       create: (onCode) => ConnectLogin(site, onCode),
                       run: widget.run,
                       onDone: (acc) => loggedIn(context, acc),
-                      intro: '点击开始后会在浏览器中打开 $site 的授权页面，确认授权并选择角色即可，启动器不会接触你的密码。',
-                      startLabel: '开始 OAuth 登录',
+                      intro: context.l10n.yggdrasilLoginDialogClickingStartOpensAuthorization(site),
+                      startLabel: context.l10n.yggdrasilLoginDialogStartOAuthSign,
                     ),
                   ),
                   Visibility(visible: !_oauth, maintainState: true, child: _passwordForm(theme)),
@@ -211,13 +227,13 @@ class _LoginDialogState extends State<_LoginDialog> {
               ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel)),
         if (!_oauth)
           FilledButton(
             onPressed: _busy ? null : _submit,
             child: _busy
                 ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('登录'),
+                : Text(context.l10n.commonSign),
           ),
       ],
     );

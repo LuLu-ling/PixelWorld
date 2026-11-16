@@ -9,6 +9,7 @@ import 'instance_config.dart';
 import 'paths.dart';
 import 'task.dart';
 import 'version.dart';
+import 'i18n/strings.dart';
 
 final _javaExe = Platform.isWindows ? 'java.exe' : 'java';
 
@@ -141,7 +142,7 @@ String? _runtimePlatform() {
 Future<String?> _installRuntime(String component, Downloader dl, TaskProgress task) async {
   final platform = _runtimePlatform();
   if (platform == null) return null;
-  task.setStage('获取 Java 运行时 ($component)');
+  task.setStage(tr.javaGetJavaRuntime(component));
   final index = await dl.fetchJson(_runtimeIndex) as Map<String, dynamic>;
   final entries = (index[platform] as Map<String, dynamic>?)?[component] as List?;
   if (entries == null || entries.isEmpty) return null;
@@ -174,16 +175,18 @@ Future<String?> _installRuntime(String component, Downloader dl, TaskProgress ta
     }
   }
 
-  task.setStage('下载 Java 运行时 ($component，${dl.useMirror ? 'BMCLAPI 镜像' : '官方源'})');
+  task.setStage(
+    tr.javaDownloadJavaRuntime(component, dl.useMirror ? tr.downloadSourceMirror : tr.downloadSourceOfficial),
+  );
   final watch = Stopwatch()..start();
   await dl.downloadAll(
     files,
-    (done, total) => task.setDetail('已下载 $done / $total 个文件'),
+    (done, total) => task.setDetail(tr.javaDownloadedFiles(done, total)),
     onBytes: (done, total) {
       task.progressBytes(done, total);
       final secs = watch.elapsedMilliseconds / 1000;
       final speed = secs > 0 ? done / secs : 0.0;
-      task.setDetail('${_mb(done)} / ${_mb(total)}${speed > 0 ? ' · 平均 ${_mb(speed)}/s' : ''}');
+      task.setDetail('${_mb(done)} / ${_mb(total)}${speed > 0 ? tr.javaAverageS(_mb(speed)) : ''}');
     },
     cancelled: () => task.cancelled,
   );
@@ -204,7 +207,7 @@ Future<String?> _installRuntime(String component, Downloader dl, TaskProgress ta
 /// Apple 芯片的 Mac：Mojang 没有提供 arm64 的 Java 8（jre-legacy 为空），改为下载 Azul Zulu 8（arm64，免费的 OpenJDK 构建）。
 /// 解压后放到与 Mojang 运行时相同的位置（runtime/jre-legacy/jre.bundle），按 Azul 提供的 SHA-256 校验
 Future<String?> _installZulu8Arm64(Downloader dl, TaskProgress task) async {
-  task.setStage('获取 Java 8（Azul Zulu，Apple 芯片）');
+  task.setStage(tr.javaGetJava8Azul);
   const api = 'https://api.azul.com/metadata/v1/zulu/packages';
   final list = await dl.fetchJson(
     '$api/?java_version=8&os=macos&arch=aarch64&archive_type=tar.gz&java_package_type=jre'
@@ -218,7 +221,7 @@ Future<String?> _installZulu8Arm64(Downloader dl, TaskProgress task) async {
   final archive = p.join(Paths.runtimeDir, '${pkg['name']}');
 
   // Azul 接口给出的 size 与 CDN 上的文件大小不一致，不按它校验；完整性由下面的 SHA-256 保证
-  task.setStage('下载 Java 8（Azul Zulu）');
+  task.setStage(tr.javaDownloadJava8Azul);
   var lastMs = 0;
   var lastBytes = 0;
   await dl.downloadStreamed(
@@ -240,22 +243,22 @@ Future<String?> _installZulu8Arm64(Downloader dl, TaskProgress task) async {
   );
   if ((await sha256.bind(File(archive).openRead()).first).toString() != sha256Hash) {
     await File(archive).delete();
-    throw Exception('Java 8 下载校验失败（SHA-256 不匹配）');
+    throw Exception(tr.javaJava8DownloadFailed);
   }
 
-  task.setStage('解压 Java 8');
+  task.setStage(tr.javaExtractJava8);
   final tmp = Directory('$base.extract');
   if (tmp.existsSync()) await tmp.delete(recursive: true);
   await tmp.create(recursive: true);
   final r = await Process.run('tar', ['-xzf', archive, '-C', tmp.path]);
   await File(archive).delete();
-  if (r.exitCode != 0) throw Exception('解压 Java 8 失败：${r.stderr}');
+  if (r.exitCode != 0) throw Exception(tr.javaCouldntExtractJava8(r.stderr));
   // 压缩包中的 Java 目录：<名称>/Contents/Home 或 <名称>/zulu-8.jre/Contents/Home
   final bundle = [
     tmp,
     ...tmp.listSync(recursive: true).whereType<Directory>(),
   ].where((d) => File(p.join(d.path, 'Contents', 'Home', 'bin', 'java')).existsSync()).firstOrNull;
-  if (bundle == null) throw Exception('Java 8 压缩包的结构无法识别');
+  if (bundle == null) throw Exception(tr.javaJava8ArchiveHas);
   if (Directory(base).existsSync()) await Directory(base).delete(recursive: true);
   await Directory(base).create(recursive: true);
   await bundle.rename(p.join(base, 'jre.bundle'));
@@ -266,9 +269,9 @@ Future<String?> _installZulu8Arm64(Downloader dl, TaskProgress task) async {
 }
 
 Future<JavaInfo> _describe(String path) async {
-  if (!File(path).existsSync()) throw Exception('Java 路径不存在：$path');
+  if (!File(path).existsSync()) throw Exception(tr.javaJavaPathDoesntExist(path));
   final info = await probeJava(path);
-  if (info == null) throw Exception('无法运行 Java：$path');
+  if (info == null) throw Exception(tr.javaCantRunJava(path));
   return info;
 }
 
@@ -277,8 +280,7 @@ Future<JavaInfo> _describe(String path) async {
 /// Java 9 起不再是，游戏会在加载时崩溃
 String? javaTooNewWarning(VersionJson v, int javaMajor) {
   if (v.mainClass == 'net.minecraft.launchwrapper.Launch' && javaMajor > 8) {
-    return '这个实例通过 LaunchWrapper 启动（Forge 1.12.2 及更早、OptiFine、LiteLoader 等），'
-        '只能在 Java 8 上运行，使用 Java $javaMajor 很可能在加载时崩溃。';
+    return tr.javaInstanceStartsThroughLaunchWrapper(javaMajor);
   }
   return null;
 }
@@ -300,28 +302,28 @@ String _runtimeComponentFor(VersionJson v, int major) {
 /// 优先级与 PCL-CE 一致：实例指定 > 全局指定 > 自动选择。
 Future<JavaInfo> ensureJava(VersionJson v, JavaPref pref, String globalJava, Downloader dl, TaskProgress task) async {
   // 安卓上的 Java 不能作为独立进程运行，要经游戏运行时（见 java_run.dart 的 runJava）
-  if (Platform.isAndroid) throw UnsupportedError('安卓上请使用 ensureAndroidJava');
+  if (Platform.isAndroid) throw UnsupportedError(tr.javaUseEnsureAndroidJavaAndroid);
   final major = v.javaMajor ?? 8;
   final component = _runtimeComponentFor(v, major);
   // 用户指定的 Java 不自动替换；路径失效或版本过低时给出明确提示
   Future<JavaInfo> chosen(String path, String where) async {
     if (!File(path).existsSync()) {
-      throw Exception('$where指定的 Java 不存在：$path。请重新选择 Java，或改为自动选择');
+      throw Exception(tr.javaJavaSetDoesntExist(where, path));
     }
     final info = await _describe(path);
     if (info.major < major) {
-      throw Exception('$where指定的是 Java ${info.major}，这个实例至少需要 Java $major。请重新选择 Java，或改为自动选择');
+      throw Exception(tr.javaJavaSetButInstance(where, info.major, major));
     }
     return info;
   }
 
   switch (pref) {
     case JavaExist(:final path) when path.isNotEmpty:
-      return chosen(path, '实例设置中');
+      return chosen(path, tr.javaInstanceSettings);
     case JavaRelative(:final path) when path.isNotEmpty:
-      return chosen(p.normalize(p.join(Paths.launcherDir, path)), '实例设置中');
+      return chosen(p.normalize(p.join(Paths.launcherDir, path)), tr.javaInstanceSettings);
     case JavaGlobal() when globalJava.isNotEmpty:
-      return chosen(globalJava, '全局设置中');
+      return chosen(globalJava, tr.javaGlobalSettings);
     default:
   }
 
@@ -330,7 +332,7 @@ Future<JavaInfo> ensureJava(VersionJson v, JavaPref pref, String globalJava, Dow
     return _describe(managed);
   }
 
-  task.setStage('检测 Java');
+  task.setStage(tr.javaDetectJava);
   final javas = await listJavas();
   final exact = javas.where((j) => j.major == major).firstOrNull;
   if (exact != null) return exact;
@@ -349,13 +351,15 @@ Future<JavaInfo> ensureJava(VersionJson v, JavaPref pref, String globalJava, Dow
   if (downloaded != null) {
     final info = await _describe(downloaded);
     if (info.major >= major) return info;
-    downloadError = '自动下载的 Java ${info.major} 低于需要的 Java $major';
+    downloadError = tr.javaAutomaticallyDownloadedJavaOlder(info.major, major);
   }
 
   // 无法下载时，退而求其次使用更新的 Java
   final newer = javas.where((j) => j.major > major).toList()..sort((a, b) => a.major.compareTo(b.major));
   if (newer.isNotEmpty) return newer.first;
-  throw Exception('找不到 Java $major，请在设置中手动指定 Java 路径${downloadError.isNotEmpty ? '（自动下载失败：$downloadError）' : ''}');
+  throw Exception(
+    tr.javaJavaWasntFoundSet(major, downloadError.isNotEmpty ? tr.javaAutomaticDownloadFailed(downloadError) : ''),
+  );
 }
 
 String _mb(num bytes) => '${(bytes / 1048576).toStringAsFixed(1)} MB';

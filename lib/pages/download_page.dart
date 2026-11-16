@@ -12,6 +12,8 @@ import '../core/optifine_compat.dart';
 import '../widgets/shell_layout.dart';
 import '../widgets/side_nav.dart';
 import 'resources.dart';
+import '../l10n/l10n.dart';
+import '../core/i18n/strings.dart';
 
 enum _Tab { versions, mods, modpacks, resourcePacks, shaders, datapacks, favorites }
 
@@ -71,14 +73,14 @@ class _DownloadPageState extends State<DownloadPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PageTabs<_Tab>(
-            tabs: const [
-              (_Tab.versions, '游戏版本'),
-              (_Tab.mods, '模组'),
-              (_Tab.modpacks, '整合包'),
-              (_Tab.resourcePacks, '资源包'),
-              (_Tab.shaders, '光影'),
-              (_Tab.datapacks, '数据包'),
-              (_Tab.favorites, '收藏'),
+            tabs: [
+              (_Tab.versions, context.l10n.commonGameVersion),
+              (_Tab.mods, context.l10n.homeMods),
+              (_Tab.modpacks, context.l10n.downloadModpacks),
+              (_Tab.resourcePacks, context.l10n.commonResourcePacks),
+              (_Tab.shaders, context.l10n.commonShaders),
+              (_Tab.datapacks, context.l10n.downloadDataPacks),
+              (_Tab.favorites, context.l10n.commonFavorites),
             ],
             value: _tab,
             onChanged: (t) => setState(() => _tab = t),
@@ -87,11 +89,11 @@ class _DownloadPageState extends State<DownloadPage> {
                 : Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: SegmentPicker<_Filter>(
-                      options: const [
-                        (_Filter.release, '正式版'),
-                        (_Filter.snapshot, '快照'),
-                        (_Filter.old, '远古版'),
-                        (_Filter.fool, '愚人节'),
+                      options: [
+                        (_Filter.release, context.l10n.updateChannelStable),
+                        (_Filter.snapshot, context.l10n.homeFeedSnapshot),
+                        (_Filter.old, context.l10n.downloadOldVersions),
+                        (_Filter.fool, context.l10n.downloadAprilFools),
                       ],
                       value: _filter,
                       onChanged: (f) => setState(() => _filter = f),
@@ -153,11 +155,11 @@ class _VersionsViewState extends State<_VersionsView> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('获取版本列表失败：${errorText(snap.error!)}'),
+                Text(context.l10n.downloadCouldntGetVersionList(errorText(snap.error!))),
                 const SizedBox(height: 12),
                 FilledButton.tonal(
                   onPressed: () => setState(() => _future = remoteVersions(AppScope.read(context).downloader)),
-                  child: const Text('重试'),
+                  child: Text(context.l10n.deviceLoginDialogRetry),
                 ),
               ],
             ),
@@ -170,7 +172,7 @@ class _VersionsViewState extends State<_VersionsView> {
               children: [
                 const CircularProgressIndicator(),
                 const SizedBox(height: 14),
-                Text('正在获取版本列表…', style: TextStyle(color: scheme.onSurfaceVariant)),
+                Text(context.l10n.downloadLoadingVersionList, style: TextStyle(color: scheme.onSurfaceVariant)),
               ],
             ),
           );
@@ -188,7 +190,7 @@ class _VersionsViewState extends State<_VersionsView> {
                 child: GlassField(
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search, size: 20),
-                    hintText: '搜索版本号',
+                    hintText: context.l10n.downloadSearchVersions,
                     isDense: true,
                     filled: true,
                     fillColor: scheme.surfaceContainerLow,
@@ -206,7 +208,10 @@ class _VersionsViewState extends State<_VersionsView> {
                   borderRadius: BorderRadius.circular(12),
                   child: list.isEmpty
                       ? Center(
-                          child: Text('没有符合条件的版本', style: TextStyle(color: scheme.onSurfaceVariant)),
+                          child: Text(
+                            context.l10n.downloadNoMatchingVersions,
+                            style: TextStyle(color: scheme.onSurfaceVariant),
+                          ),
                         )
                       : ListView.separated(
                           itemCount: list.length,
@@ -235,8 +240,11 @@ class _VersionsViewState extends State<_VersionsView> {
                                         style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                                       ),
                                       const SizedBox(width: 8),
-                                      if (latest) _Tag('最新', filled: true),
-                                      if (installed.contains(v.id)) ...[const SizedBox(width: 6), const _Tag('已安装')],
+                                      if (latest) _Tag(context.l10n.downloadLatest, filled: true),
+                                      if (installed.contains(v.id)) ...[
+                                        const SizedBox(width: 6),
+                                        _Tag(context.l10n.downloadInstalled),
+                                      ],
                                       const Spacer(),
                                       Text(
                                         v.releaseTime.split('T').first,
@@ -258,7 +266,10 @@ class _VersionsViewState extends State<_VersionsView> {
             borderRadius: BorderRadius.circular(14),
             child: selected == null
                 ? Center(
-                    child: Text('选择左边的版本', style: TextStyle(color: scheme.onSurfaceVariant)),
+                    child: Text(
+                      context.l10n.downloadChooseVersionLeft,
+                      style: TextStyle(color: scheme.onSurfaceVariant),
+                    ),
                   )
                 : InstallPanel(key: ValueKey(selected.id), version: selected),
           ),
@@ -307,16 +318,16 @@ class InstallPanel extends StatefulWidget {
 }
 
 class _InstallPanelState extends State<InstallPanel> {
-  static const _descriptions = {
-    null: '纯净的 Minecraft',
-    LoaderKind.forge: '历史最久、模组最多的加载器',
-    LoaderKind.neoforge: '从 Forge 分出的社区版，1.20.1 起可用',
-    LoaderKind.cleanroom: '基于 Forge 的 1.12.2 现代化分支，需要 Java 21',
-    LoaderKind.labymod: '自带大量功能的整合客户端（LabyMod 4）',
-    LoaderKind.fabric: '轻量、更新快的模组加载器',
-    LoaderKind.quilt: '兼容大部分 Fabric 模组',
-    LoaderKind.legacyfabric: '为 1.13.2 及更早版本移植的 Fabric',
-    LoaderKind.liteloader: '1.12.2 及更早版本的轻量加载器',
+  static Map<LoaderKind?, String> _descriptions(AppLocalizations l) => {
+    null: l.downloadPlainMinecraft,
+    LoaderKind.forge: l.downloadOldestLoaderMostMods,
+    LoaderKind.neoforge: l.downloadCommunityForkForgeAvailable,
+    LoaderKind.cleanroom: l.downloadModernized1122,
+    LoaderKind.labymod: l.downloadAllOneClientLots,
+    LoaderKind.fabric: l.downloadLightweightFastUpdatingMod,
+    LoaderKind.quilt: l.downloadCompatibleMostFabricMods,
+    LoaderKind.legacyfabric: l.downloadFabricPorted113,
+    LoaderKind.liteloader: l.downloadLightweightLoader112,
   };
 
   /// 主加载器；null 为原版。OptiFine 不在其中，作为附加项单独勾选
@@ -429,7 +440,11 @@ class _InstallPanelState extends State<InstallPanel> {
     final name = _name.text.trim();
     final withOptiFine = _optifine && _canOptiFine && _optifineVersion.isNotEmpty;
     messenger.showSnackBar(
-      const SnackBar(content: Text('已开始安装，进度见顶栏的后台任务'), behavior: SnackBarBehavior.floating, width: 420),
+      SnackBar(
+        content: Text(context.l10n.downloadInstallationStartedSeeBackground),
+        behavior: SnackBarBehavior.floating,
+        width: 420,
+      ),
     );
     // 只选 OptiFine 时安装为独立版本；有主加载器时 OptiFine 作为模组
     final future = _choice == null && withOptiFine
@@ -449,14 +464,14 @@ class _InstallPanelState extends State<InstallPanel> {
     future
         .then(
           (id) => messenger.showSnackBar(
-            SnackBar(content: Text('$id 安装完成'), behavior: SnackBarBehavior.floating, width: 420),
+            SnackBar(content: Text(tr.downloadInstalled2(id)), behavior: SnackBarBehavior.floating, width: 420),
           ),
         )
         .catchError((Object e) {
           final cancelled = e is TaskCancelled;
           return messenger.showSnackBar(
             SnackBar(
-              content: Text(cancelled ? '任务已中断' : '安装失败：${errorText(e)}'),
+              content: Text(cancelled ? tr.commonTaskCanceled : tr.commonInstallationFailed(errorText(e))),
               behavior: SnackBarBehavior.floating,
               width: 420,
             ),
@@ -470,12 +485,12 @@ class _InstallPanelState extends State<InstallPanel> {
 
   /// 加载器选项格子下面的一行小字：加载中 / 不支持 / 默认版本或说明
   String _hint(LoaderKind? k) {
-    if (_loading(k)) return '正在获取…';
-    if (!_available(k)) return '不支持 ${widget.version.id}';
-    if (k == null) return '不加装';
+    if (_loading(k)) return context.l10n.homeLoading;
+    if (!_available(k)) return context.l10n.downloadIsntSupported(widget.version.id);
+    if (k == null) return context.l10n.downloadNone;
     final list = _lists[k] ?? const <LoaderVersion>[];
     final def = (list.where((l) => l.stable).firstOrNull ?? list.firstOrNull)?.label;
-    return def ?? _descriptions[k]!;
+    return def ?? _descriptions(context.l10n)[k]!;
   }
 
   @override
@@ -499,7 +514,7 @@ class _InstallPanelState extends State<InstallPanel> {
                 textBaseline: TextBaseline.alphabetic,
                 children: [
                   Text(
-                    '安装 ${widget.version.id}',
+                    context.l10n.downloadInstall(widget.version.id),
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(width: 8),
@@ -510,7 +525,7 @@ class _InstallPanelState extends State<InstallPanel> {
                   const Spacer(),
                   if (_lists.length < LoaderKind.values.length)
                     Text(
-                      '正在获取加载器 ${_lists.length}/${LoaderKind.values.length}',
+                      context.l10n.downloadLoadingLoaders(_lists.length, LoaderKind.values.length),
                       style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                 ],
@@ -535,7 +550,7 @@ class _InstallPanelState extends State<InstallPanel> {
                 child: TextField(
                   controller: _name,
                   decoration: InputDecoration(
-                    labelText: '实例名称',
+                    labelText: context.l10n.downloadInstanceName,
                     hintText: _defaultName,
                     floatingLabelBehavior: FloatingLabelBehavior.always,
                     isDense: true,
@@ -551,7 +566,7 @@ class _InstallPanelState extends State<InstallPanel> {
                   return Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
-                      '已经有 $same 个 ${widget.version.id} 的实例；这次会再装一个独立的实例，存档和模组互不影响',
+                      context.l10n.downloadInstancesAlreadyInstalledInstalls(same, widget.version.id),
                       style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   );
@@ -571,7 +586,7 @@ class _InstallPanelState extends State<InstallPanel> {
                           width: w,
                           child: _LoaderTile(
                             loader: loaderOfKind(k),
-                            label: k?.label ?? '原版',
+                            label: k?.label ?? context.l10n.downloadVanilla,
                             hint: _hint(k),
                             selected: _choice == k,
                             loading: _loading(k),
@@ -592,12 +607,15 @@ class _InstallPanelState extends State<InstallPanel> {
                   // 选择 OptiFine 后 Forge 版本可能被自动切换，需要重建下拉框
                   key: ValueKey('$_choice-$_loaderVersion'),
                   expandedInsets: EdgeInsets.zero,
-                  label: Text('${_choice!.label} 版本'),
+                  label: Text(context.l10n.downloadVersion(_choice!.label)),
                   initialSelection: _loaderVersion,
                   menuHeight: 300,
                   dropdownMenuEntries: [
                     for (final l in current.take(40))
-                      DropdownMenuEntry(value: l.version, label: l.stable ? l.label : '${l.label}（测试版）'),
+                      DropdownMenuEntry(
+                        value: l.version,
+                        label: l.stable ? l.label : context.l10n.downloadBeta(l.label),
+                      ),
                   ],
                   onSelected: (v) => setState(() => _loaderVersion = v ?? _loaderVersion),
                 ),
@@ -613,17 +631,19 @@ class _InstallPanelState extends State<InstallPanel> {
                 child: CheckboxListTile(
                   dense: true,
                   secondary: const LoaderIcon(Loader.optifine),
-                  title: const Text('同时安装 OptiFine'),
+                  title: Text(context.l10n.downloadInstallOptiFineToo),
                   subtitle: Text(
                     ofLoading
-                        ? '正在获取 OptiFine 版本…'
+                        ? context.l10n.downloadLoadingOptiFineVersions
                         : !canAddOptiFine(loaderOfKind(_choice))
-                        ? '${_choice?.label} 不支持与 OptiFine 一起安装'
+                        ? context.l10n.downloadCantInstalledTogetherOptiFine(_choice?.label ?? '')
                         : ofList.isEmpty
-                        ? (_choice == LoaderKind.forge ? '没有与 Forge 兼容的 OptiFine' : '该版本没有 OptiFine')
+                        ? (_choice == LoaderKind.forge
+                              ? context.l10n.downloadNoOptiFineCompatibleForge
+                              : context.l10n.downloadNoOptiFineVersion)
                         : [
                             optiFineNote(loaderOfKind(_choice), ofSelected),
-                            if (_forgeMismatch(ofSelected)) '当前选择的 Forge 与 OptiFine 要求的版本不同，较新的 Forge 可能与它不兼容',
+                            if (_forgeMismatch(ofSelected)) context.l10n.downloadSelectedForgeDiffersFrom,
                           ].join('\n'),
                   ),
                   value: _optifine && _canOptiFine,
@@ -640,7 +660,7 @@ class _InstallPanelState extends State<InstallPanel> {
                 DropdownMenu<String>(
                   key: ValueKey('optifine-$_choice'),
                   expandedInsets: EdgeInsets.zero,
-                  label: const Text('OptiFine 版本'),
+                  label: Text(context.l10n.commonOptiFineVersion),
                   initialSelection: _optifineVersion,
                   menuHeight: 300,
                   dropdownMenuEntries: [
@@ -648,8 +668,8 @@ class _InstallPanelState extends State<InstallPanel> {
                       DropdownMenuEntry(
                         value: l.version,
                         label:
-                            '${l.label}${l.stable ? '' : '（预览版）'}'
-                            '${_choice == LoaderKind.forge && (l.requiredForge?.isNotEmpty ?? false) ? ' · 需要 Forge ${l.requiredForge}' : ''}',
+                            '${l.label}${l.stable ? '' : context.l10n.commonPreview}'
+                            '${_choice == LoaderKind.forge && (l.requiredForge?.isNotEmpty ?? false) ? context.l10n.commonRequiresForge(l.requiredForge ?? '') : ''}',
                       ),
                   ],
                   onSelected: (v) => setState(() {
@@ -667,7 +687,7 @@ class _InstallPanelState extends State<InstallPanel> {
             children: [
               Expanded(
                 child: Text(
-                  '安装为 ${_name.text.trim().isEmpty ? _defaultName : _name.text.trim()}',
+                  context.l10n.downloadInstallAs(_name.text.trim().isEmpty ? _defaultName : _name.text.trim()),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
@@ -677,7 +697,7 @@ class _InstallPanelState extends State<InstallPanel> {
               FilledButton(
                 onPressed: canInstall ? _install : null,
                 style: FilledButton.styleFrom(minimumSize: const Size(110, 44)),
-                child: const Text('安装'),
+                child: Text(context.l10n.commonInstall),
               ),
             ],
           ),

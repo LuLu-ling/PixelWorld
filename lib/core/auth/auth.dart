@@ -1,4 +1,5 @@
 import '../accounts.dart';
+import '../i18n/strings.dart';
 
 /// 一次登录（命令模式）：执行后得到一个新账户
 abstract interface class LoginCommand {
@@ -64,5 +65,5 @@ class LoginCancelled implements Exception {
   const LoginCancelled();
 
   @override
-  String toString() => '已取消登录';
+  String toString() => tr.authSignCanceled;
 }

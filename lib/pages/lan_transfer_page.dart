@@ -14,6 +14,8 @@ import '../widgets/format.dart';
 import '../shell.dart';
 import '../widgets/settings_group.dart';
 import 'tools_page.dart' show toolsSectionRequest;
+import '../l10n/l10n.dart';
+import '../core/i18n/strings.dart';
 
 /// 收到但还没导入的传输包；离开页面后仍保留，直到导入、删除或关闭启动器
 final _received = <ReceivedTransfer>[];
@@ -90,7 +92,7 @@ class _LanTransferPageState extends State<LanTransferPage> {
             _received.add(t);
             _recvProgress = null;
           });
-          toast(context, '收到来自 ${t.manifest.from} 的「${t.manifest.version}」');
+          toast(context, context.l10n.lanTransferReceivedFrom(t.manifest.from, t.manifest.version));
         },
         onStopped: (reason) {
           if (!mounted) return;
@@ -110,7 +112,7 @@ class _LanTransferPageState extends State<LanTransferPage> {
         _stopReason = null;
       });
     } catch (e) {
-      if (mounted) toast(context, '无法开始接收：$e');
+      if (mounted) toast(context, context.l10n.lanTransferCouldntStartReceiving(e));
     }
   }
 
@@ -129,26 +131,32 @@ class _LanTransferPageState extends State<LanTransferPage> {
     try {
       if (m.wholeVersion) {
         final ok = await _confirm(
-          '导入为新实例',
-          '将「${m.version}」导入为新实例，并开启实例隔离。\n'
-              '共 ${m.files.length} 个文件，${formatSize(m.bytes)}。\n\n'
-              '${m.parents.isEmpty ? '' : '依赖的原版 ${m.parents.join('、')} 也会一起导入（本机已有时保留本机的）。\n'}'
-              '游戏本体依赖的库文件和资源文件没有一起传输，第一次启动时会自动补全。',
+          context.l10n.lanTransferImportAsNewInstance,
+          context.l10n.lanTransferImportAsNewInstance2(
+            m.version,
+            m.files.length,
+            formatSize(m.bytes),
+            m.parents.isEmpty
+                ? ''
+                : context.l10n.lanTransferVanillaVersionDependsImported(
+                    m.parents.join(context.l10n.commonListSeparator),
+                  ),
+          ),
         );
         if (ok != true) return;
         final id = await _withProgress(
-          '正在导入「${m.version}」',
+          tr.lanTransferImporting(m.version),
           (onProgress) => importTransferVersion(t.file.path, m, state.paths.root, onProgress: onProgress),
         );
         await state.refreshVersions();
         _drop(t);
-        if (mounted) toast(context, '已导入实例「$id」');
+        if (mounted) toast(context, context.l10n.lanTransferImportedInstance(id));
       } else {
         final target = await _pickTarget(state, m);
         if (target == null) return;
         final dir = await state.gameDirOf(target);
         final backup = await _withProgress(
-          '正在导入到「${target.id}」',
+          tr.lanTransferImportingInto(target.id),
           (onProgress) => importTransferFiles(
             t.file.path,
             m,
@@ -161,11 +169,16 @@ class _LanTransferPageState extends State<LanTransferPage> {
         await state.refreshVersions();
         _drop(t);
         if (mounted) {
-          toast(context, backup == null ? '已导入到「${target.id}」' : '已导入到「${target.id}」，原来的内容已备份到 ${p.basename(backup)}');
+          toast(
+            context,
+            backup == null
+                ? context.l10n.lanTransferImportedInto(target.id)
+                : context.l10n.lanTransferImportedIntoPreviousContents(target.id, p.basename(backup)),
+          );
         }
       }
     } catch (e) {
-      if (mounted) toast(context, '导入失败：$e');
+      if (mounted) toast(context, context.l10n.lanTransferImportFailed(e));
     }
   }
 
@@ -186,7 +199,7 @@ class _LanTransferPageState extends State<LanTransferPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(v == null ? '正在准备…' : '${formatSize(v.$2)} / ${formatSize(v.$1)}'),
+                Text(v == null ? context.l10n.lanTransferPreparing : '${formatSize(v.$2)} / ${formatSize(v.$1)}'),
                 const SizedBox(height: 12),
                 LinearProgressIndicator(value: v == null || v.$1 == 0 ? null : v.$2 / v.$1),
               ],
@@ -214,8 +227,8 @@ class _LanTransferPageState extends State<LanTransferPage> {
       title: Text(title),
       content: Text(body),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('导入')),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(context.l10n.commonCancel)),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(context.l10n.pclImportButton)),
       ],
     ),
   );
@@ -223,7 +236,7 @@ class _LanTransferPageState extends State<LanTransferPage> {
   Future<InstanceInfo?> _pickTarget(AppState state, TransferManifest m) {
     final versions = state.versions;
     if (versions.isEmpty) {
-      toast(context, '还没有实例，请先安装一个实例再导入');
+      toast(context, context.l10n.lanTransferNoInstancesYetInstall);
       return Future.value();
     }
     bool loaderOk(InstanceInfo v) => m.loader == null || v.loader.name == m.loader;
@@ -234,22 +247,21 @@ class _LanTransferPageState extends State<LanTransferPage> {
         versions.where((v) => v.id == m.version).firstOrNull ??
         versions.first;
     String? warning(InstanceInfo v) {
-      final from = m.describe ?? '发送方的实例';
+      final from = m.describe ?? context.l10n.lanTransferSendersInstance;
       if (!loaderOk(v) && m.items.contains('mods')) {
-        return '这些模组来自 $from，但「${v.id}」是 ${describeVersion(v)}，导入后模组不会被加载。'
-            '建议先在这台设备上安装相同的加载器，或者让对方改用「整个实例」发送。';
+        return context.l10n.lanTransferTheseModsComeFrom(from, v.id, describeVersion(v));
       }
-      if (!loaderOk(v)) return '发送方的实例是 $from，「${v.id}」是 ${describeVersion(v)}，加载器不同。';
-      if (!gameOk(v)) return '发送方的实例是 $from，「${v.id}」是 ${describeVersion(v)}，游戏版本不同，模组和存档可能不兼容。';
+      if (!loaderOk(v)) return context.l10n.lanTransferSendersInstanceLoadersDiffer(from, v.id, describeVersion(v));
+      if (!gameOk(v)) return context.l10n.lanTransferSendersInstanceGameVersions(from, v.id, describeVersion(v));
       return null;
     }
 
-    final what = m.items.map((i) => transferItems[i] ?? i).join('、');
+    final what = m.items.map((i) => transferItems[i] ?? i).join(context.l10n.commonListSeparator);
     return showDialog<InstanceInfo>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, set) => AlertDialog(
-          title: const Text('导入到哪个实例'),
+          title: Text(context.l10n.lanTransferImportIntoWhichInstance),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,7 +275,7 @@ class _LanTransferPageState extends State<LanTransferPage> {
                 onChanged: (v) => set(() => chosen = v!),
               ),
               const SizedBox(height: 12),
-              Text('将替换这个实例的：$what\n原来的内容会先备份到游戏文件夹的 backups 中。'),
+              Text(context.l10n.lanTransferReplacesInstancesPreviousContents(what)),
               if (warning(chosen) case final w?) ...[
                 const SizedBox(height: 12),
                 Row(
@@ -280,8 +292,8 @@ class _LanTransferPageState extends State<LanTransferPage> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, chosen), child: const Text('导入')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.commonCancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, chosen), child: Text(context.l10n.pclImportButton)),
           ],
         ),
       ),
@@ -290,24 +302,26 @@ class _LanTransferPageState extends State<LanTransferPage> {
 
   Future<void> _send(AppState state) async {
     final v = _version;
-    if (v == null) return toast(context, '请选择要发送的实例');
+    if (v == null) return toast(context, context.l10n.lanTransferChooseInstanceSend);
     final Uri base;
     try {
       base = parseTransferAddress(_address.text);
     } on TransferException catch (e) {
       return toast(context, e.message);
     }
-    if (!RegExp(r'^\d{6}$').hasMatch(_code.text.trim())) return toast(context, '配对码是 6 位数字');
+    if (!RegExp(r'^\d{6}$').hasMatch(_code.text.trim())) {
+      return toast(context, context.l10n.lanTransferPairingCode6Digits);
+    }
     setState(() {
       _sending = true;
       _sendProgress = null;
-      _sendStatus = '正在连接…';
+      _sendStatus = context.l10n.lanTransferConnecting;
     });
     File? zip;
     try {
       final name = await transferHello(base, _code.text);
       if (!mounted) return;
-      setState(() => _sendStatus = '已连接到 $name，正在打包…');
+      setState(() => _sendStatus = context.l10n.lanTransferConnectedPacking(name));
       final gameDir = await state.gameDirOf(v);
       zip = await packTransfer(
         version: v.id,
@@ -319,12 +333,12 @@ class _LanTransferPageState extends State<LanTransferPage> {
         gameVersion: v.gameVersion,
         describe: describeVersion(v),
         onFile: (n) {
-          if (mounted && n % 50 == 0) setState(() => _sendStatus = '正在打包…已加入 $n 个文件');
+          if (mounted && n % 50 == 0) setState(() => _sendStatus = context.l10n.lanTransferPackingFilesAdded(n));
         },
       );
       final size = formatSize(zip.lengthSync());
       if (!mounted) return;
-      setState(() => _sendStatus = '正在发送 $size…');
+      setState(() => _sendStatus = context.l10n.lanTransferSending(size));
       final reply = await transferSend(
         base,
         _code.text,
@@ -333,9 +347,9 @@ class _LanTransferPageState extends State<LanTransferPage> {
           if (mounted) setState(() => _sendProgress = sent / total);
         },
       );
-      if (mounted) setState(() => _sendStatus = '发送完成（$size）：$reply');
+      if (mounted) setState(() => _sendStatus = context.l10n.lanTransferSent(size, reply));
     } catch (e) {
-      if (mounted) setState(() => _sendStatus = '发送失败：$e');
+      if (mounted) setState(() => _sendStatus = context.l10n.lanTransferSendingFailed(e));
     } finally {
       if (zip != null && zip.existsSync()) zip.deleteSync();
       if (mounted) setState(() => _sending = false);
@@ -358,10 +372,10 @@ class _LanTransferPageState extends State<LanTransferPage> {
     return ListView(
       padding: const EdgeInsets.all(28),
       children: [
-        Text('在同一个局域网（同一个 Wi-Fi）中的两台设备之间传输实例、模组、配置和存档。', style: muted),
+        Text(context.l10n.lanTransferTransferInstancesModsConfigs, style: muted),
         const SizedBox(height: 16),
         SettingsGroup(
-          title: '接收',
+          title: context.l10n.lanTransferReceive,
           children: [
             Padding(
               padding: const EdgeInsets.all(20),
@@ -373,45 +387,45 @@ class _LanTransferPageState extends State<LanTransferPage> {
                           Text(_stopReason!, style: TextStyle(color: theme.colorScheme.error)),
                           const SizedBox(height: 12),
                         ],
-                        Text('开始接收后，在另一台设备上输入下面显示的地址和配对码。离开这个页面会停止接收。', style: muted),
+                        Text(context.l10n.lanTransferAfterYouStartReceiving, style: muted),
                         const SizedBox(height: 12),
                         FilledButton.icon(
                           onPressed: _startReceive,
                           icon: const Icon(Icons.download),
-                          label: const Text('开始接收'),
+                          label: Text(context.l10n.lanTransferStartReceiving),
                         ),
                       ],
                     )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('配对码', style: muted),
+                        Text(context.l10n.lanTransferPairingCode, style: muted),
                         SelectableText(
                           server.code,
                           style: theme.textTheme.displaySmall?.copyWith(letterSpacing: 6, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 12),
-                        Text('地址（IP:端口）', style: muted),
-                        if (_addresses.isEmpty) const Text('没有找到局域网地址，请确认已连接 Wi-Fi 或网线'),
+                        Text(context.l10n.lanTransferAddressIPPort, style: muted),
+                        if (_addresses.isEmpty) Text(context.l10n.lanTransferNoLocalNetworkAddress),
                         for (final a in _addresses)
                           Row(
                             children: [
                               SelectableText('$a:${server.port}', style: theme.textTheme.titleMedium),
                               IconButton(
-                                tooltip: '复制',
+                                tooltip: context.l10n.commonCopy,
                                 icon: const Icon(Icons.copy, size: 18),
                                 onPressed: () {
                                   Clipboard.setData(ClipboardData(text: '$a:${server.port}'));
-                                  toast(context, '已复制');
+                                  toast(context, context.l10n.fileViewerCopied);
                                 },
                               ),
                             ],
                           ),
-                        if (_addresses.length > 1) Text('有多个地址时，通常用 192.168 开头的那个', style: muted),
-                        if (Platform.isWindows) Text('如果 Windows 防火墙弹出提示，请允许 Pixel World 访问专用网络', style: muted),
+                        if (_addresses.length > 1) Text(context.l10n.lanTransferIfThereSeveralAddresses, style: muted),
+                        if (Platform.isWindows) Text(context.l10n.lanTransferIfWindowsFirewallAsks, style: muted),
                         if (_recvProgress case (final total, final got)) ...[
                           const SizedBox(height: 12),
-                          Text('正在接收 ${formatSize(got)} / ${formatSize(total)}'),
+                          Text(context.l10n.lanTransferReceiving(formatSize(got), formatSize(total))),
                           const SizedBox(height: 4),
                           LinearProgressIndicator(value: total == 0 ? null : got / total),
                         ],
@@ -419,7 +433,7 @@ class _LanTransferPageState extends State<LanTransferPage> {
                         OutlinedButton.icon(
                           onPressed: _stopReceive,
                           icon: const Icon(Icons.stop),
-                          label: const Text('停止接收'),
+                          label: Text(context.l10n.lanTransferStopReceiving),
                         ),
                       ],
                     ),
@@ -430,18 +444,25 @@ class _LanTransferPageState extends State<LanTransferPage> {
                 leading: Icon(t.manifest.wholeVersion ? Icons.inventory_2_outlined : Icons.folder_zip_outlined),
                 title: Text(
                   t.manifest.wholeVersion
-                      ? '整个实例「${t.manifest.version}」'
-                      : '「${t.manifest.version}」的${t.manifest.items.map((i) => transferItems[i] ?? i).join('、')}',
+                      ? context.l10n.lanTransferWholeInstance(t.manifest.version)
+                      : context.l10n.lanTransferText(
+                          t.manifest.version,
+                          t.manifest.items.map((i) => transferItems[i] ?? i).join(context.l10n.commonListSeparator),
+                        ),
                 ),
                 subtitle: Text(
-                  '来自 ${t.manifest.from}（${t.address}）${t.manifest.describe == null ? '' : '，${t.manifest.describe}'}，'
-                  '${formatSize(t.manifest.bytes)}',
+                  context.l10n.lanTransferFrom(
+                    t.manifest.from,
+                    t.address,
+                    t.manifest.describe == null ? '' : '${context.l10n.commonComma}${t.manifest.describe}',
+                    formatSize(t.manifest.bytes),
+                  ),
                 ),
                 trailing: Wrap(
                   spacing: 8,
                   children: [
-                    TextButton(onPressed: () => _drop(t), child: const Text('删除')),
-                    FilledButton.tonal(onPressed: () => _import(state, t), child: const Text('导入')),
+                    TextButton(onPressed: () => _drop(t), child: Text(context.l10n.commonDelete)),
+                    FilledButton.tonal(onPressed: () => _import(state, t), child: Text(context.l10n.pclImportButton)),
                   ],
                 ),
               ),
@@ -449,7 +470,7 @@ class _LanTransferPageState extends State<LanTransferPage> {
         ),
         const SizedBox(height: 16),
         SettingsGroup(
-          title: '发送',
+          title: context.l10n.instanceSend,
           children: [
             Padding(
               padding: const EdgeInsets.all(20),
@@ -457,7 +478,7 @@ class _LanTransferPageState extends State<LanTransferPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (state.versions.isEmpty)
-                    const Text('还没有可以发送的实例')
+                    Text(context.l10n.lanTransferNoInstancesSendYet)
                   else
                     DropdownButton<InstanceInfo>(
                       // 鼠标选完后不保留焦点高亮（否则会留一块灰底）
@@ -469,9 +490,17 @@ class _LanTransferPageState extends State<LanTransferPage> {
                     ),
                   const SizedBox(height: 8),
                   SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(value: false, label: Text('选择内容'), icon: Icon(Icons.checklist)),
-                      ButtonSegment(value: true, label: Text('整个实例'), icon: Icon(Icons.inventory_2_outlined)),
+                    segments: [
+                      ButtonSegment(
+                        value: false,
+                        label: Text(context.l10n.lanTransferChooseContent),
+                        icon: const Icon(Icons.checklist),
+                      ),
+                      ButtonSegment(
+                        value: true,
+                        label: Text(context.l10n.lanTransferWholeInstance2),
+                        icon: const Icon(Icons.inventory_2_outlined),
+                      ),
                     ],
                     selected: {_whole},
                     onSelectionChanged: _sending ? null : (s) => setState(() => _whole = s.first),
@@ -479,9 +508,8 @@ class _LanTransferPageState extends State<LanTransferPage> {
                   const SizedBox(height: 8),
                   Text(
                     _whole
-                        ? '打包实例文件夹（不含日志和崩溃报告）。对方会导入为新实例并开启实例隔离。'
-                              '\n如果这个实例没有开启实例隔离，还会附带下面选中的内容。'
-                        : '对方导入时会替换选中的内容，替换前自动备份。',
+                        ? context.l10n.lanTransferPacksInstanceFolderWithout
+                        : context.l10n.lanTransferReceiverReplacesSelectedContent,
                     style: muted,
                   ),
                   const SizedBox(height: 8),
@@ -507,7 +535,10 @@ class _LanTransferPageState extends State<LanTransferPage> {
                         child: TextField(
                           controller: _address,
                           enabled: !_sending,
-                          decoration: const InputDecoration(labelText: '对方地址', hintText: '192.168.1.5:43567'),
+                          decoration: InputDecoration(
+                            labelText: context.l10n.lanTransferReceiversAddress,
+                            hintText: '192.168.1.5:43567',
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -518,7 +549,7 @@ class _LanTransferPageState extends State<LanTransferPage> {
                           enabled: !_sending,
                           keyboardType: TextInputType.number,
                           maxLength: 6,
-                          decoration: const InputDecoration(labelText: '配对码', counterText: ''),
+                          decoration: InputDecoration(labelText: context.l10n.lanTransferPairingCode, counterText: ''),
                         ),
                       ),
                     ],
@@ -527,7 +558,7 @@ class _LanTransferPageState extends State<LanTransferPage> {
                   FilledButton.icon(
                     onPressed: _sending || state.versions.isEmpty ? null : () => _send(state),
                     icon: const Icon(Icons.send),
-                    label: const Text('发送'),
+                    label: Text(context.l10n.instanceSend),
                   ),
                   if (_sendStatus != null) ...[const SizedBox(height: 12), Text(_sendStatus!)],
                   if (_sending) ...[const SizedBox(height: 4), LinearProgressIndicator(value: _sendProgress)],

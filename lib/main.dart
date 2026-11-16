@@ -9,6 +9,7 @@ import 'app_info.dart';
 import 'app_scope.dart';
 import 'app_state.dart';
 import 'core/hud_bridge.dart';
+import 'core/i18n/strings.dart';
 import 'core/instance_files.dart';
 import 'pages/file_manager_page.dart';
 import 'installer/installer_app.dart';
@@ -106,6 +107,8 @@ class PclPwApp extends StatelessWidget {
       localeListResolutionCallback: AppL10n.resolve,
       home: const Shell(),
       builder: (context, child) {
+        // core 里的文字（任务、错误、日志）跟随界面语言
+        useCoreStrings(AppLocalizations.of(context));
         if (Platform.isLinux) {
           final theme = Theme.of(context);
           final scheme = theme.colorScheme;

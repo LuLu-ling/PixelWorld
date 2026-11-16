@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 
 import '../app_info.dart';
 import 'task.dart';
+import 'i18n/strings.dart';
 
 final _client = HttpClient()
   ..userAgent = '${AppInfo.name}/${AppInfo.version} (github.com/zhuzhi-09/PixelWorld)'
@@ -97,20 +98,20 @@ int luckToday(String name, [DateTime? day]) {
 }
 
 String luckComment(int v) => switch (v) {
-  100 => '满分！今天做什么都会顺利',
-  >= 90 => '大吉，开箱必出钻石',
-  >= 75 => '运气不错，适合去下界走走',
-  >= 60 => '平平稳稳，挖矿不会挖到岩浆',
-  >= 40 => '一般般，记得多带几个床',
-  >= 20 => '小心苦力怕，出门前先存档',
-  > 0 => '今天适合在家种田',
-  _ => '零分……今天还是别下矿了',
+  100 => tr.toolboxPerfectScoreEverythingGoes,
+  >= 90 => tr.toolboxGreatLuckEveryChest,
+  >= 75 => tr.toolboxPrettyLuckyGoodDay,
+  >= 60 => tr.toolboxSteadyCalmNoLava,
+  >= 40 => tr.toolboxSoSoRememberBring,
+  >= 20 => tr.toolboxWatchOutCreepersSave,
+  > 0 => tr.toolboxGoodDayStayHome,
+  _ => tr.toolboxZeroBetterStayOut,
 };
 
 // ---------- 桌面快捷方式 ----------
 
 Future<String> createDesktopShortcut() async {
-  if (!Platform.isWindows) throw Exception('目前只支持 Windows');
+  if (!Platform.isWindows) throw Exception(tr.toolboxOnlyWindowsSupportedNow);
   final desktop = p.join(Platform.environment['USERPROFILE'] ?? '', 'Desktop');
   final path = p.join(desktop, '${AppInfo.name}.lnk');
   final exe = Platform.resolvedExecutable;
@@ -122,7 +123,7 @@ Future<String> createDesktopShortcut() async {
     "\$s = (New-Object -ComObject WScript.Shell).CreateShortcut('${q(path)}'); \$s.TargetPath = '${q(exe)}'; "
         "\$s.WorkingDirectory = '${q(p.dirname(exe))}'; \$s.Save()",
   ]);
-  if (r.exitCode != 0) throw Exception('创建快捷方式失败');
+  if (r.exitCode != 0) throw Exception(tr.toolboxCouldntCreateShortcut);
   return path;
 }
 
@@ -130,17 +131,17 @@ Future<String> createDesktopShortcut() async {
 
 Future<void> downloadToFile(String url, String path, TaskProgress task) async {
   final uri = Uri.tryParse(url.trim());
-  if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) throw Exception('请输入 http 或 https 开头的网址');
-  task.beginStep('下载');
-  task.setStage('连接 ${uri.host}');
+  if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) throw Exception(tr.toolboxEnterURLStartingHttp);
+  task.beginStep(tr.commonDownload);
+  task.setStage(tr.toolboxConnect(uri.host));
   final res = await (await _client.getUrl(uri)).close().timeout(const Duration(seconds: 30));
-  if (res.statusCode != 200) throw Exception('下载失败（HTTP ${res.statusCode}）');
+  if (res.statusCode != 200) throw Exception(tr.downloadDownloadFailedHTTP(res.statusCode));
   final total = res.contentLength;
   final tmp = File('$path.download');
   await tmp.parent.create(recursive: true);
   final sink = tmp.openWrite();
   var done = 0;
-  task.setStage('下载 ${p.basename(path)}');
+  task.setStage(tr.toolboxDownload(p.basename(path)));
   try {
     await for (final chunk in res) {
       sink.add(chunk);
@@ -150,7 +151,7 @@ Future<void> downloadToFile(String url, String path, TaskProgress task) async {
     await sink.close();
     if (File(path).existsSync()) await File(path).delete();
     await tmp.rename(path);
-    task.output('已保存到 $path（${(done / 1024 / 1024).toStringAsFixed(2)} MB）');
+    task.output(tr.toolboxSavedMB(path, (done / 1024 / 1024).toStringAsFixed(2)));
   } catch (_) {
     await sink.close().catchError((_) {});
     if (tmp.existsSync()) await tmp.delete();
@@ -180,21 +181,21 @@ class PlayerSkin {
 
 Future<PlayerSkin> fetchSkin(String name) async {
   final n = name.trim();
-  if (!RegExp(r'^[A-Za-z0-9_]{1,16}$').hasMatch(n)) throw Exception('玩家名只能包含字母、数字和下划线');
+  if (!RegExp(r'^[A-Za-z0-9_]{1,16}$').hasMatch(n)) throw Exception(tr.toolboxPlayerNamesCanOnly);
   final (s1, b1) = await _get('https://api.mojang.com/users/profiles/minecraft/$n');
-  if (s1 == 404 || s1 == 204) throw Exception('找不到正版玩家 $n');
-  if (s1 != 200) throw Exception('查询玩家失败（$s1）');
+  if (s1 == 404 || s1 == 204) throw Exception(tr.toolboxNoMinecraftPlayerNamed(n));
+  if (s1 != 200) throw Exception(tr.toolboxPlayerLookupFailed(s1));
   final profile = jsonDecode(utf8.decode(b1)) as Map<String, dynamic>;
   final uuid = '${profile['id']}';
   final (s2, b2) = await _get('https://sessionserver.mojang.com/session/minecraft/profile/$uuid');
-  if (s2 != 200) throw Exception('获取皮肤信息失败（$s2）');
+  if (s2 != 200) throw Exception(tr.toolboxCouldntGetSkinInfo(s2));
   final props = ((jsonDecode(utf8.decode(b2)) as Map)['properties'] as List).cast<Map<String, dynamic>>();
   final textures = props.firstWhere((e) => e['name'] == 'textures');
   final data = jsonDecode(utf8.decode(base64Decode('${textures['value']}'))) as Map<String, dynamic>;
   final skin = (data['textures'] as Map?)?['SKIN'] as Map<String, dynamic>?;
-  if (skin == null) throw Exception('$n 使用的是默认皮肤');
+  if (skin == null) throw Exception(tr.toolboxUsesDefaultSkin(n));
   final (s3, png) = await _get('${skin['url']}'.replaceFirst('http://', 'https://'));
-  if (s3 != 200) throw Exception('下载皮肤失败（$s3）');
+  if (s3 != 200) throw Exception(tr.toolboxCouldntDownloadSkin(s3));
   return PlayerSkin('${profile['name']}', uuid, png, slim: (skin['metadata'] as Map?)?['model'] == 'slim');
 }
 
@@ -208,7 +209,7 @@ Future<Uint8List> fetchAchievement({
   String line2 = '',
 }) async {
   String seg(String s) => Uri.encodeComponent(s.trim().replaceAll(' ', '..'));
-  if (title.trim().isEmpty || line1.trim().isEmpty) throw Exception('请填写标题和第一行文字');
+  if (title.trim().isEmpty || line1.trim().isEmpty) throw Exception(tr.toolsFillTitleFirstLine);
   var url =
       'https://minecraft-api.com/api/achivements/${seg(block.isEmpty ? 'grass' : block)}/${seg(title)}/${seg(line1)}';
   if (line2.trim().isNotEmpty) url += '/${seg(line2)}';
@@ -217,8 +218,8 @@ Future<Uint8List> fetchAchievement({
     userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
   );
-  if (status == 404) throw Exception('找不到这个物品，请检查物品 ID');
-  if (status != 200 || png.length < 8 || png[0] != 0x89) throw Exception('生成失败（$status）');
+  if (status == 404) throw Exception(tr.toolboxItemNotFoundCheck);
+  if (status != 200 || png.length < 8 || png[0] != 0x89) throw Exception(tr.toolboxGenerationFailed(status));
   return png;
 }
 
@@ -263,7 +264,7 @@ List<int> _packet(List<int> body) => [..._varint(body.length), ...body];
     v |= (b & 0x7f) << (7 * i);
     if (b & 0x80 == 0) return (v, at + i + 1);
   }
-  throw Exception('服务器返回的数据无效');
+  throw Exception(tr.toolboxServerReturnedInvalidData);
 }
 
 /// 聊天组件转成纯文本，并去掉 § 颜色代码
@@ -303,7 +304,7 @@ Future<(String, int)?> _resolveSrv(String host) async {
 
 Future<ServerStatus> queryServer(String address) async {
   final m = RegExp(r'^(\[[^\]]+\]|[^:]+)(?::(\d+))?$').firstMatch(address.trim());
-  if (m == null) throw Exception('服务器地址格式不正确');
+  if (m == null) throw Exception(tr.toolboxInvalidServerAddress);
   var host = m.group(1)!.replaceAll(RegExp(r'^\[|\]$'), '');
   var port = m.group(2) == null ? null : int.parse(m.group(2)!);
   if (port == null) {
@@ -316,7 +317,7 @@ Future<ServerStatus> queryServer(String address) async {
   try {
     sock = await Socket.connect(host, realPort, timeout: const Duration(seconds: 5));
   } catch (e) {
-    throw Exception('无法连接：$e');
+    throw Exception(tr.toolboxCantConnect(e));
   }
   final latency = DateTime.now().difference(started).inMilliseconds;
   final done = Completer<ServerStatus>();
@@ -335,7 +336,7 @@ Future<ServerStatus> queryServer(String address) async {
           ServerStatus(
             online: ((s['players'] as Map?)?['online'] as num?)?.toInt() ?? 0,
             max: ((s['players'] as Map?)?['max'] as num?)?.toInt() ?? 0,
-            version: '${(s['version'] as Map?)?['name'] ?? '未知'}',
+            version: '${(s['version'] as Map?)?['name'] ?? tr.loaderNamesUnknown}',
             motd: _flatten(s['description']).trim(),
             latency: latency,
             favicon: fav is String && fav.startsWith('data:image/png;base64,')
@@ -344,11 +345,11 @@ Future<ServerStatus> queryServer(String address) async {
           ),
         );
       } catch (e) {
-        if (!done.isCompleted) done.completeError(Exception('服务器返回的数据无效'));
+        if (!done.isCompleted) done.completeError(Exception(tr.toolboxServerReturnedInvalidData));
       }
     },
-    onError: (Object e) => done.isCompleted ? null : done.completeError(Exception('连接中断：$e')),
-    onDone: () => done.isCompleted ? null : done.completeError(Exception('服务器关闭了连接')),
+    onError: (Object e) => done.isCompleted ? null : done.completeError(Exception(tr.toolboxConnectionInterrupted(e))),
+    onDone: () => done.isCompleted ? null : done.completeError(Exception(tr.toolboxServerClosedConnection)),
   );
   final hostBytes = utf8.encode(host);
   sock.add(
@@ -364,7 +365,10 @@ Future<ServerStatus> queryServer(String address) async {
   );
   sock.add(_packet(_varint(0)));
   try {
-    return await done.future.timeout(const Duration(seconds: 5), onTimeout: () => throw Exception('连接超时'));
+    return await done.future.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => throw Exception(tr.toolboxConnectionTimedOut),
+    );
   } finally {
     sock.destroy();
   }

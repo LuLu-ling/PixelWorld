@@ -8,6 +8,7 @@ import 'package:crypto/crypto.dart';
 
 import '../app_info.dart';
 import 'network_check.dart';
+import 'i18n/strings.dart';
 
 const _bmclapi = 'https://bmclapi2.bangbang93.com';
 
@@ -101,7 +102,7 @@ class Downloader {
       }
       lastErr = err;
     }
-    throw lastErr ?? Exception('下载失败：$url');
+    throw lastErr ?? Exception(tr.downloadDownloadFailed(url));
   }
 
   /// 从一个地址下载，失败时重试 [retries] 次；返回（数据，最后的错误）
@@ -126,7 +127,7 @@ class Downloader {
             b.add(chunk);
             final secs = sw.elapsedMilliseconds / 1000;
             if (checkSpeed && secs > 8 && b.length / secs < _slowSpeed) {
-              throw HttpException('下载速度过慢，更换节点重试：$target');
+              throw HttpException(tr.downloadDownloadTooSlowRetrying(target));
             }
           }
           return (b.takeBytes(), null);
@@ -206,10 +207,10 @@ class Downloader {
     final data = await _get(item.url, cancelled: cancelled);
     final want = item.sha1?.toLowerCase();
     if (want != null && want.isNotEmpty && sha1.convert(data).toString() != want) {
-      throw Exception('校验失败（SHA-1 不匹配）：${item.path}');
+      throw Exception(tr.downloadVerificationFailedSHA1(item.path));
     }
     if (item.size != null && data.length != item.size) {
-      throw Exception('校验失败（大小应为 ${item.size}，实际 ${data.length}）：${item.path}');
+      throw Exception(tr.downloadVerificationFailedSizeShould(item.size ?? '', data.length, item.path));
     }
     if (cancelled?.call() ?? false) return;
     final f = File(item.path);
@@ -251,7 +252,7 @@ class Downloader {
         chunks.add(part);
         futures.add(() async {
           final bytes = await _get(item.url, range: 'bytes=$start-$end', cancelled: cancelled);
-          if (bytes.length != end - start + 1) throw Exception('分块大小不符：${part.path}');
+          if (bytes.length != end - start + 1) throw Exception(tr.downloadChunkSizeMismatch(part.path));
           await part.writeAsBytes(bytes, flush: true);
         }());
       }
@@ -266,11 +267,11 @@ class Downloader {
       } finally {
         await sink.close();
       }
-      if (await merged.length() != size) throw Exception('分块合并后大小不符：${item.path}');
+      if (await merged.length() != size) throw Exception(tr.downloadSizeMismatchAfterMerging(item.path));
       final want = item.sha1?.toLowerCase();
       if (want != null && want.isNotEmpty) {
         final actual = (await sha1.bind(merged.openRead()).first).toString();
-        if (actual != want) throw Exception('校验失败（SHA-1 不匹配）：${item.path}');
+        if (actual != want) throw Exception(tr.downloadVerificationFailedSHA1(item.path));
       }
       if (cancelled?.call() ?? false) throw const _Cancelled();
       await merged.rename(item.path);
@@ -308,12 +309,14 @@ class Downloader {
     final res = await req.close().timeout(const Duration(seconds: 30));
     if (res.statusCode != 200) {
       await res.drain<void>();
-      throw HttpException('下载失败（HTTP ${res.statusCode}）');
+      throw HttpException(tr.downloadDownloadFailedHTTP(res.statusCode));
     }
     final total = res.contentLength > 0 ? res.contentLength : (item.size ?? 0);
     onInfo?.call(
-      '已连接 ${Uri.parse(target).host}'
-      '${total > 0 ? '，文件大小 ${(total / 1048576).toStringAsFixed(1)} MB' : '，服务器没有提供文件大小'}',
+      tr.downloadConnected(
+        Uri.parse(target).host,
+        total > 0 ? tr.downloadFileSizeMB((total / 1048576).toStringAsFixed(1)) : tr.downloadServerDidntReportFile,
+      ),
     );
     final out = File(item.path);
     await out.parent.create(recursive: true);
@@ -330,7 +333,7 @@ class Downloader {
         onProgress?.call(received, total);
         final secs = watch.elapsedMilliseconds / 1000;
         if (secs > 15 && received / secs < 24 * 1024) {
-          throw HttpException('下载速度过慢（${(received / secs / 1024).toStringAsFixed(0)} KB/s）');
+          throw HttpException(tr.downloadDownloadTooSlowKB((received / secs / 1024).toStringAsFixed(0)));
         }
       }
     } catch (_) {
@@ -343,14 +346,14 @@ class Downloader {
       rethrow;
     }
     await sink.close();
-    if (received == 0) throw HttpException('没有收到数据');
+    if (received == 0) throw HttpException(tr.downloadNoDataReceived);
     if (total > 0 && received != total) {
       await tmp.delete().catchError((_) => tmp);
-      throw HttpException('下载不完整（$received / $total 字节）');
+      throw HttpException(tr.downloadIncompleteDownloadBytes(received, total));
     }
     if (item.size != null && received != item.size) {
       await tmp.delete().catchError((_) => tmp);
-      throw HttpException('下载不完整（应为 ${item.size} 字节，实际 $received）');
+      throw HttpException(tr.downloadIncompleteDownloadExpectedBytes(item.size ?? '', received));
     }
     if (out.existsSync()) await out.delete();
     await tmp.rename(out.path);
@@ -454,7 +457,7 @@ class Downloader {
     unawaited(hedgeLoop());
     await allDone.future;
     await VerifiedFiles.save();
-    if (errors.isNotEmpty) throw Exception('${errors.length} 个文件下载失败，例如：${errors.first}');
+    if (errors.isNotEmpty) throw Exception(tr.downloadFilesFailedDownloadE(errors.length, errors.first));
   }
 }
 

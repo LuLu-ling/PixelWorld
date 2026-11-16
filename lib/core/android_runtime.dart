@@ -11,6 +11,7 @@ import 'java.dart';
 import 'paths.dart';
 import 'task.dart';
 import 'version.dart';
+import 'i18n/strings.dart';
 
 /// 安卓上的游戏运行时（android/runtime 模块，LGPL-3.0）。启动器只通过这里与它交互，以后可以整体替换。
 abstract final class AndroidRuntime {
@@ -109,7 +110,7 @@ abstract final class AndroidRuntime {
     try {
       return await _channel.invokeMethod<String>('logcat', {'since': since.millisecondsSinceEpoch}) ?? '';
     } catch (e) {
-      return '读取系统日志失败：$e';
+      return tr.androidRuntimeCouldntReadSystemLog(e);
     }
   }
 
@@ -159,10 +160,10 @@ abstract final class AndroidRuntime {
     }
     read();
     final exit = await lastExit() ?? code ?? (started ? 0 : -1);
-    if (!started) onLog('\n[Pixel World] 游戏进程没有启动，或启动后立即退出了。\n');
+    if (!started) onLog(tr.androidRuntimePixelWorldGameProcess);
     // 异常退出时附上系统日志，原生库加载失败等问题只会出现在这里
     if (exit != 0 || offset == 0) {
-      onLog('\n---------- 系统日志（logcat） ----------\n${await systemLog()}\n');
+      onLog(tr.androidRuntimeSystemLogLogcat(await systemLog()));
     }
     return exit;
   }
@@ -265,9 +266,9 @@ abstract final class AndroidRuntime {
       code = 1;
     }
     if (!started) {
-      out.writeln('[Pixel World] jar 运行进程没有启动');
+      out.writeln(tr.androidRuntimePixelWorldJarRunner);
     } else if (!jvmStarted) {
-      out.writeln('[Pixel World] jar 运行进程在启动 Java 前退出了');
+      out.writeln(tr.androidRuntimePixelWorldJarRunner2);
       final log = await systemLog();
       final lines = log.split('\n').where((l) => l.contains(':jar') || l.contains('AndroidRuntime')).toList();
       out.writeln((lines.length > 30 ? lines.sublist(lines.length - 30) : lines).join('\n'));
@@ -282,25 +283,21 @@ abstract final class AndroidRuntime {
 /// 安卓上的渲染器（名字与运行时 GameRuntime 一致）；auto 按显卡选择
 /// MobileGlues + ANGLE（运行时名 angle）暂不提供：在骁龙 8 Gen 3 上 ANGLE 初始化后界面线程卡死被系统结束。
 /// 已选的会按「自动」处理
-const androidRenderers = {
-  'auto': '自动',
+Map<String, String> get androidRenderers => {
+  'auto': tr.commonAuto,
   'mobileglues': 'MobileGlues',
-  'zink': 'Zink（OpenGL 转 Vulkan）',
-  'krypton': 'Krypton Wrapper（推荐）',
-  'system_gles': '系统 GLES 驱动（仅限支持 GLES 的模组）',
+  'zink': tr.androidRuntimeZinkOpenGLVulkan,
+  'krypton': tr.androidRuntimeKryptonWrapperRecommended,
+  'system_gles': tr.androidRuntimeSystemGLESDriverGLES,
 };
 
 /// 各渲染器的说明，显示在设置里
-const androidRendererHints = {
-  'auto': '默认用 Krypton Wrapper；26.x 版本改用 MobileGlues，显卡不支持 OpenGL ES 3 时用 Zink',
-  'mobileglues': 'OpenGL 转 OpenGL ES，支持所有版本，包括 26.x（旧版本自动加 SFPEW 模拟固定管线）',
-  'zink':
-      'Mesa Zink：完整的 OpenGL 4.6，需要 Vulkan 1.1。骁龙（Adreno）上自动改用自带的开源驱动 Turnip，'
-      '适合 MobileGlues 画面出错时使用',
-  'krypton':
-      'NG-GL4ES：OpenGL 转 OpenGL ES，效率高，新旧版本都能用，能运行 Sodium 和部分光影。'
-      '26.3 快照起的版本暂不可用',
-  'system_gles': '直接使用系统 GLES 驱动，不做转译。原版 Minecraft 无法以此运行',
+Map<String, String> get androidRendererHints => {
+  'auto': tr.androidRuntimeUsesKryptonWrapperDefault,
+  'mobileglues': tr.androidRuntimeOpenGLOpenGLESSupports,
+  'zink': tr.androidRuntimeMesaZinkFullOpenGL,
+  'krypton': tr.androidRuntimeNGGL4ESOpenGLOpenGL,
+  'system_gles': tr.androidRuntimeUsesSystemGLESDriver,
 };
 
 /// 显卡信息（系统 GLES 驱动报告的名称与 Vulkan 版本）
@@ -330,7 +327,7 @@ class AndroidGpu {
   String toString() => [
     if (renderer.isNotEmpty) renderer,
     if (glesVersion.isNotEmpty) glesVersion.split(' ').take(3).join(' '),
-    vulkan.isEmpty ? '无 Vulkan' : 'Vulkan $vulkan',
+    vulkan.isEmpty ? tr.androidRuntimeNoVulkan : 'Vulkan $vulkan',
     if (soc.isNotEmpty) soc,
   ].join(' · ');
 }
@@ -359,13 +356,15 @@ bool hasTouchController(String gameDir) {
 }
 
 ({String renderer, String reason}) resolveAndroidRenderer(String pref, AndroidGpu gpu, {bool sdl = false}) {
-  if (pref != 'auto' && androidRenderers.containsKey(pref)) return (renderer: pref, reason: '设置指定');
+  if (pref != 'auto' && androidRenderers.containsKey(pref)) {
+    return (renderer: pref, reason: tr.androidRuntimeSetSettings);
+  }
   // Krypton Wrapper 和 MobileGlues 都需要 OpenGL ES 3；更老的驱动只能走 Vulkan
   if (gpu.glesMajor > 0 && gpu.glesMajor < 3 && gpu.hasVulkan11) {
-    return (renderer: 'zink', reason: '显卡不支持 OpenGL ES 3');
+    return (renderer: 'zink', reason: tr.androidRuntimeGPUDoesntSupportOpenGL);
   }
-  if (sdl) return (renderer: 'mobileglues', reason: '26.x 版本，Krypton Wrapper 暂不支持');
-  return (renderer: 'krypton', reason: '自动选择');
+  if (sdl) return (renderer: 'mobileglues', reason: tr.androidRuntime26XVersionKrypton);
+  return (renderer: 'krypton', reason: tr.downloadSourceAuto);
 }
 
 /// 安卓版 OpenJDK（AngelAuraMC 构建，GPLv2 + Classpath Exception）
@@ -439,8 +438,8 @@ Future<JavaInfo> _installAndroidJava(int major, Downloader dl, TaskProgress task
     // 解压也按压缩包读取的字节显示进度
     final size = archive.lengthSync();
     task.progressBytes(0, size);
-    task.setStageKeepProgress('解压 Java $major');
-    task.setDetail('正在解压 ${_mb(size)} MB…');
+    task.setStageKeepProgress(tr.androidRuntimeExtractJava(major));
+    task.setDetail(tr.androidRuntimeExtractingMB(_mb(size)));
     final dir = Directory(home);
     if (dir.existsSync()) await dir.delete(recursive: true);
     await AndroidRuntime.installJre(
@@ -448,7 +447,7 @@ Future<JavaInfo> _installAndroidJava(int major, Downloader dl, TaskProgress task
       home,
       onProgress: (done, total) {
         task.progressBytes(done, total);
-        if (total > 0) task.setDetail('解压中 ${(done / total * 100).toStringAsFixed(0)}%');
+        if (total > 0) task.setDetail(tr.androidRuntimeExtracting((done / total * 100).toStringAsFixed(0)));
       },
     );
     await File(p.join(home, '.installed')).writeAsString('$major');
@@ -464,7 +463,7 @@ Future<File> _downloadJavaArchive(int major, Downloader dl, TaskProgress task) a
   final archive = Paths.tempFile('jre$major.tar.xz');
   final failures = <String>[];
   for (final mirror in androidJreMirrors) {
-    task.setStage('下载 Java $major（${mirror.name}）');
+    task.setStage(tr.androidRuntimeDownloadJava(major, mirror.name));
     var lastMs = 0;
     var lastBytes = 0;
     try {
@@ -485,17 +484,17 @@ Future<File> _downloadJavaArchive(int major, Downloader dl, TaskProgress task) a
         },
         onInfo: task.output,
       );
-      if (!await _isXzArchive(archive)) throw Exception('下载到的不是有效的压缩包');
+      if (!await _isXzArchive(archive)) throw Exception(tr.androidRuntimeDownloadIsntValidArchive);
       task.progressBytes(archive.lengthSync(), archive.lengthSync());
-      task.output('Java $major 下载完成（${_mb(archive.lengthSync())} MB，来源 ${mirror.name}）');
+      task.output(tr.androidRuntimeJavaDownloadedMBFrom(major, _mb(archive.lengthSync()), mirror.name));
       return archive;
     } catch (e) {
-      failures.add('${mirror.name}：${_shortError(e)}');
-      task.output('${mirror.name} 下载失败：${_shortError(e)}');
+      failures.add('${mirror.name}${tr.commonColon}${_shortError(e)}');
+      task.output(tr.androidRuntimeDownloadFailed(mirror.name, _shortError(e)));
     }
   }
   await archive.delete().catchError((_) => archive);
-  throw Exception('Java $major 下载失败，已尝试 GitHub 与镜像：\n${failures.join('\n')}');
+  throw Exception(tr.androidRuntimeJavaDownloadFailedTried(major, failures.join('\n')));
 }
 
 String _mb(num bytes) => (bytes / 1048576).toStringAsFixed(1);
@@ -555,19 +554,19 @@ Future<JavaInfo> ensureAndroidJava(
   JavaInfo chosen(String home, String where) {
     final info = androidJavaAt(home);
     if (info == null) {
-      throw Exception('$where指定的 Java 没有安装：$home。请在设置的 Java 页面下载，或改为自动选择');
+      throw Exception(tr.androidRuntimeJavaSetIsntInstalled(where, home));
     }
     if (info.major < required) {
-      throw Exception('$where指定的是 Java ${info.major}，这个实例至少需要 Java $required。请重新选择 Java，或改为自动选择');
+      throw Exception(tr.androidRuntimeJavaSetButInstance(where, info.major, required));
     }
     return info;
   }
 
   switch (pref) {
     case JavaExist(:final path) when path.isNotEmpty:
-      return chosen(path, '实例设置中');
+      return chosen(path, tr.javaInstanceSettings);
     case JavaGlobal() when globalJava.isNotEmpty:
-      return chosen(globalJava, '全局设置中');
+      return chosen(globalJava, tr.javaGlobalSettings);
     default:
   }
   return installAndroidJava(androidJavaMajor(required), dl, task);

@@ -15,6 +15,7 @@ import 'java.dart';
 import 'memory.dart';
 import 'paths.dart';
 import 'version.dart';
+import 'i18n/strings.dart';
 
 final _sep = Platform.isWindows ? ';' : ':';
 bool _isAscii(String s) => s.codeUnits.every((c) => c < 0x80);
@@ -343,7 +344,7 @@ Future<void> setGpuPreference(String javaPath) async {
 /// 启动前自定义命令，在游戏文件夹中执行
 Future<void> runPreLaunch(String command, bool wait, String cwd, void Function(String) log) async {
   if (command.trim().isEmpty) return;
-  log('执行启动前命令：$command');
+  log(tr.launchRunningPreLaunchCommand(command));
   final proc = await Process.start(
     Platform.isWindows ? 'cmd.exe' : '/bin/sh',
     Platform.isWindows ? ['/c', command] : ['-c', command],

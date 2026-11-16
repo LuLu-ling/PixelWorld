@@ -11,6 +11,7 @@ import '../core/modrinth.dart';
 import '../core/task.dart';
 import '../widgets/format.dart';
 import '../widgets/app_background.dart';
+import '../l10n/l10n.dart';
 
 /// 社区资源（Modrinth）：搜索列表，点击进入详情
 class ResourceBrowser extends StatefulWidget {
@@ -91,14 +92,19 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
   }
 
   Future<void> _installFromFile() async {
-    final path = await pickFile(context, extensions: const ['mrpack'], label: 'Modrinth 整合包');
+    final path = await pickFile(context, extensions: const ['mrpack'], label: context.l10n.resourcesModrinthModpacks);
     if (path == null || !mounted) return;
     setState(() => _installingPack = true);
     try {
       final id = await AppScope.read(context).installModpackFile(path);
-      if (mounted) toast(context, '已安装整合包为 $id');
+      if (mounted) toast(context, context.l10n.resourcesInstalledModpackAs(id));
     } catch (e) {
-      if (mounted) toast(context, e is TaskCancelled ? '任务已中断' : '安装失败：${errorText(e)}');
+      if (mounted) {
+        toast(
+          context,
+          e is TaskCancelled ? context.l10n.commonTaskCanceled : context.l10n.commonInstallationFailed(errorText(e)),
+        );
+      }
     } finally {
       if (mounted) setState(() => _installingPack = false);
     }
@@ -129,14 +135,18 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '正在为 ${current.id} 添加${widget.type.label} · 只显示适配 ${current.gameVersion} 的${widget.type.label}，'
-                      '安装时直接装进这个实例',
+                      context.l10n.resourcesAddingOnlyCompatibleShown(
+                        current.id,
+                        widget.type.label,
+                        current.gameVersion,
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onPrimaryContainer),
                     ),
                   ),
-                  if (widget.onUnlock != null) TextButton(onPressed: widget.onUnlock, child: const Text('改为普通浏览')),
+                  if (widget.onUnlock != null)
+                    TextButton(onPressed: widget.onUnlock, child: Text(context.l10n.resourcesBrowseNormally)),
                 ],
               ),
             ),
@@ -152,7 +162,7 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
                 child: GlassField(
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search, size: 20),
-                    hintText: '在 Modrinth 搜索${widget.type.label}',
+                    hintText: context.l10n.resourcesSearchModrinth(widget.type.label),
                     isDense: true,
                     filled: true,
                     fillColor: scheme.surfaceContainerLow,
@@ -169,7 +179,7 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
                   color: Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   child: FilterChip(
-                    label: Text('适配 ${current.id}', overflow: TextOverflow.ellipsis),
+                    label: Text(context.l10n.resourcesText(current.id), overflow: TextOverflow.ellipsis),
                     selected: _fitCurrent,
                     onSelected: (v) {
                       _fitCurrent = v;
@@ -180,18 +190,18 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
               ],
               const SizedBox(width: 8),
               PopupMenuButton<String>(
-                tooltip: '排序',
+                tooltip: context.l10n.resourcesSort,
                 initialValue: _sort,
                 onSelected: (v) {
                   _sort = v;
                   _search();
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'relevance', child: Text('相关性')),
-                  PopupMenuItem(value: 'downloads', child: Text('下载量')),
-                  PopupMenuItem(value: 'follows', child: Text('关注数')),
-                  PopupMenuItem(value: 'newest', child: Text('最新发布')),
-                  PopupMenuItem(value: 'updated', child: Text('最近更新')),
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'relevance', child: Text(context.l10n.resourcesRelevance)),
+                  PopupMenuItem(value: 'downloads', child: Text(context.l10n.resourcesDownloads)),
+                  PopupMenuItem(value: 'follows', child: Text(context.l10n.resourcesFollows)),
+                  PopupMenuItem(value: 'newest', child: Text(context.l10n.resourcesNewest)),
+                  PopupMenuItem(value: 'updated', child: Text(context.l10n.resourcesRecentlyUpdated)),
                 ],
                 child: GlassPanel(
                   color: scheme.surfaceContainerLow,
@@ -204,7 +214,16 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '排序 ${const {'relevance': '相关性', 'downloads': '下载量', 'follows': '关注数', 'newest': '最新发布', 'updated': '最近更新'}[_sort]}',
+                          context.l10n.resourcesSort2(
+                            {
+                                  'relevance': context.l10n.resourcesRelevance,
+                                  'downloads': context.l10n.resourcesDownloads,
+                                  'follows': context.l10n.resourcesFollows,
+                                  'newest': context.l10n.resourcesNewest,
+                                  'updated': context.l10n.resourcesRecentlyUpdated,
+                                }[_sort] ??
+                                '',
+                          ),
                           style: theme.textTheme.labelLarge,
                         ),
                         const Icon(Icons.arrow_drop_down, size: 20),
@@ -221,7 +240,7 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
                   icon: _installingPack
                       ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.add, size: 18),
-                  label: const Text('从文件安装'),
+                  label: Text(context.l10n.resourcesInstallFromFile),
                 ),
               ],
             ],
@@ -238,7 +257,7 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
                         builder: (context, fg, _) => Text(_error!, style: TextStyle(color: fg)),
                       ),
                       const SizedBox(height: 12),
-                      FilledButton.tonal(onPressed: _search, child: const Text('重试')),
+                      FilledButton.tonal(onPressed: _search, child: Text(context.l10n.deviceLoginDialogRetry)),
                     ],
                   ),
                 )
@@ -247,8 +266,10 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
               : _hits.isEmpty
               ? Center(
                   child: OnBackground(
-                    builder: (context, _, muted) =>
-                        Text('没有找到结果', style: TextStyle(color: muted ?? scheme.onSurfaceVariant)),
+                    builder: (context, _, muted) => Text(
+                      context.l10n.resourcesNoResults,
+                      style: TextStyle(color: muted ?? scheme.onSurfaceVariant),
+                    ),
                   ),
                 )
               : ListView.builder(
@@ -261,7 +282,10 @@ class _ResourceBrowserState extends State<ResourceBrowser> {
                         child: Center(
                           child: _loading
                               ? const CircularProgressIndicator()
-                              : OutlinedButton(onPressed: () => _search(more: true), child: const Text('加载更多')),
+                              : OutlinedButton(
+                                  onPressed: () => _search(more: true),
+                                  child: Text(context.l10n.resourcesLoadMore),
+                                ),
                         ),
                       );
                     }
@@ -362,15 +386,15 @@ class ResourceCard extends StatelessWidget {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           for (final c in hit.categories.take(4)) _Tag(c),
-                          _Stat(Icons.download_outlined, formatCount(hit.downloads)),
-                          if (hit.updated.isNotEmpty) _Stat(Icons.update, timeAgo(hit.updated)),
+                          _Stat(Icons.download_outlined, formatCount(context.l10n, hit.downloads)),
+                          if (hit.updated.isNotEmpty) _Stat(Icons.update, timeAgo(context.l10n, hit.updated)),
                         ],
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  tooltip: fav ? '取消收藏' : '收藏',
+                  tooltip: fav ? context.l10n.resourcesRemoveFromFavorites : context.l10n.commonFavorites,
                   onPressed: () => state.toggleFavorite(hit),
                   icon: Icon(fav ? Icons.favorite : Icons.favorite_border, color: fav ? scheme.error : null),
                 ),
@@ -496,9 +520,11 @@ class _ResourceDetailState extends State<ResourceDetail> {
 
   String? _warning(InstanceInfo? inst) {
     if (_type == ResourceType.modpack) return null;
-    if (inst == null) return '还没有安装任何实例';
-    if (_type == ResourceType.mod && modrinthLoaders(inst.loader).isEmpty) return '${inst.id} 没有安装模组加载器，模组不会生效';
-    if (_type == ResourceType.datapack && _worlds.isEmpty) return '${inst.id} 还没有存档，请先进入游戏创建一个世界';
+    if (inst == null) return context.l10n.resourcesNoInstancesInstalledYet;
+    if (_type == ResourceType.mod && modrinthLoaders(inst.loader).isEmpty) {
+      return context.l10n.resourcesHasNoModLoader(inst.id);
+    }
+    if (_type == ResourceType.datapack && _worlds.isEmpty) return context.l10n.resourcesHasNoWorldsYet(inst.id);
     return null;
   }
 
@@ -507,12 +533,19 @@ class _ResourceDetailState extends State<ResourceDetail> {
     try {
       final r = await AppScope.read(context).installResource(v, _type, inst, world: _world);
       if (!mounted) return;
-      final parts = ['已安装 ${r.installed.length} 个文件'];
-      if (r.skipped.isNotEmpty) parts.add('${r.skipped.length} 个已存在');
-      if (r.missing.isNotEmpty) parts.add('找不到兼容的前置：${r.missing.join('、')}');
-      toast(context, parts.join('，'));
+      final parts = [context.l10n.resourcesInstalledFiles(r.installed.length)];
+      if (r.skipped.isNotEmpty) parts.add(context.l10n.resourcesAlreadyPresent(r.skipped.length));
+      if (r.missing.isNotEmpty) {
+        parts.add(context.l10n.resourcesNoCompatibleDependencyFound(r.missing.join(context.l10n.commonListSeparator)));
+      }
+      toast(context, parts.join(context.l10n.commonClauseSeparator));
     } catch (e) {
-      if (mounted) toast(context, e is TaskCancelled ? '任务已中断' : '安装失败：${errorText(e)}');
+      if (mounted) {
+        toast(
+          context,
+          e is TaskCancelled ? context.l10n.commonTaskCanceled : context.l10n.commonInstallationFailed(errorText(e)),
+        );
+      }
     } finally {
       if (mounted) setState(() => _installing = '');
     }
@@ -522,9 +555,14 @@ class _ResourceDetailState extends State<ResourceDetail> {
     setState(() => _installing = v.id);
     try {
       final id = await AppScope.read(context).installModpack(v, name: widget.hit.title);
-      if (mounted) toast(context, '已安装整合包为 $id');
+      if (mounted) toast(context, context.l10n.resourcesInstalledModpackAs(id));
     } catch (e) {
-      if (mounted) toast(context, e is TaskCancelled ? '任务已中断' : '安装失败：${errorText(e)}');
+      if (mounted) {
+        toast(
+          context,
+          e is TaskCancelled ? context.l10n.commonTaskCanceled : context.l10n.commonInstallationFailed(errorText(e)),
+        );
+      }
     } finally {
       if (mounted) setState(() => _installing = '');
     }
@@ -553,7 +591,11 @@ class _ResourceDetailState extends State<ResourceDetail> {
           children: [
             Row(
               children: [
-                IconButton(tooltip: '返回', onPressed: widget.onBack, icon: const Icon(Icons.arrow_back)),
+                IconButton(
+                  tooltip: context.l10n.tooltipBack,
+                  onPressed: widget.onBack,
+                  icon: const Icon(Icons.arrow_back),
+                ),
                 const SizedBox(width: 4),
                 ResourceIcon(url: hit.icon, size: 64),
                 const SizedBox(width: 16),
@@ -563,15 +605,21 @@ class _ResourceDetailState extends State<ResourceDetail> {
                     children: [
                       Text(hit.title, style: theme.textTheme.titleLarge),
                       Text(
-                        '${project?.hit.author ?? hit.author} · ${_type.label} · ${formatCount(hit.downloads)} 次下载'
-                        '${hit.updated.isNotEmpty ? ' · 更新于 ${timeAgo(hit.updated)}' : ''}',
+                        context.l10n.resourcesDownloads2(
+                          project?.hit.author ?? hit.author,
+                          _type.label,
+                          formatCount(context.l10n, hit.downloads),
+                          hit.updated.isNotEmpty
+                              ? context.l10n.resourcesUpdated(timeAgo(context.l10n, hit.updated))
+                              : '',
+                        ),
                         style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  tooltip: fav ? '取消收藏' : '收藏',
+                  tooltip: fav ? context.l10n.resourcesRemoveFromFavorites : context.l10n.commonFavorites,
                   onPressed: () => state.toggleFavorite(hit),
                   icon: Icon(fav ? Icons.favorite : Icons.favorite_border, color: fav ? scheme.error : null),
                 ),
@@ -579,7 +627,7 @@ class _ResourceDetailState extends State<ResourceDetail> {
                   onPressed: () =>
                       launchUrl(Uri.parse(project?.page ?? 'https://modrinth.com/${_type.tag}/${hit.slug}')),
                   icon: const Icon(Icons.open_in_new, size: 18),
-                  label: const Text('在 Modrinth 查看'),
+                  label: Text(context.l10n.resourcesViewModrinth),
                 ),
               ],
             ),
@@ -590,7 +638,10 @@ class _ResourceDetailState extends State<ResourceDetail> {
             if (snap.hasError)
               Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text('加载失败：${errorText(snap.error!)}', style: TextStyle(color: scheme.error)),
+                child: Text(
+                  context.l10n.homeFeedCouldntLoad(errorText(snap.error!)),
+                  style: TextStyle(color: scheme.error),
+                ),
               )
             else if (!snap.hasData)
               const Padding(
@@ -609,11 +660,14 @@ class _ResourceDetailState extends State<ResourceDetail> {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       if (_type != ResourceType.modpack && widget.target != null)
-                        Chip(avatar: const Icon(Icons.link, size: 18), label: Text('安装到 ${widget.target}'))
+                        Chip(
+                          avatar: const Icon(Icons.link, size: 18),
+                          label: Text(context.l10n.resourcesInstall(widget.target ?? '')),
+                        )
                       else if (_type != ResourceType.modpack)
                         DropdownMenu<String>(
                           width: 320,
-                          label: const Text('安装到'),
+                          label: Text(context.l10n.resourcesInstall2),
                           initialSelection: _instanceId.isEmpty ? null : _instanceId,
                           inputDecorationTheme: const InputDecorationTheme(isDense: true, border: OutlineInputBorder()),
                           dropdownMenuEntries: [
@@ -625,19 +679,22 @@ class _ResourceDetailState extends State<ResourceDetail> {
                           },
                         )
                       else
-                        Chip(avatar: const Icon(Icons.inventory_2_outlined, size: 18), label: const Text('将安装为新的实例')),
+                        Chip(
+                          avatar: const Icon(Icons.inventory_2_outlined, size: 18),
+                          label: Text(context.l10n.resourcesWillInstalledAsNew),
+                        ),
                       if (_type == ResourceType.datapack && _worlds.isNotEmpty)
                         DropdownMenu<String>(
                           key: ValueKey(_instanceId),
                           width: 220,
-                          label: const Text('世界'),
+                          label: Text(context.l10n.resourcesWorld),
                           initialSelection: _world,
                           inputDecorationTheme: const InputDecorationTheme(isDense: true, border: OutlineInputBorder()),
                           dropdownMenuEntries: [for (final w in _worlds) DropdownMenuEntry(value: w, label: w)],
                           onSelected: (w) => setState(() => _world = w),
                         ),
                       FilterChip(
-                        label: const Text('显示全部文件'),
+                        label: Text(context.l10n.resourcesShowAllFiles),
                         selected: _showAll,
                         onSelected: (v) => setState(() => _showAll = v),
                       ),
@@ -652,7 +709,9 @@ class _ResourceDetailState extends State<ResourceDetail> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(56, 16, 0, 0),
                   child: Text(
-                    inst == null ? '没有可用的文件' : '没有适配 ${inst.gameVersion} 的文件，可以打开「显示全部文件」',
+                    inst == null
+                        ? context.l10n.resourcesNoFilesAvailable
+                        : context.l10n.resourcesNoFilesYouCan(inst.gameVersion),
                     style: TextStyle(color: scheme.onSurfaceVariant),
                   ),
                 ),
@@ -665,9 +724,9 @@ class _ResourceDetailState extends State<ResourceDetail> {
                     child: ListTile(
                       title: Text(v.name, overflow: TextOverflow.ellipsis),
                       subtitle: Text(
-                        '${const {'release': '正式', 'beta': 'Beta', 'alpha': 'Alpha'}[v.type] ?? v.type}'
-                        ' · ${v.loaders.join(' / ')} · ${_compactVersions(v.gameVersions)}'
-                        ' · ${formatSize(v.fileSize)} · ${timeAgo(v.published)}',
+                        '${{'release': context.l10n.resourcesRelease, 'beta': 'Beta', 'alpha': 'Alpha'}[v.type] ?? v.type}'
+                        ' · ${v.loaders.join(' / ')} · ${_compactVersions(context.l10n, v.gameVersions)}'
+                        ' · ${formatSize(v.fileSize)} · ${timeAgo(context.l10n, v.published)}',
                         overflow: TextOverflow.ellipsis,
                       ),
                       trailing: _installing == v.id
@@ -680,7 +739,7 @@ class _ResourceDetailState extends State<ResourceDetail> {
                                   : inst == null || (_type == ResourceType.datapack && _world == null)
                                   ? null
                                   : () => _install(v, inst),
-                              child: const Text('安装'),
+                              child: Text(context.l10n.commonInstall),
                             ),
                     ),
                   ),
@@ -698,9 +757,9 @@ class _ResourceDetailState extends State<ResourceDetail> {
   }
 
   /// 版本列表太长时只显示首尾
-  static String _compactVersions(List<String> list) {
-    if (list.length <= 3) return list.join('、');
-    return '${list.first} ~ ${list.last}（${list.length} 个版本）';
+  static String _compactVersions(AppLocalizations l, List<String> list) {
+    if (list.length <= 3) return list.join(l.commonListSeparator);
+    return l.resourcesVersions(list.first, list.last, list.length);
   }
 }
 
@@ -725,13 +784,16 @@ class _FavoritesListState extends State<FavoritesList> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-          child: Text('收藏夹', style: theme.textTheme.headlineSmall),
+          child: Text(context.l10n.resourcesFavorites, style: theme.textTheme.headlineSmall),
         ),
         if (favorites.isEmpty)
           Padding(
             padding: const EdgeInsets.all(32),
             child: Center(
-              child: Text('还没有收藏，点击资源右侧的心形图标即可收藏', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+              child: Text(
+                context.l10n.resourcesNoFavoritesYetClick,
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              ),
             ),
           ),
         for (final h in favorites) ResourceCard(hit: h, onTap: () => setState(() => _open = h)),

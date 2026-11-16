@@ -17,13 +17,14 @@ import '../widgets/app_background.dart';
 import 'download_page.dart' show downloadTabRequest;
 import 'home_page.dart' show instanceModCount;
 import 'instance_page.dart' show instanceSectionRequest;
+import '../l10n/l10n.dart';
 
 /// 版本选择：左侧游戏文件夹，右侧该文件夹中的版本（PCL 的布局）
 class VersionsPage extends StatelessWidget {
   const VersionsPage({super.key});
 
   /// 与 PCL-CE 的 McFolderListLoadSub 一致的自动发现规则，加上用户添加的文件夹
-  static List<GameFolder> folders(LauncherConfig cfg) {
+  static List<GameFolder> folders(LauncherConfig cfg, AppLocalizations l) {
     String norm(String x) => Platform.isWindows ? p.normalize(x).toLowerCase() : p.normalize(x);
     final out = <GameFolder>[];
     void push(GameFolder f) {
@@ -35,7 +36,7 @@ class VersionsPage extends StatelessWidget {
       if (Directory(f.path).existsSync()) push(f);
     }
     final exeDir = Paths.launcherDir;
-    if (hasVersions(exeDir)) push(GameFolder(name: '当前文件夹', path: exeDir, custom: false));
+    if (hasVersions(exeDir)) push(GameFolder(name: l.versionsCurrentFolder, path: exeDir, custom: false));
     try {
       for (final d in Directory(exeDir).listSync().whereType<Directory>()) {
         final name = p.basename(d.path);
@@ -45,13 +46,13 @@ class VersionsPage extends StatelessWidget {
       // 没有权限扫描启动器目录
     }
     if (hasVersions(Paths.officialMinecraftDir)) {
-      push(GameFolder(name: '官方启动器文件夹', path: Paths.officialMinecraftDir, custom: false));
+      push(GameFolder(name: l.versionsOfficialLauncherFolder, path: Paths.officialMinecraftDir, custom: false));
     }
     // 手机存储中的文件夹在重装应用后仍然存在
     if (Platform.isAndroid && hasVersions(AndroidStorage.gameDir)) {
-      push(GameFolder(name: '手机存储', path: AndroidStorage.gameDir, custom: false));
+      push(GameFolder(name: l.oobePhoneStorage, path: AndroidStorage.gameDir, custom: false));
     }
-    push(GameFolder(name: '启动器默认文件夹', path: p.join(Paths.appData, '.minecraft'), custom: false));
+    push(GameFolder(name: l.versionsLauncherDefaultFolder, path: p.join(Paths.appData, '.minecraft'), custom: false));
     // 当前目录即使不在列表中也要显示
     push(GameFolder(name: p.basename(cfg.gameDir), path: cfg.gameDir, custom: true));
     return out;
@@ -59,7 +60,7 @@ class VersionsPage extends StatelessWidget {
 
   Future<void> _addFolder(BuildContext context) async {
     final state = AppScope.read(context);
-    final dir = await pickFolder(context, confirm: '添加');
+    final dir = await pickFolder(context, confirm: context.l10n.oobeAdd);
     if (dir == null) return;
     final list = state.config.gameFolders.where((f) => p.normalize(f.path) != p.normalize(dir)).toList()
       ..add(GameFolder(name: p.basename(dir), path: dir, custom: true));
@@ -82,7 +83,7 @@ class VersionsPage extends StatelessWidget {
     final state = AppScope.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final list = folders(state.config);
+    final list = folders(state.config, context.l10n);
     final current = p.normalize(state.config.gameDir);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -95,7 +96,10 @@ class VersionsPage extends StatelessWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  child: Text('游戏文件夹', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                  child: Text(
+                    context.l10n.oobeGameFolder,
+                    style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
                 ),
                 for (final f in list)
                   Padding(
@@ -112,7 +116,7 @@ class VersionsPage extends StatelessWidget {
                         onTap: () => state.selectFolder(f.path),
                         trailing: f.custom && state.config.gameFolders.any((x) => x.path == f.path)
                             ? IconButton(
-                                tooltip: '从列表移除（不会删除文件）',
+                                tooltip: context.l10n.versionsRemoveFromListFiles,
                                 icon: const Icon(Icons.close, size: 18),
                                 onPressed: () => _removeFolder(context, f),
                               )
@@ -124,7 +128,7 @@ class VersionsPage extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: () => _addFolder(context),
                   icon: const Icon(Icons.create_new_folder_outlined),
-                  label: const Text('添加文件夹'),
+                  label: Text(context.l10n.versionsAddFolder),
                 ),
               ],
             ),
@@ -137,7 +141,7 @@ class VersionsPage extends StatelessWidget {
                 : state.versions.isEmpty
                 ? Center(
                     child: Text(
-                      '这个文件夹中还没有实例',
+                      context.l10n.versionsNoInstancesFolderYet,
                       style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   )
@@ -146,17 +150,26 @@ class VersionsPage extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Expanded(child: Text('${state.versions.length} 个实例', style: theme.textTheme.titleSmall)),
+                          Expanded(
+                            child: Text(
+                              context.l10n.versionsOtherInstances(state.versions.length),
+                              style: theme.textTheme.titleSmall,
+                            ),
+                          ),
                           FilledButton.tonalIcon(
                             onPressed: () {
                               downloadTabRequest.value = 'versions';
                               ShellNav.of(context).goMain(MainPage.download);
                             },
                             icon: const Icon(Icons.add, size: 18),
-                            label: const Text('新建实例'),
+                            label: Text(context.l10n.versionsNewInstance),
                           ),
                           const SizedBox(width: 4),
-                          IconButton(tooltip: '刷新', onPressed: state.refreshVersions, icon: const Icon(Icons.refresh)),
+                          IconButton(
+                            tooltip: context.l10n.fileViewerRefresh,
+                            onPressed: state.refreshVersions,
+                            icon: const Icon(Icons.refresh),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -173,15 +186,19 @@ class VersionsPage extends StatelessWidget {
                             // 同一个游戏版本可以装多个实例，带上模组数方便区分
                             subtitle: FutureBuilder<int?>(
                               future: v.loader == Loader.vanilla ? Future.value(null) : instanceModCount(state, v),
-                              builder: (context, snap) =>
-                                  Text([describeVersion(v), if (snap.data != null) '${snap.data} 个模组'].join(' · ')),
+                              builder: (context, snap) => Text(
+                                [
+                                  describeVersion(v),
+                                  if (snap.data != null) context.l10n.commonModCount(snap.data ?? 0),
+                                ].join(' · '),
+                              ),
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 if (v.id == state.config.selectedVersion) const Icon(Icons.check),
                                 IconButton(
-                                  tooltip: '实例设置',
+                                  tooltip: context.l10n.tourInstanceSettings,
                                   icon: const Icon(Icons.settings_outlined),
                                   onPressed: () {
                                     state.instanceId = v.id;

@@ -11,6 +11,8 @@ import '../net_proxy.dart';
 import '../paths.dart';
 import '../secure.dart';
 import '../safe_write.dart';
+import '../../l10n/app_localizations.dart';
+import '../i18n/strings.dart';
 
 // MCP（Model Context Protocol）客户端：让应用内 AI 使用外部 MCP 服务提供的工具。
 // 启动器只主动连出去，不监听任何端口。支持两种服务：
@@ -89,15 +91,23 @@ class McpServerConfig {
     trusted: trusted ?? this.trusted,
   );
 
+  /// 界面上显示的名称。内置的 Exa 服务保存的是创建时那种语言的默认名称，没有改过名时跟随当前界面语言
+  String get displayName => id == 'exa' && _exaDefaultNames.contains(name) ? tr.mcpClientExaSearch : name;
+
   /// 配置变化（地址、jar、参数）后要重新连接
   String get signature => jsonEncode([type, url, jar, args, trusted]);
 }
 
 /// 默认配置好并打开的服务：Exa 公开的搜索服务（不需要 Key，国内可以直连）。
 /// 它的工具都只读，所以信任它的只读声明，用的时候不用确认
-const defaultMcpServers = [
-  McpServerConfig(id: 'exa', name: 'Exa 搜索', type: 'http', url: 'https://mcp.exa.ai/mcp', trusted: true),
+List<McpServerConfig> get defaultMcpServers => [
+  McpServerConfig(id: 'exa', name: tr.mcpClientExaSearch, type: 'http', url: 'https://mcp.exa.ai/mcp', trusted: true),
 ];
+
+/// Exa 服务在各种界面语言下的默认名称
+final _exaDefaultNames = {
+  for (final l in AppLocalizations.supportedLocales) lookupAppLocalizations(l).mcpClientExaSearch,
+};
 
 final mcpIdPattern = RegExp(r'^[a-z0-9]{1,16}$');
 
@@ -117,10 +127,10 @@ String newMcpId(String name, Iterable<String> taken) {
 /// 网址检查：只允许 http / https；http 只允许本机地址（远程服务的令牌不能明文传输）
 String? checkMcpUrl(String url) {
   final u = Uri.tryParse(url.trim());
-  if (u == null || !u.hasScheme || u.host.isEmpty) return '网址无效';
+  if (u == null || !u.hasScheme || u.host.isEmpty) return tr.mcpClientInvalidURL;
   if (u.scheme == 'https') return null;
-  if (u.scheme != 'http') return '只支持 http / https';
-  return isLoopbackHost(u.host) ? null : '远程服务请使用 https；http 只能连接本机（127.0.0.1 / localhost）';
+  if (u.scheme != 'http') return tr.mcpClientOnlyHttpHttpsSupported;
+  return isLoopbackHost(u.host) ? null : tr.mcpClientRemoteServicesMustUse;
 }
 
 bool isLoopbackHost(String host) {
@@ -232,7 +242,7 @@ abstract class McpTransport {
 
 Map<String, dynamic> _resultOf(Map<String, dynamic> msg) {
   final err = msg['error'];
-  if (err is Map) throw McpError('服务返回错误：${err['message'] ?? err}');
+  if (err is Map) throw McpError(tr.mcpClientServiceReturnedError(err['message'] ?? err));
   final r = msg['result'];
   return r is Map<String, dynamic> ? r : <String, dynamic>{};
 }
@@ -281,12 +291,12 @@ class McpHttpTransport extends McpTransport {
 
   static String _httpError(int status, String body) {
     final hint = switch (status) {
-      401 || 403 => '访问被拒绝，检查访问令牌',
-      404 => '地址不对，或服务已经关闭了这个会话',
+      401 || 403 => tr.mcpClientAccessDeniedCheckAccess,
+      404 => tr.mcpClientWrongAddressServiceClosed,
       _ => '',
     };
     final text = body.trim();
-    return 'HTTP $status${hint.isEmpty ? '' : '（$hint）'}${text.isEmpty ? '' : '：${text.length > 200 ? text.substring(0, 200) : text}'}';
+    return 'HTTP $status${hint.isEmpty ? '' : tr.commonParenthesized(hint)}${text.isEmpty ? '' : '${tr.commonColon}${text.length > 200 ? text.substring(0, 200) : text}'}';
   }
 
   @override
@@ -300,23 +310,23 @@ class McpHttpTransport extends McpTransport {
       final b = BytesBuilder(copy: false);
       await for (final chunk in res) {
         b.add(chunk);
-        if (b.length > _maxBytes) throw McpError('响应太大');
+        if (b.length > _maxBytes) throw McpError(tr.mcpClientResponseTooLarge);
       }
       final msg = jsonDecode(utf8.decode(b.takeBytes(), allowMalformed: true));
-      if (msg is! Map<String, dynamic>) throw McpError('响应格式不对');
+      if (msg is! Map<String, dynamic>) throw McpError(tr.mcpClientMalformedResponse);
       return _resultOf(msg);
     }
 
     try {
       return await run().timeout(timeout ?? const Duration(seconds: 120));
     } on TimeoutException {
-      throw McpError('等待服务响应超时');
+      throw McpError(tr.mcpClientTimedOutWaitingService);
     } on FormatException {
-      throw McpError('服务的响应不是有效的 JSON');
+      throw McpError(tr.mcpClientServicesResponseIsntValid);
     } on SocketException catch (e) {
-      throw McpError('连不上服务：${e.message}');
+      throw McpError(tr.mcpClientCantReachService(e.message));
     } on HttpException catch (e) {
-      throw McpError('连接出错：${e.message}');
+      throw McpError(tr.mcpClientConnectionError(e.message));
     }
   }
 
@@ -326,7 +336,7 @@ class McpHttpTransport extends McpTransport {
     var total = 0;
     await for (final line in res.transform(const Utf8Decoder(allowMalformed: true)).transform(const LineSplitter())) {
       total += line.length;
-      if (total > _maxBytes) throw McpError('响应太大');
+      if (total > _maxBytes) throw McpError(tr.mcpClientResponseTooLarge);
       if (line.startsWith('data:')) {
         data.write(line.substring(5).trimLeft());
         continue;
@@ -348,7 +358,7 @@ class McpHttpTransport extends McpTransport {
       final msg = jsonDecode(data.toString());
       if (msg is Map<String, dynamic> && msg['id'] == id) return msg;
     }
-    throw McpError('服务没有返回响应就断开了');
+    throw McpError(tr.mcpClientServiceDisconnectedWithoutResponding);
   }
 
   @override
@@ -382,7 +392,7 @@ class McpStdioTransport extends McpTransport {
     _out = _process.stdout
         .transform(const Utf8Decoder(allowMalformed: true))
         .transform(const LineSplitter())
-        .listen(_onLine, onDone: () => _fail('服务进程已经退出'));
+        .listen(_onLine, onDone: () => _fail(tr.mcpClientServiceProcessHasExited));
     _err = _process.stderr.transform(const Utf8Decoder(allowMalformed: true)).transform(const LineSplitter()).listen((
       l,
     ) {
@@ -391,7 +401,7 @@ class McpStdioTransport extends McpTransport {
         _stderr.removeFirst();
       }
     });
-    unawaited(_process.exitCode.then((code) => _fail('服务进程已经退出（退出代码 $code）')));
+    unawaited(_process.exitCode.then((code) => _fail(tr.mcpClientServiceProcessHasExited2(code))));
   }
 
   final Process _process;
@@ -436,7 +446,7 @@ class McpStdioTransport extends McpTransport {
               : {
                   'jsonrpc': '2.0',
                   'id': id,
-                  'error': {'code': -32601, 'message': 'Pixel World 不支持这个请求'},
+                  'error': {'code': -32601, 'message': tr.mcpClientPixelWorldDoesntSupport},
                 },
         );
       }
@@ -461,7 +471,7 @@ class McpStdioTransport extends McpTransport {
       return _resultOf(await c.future.timeout(timeout ?? const Duration(seconds: 120)));
     } on TimeoutException {
       _pending.remove(id);
-      throw McpError(_withDiagnostics('等待服务响应超时'));
+      throw McpError(_withDiagnostics(tr.mcpClientTimedOutWaitingService));
     }
   }
 
@@ -471,7 +481,7 @@ class McpStdioTransport extends McpTransport {
 
   @override
   Future<void> close() async {
-    _closed ??= '已关闭';
+    _closed ??= tr.instanceOff;
     try {
       await _process.stdin.close();
     } catch (_) {}
@@ -501,7 +511,7 @@ class McpClient {
         'clientInfo': {'name': AppInfo.name, 'version': AppInfo.version},
       }, timeout: const Duration(seconds: 30));
       if (r['capabilities'] is Map && (r['capabilities'] as Map)['tools'] == null) {
-        throw McpError('这个服务没有提供工具');
+        throw McpError(tr.mcpClientServiceProvidesNoTools);
       }
       await transport.notify('notifications/initialized', {});
       final info = (r['serverInfo'] as Map?) ?? const {};

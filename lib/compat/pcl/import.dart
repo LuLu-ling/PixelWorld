@@ -12,6 +12,7 @@ import '../../core/accounts.dart';
 import '../../core/cat_ini.dart';
 import '../../core/config.dart';
 import '../../core/secure.dart';
+import '../../core/i18n/strings.dart';
 
 /// 从 PCL-CE 导入全局设置、游戏文件夹与账户。
 /// 全局配置分两处（PCL.Core/App/Configuration/ConfigService.cs）：
@@ -109,7 +110,7 @@ const _cpdMagic = 0x5f445043; // "CPD_"，小端（结构体直接写入内存�
   final d = ByteData.sublistView(buf);
   if (d.getUint32(0) != _dataMagic) return null;
   final len = d.getInt32(8);
-  if (len < 0 || len > buf.length - 12) throw Exception('加密数据长度无效');
+  if (len < 0 || len > buf.length - 12) throw Exception(tr.importInvalidEncryptedDataLength);
   return (version: d.getUint32(4), data: buf.sublist(12, 12 + len));
 }
 
@@ -151,7 +152,7 @@ Future<Uint8List> _ncryptUnprotect(Uint8List blob) async {
 /// PlainToolkit.CngProtectedData 的解包：[header 8][nonce 12][ciphertext][tag 16]，熵通过 AES-GCM 模拟
 Future<Uint8List> _cpdUnpack(Uint8List packed) async {
   if (packed.length < 8 || ByteData.sublistView(packed).getUint32(0, Endian.little) != _cpdMagic) {
-    throw Exception('无法识别的 CNG 保护数据');
+    throw Exception(tr.importUnrecognizedCNGProtectedData);
   }
   final hasEntropy = (packed[5] & 1) != 0;
   if (!hasEntropy) return packed.sublist(8);
@@ -170,15 +171,15 @@ Future<Uint8List> _cpdUnpack(Uint8List packed) async {
 
 /// 读取并解开 %APPDATA%\PCLCE\UserKey.bin
 Future<Uint8List> _loadUserKey() async {
-  if (!Platform.isWindows) throw Exception('PCL-CE 的账户密钥只能在 Windows 上解开');
+  if (!Platform.isWindows) throw Exception(tr.importPCLCEAccountKeys);
   final f = File(p.join(pclSharedDir, 'UserKey.bin'));
-  if (!f.existsSync()) throw Exception('找不到 PCL-CE 用户密钥 UserKey.bin');
+  if (!f.existsSync()) throw Exception(tr.importPCLCEUserKey);
   final ed = _parseEncryptionData(f.readAsBytesSync());
-  if (ed == null) throw Exception('UserKey.bin 格式无法识别');
+  if (ed == null) throw Exception(tr.importUnrecognizedUserKeyBinFormat);
   return switch (ed.version) {
     2 => _cpdUnpack(await _ncryptUnprotect(ed.data)),
     1 => SecureData.unprotect(ed.data, entropy: _entropy),
-    _ => throw Exception('不支持的 UserKey 版本 ${ed.version}'),
+    _ => throw Exception(tr.importUnsupportedUserKeyVersion(ed.version)),
   };
 }
 
@@ -187,7 +188,7 @@ Future<String> _secretDecrypt(String value, Uint8List key) async {
   if (value.isEmpty) return '';
   final ed = _parseEncryptionData(base64Decode(value));
   // 非常老的 PCL 使用与硬件绑定的 AES-CBC 密钥，这里不支持
-  if (ed == null) throw Exception('旧版加密格式，不支持导入');
+  if (ed == null) throw Exception(tr.importOldEncryptionFormatImport);
   final d = ed.data;
   final List<int> plain;
   switch (ed.version) {
@@ -215,7 +216,7 @@ Future<String> _secretDecrypt(String value, Uint8List key) async {
         secretKey: SecretKey(key),
       );
     default:
-      throw Exception('不支持的加密版本 ${ed.version}');
+      throw Exception(tr.importUnsupportedEncryptionVersion(ed.version));
   }
   return utf8.decode(plain);
 }
@@ -293,7 +294,7 @@ Future<PclImportResult> importFromPcl(
   String? pclDir,
 }) async {
   final shared = _readShared();
-  if (shared == null && pclDir == null) throw Exception(r'没有找到 PCL-CE 的配置（%APPDATA%\PCLCE）');
+  if (shared == null && pclDir == null) throw Exception(tr.importNoPCLCEConfiguration);
   final s = shared ?? const <String, dynamic>{};
   final local = _readLocal(pclDir);
   final result = PclImportResult();
@@ -306,32 +307,32 @@ Future<PclImportResult> importFromPcl(
 
   if (settings) {
     // 共享配置
-    take('preferredIpStack', _ipStack(s['LaunchPreferredIpStack']), 'IP 协议偏好');
-    take('gpuPreference', _bool(s['LaunchAdvanceGraphicCard']), '高性能显卡');
-    take('afterLaunch', _visibility(s['LaunchArgumentVisible']), '启动后启动器行为');
-    take('processPriority', _priority(s['LaunchArgumentPriority']), '进程优先级');
+    take('preferredIpStack', _ipStack(s['LaunchPreferredIpStack']), tr.importIPProtocolPreference);
+    take('gpuPreference', _bool(s['LaunchAdvanceGraphicCard']), tr.importHighPerformanceGPU);
+    take('afterLaunch', _visibility(s['LaunchArgumentVisible']), tr.importLauncherBehaviorAfterLaunch);
+    take('processPriority', _priority(s['LaunchArgumentPriority']), tr.priority);
     final java = _str(s['LaunchArgumentJavaSelect']);
-    if (java != null && File(java).existsSync()) take('javaPath', java, 'Java 选择');
+    if (java != null && File(java).existsSync()) take('javaPath', java, tr.importJavaChoice);
 
     // 本地配置（需要 PCL 所在目录）
     if (pclDir != null) {
       final indie = _num(local['LaunchArgumentIndieV2']);
-      if (indie != null && indie >= 0 && indie <= 4) take('isolationMode', indie, '实例隔离');
+      if (indie != null && indie >= 0 && indie <= 4) take('isolationMode', indie, tr.isolation);
       final ramType = _num(local['LaunchRamType']);
-      if (ramType != null) take('memoryMode', ramType == 1 ? 'custom' : 'auto', '内存模式');
-      take('memoryTick', _num(local['LaunchRamCustom']), '自定义内存');
-      take('memoryInitialTick', _num(local['LaunchRamCustomInitial']), '初始内存');
-      take('lockMemory', _bool(local['LaunchAdvanceLockMemory']), '锁定内存');
-      take('jvmArgs', _str(local['LaunchAdvanceJvm']), 'JVM 参数');
-      take('gameArgs', _str(local['LaunchAdvanceGame']), '游戏参数');
-      take('preLaunchCommand', _str(local['LaunchAdvanceRun']), '启动前命令');
-      take('preLaunchWait', _bool(local['LaunchAdvanceRunWait']), '等待启动前命令');
-      take('versionType', _str(local['LaunchArgumentInfo']), '版本类型');
-      take('windowMode', _windowMode(local['LaunchArgumentWindowType']), '窗口模式');
-      take('windowWidth', _num(local['LaunchArgumentWindowWidth']), '窗口宽度');
-      take('windowHeight', _num(local['LaunchArgumentWindowHeight']), '窗口高度');
+      if (ramType != null) take('memoryMode', ramType == 1 ? 'custom' : 'auto', tr.importMemoryMode);
+      take('memoryTick', _num(local['LaunchRamCustom']), tr.importCustomMemory);
+      take('memoryInitialTick', _num(local['LaunchRamCustomInitial']), tr.instanceInitialMemory);
+      take('lockMemory', _bool(local['LaunchAdvanceLockMemory']), tr.memoryLock);
+      take('jvmArgs', _str(local['LaunchAdvanceJvm']), tr.jvmArgs);
+      take('gameArgs', _str(local['LaunchAdvanceGame']), tr.gameArgs);
+      take('preLaunchCommand', _str(local['LaunchAdvanceRun']), tr.importPreLaunchCommand);
+      take('preLaunchWait', _bool(local['LaunchAdvanceRunWait']), tr.importWaitPreLaunchCommand);
+      take('versionType', _str(local['LaunchArgumentInfo']), tr.importVersionType);
+      take('windowMode', _windowMode(local['LaunchArgumentWindowType']), tr.importWindowMode);
+      take('windowWidth', _num(local['LaunchArgumentWindowWidth']), tr.gameWindowWidth);
+      take('windowHeight', _num(local['LaunchArgumentWindowHeight']), tr.gameWindowHeight);
     } else {
-      result.warnings.add('内存、JVM 参数、实例隔离等设置保存在 PCL-CE 程序目录中，选择该目录后才能导入');
+      result.warnings.add(tr.importMemoryJVMArgumentsInstance);
     }
   }
 
@@ -339,7 +340,7 @@ Future<PclImportResult> importFromPcl(
     final found = _parseFolders(s['LaunchFolders'], pclDir);
     // PCL 程序目录下的 .minecraft 也算
     if (pclDir != null && Directory(p.join(pclDir, '.minecraft', 'versions')).existsSync()) {
-      found.add(GameFolder(name: 'PCL-CE 文件夹', path: p.join(pclDir, '.minecraft'), custom: true));
+      found.add(GameFolder(name: tr.importPCLCEFolder, path: p.join(pclDir, '.minecraft'), custom: true));
     }
     final list = [...cfg.gameFolders];
     for (final f in found) {
@@ -373,7 +374,7 @@ Future<PclImportResult> importFromPcl(
           final converted = pclAccount(profiles[i]);
           if (converted == null) {
             final name = _text(profiles[i]['username']);
-            if (name != null) result.skippedAccounts.add('$name（账户信息不完整，请在账户中重新登录）');
+            if (name != null) result.skippedAccounts.add(tr.importIncompleteAccountInfoSign(name));
             continue;
           }
           final acc = await store.importAccount(converted);
@@ -384,7 +385,7 @@ Future<PclImportResult> importFromPcl(
         }
       }
     } catch (e) {
-      result.warnings.add('账户导入失败：$e');
+      result.warnings.add(tr.importAccountImportFailed(e));
     }
   }
 

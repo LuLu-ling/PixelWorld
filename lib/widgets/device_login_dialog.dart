@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../app_scope.dart';
 import '../core/accounts.dart';
 import '../core/auth/auth.dart';
+import '../l10n/l10n.dart';
 
 /// 设备代码登录对话框（微软）。[create] 用展示代码的回调创建登录命令
 Future<void> showDeviceLogin(
@@ -23,14 +24,14 @@ Future<void> showDeviceLogin(
         width: 400,
         child: DeviceLoginPanel(create: create, run: run, onDone: (acc) => loggedIn(context, acc), autoStart: true),
       ),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel))],
     ),
   );
 }
 
 void loggedIn(BuildContext context, Account acc) {
   Navigator.pop(context);
-  toast(context, '已登录 ${acc.name}');
+  toast(context, context.l10n.deviceLoginDialogSignedAs(acc.name));
 }
 
 /// 设备代码登录的内容：用户点「开始」（或 [autoStart] 时创建后立即）开始，显示代码并打开授权页面，
@@ -43,7 +44,7 @@ class DeviceLoginPanel extends StatefulWidget {
     required this.onDone,
     this.autoStart = false,
     this.intro,
-    this.startLabel = '开始登录',
+    this.startLabel,
   });
 
   final LoginCommand Function(void Function(DeviceCode) onCode) create;
@@ -53,7 +54,9 @@ class DeviceLoginPanel extends StatefulWidget {
 
   /// 开始前显示的说明
   final String? intro;
-  final String startLabel;
+
+  /// 开始按钮的文字，默认「开始登录」
+  final String? startLabel;
 
   @override
   State<DeviceLoginPanel> createState() => _DeviceLoginPanelState();
@@ -108,7 +111,7 @@ class _DeviceLoginPanelState extends State<DeviceLoginPanel> {
           FilledButton.icon(
             onPressed: () => setState(_start),
             icon: const Icon(Icons.open_in_browser),
-            label: Text(widget.startLabel),
+            label: Text(widget.startLabel ?? context.l10n.deviceLoginDialogStartSign),
           ),
         ],
       );
@@ -119,7 +122,11 @@ class _DeviceLoginPanelState extends State<DeviceLoginPanel> {
         children: [
           Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
           const SizedBox(height: 8),
-          TextButton.icon(onPressed: () => setState(_start), icon: const Icon(Icons.refresh), label: const Text('重试')),
+          TextButton.icon(
+            onPressed: () => setState(_start),
+            icon: const Icon(Icons.refresh),
+            label: Text(context.l10n.deviceLoginDialogRetry),
+          ),
         ],
       );
     }
@@ -129,7 +136,11 @@ class _DeviceLoginPanelState extends State<DeviceLoginPanel> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(code.completeUri != null ? '已在浏览器中打开授权页面，请确认页面上的代码与下面一致后完成授权：' : '已在浏览器中打开登录页面，请输入下面的代码（已复制到剪贴板）：'),
+        Text(
+          code.completeUri != null
+              ? context.l10n.deviceLoginDialogAuthorizationPageHasOpened
+              : context.l10n.deviceLoginDialogSignPageHasOpened,
+        ),
         const SizedBox(height: 16),
         SelectableText(
           code.userCode,
@@ -141,12 +152,12 @@ class _DeviceLoginPanelState extends State<DeviceLoginPanel> {
           child: Text(code.verificationUri),
         ),
         const SizedBox(height: 8),
-        const Row(
+        Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
             SizedBox(width: 12),
-            Text('等待登录完成'),
+            Text(context.l10n.deviceLoginDialogWaitingSign),
           ],
         ),
       ],

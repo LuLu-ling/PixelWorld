@@ -1,5 +1,6 @@
 import 'auth.dart';
 import 'http_json.dart';
+import '../i18n/strings.dart';
 
 /// 一个 authlib-injector 验证服务器：API 根地址与元数据
 class YggdrasilServer {
@@ -21,7 +22,7 @@ class YggdrasilServer {
   /// 跟随重定向，再按 API 地址指示（ALI）响应头确定 API 根地址
   static Future<YggdrasilServer> resolve(String input) async {
     var url = input.trim();
-    if (url.isEmpty) throw Exception('请输入验证服务器地址');
+    if (url.isEmpty) throw Exception(tr.yggdrasilApiEnterAuthenticationServerAddress);
     if (!RegExp(r'^https?://', caseSensitive: false).hasMatch(url)) url = 'https://$url';
     var r = await requestJson('GET', url);
     final ali = r.headers.value('x-authlib-injector-api-location');
@@ -37,7 +38,7 @@ class YggdrasilServer {
 
   static YggdrasilServer _parse(JsonResponse r) {
     final meta = r.map['meta'];
-    if (!r.ok || meta is! Map<String, dynamic>) throw Exception('${r.url} 不是有效的验证服务器');
+    if (!r.ok || meta is! Map<String, dynamic>) throw Exception(tr.yggdrasilApiIsntValidAuthenticationServer(r.url));
     return YggdrasilServer._(r.url.toString().replaceFirst(RegExp(r'/+$'), ''), r.body, meta);
   }
 }
@@ -101,7 +102,9 @@ class YggdrasilClient {
     final r = await requestJson('POST', '$root/authserver/$path', json: body);
     final j = r.map;
     if (!r.ok || j['accessToken'] == null) {
-      throw YggdrasilException('${j['errorMessage'] ?? j['error'] ?? '验证服务器返回 HTTP ${r.status}'}');
+      throw YggdrasilException(
+        '${j['errorMessage'] ?? j['error'] ?? tr.yggdrasilApiAuthenticationServerReturnedHTTP(r.status)}',
+      );
     }
     return YggdrasilSession(j);
   }

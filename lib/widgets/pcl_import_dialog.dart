@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_scope.dart';
 import '../core/pcl_import.dart';
 import '../pages/file_manager_page.dart';
+import '../l10n/l10n.dart';
 
 /// 从 PCL-CE 导入设置、游戏文件夹与账户
 Future<void> showPclImport(BuildContext context) =>
@@ -61,7 +62,7 @@ class _PclImportDialogState extends State<_PclImportDialog> {
     final r = _result;
     return AlertDialog(
       icon: const Icon(Icons.move_down),
-      title: const Text('从 PCL-CE 导入'),
+      title: Text(context.l10n.pclImport),
       content: SizedBox(
         width: 460,
         child: r != null
@@ -69,11 +70,15 @@ class _PclImportDialogState extends State<_PclImportDialog> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('导入完成', style: theme.textTheme.titleMedium),
+                  Text(context.l10n.pclImportDialogImportComplete, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  if (r.settings.isNotEmpty) Text('设置：${r.settings.join('、')}'),
-                  Text('新增游戏文件夹 ${r.folders} 个，账户 ${r.accounts} 个'),
-                  if (r.skippedAccounts.isNotEmpty) Text('未导入：${r.skippedAccounts.join('、')}'),
+                  if (r.settings.isNotEmpty)
+                    Text(context.l10n.pclImportDialogSettings(r.settings.join(context.l10n.commonListSeparator))),
+                  Text(context.l10n.pclImportDialogAddedGameFoldersAccounts(r.folders, r.accounts)),
+                  if (r.skippedAccounts.isNotEmpty)
+                    Text(
+                      context.l10n.pclImportDialogNotImported(r.skippedAccounts.join(context.l10n.commonListSeparator)),
+                    ),
                   for (final w in r.warnings)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
@@ -87,12 +92,15 @@ class _PclImportDialogState extends State<_PclImportDialog> {
                 children: [
                   Text(
                     _detection.found
-                        ? '检测到 PCL-CE 的配置：${_detection.folders} 个游戏文件夹${_detection.hasAccounts ? '，有账户' : ''}'
-                        : r'没有在 %APPDATA%\PCLCE 找到 PCL-CE 的配置，可以选择 PCL-CE 所在目录导入本地设置',
+                        ? context.l10n.pclImportDialogFoundPCLCEConfiguration(
+                            _detection.folders,
+                            _detection.hasAccounts ? context.l10n.pclImportDialogAccounts : '',
+                          )
+                        : context.l10n.pclImportDialogNoPCLCEConfiguration,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '实例独立设置无需导入，两者直接共用。',
+                    context.l10n.pclImportDialogPerInstanceSettingsDont,
                     style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 12),
@@ -100,32 +108,34 @@ class _PclImportDialogState extends State<_PclImportDialog> {
                     contentPadding: EdgeInsets.zero,
                     value: _settings,
                     onChanged: (v) => setState(() => _settings = v!),
-                    title: const Text('启动设置'),
-                    subtitle: const Text('内存、JVM 参数等需要选择 PCL-CE 所在目录'),
+                    title: Text(context.l10n.pclImportDialogLaunchSettings),
+                    subtitle: Text(context.l10n.pclImportDialogMemoryJVMArgumentsMore),
                   ),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     value: _folders,
                     onChanged: (v) => setState(() => _folders = v!),
-                    title: const Text('游戏文件夹'),
+                    title: Text(context.l10n.oobeGameFolder),
                   ),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     value: _accounts,
                     onChanged: (v) => setState(() => _accounts = v!),
-                    title: const Text('账户'),
-                    subtitle: const Text('导入的微软账户过期后需要在这里重新登录'),
+                    title: Text(context.l10n.oobeAccount),
+                    subtitle: Text(context.l10n.pclImportDialogImportedMicrosoftAccountsNeed),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
                         child: Text(
-                          _pclDir == null ? 'PCL-CE 所在目录：未选择（可选）' : 'PCL-CE 所在目录：$_pclDir',
+                          _pclDir == null
+                              ? context.l10n.pclImportDialogPCLCEFolderNot
+                              : context.l10n.pclImportDialogPCLCEFolder(_pclDir!),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      TextButton(onPressed: _pickDir, child: const Text('选择')),
+                      TextButton(onPressed: _pickDir, child: Text(context.l10n.commonChoose)),
                     ],
                   ),
                   if (_error != null) Text(_error!, style: TextStyle(color: scheme.error)),
@@ -134,14 +144,14 @@ class _PclImportDialogState extends State<_PclImportDialog> {
               ),
       ),
       actions: r != null
-          ? [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('完成'))]
+          ? [FilledButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.oobeDone))]
           : [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+              TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel)),
               FilledButton(
                 onPressed: _running || (!_detection.found && _pclDir == null) || !(_settings || _folders || _accounts)
                     ? null
                     : _run,
-                child: const Text('导入'),
+                child: Text(context.l10n.pclImportButton),
               ),
             ],
     );

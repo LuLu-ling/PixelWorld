@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'i18n/strings.dart';
+
 /// 路径不在允许的目录内，或无法确认是否安全
 class UnsafePathException implements Exception {
   UnsafePathException(this.message);
@@ -24,7 +26,7 @@ class UnsafePathException implements Exception {
 String resolveInside(String root, String rel) {
   final parts = splitRelative(rel);
   final abs = p.normalize(p.joinAll([root, ...parts]));
-  if (!p.isWithin(root, abs)) throw UnsafePathException('只能访问版本运行目录中的文件：$rel');
+  if (!p.isWithin(root, abs)) throw UnsafePathException(tr.safePathOnlyFilesVersionsWorking(rel));
   recheckInside(root, abs);
   return abs;
 }
@@ -32,25 +34,27 @@ String resolveInside(String root, String rel) {
 /// 校验并拆分相对路径（不访问文件系统）
 List<String> splitRelative(String rel) {
   final s = rel.replaceAll('\\', '/').trim();
-  if (s.isEmpty) throw UnsafePathException('路径无效：$rel');
+  if (s.isEmpty) throw UnsafePathException(tr.safePathInvalidPath(rel));
   if (s.startsWith('/') || p.posix.isAbsolute(s) || p.windows.isAbsolute(s)) {
-    throw UnsafePathException('路径无效：$rel');
+    throw UnsafePathException(tr.safePathInvalidPath(rel));
   }
   final parts = s.split('/').where((e) => e.isNotEmpty).toList();
-  if (parts.isEmpty) throw UnsafePathException('路径无效：$rel');
+  if (parts.isEmpty) throw UnsafePathException(tr.safePathInvalidPath(rel));
   for (final part in parts) {
     if (part == '..' || part == '.' || part.contains(':') || part.codeUnits.any((c) => c < 0x20)) {
-      throw UnsafePathException('路径无效：$rel');
+      throw UnsafePathException(tr.safePathInvalidPath(rel));
     }
     // Windows 会忽略结尾的点和空格，"mods." 实际指向 "mods"
-    if (Platform.isWindows && (part.endsWith('.') || part.endsWith(' '))) throw UnsafePathException('路径无效：$rel');
+    if (Platform.isWindows && (part.endsWith('.') || part.endsWith(' '))) {
+      throw UnsafePathException(tr.safePathInvalidPath(rel));
+    }
   }
   return parts;
 }
 
 /// 确认 [abs]（必须已在 [root] 之下）沿途没有符号链接，且真实路径仍在 [root] 中
 void recheckInside(String root, String abs) {
-  if (!p.isWithin(root, abs)) throw UnsafePathException('只能访问版本运行目录中的文件');
+  if (!p.isWithin(root, abs)) throw UnsafePathException(tr.safePathOnlyFilesVersionsWorking2);
   final rel = p.relative(abs, from: root);
   var cur = root;
   var deepest = root;
@@ -59,7 +63,7 @@ void recheckInside(String root, String abs) {
     final type = FileSystemEntity.typeSync(cur, followLinks: false);
     if (type == FileSystemEntityType.notFound) break;
     if (type == FileSystemEntityType.link) {
-      throw UnsafePathException('路径中有符号链接，为安全起见不能操作：${p.relative(cur, from: root)}');
+      throw UnsafePathException(tr.safePathPathContainsSymbolicLink(p.relative(cur, from: root)));
     }
     deepest = cur;
   }
@@ -71,10 +75,10 @@ void recheckInside(String root, String abs) {
         ? Directory(deepest).resolveSymbolicLinksSync()
         : File(deepest).resolveSymbolicLinksSync();
   } on FileSystemException {
-    throw UnsafePathException('无法确认路径的真实位置：${p.relative(abs, from: root)}');
+    throw UnsafePathException(tr.safePathCantDetermineRealLocation(p.relative(abs, from: root)));
   }
   if (!p.equals(realRoot, realDeepest) && !p.isWithin(realRoot, realDeepest)) {
-    throw UnsafePathException('路径实际指向版本运行目录之外：${p.relative(abs, from: root)}');
+    throw UnsafePathException(tr.safePathPathActuallyPointsOutside(p.relative(abs, from: root)));
   }
 }
 

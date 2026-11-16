@@ -671,14 +671,7 @@ class MiscSection extends StatelessWidget {
               title: l.updateChannel,
               subtitle: l.updateChannelHint,
               value: UpdateChannel.parse(cfg.updateChannel),
-              options: {
-                for (final c in UpdateChannel.values)
-                  c: switch (c) {
-                    UpdateChannel.stable => l.updateChannelStable,
-                    UpdateChannel.preview => l.updateChannelPreview,
-                    UpdateChannel.nightly => c.label,
-                  },
-              },
+              options: {for (final c in UpdateChannel.values) c: c.label},
               onChanged: (v) => cfg.update({'updateChannel': v.name, 'updateSkipped': ''}),
             ),
             _SwitchRow(

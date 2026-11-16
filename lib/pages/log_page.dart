@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../app_scope.dart';
 import '../app_state.dart';
 import '../widgets/side_nav.dart';
+import '../l10n/l10n.dart';
 
 /// 游戏日志：实时输出，自动滚动到底部
 class LogPage extends StatefulWidget {
@@ -45,27 +46,34 @@ class _LogPageState extends State<LogPage> {
                 children: [
                   Expanded(
                     child: Text(switch (state.gameState) {
-                      GameState.running => '游戏运行中',
-                      GameState.preparing => '正在启动',
-                      GameState.idle => state.lastExitCode == null ? '游戏未运行' : '游戏已退出，代码 ${state.lastExitCode}',
+                      GameState.running => context.l10n.logGameRunning,
+                      GameState.preparing => context.l10n.logStarting,
+                      GameState.idle =>
+                        state.lastExitCode == null
+                            ? context.l10n.logGameNotRunning
+                            : context.l10n.logGameExitedCode(state.lastExitCode ?? ''),
                     }, style: Theme.of(context).textTheme.titleSmall),
                   ),
                   FilterChip(
-                    label: const Text('自动滚动'),
+                    label: Text(context.l10n.logAutoScroll),
                     selected: _follow,
                     onSelected: (v) => setState(() => _follow = v),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    tooltip: '复制全部',
+                    tooltip: context.l10n.logCopyAll,
                     icon: const Icon(Icons.copy_all_outlined),
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: state.log.value.join('\n')));
-                      toast(context, '已复制日志');
+                      toast(context, context.l10n.commonLogCopied);
                     },
                   ),
                   if (state.gameState == GameState.running)
-                    TextButton.icon(onPressed: state.killGame, icon: const Icon(Icons.stop), label: const Text('结束游戏')),
+                    TextButton.icon(
+                      onPressed: state.killGame,
+                      icon: const Icon(Icons.stop),
+                      label: Text(context.l10n.commonStopGame),
+                    ),
                 ],
               ),
             ),
@@ -80,7 +88,7 @@ class _LogPageState extends State<LogPage> {
                   }
                   if (lines.isEmpty) {
                     return Center(
-                      child: Text('启动游戏后，日志会显示在这里', style: TextStyle(color: scheme.onSurfaceVariant)),
+                      child: Text(context.l10n.logLogWillAppearHere, style: TextStyle(color: scheme.onSurfaceVariant)),
                     );
                   }
                   return SelectionArea(

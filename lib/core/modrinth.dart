@@ -9,21 +9,30 @@ import 'instance.dart';
 import 'paths.dart';
 import 'safe_write.dart';
 import 'task.dart';
+import 'i18n/strings.dart';
 
 const _api = 'https://api.modrinth.com/v2';
 
 enum ResourceType {
-  mod('mod', '模组', 'mods'),
-  modpack('modpack', '整合包', 'mods'),
-  resourcepack('resourcepack', '资源包', 'resourcepacks'),
-  shader('shader', '光影包', 'shaderpacks'),
-  datapack('datapack', '数据包', 'datapacks');
+  mod('mod', 'mods'),
+  modpack('modpack', 'mods'),
+  resourcepack('resourcepack', 'resourcepacks'),
+  shader('shader', 'shaderpacks'),
+  datapack('datapack', 'datapacks');
 
-  const ResourceType(this.tag, this.label, this.folder);
+  const ResourceType(this.tag, this.folder);
 
   /// Modrinth 的 project_type
   final String tag;
-  final String label;
+
+  /// 界面上的名称（随界面语言）
+  String get label => switch (this) {
+    mod => tr.homeMods,
+    modpack => tr.downloadModpacks,
+    resourcepack => tr.commonResourcePacks,
+    shader => tr.modrinthShaderPacks,
+    datapack => tr.downloadDataPacks,
+  };
 
   /// 安装到运行目录下的哪个文件夹
   final String folder;
@@ -165,11 +174,11 @@ class Modrinth {
         final res = await (await _client.getUrl(Uri.parse('$_api$path'))).close().timeout(const Duration(seconds: 20));
         final body = await res.transform(utf8.decoder).join();
         if (res.statusCode == 404) throw const _NotFound();
-        if (res.statusCode == 429) throw Exception('请求过于频繁，请稍后再试');
-        if (res.statusCode != 200) throw Exception('Modrinth 请求失败（${res.statusCode}）');
+        if (res.statusCode == 429) throw Exception(tr.modrinthTooManyRequestsPlease);
+        if (res.statusCode != 200) throw Exception(tr.modrinthModrinthRequestFailed(res.statusCode));
         return jsonDecode(body);
       } on _NotFound {
-        throw Exception('Modrinth 上找不到该资源');
+        throw Exception(tr.modrinthResourceWasntFoundModrinth);
       } catch (e) {
         lastErr = e;
         await Future<void>.delayed(Duration(milliseconds: 400 * (i + 1)));
@@ -271,10 +280,10 @@ class Modrinth {
     required Downloader dl,
     required TaskProgress task,
   }) async {
-    if (type == ResourceType.modpack) throw Exception('整合包安装将在后续版本提供');
+    if (type == ResourceType.modpack) throw Exception(tr.modrinthModpackInstallationWillCome);
     final String dir;
     if (type == ResourceType.datapack) {
-      if (world == null) throw Exception('请选择要安装数据包的世界');
+      if (world == null) throw Exception(tr.modrinthChooseWorldInstallData);
       dir = p.join(gameDir, 'saves', world, 'datapacks');
     } else {
       dir = p.join(gameDir, type.folder);
@@ -285,14 +294,14 @@ class Modrinth {
     final files = [version];
     final missing = <String>[];
     if (type == ResourceType.mod) {
-      task.beginStep('解析前置');
+      task.beginStep(tr.commonResolveDependencies);
       final loaders = modrinthLoaders(instance.loader);
       final seen = {version.projectId};
       final queue = [...version.requires];
       while (queue.isNotEmpty) {
         final pid = queue.removeAt(0);
         if (!seen.add(pid)) continue;
-        task.setStage('解析前置（${seen.length - 1}）');
+        task.setStage(tr.modrinthResolveDependencies(seen.length - 1));
         final candidates = await versions(
           pid,
           gameVersion: instance.gameVersion,
@@ -321,8 +330,8 @@ class Modrinth {
       task.registerCleanupPath(p.join(dir, v.fileName));
       installed.add(v.fileName);
     }
-    task.beginStep('下载文件');
-    task.setStage('下载文件');
+    task.beginStep(tr.commonDownloadFiles);
+    task.setStage(tr.commonDownloadFiles);
     await dl.downloadAll(items, task.progress, cancelled: () => task.cancelled);
     return InstallResult(installed, skipped, missing);
   }
@@ -347,6 +356,8 @@ class Favorites {
     }
   }
 
-  static Future<void> save(List<ResourceHit> list) =>
-      writeFileSafely(_file, utf8.encode(const JsonEncoder.withIndent('  ').convert([for (final h in list) h.toJson()])));
+  static Future<void> save(List<ResourceHit> list) => writeFileSafely(
+    _file,
+    utf8.encode(const JsonEncoder.withIndent('  ').convert([for (final h in list) h.toJson()])),
+  );
 }

@@ -43,6 +43,7 @@ import 'core/precheck.dart';
 import 'core/task.dart';
 import 'platform.dart';
 import 'core/loader_names.dart';
+import 'core/i18n/strings.dart';
 
 enum GameState { idle, preparing, running }
 
@@ -127,7 +128,7 @@ class AppState extends ChangeNotifier {
   Future<void> _cleanupCancelled(TaskProgress t) async {
     if (t.cleanupDone) return;
     final removed = await t.cleanupFiles();
-    if (removed > 0) t.output('已清理 $removed 个由本次任务创建的文件或目录');
+    if (removed > 0) t.output(tr.appStateRemovedFilesFoldersCreated(removed));
     t.markCancelled();
   }
 
@@ -284,8 +285,8 @@ class AppState extends ChangeNotifier {
     String? world,
   }) async {
     final t = TaskProgress(
-      '安装 ${version.fileName}',
-      steps: [if (type == ResourceType.mod) '解析前置', '下载文件'],
+      tr.appStateInstall(version.fileName),
+      steps: [if (type == ResourceType.mod) tr.commonResolveDependencies, tr.commonDownloadFiles],
       canCancel: true,
       retry: () => installResource(version, type, instance, world: world).catchError((_) => InstallResult([], [], [])),
     );
@@ -302,8 +303,11 @@ class AppState extends ChangeNotifier {
         task: t,
       );
       t.output(
-        '已安装 ${r.installed.length} 个文件，跳过 ${r.skipped.length} 个已存在的文件'
-        '${r.missing.isEmpty ? '' : '，找不到兼容的前置：${r.missing.join('、')}'}',
+        tr.appStateInstalledFilesSkippedExisting(
+          r.installed.length,
+          r.skipped.length,
+          r.missing.isEmpty ? '' : tr.appStateNoCompatibleDependencyFound(r.missing.join(tr.commonListSeparator)),
+        ),
       );
       return r;
     });
@@ -312,8 +316,13 @@ class AppState extends ChangeNotifier {
   /// 安装 Modrinth 整合包为新版本，完成后选中它
   Future<String> installModpack(ResourceVersion version, {String? name}) async {
     final t = TaskProgress(
-      '安装整合包 ${name ?? version.name}',
-      steps: const ['下载整合包', '安装游戏与加载器', '下载整合包文件', '解压整合包配置'],
+      tr.appStateInstallModpack(name ?? version.name),
+      steps: [
+        tr.commonDownloadModpack,
+        tr.commonInstallGameLoader,
+        tr.commonDownloadModpackFiles,
+        tr.commonExtractModpackConfigs,
+      ],
       canCancel: true,
       retry: () => installModpack(version, name: name).catchError((_) => ''),
     );
@@ -321,7 +330,7 @@ class AppState extends ChangeNotifier {
       final id = await installModpackFiles(paths, version, downloader, t, name: name);
       await refreshVersions();
       await selectVersion(id);
-      t.output('已安装为 $id');
+      t.output(tr.appStateInstalledAs(id));
       return id;
     });
   }
@@ -329,8 +338,13 @@ class AppState extends ChangeNotifier {
   /// 安装本地 .mrpack 整合包为新版本，完成后选中它
   Future<String> installModpackFile(String path, {String? name}) async {
     final t = TaskProgress(
-      '安装整合包 ${name ?? p.basenameWithoutExtension(path)}',
-      steps: const ['读取整合包', '安装游戏与加载器', '下载整合包文件', '解压整合包配置'],
+      tr.appStateInstallModpack2(name ?? p.basenameWithoutExtension(path)),
+      steps: [
+        tr.commonReadModpack,
+        tr.commonInstallGameLoader,
+        tr.commonDownloadModpackFiles,
+        tr.commonExtractModpackConfigs,
+      ],
       canCancel: true,
       retry: () => installModpackFile(path, name: name).catchError((_) => ''),
     );
@@ -338,7 +352,7 @@ class AppState extends ChangeNotifier {
       final id = await installModpackArchive(paths, path, downloader, t, name: name);
       await refreshVersions();
       await selectVersion(id);
-      t.output('已安装为 $id');
+      t.output(tr.appStateInstalledAs(id));
       return id;
     });
   }
@@ -346,7 +360,7 @@ class AppState extends ChangeNotifier {
   /// 给已安装的版本添加 OptiFine（作为模组）
   Future<void> addOptiFineMod(InstanceInfo instance, String version) {
     final t = TaskProgress(
-      '为 ${instance.id} 添加 OptiFine',
+      tr.appStateAddOptiFine(instance.id),
       steps: [
         downloadStep(loaderComponent(LoaderKind.optifine, instance.gameVersion, version)),
         installStep(loaderComponent(LoaderKind.optifine, instance.gameVersion, version)),
@@ -361,7 +375,9 @@ class AppState extends ChangeNotifier {
 
   /// 删除版本文件夹（移到回收站）
   Future<void> deleteVersion(String id) async {
-    if (id.isEmpty || id.contains('..') || RegExp(r'[\\/]').hasMatch(id)) throw Exception('实例名称不合法');
+    if (id.isEmpty || id.contains('..') || RegExp(r'[\\/]').hasMatch(id)) {
+      throw Exception(tr.appStateInvalidInstanceName);
+    }
     await moveToTrash(paths.versionDir(id));
     if (config.selectedVersion == id) await config.update({'selectedVersion': ''});
     await refreshVersions();
@@ -381,7 +397,7 @@ class AppState extends ChangeNotifier {
     final vanillaMissing = !File(paths.versionJson(gameVersion)).existsSync();
     final component = loader == null ? null : loaderComponent(loader, gameVersion, loaderVersion);
     final t = TaskProgress(
-      '安装 ${name ?? defaultVersionName(loader, gameVersion, loaderVersion)}',
+      tr.appStateInstall2(name ?? defaultVersionName(loader, gameVersion, loaderVersion)),
       steps: [
         if (loader == null || vanillaMissing) ...[
           downloadStep('Minecraft $gameVersion'),
@@ -414,7 +430,7 @@ class AppState extends ChangeNotifier {
       }
       await refreshVersions();
       await selectVersion(id);
-      t.output('已安装为 $id');
+      t.output(tr.appStateInstalledAs(id));
       return id;
     });
   }
@@ -445,11 +461,11 @@ class AppState extends ChangeNotifier {
     required ({int width, int height}) launcherSize,
     required ({int width, int height}) screenSize,
   }) async {
-    if (gameState != GameState.idle) throw Exception('游戏已在运行');
+    if (gameState != GameState.idle) throw Exception(tr.appStateGameAlreadyRunning);
     final id = config.selectedVersion;
-    if (id.isEmpty) throw Exception('请先选择一个实例');
+    if (id.isEmpty) throw Exception(tr.appStateChooseInstanceFirst);
     var acc = selectedAccount;
-    if (acc == null) throw Exception('请先添加一个账户');
+    if (acc == null) throw Exception(tr.appStateAddAccountFirst);
 
     // ---- 正版购买劝导与赞助劝导 ----
     var demo = false;
@@ -469,7 +485,10 @@ class AppState extends ChangeNotifier {
 
     final g = paths;
     final cfg = config;
-    final t = TaskProgress('启动 $id', steps: const ['检查文件', '准备启动', '启动游戏']);
+    final t = TaskProgress(
+      tr.appStateLaunch(id),
+      steps: [tr.appStateCheckFiles, tr.appStatePrepareLaunch, tr.appStateStartGame],
+    );
     task = t;
     tasks.insert(0, t);
     gameState = GameState.preparing;
@@ -477,7 +496,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       final dl = downloader;
-      if (acc.type != AccountType.offline) t.setStage('验证账户');
+      if (acc.type != AccountType.offline) t.setStage(tr.appStateVerifyAccount);
       final AuthSession auth;
       try {
         auth = await _authFor(acc).prepare(acc, prompts);
@@ -487,14 +506,14 @@ class AppState extends ChangeNotifier {
         return false;
       }
       if (!identical(auth.account, acc)) acc = await accounts.upsert(auth.account);
-      t.setStage('分析实例');
+      t.setStage(tr.appStateAnalyzeInstance);
       final info = await analyzeInstance(g, id);
       final inst = readInstanceSettings(g.versionDir(id));
       // 首次启动时决定并记录版本隔离
       final gameDir = await gameDirFor(g, info, cfg.isolationMode, persist: true);
       await Directory(gameDir).create(recursive: true);
 
-      t.beginStep('检查文件');
+      t.beginStep(tr.appStateCheckFiles);
       final v = await ensureVersionFiles(g, id, dl, t, resourcesDir: () => p.join(gameDir, 'resources'));
       final java = isDesktop
           ? await ensureJava(v, inst.java, cfg.javaPath, dl, t)
@@ -507,8 +526,8 @@ class AppState extends ChangeNotifier {
         return false;
       }
 
-      t.beginStep('准备启动');
-      t.setStage('解压本地库');
+      t.beginStep(tr.appStatePrepareLaunch);
+      t.setStage(tr.appStateExtractNativeLibraries);
       // 26.x 用 SDL3 代替 GLFW 管理窗口与输入
       final sdl = v.libraries.any((l) => '${l['name']}'.startsWith('org.lwjgl:lwjgl-sdl:'));
       // 安卓上用运行时自带的 LWJGL 与本地库代替游戏自带的
@@ -579,17 +598,17 @@ class AppState extends ChangeNotifier {
         if (sdl && !args.contains('--graphicsBackend')) args.addAll(['--graphicsBackend', 'opengl']);
       }
 
-      t.setStage('准备启动');
+      t.setStage(tr.appStatePrepareLaunch);
       await prepareOptions(cfg, gameDir, v.releaseTime).catchError((_) {});
       if (android != null) await disableForgeSplash(gameDir).catchError((_) {});
       await writePclSelectedVersion(g.root, id).catchError((_) {});
       if (android != null) {
-        t.beginStep('启动游戏');
-        _launcherLog('Java: ${java.path}（安卓版 Java ${java.major}）');
-        _launcherLog('内存: ${memory.max.toStringAsFixed(1)} GB');
-        _launcherLog('工作目录: $gameDir');
-        if (demo) _launcherLog('以试玩模式启动');
-        _launcherLog('渲染比例: ${(cfg.renderScale * 100).round()}%');
+        t.beginStep(tr.appStateStartGame);
+        _launcherLog(tr.appStateJavaAndroidJava(java.path, java.major));
+        _launcherLog(tr.appStateMemoryGB(memory.max.toStringAsFixed(1)));
+        _launcherLog(tr.appStateWorkingDirectory(gameDir));
+        if (demo) _launcherLog(tr.appStateLaunchingDemoMode);
+        _launcherLog(tr.appStateRenderScale((cfg.renderScale * 100).round()));
         // 版本设置优先，其次全局设置；「自动」按显卡选择
         final gpu = await androidGpu().catchError((_) => AndroidGpu(const {}));
         final renderer = resolveAndroidRenderer(
@@ -601,20 +620,26 @@ class AppState extends ChangeNotifier {
         final sfpew = ffp && renderer.renderer == 'mobileglues';
         // Zink 搭配高通自带的 Vulkan 驱动时画面不刷新，骁龙上改用自带的 Turnip
         final turnip = renderer.renderer == 'zink' && gpu.isAdreno;
-        _launcherLog('显卡: $gpu');
+        _launcherLog(tr.appStateGPU(gpu));
         _launcherLog(
-          '渲染器: ${androidRenderers[renderer.renderer]}（${renderer.reason}）'
-          '${sfpew ? ' + SFPEW（固定管线模拟）' : ''}${turnip ? ' + Turnip 驱动' : ''}，LWJGL ${android.lwjgl}'
-          '${lwjgl2 ? '（LWJGL 2 兼容层）' : ''}${sdl ? '，SDL3' : ''}',
+          tr.appStateRendererLWJGL(
+            androidRenderers[renderer.renderer] ?? '',
+            renderer.reason,
+            sfpew ? tr.appStateSFPEWFixedFunctionEmulation : '',
+            turnip ? tr.appStateTurnipDriver : '',
+            android.lwjgl,
+            lwjgl2 ? tr.appStateLWJGL2CompatibilityLayer : '',
+            sdl ? '${tr.commonComma}SDL3' : '',
+          ),
         );
         if (renderer.renderer == 'zink' && !gpu.hasVulkan11) {
-          _launcherLog('警告：这台设备没有声明 Vulkan 1.1，所选渲染器可能无法启动');
+          _launcherLog(tr.appStateWarningDeviceDoesntReport);
         }
         // 装了 TouchController 模组：游戏内的触摸交给它（基岩版风格的触控），我们的虚拟按键不再显示
         final touchController = hasTouchController(gameDir);
-        if (touchController) _launcherLog('检测到 TouchController 模组：使用它的触控方式');
+        if (touchController) _launcherLog(tr.appStateTouchControllerModDetectedUsing);
         if (renderer.renderer == 'krypton' && sdl) {
-          _launcherLog('警告：Krypton Wrapper 在 26.3 快照及之后的版本上会崩溃，出现问题请换用 MobileGlues');
+          _launcherLog(tr.appStateWarningKryptonWrapperCrashes);
         }
         await AndroidRuntime.launch(
           javaHome: java.path,
@@ -639,7 +664,7 @@ class AppState extends ChangeNotifier {
         unawaited(
           AndroidRuntime.watch(parser.push).then((code) {
             parser.push('\n');
-            _launcherLog('游戏已退出，代码 $code');
+            _launcherLog(tr.appStateGameExitedCode(code));
             lastExitCode = code;
             run.exitCode = code;
             gameState = GameState.idle;
@@ -651,19 +676,21 @@ class AppState extends ChangeNotifier {
         return true;
       }
       if (cfg.gpuPreference) await setGpuPreference(java.path);
-      await writeLaunchScript(java.path, args, gameDir, acc, '启动 - $id');
+      await writeLaunchScript(java.path, args, gameDir, acc, tr.appStateLaunch2(id));
       await runPreLaunch(cfg.preLaunchCommand, cfg.preLaunchWait, g.root, _launcherLog);
       await runPreLaunch(inst.preLaunchCommand, inst.preLaunchWait, g.root, _launcherLog);
 
-      t.beginStep('启动游戏');
-      t.setStage('启动游戏');
-      _launcherLog('Java: ${java.path}（Java ${java.major}，${java.is64 ? 64 : 32} 位）');
+      t.beginStep(tr.appStateStartGame);
+      t.setStage(tr.appStateStartGame);
+      _launcherLog(tr.appStateJavaJavaBit(java.path, java.major, java.is64 ? 64 : 32));
       _launcherLog(
-        '内存: ${memory.max.toStringAsFixed(1)} GB'
-        '${memory.initial != null ? '，初始 ${memory.initial!.toStringAsFixed(1)} GB' : ''}',
+        tr.appStateMemoryGB2(
+          memory.max.toStringAsFixed(1),
+          memory.initial != null ? tr.appStateInitialGB(memory.initial!.toStringAsFixed(1)) : '',
+        ),
       );
-      _launcherLog('工作目录: $gameDir');
-      if (demo) _launcherLog('以试玩模式启动');
+      _launcherLog(tr.appStateWorkingDirectory(gameDir));
+      if (demo) _launcherLog(tr.appStateLaunchingDemoMode);
 
       final detached = cfg.afterLaunch == 'exit';
       final proc = await startGame(ctx, args, detached: detached);
@@ -683,7 +710,7 @@ class AppState extends ChangeNotifier {
         unawaited(
           proc.exitCode.then((code) {
             parser.push('\n');
-            _launcherLog('游戏已退出，代码 $code');
+            _launcherLog(tr.appStateGameExitedCode(code));
             _game = null;
             lastExitCode = code;
             run.exitCode = code;
@@ -698,7 +725,7 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       t.fail(e);
       if (_game == null) gameState = GameState.idle;
-      _launcherLog('启动失败：$e');
+      _launcherLog(tr.appStateLaunchFailed(e));
       rethrow;
     } finally {
       task = null;
@@ -737,13 +764,13 @@ class AppState extends ChangeNotifier {
     var crashed = false;
     try {
       final report = await collectCrash(run, log.value);
-      crashed = !run.killed && (run.exitCode != 0 || report.sources.any((s) => s.name != '游戏输出'));
+      crashed = !run.killed && (run.exitCode != 0 || report.sources.any((s) => !s.gameOutput));
       if (crashed) {
-        _launcherLog('游戏崩溃了，可以在错误分析中查看原因');
+        _launcherLog(tr.appStateGameCrashedSeeCrash);
         _crashes.add(report);
       }
     } catch (e) {
-      _launcherLog('收集崩溃信息失败：$e');
+      _launcherLog(tr.appStateCouldntCollectCrashInformation(e));
     } finally {
       _afterExited(config.afterLaunch, crashed: crashed);
     }

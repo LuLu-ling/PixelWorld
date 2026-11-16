@@ -1,5 +1,6 @@
 import 'auth.dart';
 import 'http_json.dart';
+import '../i18n/strings.dart';
 
 class OAuthToken {
   OAuthToken(Map<String, dynamic> j)
@@ -34,7 +35,7 @@ class OAuthClient {
   }) async {
     final r = await requestJson('POST', deviceEndpoint!, form: {'client_id': clientId, 'scope': scope});
     final dc = r.map;
-    if (!r.ok || dc['device_code'] == null) throw Exception('无法开始登录：${_describe(dc, r.status)}');
+    if (!r.ok || dc['device_code'] == null) throw Exception(tr.oauthCantStartSign(_describe(dc, r.status)));
     final expiresIn = (dc['expires_in'] as num).toInt();
     onCode(
       DeviceCode(
@@ -65,16 +66,16 @@ class OAuthClient {
           interval += const Duration(seconds: 5);
           continue;
         case 'access_denied':
-          throw Exception('已拒绝授权');
+          throw Exception(tr.oauthAuthorizationDenied);
         case 'expired_token':
-          throw Exception('登录超时，请重试');
+          throw Exception(tr.oauthSignTimedOutPlease);
         case null when t.ok && t.map['access_token'] != null:
           return OAuthToken(t.map);
         default:
-          throw Exception('登录失败：${_describe(t.map, t.status)}');
+          throw Exception(tr.oauthSignFailed(_describe(t.map, t.status)));
       }
     }
-    throw Exception('登录超时，请重试');
+    throw Exception(tr.oauthSignTimedOutPlease);
   }
 
   /// 用刷新令牌换新的令牌；刷新令牌已失效时返回 null（网络错误照常抛出）
@@ -84,7 +85,7 @@ class OAuthClient {
       tokenEndpoint,
       form: {'grant_type': 'refresh_token', 'client_id': clientId, 'refresh_token': refreshToken, 'scope': ?scope},
     );
-    if (t.status >= 500) throw Exception('验证服务器暂时不可用（${t.status}），请稍后再试');
+    if (t.status >= 500) throw Exception(tr.oauthAuthenticationServerTemporarilyUnavailable(t.status));
     return t.ok && t.map['access_token'] != null ? OAuthToken(t.map) : null;
   }
 }

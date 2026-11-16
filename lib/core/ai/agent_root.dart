@@ -6,12 +6,19 @@ import '../../app_state.dart';
 import '../android_storage.dart';
 import '../paths.dart';
 import '../safe_path.dart';
+import '../i18n/strings.dart';
 
 /// AI 可以访问的一个文件夹（「根」）。模型只看到 [id] 和相对路径，看不到 [path]。
 enum RootKind { workspace, game, downloads, user }
 
 class AgentRoot {
-  const AgentRoot({required this.id, required this.label, required this.path, required this.writable, required this.kind});
+  const AgentRoot({
+    required this.id,
+    required this.label,
+    required this.path,
+    required this.writable,
+    required this.kind,
+  });
 
   /// 小写字母、数字和连字符
   final String id;
@@ -46,7 +53,15 @@ Future<List<AgentRoot>> agentRoots(AppState state) async {
   final roots = <AgentRoot>[];
   final ws = Directory(aiWorkspaceDir);
   if (!ws.existsSync()) ws.createSync(recursive: true);
-  roots.add(AgentRoot(id: 'workspace', label: 'AI 工作区', path: _real(ws.path) ?? ws.path, writable: true, kind: RootKind.workspace));
+  roots.add(
+    AgentRoot(
+      id: 'workspace',
+      label: tr.commonAIWorkspace,
+      path: _real(ws.path) ?? ws.path,
+      writable: true,
+      kind: RootKind.workspace,
+    ),
+  );
 
   // 当前版本的运行目录：只读，修改游戏文件仍然走带备份和校验的专用工具
   final v = state.selectedVersion;
@@ -54,14 +69,26 @@ Future<List<AgentRoot>> agentRoots(AppState state) async {
     try {
       final dir = _real(await state.gameDirOf(v));
       if (dir != null) {
-        roots.add(AgentRoot(id: 'game', label: '当前实例（${v.id}）', path: dir, writable: false, kind: RootKind.game));
+        roots.add(
+          AgentRoot(
+            id: 'game',
+            label: tr.agentRootCurrentInstance(v.id),
+            path: dir,
+            writable: false,
+            kind: RootKind.game,
+          ),
+        );
       }
     } catch (_) {}
   }
 
   if (Platform.isAndroid && await AndroidStorage.hasAccess()) {
     final dir = _real(p.join(AndroidStorage.root, 'Download'));
-    if (dir != null) roots.add(AgentRoot(id: 'downloads', label: '下载目录', path: dir, writable: true, kind: RootKind.downloads));
+    if (dir != null) {
+      roots.add(
+        AgentRoot(id: 'downloads', label: tr.agentRootDownloads, path: dir, writable: true, kind: RootKind.downloads),
+      );
+    }
   }
 
   final taken = {for (final r in roots) r.id};
@@ -71,7 +98,9 @@ Future<List<AgentRoot>> agentRoots(AppState state) async {
     if (!rootIdPattern.hasMatch(id) || taken.contains(id) || !p.isAbsolute(path)) continue;
     final real = _real(path);
     if (real == null) continue;
-    roots.add(AgentRoot(id: id, label: '${r['label'] ?? id}', path: real, writable: r['writable'] == true, kind: RootKind.user));
+    roots.add(
+      AgentRoot(id: id, label: '${r['label'] ?? id}', path: real, writable: r['writable'] == true, kind: RootKind.user),
+    );
     taken.add(id);
   }
   return roots;

@@ -9,6 +9,7 @@ import '../download.dart';
 import '../paths.dart';
 import 'auth.dart';
 import 'yggdrasil_api.dart';
+import '../i18n/strings.dart';
 
 /// authlib-injector：让游戏使用外置验证服务器。负责缓存 jar 并生成 JVM 参数（authlib-injector 启动器规范「启动游戏」）
 class AuthlibInjector {
@@ -58,13 +59,13 @@ class AuthlibInjector {
         await dl.downloadFile(DownloadItem(url: '${latest['download_url']}', path: tmp.path));
         if (sha256.convert(await tmp.readAsBytes()).toString() != want) {
           await tmp.delete();
-          throw Exception('校验失败（SHA-256 不匹配）');
+          throw Exception(tr.authlibInjectorVerificationFailedSHA256);
         }
         await tmp.rename(jar.path);
       }
       await checked.writeAsString(jsonEncode(latest));
     } catch (e) {
-      if (!jar.existsSync()) throw Exception('无法下载 authlib-injector：$e');
+      if (!jar.existsSync()) throw Exception(tr.authlibInjectorCouldntDownloadAuthlibInjector(e));
     }
     return jar.path;
   }

@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../app_info.dart';
 import '../app_scope.dart';
 import '../core/updater.dart';
+import '../l10n/l10n.dart';
 
 /// 当前使用的更新通道：设置里没有选择时跟随这个构建自己的通道
 UpdateChannel currentUpdateChannel(BuildContext context) =>
@@ -24,7 +25,7 @@ Future<void> checkUpdates(BuildContext context, {required bool manual}) async {
     final r = await checkForUpdate(channel);
     if (!context.mounted) return;
     if (r == null) {
-      if (manual) toast(context, '已是最新版本（${channel.label}）');
+      if (manual) toast(context, context.l10n.updateDialogYoureLatestVersion(channel.label));
       return;
     }
     // 自动检查：跳过的版本不提示；本地构建没有提交号，不自动提示 nightly
@@ -34,7 +35,7 @@ Future<void> checkUpdates(BuildContext context, {required bool manual}) async {
       builder: (_) => _UpdateDialog(release: r, manual: manual),
     );
   } catch (e) {
-    if (manual && context.mounted) toast(context, '检查更新失败：${errorText(e)}');
+    if (manual && context.mounted) toast(context, context.l10n.updateDialogCouldntCheckUpdates(errorText(e)));
   } finally {
     _checking = false;
   }
@@ -108,9 +109,9 @@ class _UpdateDialogState extends State<_UpdateDialog> {
     final date = r.publishedAt?.toLocal().toString().substring(0, 16);
     final current = AppInfo.commit.isEmpty
         ? AppInfo.version
-        : '${AppInfo.version}（${AppInfo.commit.substring(0, AppInfo.commit.length.clamp(0, 7))}）';
+        : '${AppInfo.version}${context.l10n.commonParenthesized(AppInfo.commit.substring(0, AppInfo.commit.length.clamp(0, 7)))}';
     return AlertDialog(
-      title: Text('发现新版本：${r.label}'),
+      title: Text(context.l10n.updateDialogNewVersionAvailable(r.label)),
       content: SizedBox(
         width: 520,
         child: Column(
@@ -118,36 +119,47 @@ class _UpdateDialogState extends State<_UpdateDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '当前版本 $current · ${r.isNightly ? 'Nightly' : (r.prerelease ? '预览版' : '正式版')}'
-              '${date == null ? '' : ' · 发布于 $date'}',
+              context.l10n.updateDialogCurrentVersion(
+                current,
+                r.isNightly
+                    ? 'Nightly'
+                    : (r.prerelease ? context.l10n.updateChannelPreview : context.l10n.updateChannelStable),
+                date == null ? '' : context.l10n.updateDialogReleased(date),
+              ),
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
             // 更新日志占用剩下的高度并可滚动：手机横屏只有约 400 高，固定高度会把按钮挤出去
             Flexible(
-              child: SingleChildScrollView(child: MarkdownBody(data: r.body.isEmpty ? '没有更新说明' : r.body)),
+              child: SingleChildScrollView(
+                child: MarkdownBody(data: r.body.isEmpty ? context.l10n.updateDialogNoReleaseNotes : r.body),
+              ),
             ),
             if (asset == null) ...[
               const SizedBox(height: 12),
               Text(
-                Platform.isLinux ? '这个平台还没有发布包，请到 GitHub 查看。' : '这个发布中没有适用于当前平台的文件。',
+                Platform.isLinux
+                    ? context.l10n.updateDialogNoPackageHasBeen
+                    : context.l10n.updateDialogReleaseHasNoFile,
                 style: TextStyle(color: theme.colorScheme.error),
               ),
             ],
             if (Platform.isMacOS && asset != null) ...[
               const SizedBox(height: 12),
-              Text('下载后会打开安装镜像，把 Pixel World 拖进「应用程序」文件夹替换旧版本即可；游戏文件不受影响。', style: theme.textTheme.bodySmall),
+              Text(context.l10n.updateDialogAfterDownloadingInstallerImage, style: theme.textTheme.bodySmall),
             ],
             if (Platform.isAndroid && asset != null) ...[
               const SizedBox(height: 12),
-              Text('下载后由系统安装，需要在弹出的界面中确认；游戏文件不受影响。', style: theme.textTheme.bodySmall),
+              Text(context.l10n.updateDialogAfterDownloadingSystemInstalls, style: theme.textTheme.bodySmall),
             ],
             if (_busy) ...[
               const SizedBox(height: 16),
               LinearProgressIndicator(value: _progress, borderRadius: BorderRadius.circular(4)),
               const SizedBox(height: 4),
               Text(
-                _progress == null ? '正在下载' : '正在下载 ${(_progress! * 100).toStringAsFixed(0)}%',
+                _progress == null
+                    ? context.l10n.updateDialogDownloading
+                    : context.l10n.updateDialogDownloading2((_progress! * 100).toStringAsFixed(0)),
                 style: theme.textTheme.labelSmall,
               ),
             ],
@@ -164,7 +176,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '安装包已经下载完成。第一次安装需要在系统设置中允许「安装未知应用」；允许后回到这里点「继续安装」，不需要重新下载。',
+                  context.l10n.updateDialogInstallerHasBeenDownloaded,
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSecondaryContainer),
                 ),
               ),
@@ -181,17 +193,23 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                     AppScope.read(context).config.update({'updateSkipped': r.key});
                     Navigator.pop(context);
                   },
-            child: const Text('跳过这个版本'),
+            child: Text(context.l10n.updateDialogSkipVersion),
           ),
         TextButton(
           onPressed: () => launchUrl(Uri.parse(r.page), mode: LaunchMode.externalApplication),
-          child: const Text('在 GitHub 查看'),
+          child: Text(context.l10n.updateDialogViewGitHub),
         ),
-        TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('稍后')),
+        TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: Text(context.l10n.updateDialogLater)),
         if (asset != null)
           FilledButton(
             onPressed: _busy ? null : () => _update(asset),
-            child: Text(_file != null ? '继续安装' : (Platform.isWindows ? '更新并重启' : '下载并安装')),
+            child: Text(
+              _file != null
+                  ? context.l10n.updateDialogContinueInstall
+                  : (Platform.isWindows
+                        ? context.l10n.updateDialogUpdateRestart
+                        : context.l10n.updateDialogDownloadInstall),
+            ),
           ),
       ],
     );

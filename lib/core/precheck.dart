@@ -20,4 +20,3 @@ bool shouldAskSponsor(int launchCount) => sponsorCounts.contains(launchCount);
 
 /// 正版验证对话框的选择：打开购买页面（不启动）、这次先离线启动、试玩、返回
 enum OwnershipChoice { store, launch, demo, cancel }
-

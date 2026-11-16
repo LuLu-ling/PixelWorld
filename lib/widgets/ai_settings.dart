@@ -10,6 +10,7 @@ import '../core/secure.dart';
 import '../platform.dart';
 import '../shell.dart' show ShellNav;
 import 'ai_mcp_settings.dart';
+import '../l10n/l10n.dart';
 
 /// AI 排障的接口设置：用户自己填写接口地址、模型与 API Key
 class AiSettingsForm extends StatefulWidget {
@@ -73,7 +74,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
     await _current.save(cfg);
     await cfg.update({'aiContextWindow': int.tryParse(_ctx.text.trim()) ?? 0});
     if (!mounted) return;
-    toast(context, '已保存');
+    toast(context, context.l10n.aiSettingsSaved);
     widget.onSaved?.call();
   }
 
@@ -82,7 +83,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
     if (!s.ready) {
       setState(() {
         _ok = false;
-        _result = '请填写接口地址、模型${s.isLocal ? '' : '和 API Key'}';
+        _result = context.l10n.aiSettingsFillAPIAddressModel(s.isLocal ? '' : context.l10n.aiSettingsAPIKey);
       });
       return;
     }
@@ -94,7 +95,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
       final reply = await aiChat(s, '你是一个连接测试助手。', const [AiMessage('user', '只回复两个字：成功')]).join();
       setState(() {
         _ok = true;
-        _result = '连接成功，模型回复：${reply.trim().characters.take(40)}';
+        _result = context.l10n.aiSettingsConnectedModelReplied(reply.trim().characters.take(40));
       });
     } catch (e) {
       setState(() {
@@ -108,14 +109,14 @@ class AiSettingsFormState extends State<AiSettingsForm> {
 
   /// 从剪贴板粘贴（不需要点开输入框，手机上不会弹出键盘）
   Widget _pasteButton(TextEditingController c) => IconButton(
-    tooltip: '粘贴',
+    tooltip: context.l10n.toolsPaste,
     icon: const Icon(Icons.content_paste),
     onPressed: () async {
       final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text?.trim() ?? '';
       if (!mounted) return;
-      if (text.isEmpty) return toast(context, '剪贴板是空的');
+      if (text.isEmpty) return toast(context, context.l10n.aiSettingsClipboardEmpty);
       setState(() => c.text = text);
-      toast(context, '已粘贴');
+      toast(context, context.l10n.aiSettingsPasted);
     },
   );
 
@@ -140,7 +141,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
       if (mounted) setState(() => _loadingModels = false);
     }
     if (!mounted) return;
-    if (models.isEmpty) return toast(context, '接口没有返回可用的模型');
+    if (models.isEmpty) return toast(context, context.l10n.aiSettingsAPIReturnedNoUsable);
     final picked = await showDialog<String>(
       context: context,
       builder: (context) => _ModelPicker(models: models, current: _model.text.trim()),
@@ -160,7 +161,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
 
   Widget get testLabel => _testing
       ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
-      : const Text('测试连接');
+      : Text(context.l10n.commonTestConnection);
 
   @override
   Widget build(BuildContext context) {
@@ -169,7 +170,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('常用服务', style: theme.textTheme.labelLarge),
+        Text(context.l10n.aiSettingsPopularServices, style: theme.textTheme.labelLarge),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -189,9 +190,9 @@ class AiSettingsFormState extends State<AiSettingsForm> {
         ),
         const SizedBox(height: 16),
         SegmentedButton<AiProvider>(
-          segments: const [
-            ButtonSegment(value: AiProvider.openai, label: Text('OpenAI 兼容接口')),
-            ButtonSegment(value: AiProvider.anthropic, label: Text('Anthropic 接口')),
+          segments: [
+            ButtonSegment(value: AiProvider.openai, label: Text(context.l10n.aiSettingsOpenAICompatibleAPI)),
+            ButtonSegment(value: AiProvider.anthropic, label: Text(context.l10n.aiSettingsAnthropicAPI)),
           ],
           selected: {_provider},
           onSelectionChanged: (s) => setState(() => _provider = s.first),
@@ -200,7 +201,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
         TextField(
           controller: _url,
           decoration: InputDecoration(
-            labelText: '接口地址',
+            labelText: context.l10n.aiSettingsAPIAddress,
             hintText: _provider == AiProvider.anthropic ? 'https://api.anthropic.com' : 'https://api.example.com/v1',
             border: const OutlineInputBorder(),
             suffixIcon: _pasteButton(_url),
@@ -215,14 +216,18 @@ class AiSettingsFormState extends State<AiSettingsForm> {
           enableSuggestions: false,
           decoration: InputDecoration(
             labelText: 'API Key',
-            helperText: '${SecureData.available ? '加密保存在本机' : '保存在启动器的私有数据目录（未加密）'}，只会发送给上面填写的接口地址；本机运行的服务可以不填',
+            helperText: context.l10n.aiSettingsOnlySentAPIAddress(
+              SecureData.available
+                  ? context.l10n.aiSettingsStoredEncryptedDevice
+                  : context.l10n.aiSettingsStoredLaunchersPrivateData,
+            ),
             border: const OutlineInputBorder(),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 _pasteButton(_key),
                 IconButton(
-                  tooltip: _showKey ? '隐藏' : '显示',
+                  tooltip: _showKey ? context.l10n.aiSettingsHide : context.l10n.aiSettingsShow,
                   icon: Icon(_showKey ? Icons.visibility_off_outlined : Icons.visibility_outlined),
                   onPressed: () => setState(() => _showKey = !_showKey),
                 ),
@@ -234,15 +239,19 @@ class AiSettingsFormState extends State<AiSettingsForm> {
         TextField(
           controller: _model,
           decoration: InputDecoration(
-            labelText: '模型',
-            hintText: '点右侧按钮从接口获取可用的模型',
+            labelText: context.l10n.aiSettingsModel,
+            hintText: context.l10n.aiSettingsUseButtonRightFetch,
             border: const OutlineInputBorder(),
             suffixIcon: _loadingModels
                 ? const Padding(
                     padding: EdgeInsets.all(14),
                     child: SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)),
                   )
-                : IconButton(tooltip: '获取模型列表', icon: const Icon(Icons.list_alt), onPressed: _pickModel),
+                : IconButton(
+                    tooltip: context.l10n.aiSettingsFetchModelList,
+                    icon: const Icon(Icons.list_alt),
+                    onPressed: _pickModel,
+                  ),
           ),
           onChanged: (_) => setState(() {}),
         ),
@@ -256,9 +265,11 @@ class AiSettingsFormState extends State<AiSettingsForm> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
-                  labelText: '上下文长度（tokens）',
-                  hintText: '留空自动：${knownContextWindow(_model.text.trim()) ?? defaultContextWindow}',
-                  helperText: '见服务商文档；未知的模型默认按 $defaultContextWindow 计算',
+                  labelText: context.l10n.aiSettingsContextLengthTokens,
+                  hintText: context.l10n.aiSettingsEmptyAutomatic(
+                    knownContextWindow(_model.text.trim()) ?? defaultContextWindow,
+                  ),
+                  helperText: context.l10n.aiSettingsSeeYourProvidersDocs(defaultContextWindow),
                   border: const OutlineInputBorder(),
                 ),
               ),
@@ -269,17 +280,17 @@ class AiSettingsFormState extends State<AiSettingsForm> {
                 initialValue: const [32000, 64000, 128000, 256000, 0].contains(cfg.aiCompactAt)
                     ? cfg.aiCompactAt
                     : 64000,
-                decoration: const InputDecoration(
-                  labelText: '自动压缩上下文',
-                  helperText: '超过后把较早的对话压缩成摘要，节省费用',
+                decoration: InputDecoration(
+                  labelText: context.l10n.aiSettingsCompactContextAutomatically,
+                  helperText: context.l10n.aiSettingsSummarizeEarlierMessagesOnce,
                   border: OutlineInputBorder(),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 32000, child: Text('超过 32k tokens 时')),
-                  DropdownMenuItem(value: 64000, child: Text('超过 64k tokens 时')),
-                  DropdownMenuItem(value: 128000, child: Text('超过 128k tokens 时')),
-                  DropdownMenuItem(value: 256000, child: Text('超过 256k tokens 时')),
-                  DropdownMenuItem(value: 0, child: Text('不自动压缩')),
+                items: [
+                  DropdownMenuItem(value: 32000, child: Text(context.l10n.aiSettingsAbove32kTokens)),
+                  DropdownMenuItem(value: 64000, child: Text(context.l10n.aiSettingsAbove64kTokens)),
+                  DropdownMenuItem(value: 128000, child: Text(context.l10n.aiSettingsAbove128kTokens)),
+                  DropdownMenuItem(value: 256000, child: Text(context.l10n.aiSettingsAbove256kTokens)),
+                  DropdownMenuItem(value: 0, child: Text(context.l10n.aiSettingsNever)),
                 ],
                 onChanged: (v) => cfg.update({'aiCompactAt': v ?? 64000}),
               ),
@@ -289,8 +300,8 @@ class AiSettingsFormState extends State<AiSettingsForm> {
         const SizedBox(height: 8),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('发送前确认内容'),
-          subtitle: const Text('每次分析前显示将要发送的日志与环境信息'),
+          title: Text(context.l10n.aiSettingsConfirmBeforeSending),
+          subtitle: Text(context.l10n.aiSettingsShowLogEnvironmentInfo),
           value: cfg.aiConfirm,
           onChanged: (v) => cfg.update({'aiConfirm': v}),
         ),
@@ -298,7 +309,7 @@ class AiSettingsFormState extends State<AiSettingsForm> {
           const SizedBox(height: 8),
           Row(
             children: [
-              FilledButton(onPressed: save, child: const Text('保存')),
+              FilledButton(onPressed: save, child: Text(context.l10n.fileManagerSave)),
               const SizedBox(width: 12),
               OutlinedButton(onPressed: _testing ? null : test, child: testLabel),
             ],
@@ -322,16 +333,16 @@ class AiToolsSettings extends StatelessWidget {
       children: [
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('允许 AI 使用工具'),
-          subtitle: const Text('查看实例、模组与日志，安装或禁用模组，联网搜索，以及下面的 MCP 服务；会修改内容的操作都需要你确认'),
+          title: Text(context.l10n.aiSettingsAllowAIUseTools),
+          subtitle: Text(context.l10n.aiSettingsViewInstancesModsLogs),
           value: cfg.aiTools,
           onChanged: (v) => cfg.update({'aiTools': v}),
         ),
         if (cfg.aiTools)
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('查看类操作也需要确认'),
-            subtitle: const Text('关闭时，AI 查看实例、模组、文件与日志不需要确认'),
+            title: Text(context.l10n.aiSettingsConfirmReadOnlyActions),
+            subtitle: Text(context.l10n.aiSettingsWhenOffAICan),
             value: cfg.aiConfirmRead,
             onChanged: (v) => cfg.update({'aiConfirmRead': v}),
           ),
@@ -354,7 +365,7 @@ Future<void> showAiSettingsDialog(BuildContext context, {String section = 'ai'})
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (context) => Scaffold(
-          appBar: AppBar(title: const Text('AI 排障设置')),
+          appBar: AppBar(title: Text(context.l10n.aiSettingsAITroubleshootingSettings)),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
             children: [AiSettingsForm(onSaved: () => Navigator.pop(context))],
@@ -369,7 +380,7 @@ Future<void> showAiSettingsDialog(BuildContext context, {String section = 'ai'})
     context: context,
     builder: (context) => StatefulBuilder(
       builder: (context, setLocal) => AlertDialog(
-        title: const Text('AI 排障设置'),
+        title: Text(context.l10n.aiSettingsAITroubleshootingSettings),
         content: SizedBox(
           width: 520,
           child: SingleChildScrollView(
@@ -379,7 +390,7 @@ Future<void> showAiSettingsDialog(BuildContext context, {String section = 'ai'})
         actionsOverflowButtonSpacing: 8,
         actions: [
           if (form.currentState != null) SizedBox(width: 240, child: form.currentState!.resultText),
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel)),
           OutlinedButton(
             onPressed: form.currentState?.testing ?? false
                 ? null
@@ -389,9 +400,9 @@ Future<void> showAiSettingsDialog(BuildContext context, {String section = 'ai'})
                     await t;
                     if (context.mounted) setLocal(() {});
                   },
-            child: form.currentState?.testLabel ?? const Text('测试连接'),
+            child: form.currentState?.testLabel ?? Text(context.l10n.commonTestConnection),
           ),
-          FilledButton(onPressed: () => form.currentState?.save(), child: const Text('保存')),
+          FilledButton(onPressed: () => form.currentState?.save(), child: Text(context.l10n.fileManagerSave)),
         ],
       ),
     ),
@@ -416,7 +427,7 @@ class _ModelPickerState extends State<_ModelPicker> {
   Widget build(BuildContext context) {
     final list = widget.models.where((m) => m.toLowerCase().contains(_filter.toLowerCase())).toList();
     return AlertDialog(
-      title: Text('选择模型（${widget.models.length} 个）'),
+      title: Text(context.l10n.aiSettingsChooseModel(widget.models.length)),
       content: SizedBox(
         width: 480,
         height: 420,
@@ -424,9 +435,9 @@ class _ModelPickerState extends State<_ModelPicker> {
           children: [
             TextField(
               autofocus: true,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 prefixIcon: Icon(Icons.search),
-                hintText: '筛选',
+                hintText: context.l10n.instanceFilter,
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
@@ -435,7 +446,7 @@ class _ModelPickerState extends State<_ModelPicker> {
             const SizedBox(height: 8),
             Expanded(
               child: list.isEmpty
-                  ? const Center(child: Text('没有匹配的模型'))
+                  ? Center(child: Text(context.l10n.aiSettingsNoMatchingModels))
                   : ListView.builder(
                       itemCount: list.length,
                       itemBuilder: (context, i) => ListTile(
@@ -450,7 +461,7 @@ class _ModelPickerState extends State<_ModelPicker> {
           ],
         ),
       ),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel))],
     );
   }
 }

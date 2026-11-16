@@ -5,6 +5,7 @@ import '../core/accounts.dart';
 import '../core/microsoft.dart';
 import 'device_login_dialog.dart';
 import 'yggdrasil_login_dialog.dart';
+import '../l10n/l10n.dart';
 
 /// 账户管理：切换、添加离线 / 微软 / 外置登录账户、移除
 Future<void> showAccountsDialog(BuildContext context) =>
@@ -42,7 +43,7 @@ class _AccountsDialogState extends State<_AccountsDialog> {
     final scheme = Theme.of(context).colorScheme;
     final selected = state.selectedAccount?.id;
     return AlertDialog(
-      title: const Text('账户'),
+      title: Text(context.l10n.oobeAccount),
       content: SizedBox(
         width: 440,
         child: Column(
@@ -52,7 +53,7 @@ class _AccountsDialogState extends State<_AccountsDialog> {
             if (state.accounts.accounts.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('还没有账户', style: TextStyle(color: scheme.onSurfaceVariant)),
+                child: Text(context.l10n.accountsDialogNoAccountsYet, style: TextStyle(color: scheme.onSurfaceVariant)),
               ),
             for (final a in state.accounts.accounts)
               ListTile(
@@ -65,13 +66,13 @@ class _AccountsDialogState extends State<_AccountsDialog> {
                 subtitle: Text(a.typeLabel),
                 onTap: () => state.selectAccount(a.id),
                 trailing: IconButton(
-                  tooltip: '移除',
+                  tooltip: context.l10n.bgImageRemove,
                   icon: const Icon(Icons.delete_outline),
                   onPressed: () => state.removeAccount(a.id),
                 ),
               ),
             const SizedBox(height: 16),
-            Text('添加离线账户', style: Theme.of(context).textTheme.titleSmall),
+            Text(context.l10n.accountsDialogAddOfflineAccount, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,7 +81,7 @@ class _AccountsDialogState extends State<_AccountsDialog> {
                   child: TextField(
                     controller: _name,
                     decoration: InputDecoration(
-                      labelText: '用户名',
+                      labelText: context.l10n.accountsDialogUsername,
                       errorText: _error,
                       border: const OutlineInputBorder(),
                       isDense: true,
@@ -91,47 +92,47 @@ class _AccountsDialogState extends State<_AccountsDialog> {
                 const SizedBox(width: 8),
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: FilledButton.tonal(onPressed: _add, child: const Text('添加')),
+                  child: FilledButton.tonal(onPressed: _add, child: Text(context.l10n.oobeAdd)),
                 ),
               ],
             ),
             const SizedBox(height: 20),
-            Text('正版账户', style: Theme.of(context).textTheme.titleSmall),
+            Text(context.l10n.accountsDialogMicrosoftAccounts, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.icon(
                 onPressed: () => showDeviceLogin(
                   context,
-                  title: '微软登录',
+                  title: context.l10n.commonSignMicrosoft,
                   create: (onCode) => MicrosoftLogin(state.config.effectiveMsClientId, onCode),
                 ),
                 icon: const Icon(Icons.login),
-                label: const Text('微软登录'),
+                label: Text(context.l10n.commonSignMicrosoft),
               ),
             ),
             if (state.config.effectiveMsClientId.trim().isEmpty) ...[
               const SizedBox(height: 8),
               Text(
-                '微软登录需要先在「设置 - 其他」中填写 Azure 应用 Client ID。',
+                context.l10n.accountsDialogMicrosoftSignNeedsAzure,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ],
             const SizedBox(height: 20),
-            Text('第三方账户', style: Theme.of(context).textTheme.titleSmall),
+            Text(context.l10n.accountsDialogThirdPartyAccounts, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.tonalIcon(
                 onPressed: () => showYggdrasilLogin(context),
                 icon: const Icon(Icons.dns_outlined),
-                label: const Text('外置登录'),
+                label: Text(context.l10n.oobeExternalSign),
               ),
             ),
           ],
         ),
       ),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('完成'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.oobeDone))],
     );
   }
 }

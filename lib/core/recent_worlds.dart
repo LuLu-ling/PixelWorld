@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'config.dart';
+import 'i18n/strings.dart';
 
 /// 一个最近玩过的存档。存档可能位于游戏根目录的 `saves`，也可能位于隔离版本的 `versions/<id>/saves`。
 class RecentWorld {
@@ -38,7 +39,7 @@ Future<List<RecentWorld>> recentWorlds(LauncherConfig config, {bool force = fals
     roots.add((path: path, label: label));
   }
 
-  addRoot(config.gameDir, '当前文件夹');
+  addRoot(config.gameDir, tr.versionsCurrentFolder);
   for (final folder in config.gameFolders) {
     addRoot(folder.path, folder.name);
   }
@@ -88,12 +89,7 @@ Future<void> _scanRoot(String root, String label, List<RecentWorld> out) async {
   }
 }
 
-Future<void> _scanSaves(
-  Directory dir,
-  String folderName,
-  String? versionId,
-  List<RecentWorld> out,
-) async {
+Future<void> _scanSaves(Directory dir, String folderName, String? versionId, List<RecentWorld> out) async {
   if (!await dir.exists()) return;
   List<FileSystemEntity> entries;
   try {

@@ -9,8 +9,7 @@ import '../../core/cat_ini.dart';
 String get pclCompatAppData => Platform.environment['APPDATA'] ?? '';
 
 /// PW_PCL_SHARED_DIR 仅用于测试，避免读写真实的 PCL-CE 数据
-String get pclCompatSharedDir =>
-    Platform.environment['PW_PCL_SHARED_DIR'] ?? p.join(pclCompatAppData, 'PCLCE');
+String get pclCompatSharedDir => Platform.environment['PW_PCL_SHARED_DIR'] ?? p.join(pclCompatAppData, 'PCLCE');
 
 /// PCL-CE 的实例配置：`versions/<id>/PCL/config.v1.yml`
 String pclInstanceConfig(String versionDir) => p.join(versionDir, 'PCL', 'config.v1.yml');

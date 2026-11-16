@@ -12,6 +12,7 @@ import 'modrinth.dart';
 import 'paths.dart';
 import 'safe_path.dart';
 import 'task.dart';
+import 'i18n/strings.dart';
 
 /// Modrinth 整合包（.mrpack）里的依赖。
 class _PackDependencies {
@@ -34,7 +35,7 @@ class _PackDependencies {
 _PackDependencies _parseDependencies(Map<String, dynamic> index) {
   final deps = (index['dependencies'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
   final minecraft = '${deps['minecraft'] ?? ''}'.trim();
-  if (minecraft.isEmpty) throw Exception('整合包没有标明 Minecraft 版本');
+  if (minecraft.isEmpty) throw Exception(tr.modpackModpackDoesntSpecifyMinecraft);
   for (final (key, kind) in const [
     ('fabric-loader', LoaderKind.fabric),
     ('quilt-loader', LoaderKind.quilt),
@@ -53,7 +54,7 @@ String _uniqueVersionName(GamePaths g, String wanted, String fallback) {
   var base = wanted.trim().replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1F]'), '-').replaceAll(RegExp(r'\s+'), ' ');
   if (base.isEmpty) base = fallback;
   if (base.length > 60) base = base.substring(0, 60).trim();
-  if (base.isEmpty || base == '.' || base == '..') base = '整合包';
+  if (base.isEmpty || base == '.' || base == '..') base = tr.downloadModpacks;
 
   var name = base;
   for (var i = 2; Directory(g.versionDir(name)).existsSync(); i++) {
@@ -70,8 +71,8 @@ Future<String> installModpackFiles(
   TaskProgress task, {
   String? name,
 }) async {
-  task.beginStep('下载整合包');
-  task.setStage('下载整合包');
+  task.beginStep(tr.commonDownloadModpack);
+  task.setStage(tr.commonDownloadModpack);
   final pack = Paths.tempFile('modpack-${version.id}.mrpack');
   try {
     await dl.downloadFile(
@@ -96,8 +97,8 @@ Future<String> installModpackArchive(
   TaskProgress task, {
   String? name,
 }) {
-  task.beginStep('读取整合包');
-  task.setStage('读取整合包');
+  task.beginStep(tr.commonReadModpack);
+  task.setStage(tr.commonReadModpack);
   return _installArchive(g, archivePath, dl, task, name: name, fallbackName: p.basenameWithoutExtension(archivePath));
 }
 
@@ -115,15 +116,15 @@ Future<String> _installArchive(
     final archive = ZipDecoder().decodeStream(input, verify: true);
     final indexEntry = archive.findFile('modrinth.index.json');
     if (indexEntry == null || !indexEntry.isFile) {
-      throw Exception('不是有效的 Modrinth 整合包：缺少 modrinth.index.json');
+      throw Exception(tr.modpackNotValidModrinthModpack);
     }
     final index = jsonDecode(utf8.decode(indexEntry.content)) as Map<String, dynamic>;
     final deps = _parseDependencies(index);
 
     // 先确定版本名，再安装游戏与加载器
-    final packName = _uniqueVersionName(g, name ?? '${index['name'] ?? fallbackName}', '整合包');
-    task.beginStep('安装游戏与加载器');
-    task.setStage('安装 Minecraft ${deps.minecraft}');
+    final packName = _uniqueVersionName(g, name ?? '${index['name'] ?? fallbackName}', tr.downloadModpacks);
+    task.beginStep(tr.commonInstallGameLoader);
+    task.setStage(tr.modpackInstallMinecraft(deps.minecraft));
     final String id;
     if (deps.loader == null) {
       id = await installVanilla(g, deps.minecraft, dl, task, name: packName);
@@ -158,7 +159,7 @@ Future<String> _installArchive(
       try {
         target = resolveInside(gameDir, rel);
       } on UnsafePathException catch (e) {
-        throw Exception('整合包包含不安全的路径：${e.message}');
+        throw Exception(tr.modpackModpackContainsUnsafePath(e.message));
       }
       final hashes = (file['hashes'] as Map?)?.cast<String, dynamic>();
       final size = (file['fileSize'] as num?)?.toInt();
@@ -172,19 +173,19 @@ Future<String> _installArchive(
       );
     }
 
-    task.beginStep('下载整合包文件');
-    task.setStage('下载整合包文件');
+    task.beginStep(tr.commonDownloadModpackFiles);
+    task.setStage(tr.commonDownloadModpackFiles);
     if (items.isEmpty) {
       task.progress(0, 0);
     } else {
       await dl.downloadAll(items, task.progress, cancelled: () => task.cancelled);
     }
-    if (skipped > 0) task.output('跳过 $skipped 个不需要的文件');
+    if (skipped > 0) task.output(tr.modpackSkippedUnneededFiles(skipped));
 
     // overrides 与 client-overrides 解压到版本目录。
     // client-overrides 后解压，遇到同名文件时覆盖 overrides。
-    task.beginStep('解压整合包配置');
-    task.setStage('解压整合包配置');
+    task.beginStep(tr.commonExtractModpackConfigs);
+    task.setStage(tr.commonExtractModpackConfigs);
     var extracted = 0;
     for (final prefix in const ['overrides/', 'client-overrides/']) {
       for (final f in archive.files) {
@@ -197,7 +198,7 @@ Future<String> _installArchive(
         try {
           target = resolveInside(gameDir, rel);
         } on UnsafePathException catch (e) {
-          throw Exception('整合包包含不安全的路径：${e.message}');
+          throw Exception(tr.modpackModpackContainsUnsafePath(e.message));
         }
         await Directory(p.dirname(target)).create(recursive: true);
         final out = OutputFileStream(target);
@@ -209,7 +210,7 @@ Future<String> _installArchive(
         extracted++;
       }
     }
-    task.output('已解压 $extracted 个配置与覆盖文件');
+    task.output(tr.modpackExtractedConfigOverrideFiles(extracted));
     return id;
   } finally {
     await input.close();

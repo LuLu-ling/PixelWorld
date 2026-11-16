@@ -107,7 +107,7 @@ class _InstancePageState extends State<InstancePage> {
         screenSize: (width: screen.width.round(), height: screen.height.round()),
       );
     } catch (e) {
-      if (mounted) toast(context, '启动失败：${errorText(e)}');
+      if (mounted) toast(context, context.l10n.homeCouldntLaunch(errorText(e)));
     }
   }
 
@@ -118,19 +118,19 @@ class _InstancePageState extends State<InstancePage> {
     final state = AppScope.of(context);
     final info = state.instance(state.instanceId);
     if (info == null) {
-      return const Center(child: Text('这个实例已不存在'));
+      return Center(child: Text(context.l10n.instanceInstanceNoLongerExists));
     }
     final tabs = <(_Section, String)>[
       // 与 PCL 一样，没有加载器的版本不显示模组
-      if (info.modable) (_Section.mods, '模组'),
-      (_Section.saves, '存档'),
-      (_Section.resourcepacks, '资源包'),
-      (_Section.shaderpacks, '光影'),
-      (_Section.screenshots, '截图'),
-      (_Section.schematics, '投影'),
-      (_Section.servers, '服务器'),
-      (_Section.setup, '实例设置'),
-      (_Section.overview, '概览'),
+      if (info.modable) (_Section.mods, context.l10n.homeMods),
+      (_Section.saves, context.l10n.instanceWorlds),
+      (_Section.resourcepacks, context.l10n.commonResourcePacks),
+      (_Section.shaderpacks, context.l10n.commonShaders),
+      (_Section.screenshots, context.l10n.instanceScreenshots),
+      (_Section.schematics, context.l10n.instanceSchematics),
+      (_Section.servers, context.l10n.instanceServers),
+      (_Section.setup, context.l10n.tourInstanceSettings),
+      (_Section.overview, context.l10n.instanceOverview),
     ];
     final section = tabs.any((t) => t.$1 == _section) ? _section! : tabs.first.$1;
     final folder = _folders[section];
@@ -158,23 +158,23 @@ class _InstancePageState extends State<InstancePage> {
                   children: [
                     // 点图标更换或恢复默认
                     PopupMenuButton<String>(
-                      tooltip: '更换图标',
+                      tooltip: context.l10n.instanceChangeIcon,
                       onSelected: (v) async {
                         final dir = state.paths.versionDir(info.id);
                         try {
                           if (v == 'pick') await pickVersionLogo(dir);
                           if (v == 'reset') await resetVersionLogo(dir);
                         } catch (e) {
-                          if (context.mounted) toast(context, '更换图标失败：${errorText(e)}');
+                          if (context.mounted) toast(context, context.l10n.instanceCouldntChangeIcon(errorText(e)));
                         }
                         if (mounted) setState(() {});
                       },
                       itemBuilder: (_) => [
-                        const PopupMenuItem(value: 'pick', child: Text('更换图标…')),
+                        PopupMenuItem(value: 'pick', child: Text(context.l10n.instanceChangeIcon2)),
                         PopupMenuItem(
                           value: 'reset',
                           enabled: customVersionLogo(state.paths.versionDir(info.id)) != null,
-                          child: const Text('恢复默认图标'),
+                          child: Text(context.l10n.instanceRestoreDefaultIcon),
                         ),
                       ],
                       child: VersionIcon(info: info, versionDir: state.paths.versionDir(info.id), size: 48),
@@ -209,19 +209,19 @@ class _InstancePageState extends State<InstancePage> {
                               try {
                                 await openInFileManager(dir);
                               } catch (e) {
-                                if (context.mounted) toast(context, '打不开文件夹：${errorText(e)}');
+                                if (context.mounted) toast(context, context.l10n.homeCantOpenFolder(errorText(e)));
                               }
                             },
                       style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
                       icon: const Icon(Icons.folder_outlined, size: 18),
-                      label: const Text('打开文件夹'),
+                      label: Text(context.l10n.homeOpenFolder),
                     ),
                     const SizedBox(width: 8),
                     FilledButton.icon(
                       onPressed: running ? null : () => _launch(info),
                       style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
                       icon: const Icon(Icons.rocket_launch, size: 19),
-                      label: const Text('开始游戏'),
+                      label: Text(context.l10n.tourPlay),
                     ),
                   ],
                 ),
@@ -250,7 +250,7 @@ class _InstancePageState extends State<InstancePage> {
                               child: TextButton.icon(
                                 onPressed: () => setState(() => _adding = null),
                                 icon: const Icon(Icons.arrow_back, size: 18),
-                                label: Text('返回${folder!.label}列表'),
+                                label: Text(context.l10n.instanceBackList(folder!.label)),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -304,14 +304,14 @@ class _Overview extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.delete_outline),
-        title: Text('删除 ${info.id}？'),
-        content: const Text('实例文件夹会移到回收站。开启实例隔离时，其中的存档和模组也会一并删除。'),
+        title: Text(context.l10n.instanceDelete(info.id)),
+        content: Text(context.l10n.instanceInstanceFolderWillMoved),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(context.l10n.commonCancel)),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
+            child: Text(context.l10n.commonDelete),
           ),
         ],
       ),
@@ -322,7 +322,7 @@ class _Overview extends StatelessWidget {
     try {
       await state.deleteVersion(info.id);
       nav.back();
-      if (context.mounted) toast(context, '已删除 ${info.id}');
+      if (context.mounted) toast(context, context.l10n.instanceDeleted(info.id));
     } catch (e) {
       if (context.mounted) toast(context, errorText(e));
     }
@@ -357,11 +357,14 @@ class _Overview extends StatelessWidget {
             ),
             if (current)
               Chip(
-                label: const Text('当前实例'),
+                label: Text(context.l10n.homeCurrentInstance),
                 avatar: Icon(Icons.check, color: scheme.primary),
               )
             else
-              FilledButton.tonal(onPressed: () => state.selectVersion(info.id), child: const Text('设为当前实例')),
+              FilledButton.tonal(
+                onPressed: () => state.selectVersion(info.id),
+                child: Text(context.l10n.instanceSetAsCurrentInstance),
+              ),
           ],
         ),
         const SizedBox(height: 16),
@@ -372,19 +375,30 @@ class _Overview extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Column(
               children: [
-                row('类型', describeVersion(info)),
-                row('游戏版本', info.gameVersion),
-                row('实例隔离', info.isolation == null ? '首次启动时决定' : (info.isolation! ? '已开启' : '已关闭')),
-                row('运行目录', gameDir),
+                row(context.l10n.homeType, describeVersion(info)),
+                row(context.l10n.commonGameVersion, info.gameVersion),
+                row(
+                  context.l10n.isolation,
+                  info.isolation == null
+                      ? context.l10n.instanceDecidedAtFirstLaunch
+                      : (info.isolation! ? context.l10n.instanceText : context.l10n.instanceOff),
+                ),
+                row(context.l10n.instanceWorkingDirectory, gameDir),
                 // 加载器版本文件里的时间是加载器的构建时间，只对原版显示
                 if (info.releaseTime != null && info.loader == Loader.vanilla)
-                  row('发布时间', DateTime.tryParse(info.releaseTime!)?.toLocal().toString().split('.').first ?? ''),
+                  row(
+                    context.l10n.instanceReleaseDate,
+                    DateTime.tryParse(info.releaseTime!)?.toLocal().toString().split('.').first ?? '',
+                  ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 24),
-        Text('快捷方式', style: theme.textTheme.titleSmall?.copyWith(color: scheme.onSurfaceVariant)),
+        Text(
+          context.l10n.instanceShortcuts,
+          style: theme.textTheme.titleSmall?.copyWith(color: scheme.onSurfaceVariant),
+        ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -393,7 +407,7 @@ class _Overview extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: () => openInFileManager(versionDir),
               icon: const Icon(Icons.folder_open),
-              label: const Text('实例文件夹'),
+              label: Text(context.l10n.instanceInstanceFolder),
             ),
             for (final f in [
               InstanceFolder.saves,
@@ -404,12 +418,12 @@ class _Overview extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: () => openInFileManager('$gameDir${Platform.pathSeparator}${f.name}'),
                 icon: const Icon(Icons.folder_outlined),
-                label: Text('${f.label}文件夹'),
+                label: Text(context.l10n.instanceFolder(f.label)),
               ),
           ],
         ),
         const SizedBox(height: 24),
-        Text('管理', style: theme.textTheme.titleSmall?.copyWith(color: scheme.onSurfaceVariant)),
+        Text(context.l10n.instanceManage, style: theme.textTheme.titleSmall?.copyWith(color: scheme.onSurfaceVariant)),
         const SizedBox(height: 12),
         Card.filled(
           color: scheme.surfaceContainerLow,
@@ -419,22 +433,22 @@ class _Overview extends StatelessWidget {
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 leading: const Icon(Icons.send_outlined),
-                title: const Text('发送这个实例'),
-                subtitle: const Text('通过局域网把整个实例传到另一台设备'),
+                title: Text(context.l10n.instanceSendInstance),
+                subtitle: Text(context.l10n.instanceSendWholeInstanceAnother),
                 trailing: FilledButton.tonal(
                   onPressed: () => openLanTransfer(context, instance: info.id, whole: true),
-                  child: const Text('发送'),
+                  child: Text(context.l10n.instanceSend),
                 ),
               ),
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 leading: Icon(Icons.delete_outline, color: scheme.error),
-                title: const Text('删除这个实例'),
-                subtitle: const Text('移到回收站；开启实例隔离时，其中的存档和模组也会一并删除'),
+                title: Text(context.l10n.instanceDeleteInstance),
+                subtitle: Text(context.l10n.instanceMovesRecycleBinIf),
                 trailing: OutlinedButton(
                   style: OutlinedButton.styleFrom(foregroundColor: scheme.error),
                   onPressed: () => _delete(context),
-                  child: const Text('删除'),
+                  child: Text(context.l10n.commonDelete),
                 ),
               ),
             ],
@@ -514,12 +528,12 @@ class _SetupState extends State<_Setup> {
     final maxTick = maxTickFor(mem.total);
     const pad = EdgeInsets.symmetric(horizontal: 20, vertical: 8);
     final javaOptions = <String, String>{
-      'global': '跟随全局设置',
-      'auto': '自动选择',
+      'global': context.l10n.instanceUseGlobalSetting,
+      'auto': context.l10n.downloadSourceAuto,
       for (final j in _javas) 'path:${j.path}': Platform.isAndroid ? 'Java ${j.major}' : 'Java ${j.major} · ${j.path}',
       if (_javaKey.startsWith('path:') && !_javas.any((j) => 'path:${j.path}' == _javaKey))
-        _javaKey: Platform.isAndroid ? '${_javaKey.substring(5)}（未安装）' : _javaKey.substring(5),
-      if (!Platform.isAndroid) 'browse': '手动选择…',
+        _javaKey: Platform.isAndroid ? context.l10n.instanceNotInstalled(_javaKey.substring(5)) : _javaKey.substring(5),
+      if (!Platform.isAndroid) 'browse': context.l10n.instanceChooseManually,
     };
     return ListView(
       padding: const EdgeInsets.all(28),
@@ -532,7 +546,7 @@ class _SetupState extends State<_Setup> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '这些设置保存在实例文件夹的 PCL/config.v1.yml 中，与 PCL-CE 互通',
+                  context.l10n.instanceTheseSettingsStoredPCL,
                   style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                 ),
               ),
@@ -540,22 +554,22 @@ class _SetupState extends State<_Setup> {
           ),
         ),
         SettingsGroup(
-          title: '启动',
+          title: context.l10n.settingsLaunch,
           children: [
             ListTile(
               contentPadding: pad,
               leading: const Icon(Icons.call_split),
-              title: const Text('实例隔离'),
+              title: Text(context.l10n.isolation),
               subtitle: Text(
                 _s.isolation == null
-                    ? '尚未决定：首次启动时按全局策略「${context.l10n.isolationMode(cfg.isolationMode)}」决定，之后固定'
-                    : '运行目录为实例文件夹',
+                    ? context.l10n.instanceNotDecidedYetSet(context.l10n.isolationMode(cfg.isolationMode))
+                    : context.l10n.instanceWorkingDirectoryInstanceFolder,
               ),
               trailing: SegmentedButton<bool>(
                 emptySelectionAllowed: true,
-                segments: const [
-                  ButtonSegment(value: true, label: Text('开启')),
-                  ButtonSegment(value: false, label: Text('关闭')),
+                segments: [
+                  ButtonSegment(value: true, label: Text(context.l10n.instanceText2)),
+                  ButtonSegment(value: false, label: Text(context.l10n.windowClose)),
                 ],
                 selected: {?_s.isolation},
                 onSelectionChanged: (v) => v.isEmpty ? null : _save({'VersionArgumentIndieV2': v.first}),
@@ -568,7 +582,9 @@ class _SetupState extends State<_Setup> {
               // 跟随全局时写出全局现在的选择，不用再去设置页对照
               subtitle: _javaKey == 'global'
                   ? Text(
-                      '跟随全局：${cfg.javaPath.isEmpty ? '自动选择' : cfg.javaPath}',
+                      context.l10n.instanceGlobal(
+                        cfg.javaPath.isEmpty ? context.l10n.downloadSourceAuto : cfg.javaPath,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     )
@@ -589,10 +605,10 @@ class _SetupState extends State<_Setup> {
               ListTile(
                 contentPadding: pad,
                 leading: const Icon(Icons.memory),
-                title: const Text('渲染器'),
+                title: Text(context.l10n.renderer),
                 subtitle: Text(
                   _s.renderer.isEmpty
-                      ? '跟随全局设置「${androidRenderers[cfg.androidRenderer] ?? cfg.androidRenderer}」'
+                      ? context.l10n.instanceGlobalSetting(androidRenderers[cfg.androidRenderer] ?? cfg.androidRenderer)
                       : androidRendererHints[_s.renderer] ?? '',
                 ),
                 trailing: DropdownMenu<String>(
@@ -602,7 +618,7 @@ class _SetupState extends State<_Setup> {
                   requestFocusOnTap: false,
                   inputDecorationTheme: const InputDecorationTheme(isDense: true, border: OutlineInputBorder()),
                   dropdownMenuEntries: [
-                    const DropdownMenuEntry(value: '', label: '跟随全局设置'),
+                    DropdownMenuEntry(value: '', label: context.l10n.instanceUseGlobalSetting),
                     for (final e in androidRenderers.entries) DropdownMenuEntry(value: e.key, label: e.value),
                   ],
                   onSelected: (v) => v == null ? null : _save({'PclpwAndroidRenderer': v}),
@@ -611,24 +627,24 @@ class _SetupState extends State<_Setup> {
           ],
         ),
         SettingsGroup(
-          title: '游戏内存',
+          title: context.l10n.memory,
           children: [
             ListTile(
               contentPadding: pad,
               leading: const Icon(Icons.memory_outlined),
-              title: const Text('分配方式'),
+              title: Text(context.l10n.memoryMode),
               subtitle: _s.memoryMode == 'global'
                   ? Text(
                       cfg.memoryMode == 'custom'
-                          ? '跟随全局：自定义 ${ramFromTick(cfg.memoryTick).toStringAsFixed(1)} GB'
-                          : '跟随全局：自动分配',
+                          ? context.l10n.instanceGlobalCustomGB(ramFromTick(cfg.memoryTick).toStringAsFixed(1))
+                          : context.l10n.instanceGlobalAutomatic,
                     )
                   : null,
               trailing: SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'global', label: Text('跟随全局')),
-                  ButtonSegment(value: 'auto', label: Text('自动')),
-                  ButtonSegment(value: 'custom', label: Text('自定义')),
+                segments: [
+                  ButtonSegment(value: 'global', label: Text(context.l10n.instanceGlobal2)),
+                  ButtonSegment(value: 'auto', label: Text(context.l10n.commonAuto)),
+                  ButtonSegment(value: 'custom', label: Text(context.l10n.commonCustom)),
                 ],
                 selected: {_s.memoryMode},
                 onSelectionChanged: (v) => _save({
@@ -638,8 +654,8 @@ class _SetupState extends State<_Setup> {
             ),
             if (_s.memoryMode == 'custom')
               for (final (label, key, value, min) in [
-                ('最大内存', 'VersionRamCustom', _s.memoryTick, 1),
-                ('初始内存', 'VersionRamCustomInitial', _s.memoryInitialTick, 0),
+                (context.l10n.instanceMaximumMemory, 'VersionRamCustom', _s.memoryTick, 1),
+                (context.l10n.instanceInitialMemory, 'VersionRamCustomInitial', _s.memoryInitialTick, 0),
               ])
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
@@ -677,7 +693,7 @@ class _SetupState extends State<_Setup> {
                       SizedBox(
                         width: 72,
                         child: Text(
-                          value == 0 ? '不设置' : '${ramFromTick(value).toStringAsFixed(1)} GB',
+                          value == 0 ? context.l10n.instanceNotSet : '${ramFromTick(value).toStringAsFixed(1)} GB',
                           textAlign: TextAlign.end,
                         ),
                       ),
@@ -687,14 +703,38 @@ class _SetupState extends State<_Setup> {
           ],
         ),
         SettingsGroup(
-          title: '高级',
+          title: context.l10n.advanced,
           children: [
             for (final (icon, title, key, value, hint) in [
-              (Icons.dns_outlined, '自动进入服务器', 'VersionServerEnter', _s.server, 'mc.example.com:25565'),
-              (Icons.label_outline, '版本类型显示', 'VersionArgumentInfo', _s.versionType, '留空则使用全局设置'),
-              (Icons.code, 'JVM 参数', 'VersionAdvanceJvm', _s.jvmArgs, '留空则使用全局设置'),
-              (Icons.terminal, '游戏参数', 'VersionAdvanceGame', _s.gameArgs, '留空则使用全局设置'),
-              (Icons.play_circle_outline, '启动前执行命令', 'VersionAdvanceRun', _s.preLaunchCommand, ''),
+              (
+                Icons.dns_outlined,
+                context.l10n.instanceJoinServerAutomatically,
+                'VersionServerEnter',
+                _s.server,
+                'mc.example.com:25565',
+              ),
+              (
+                Icons.label_outline,
+                context.l10n.versionType,
+                'VersionArgumentInfo',
+                _s.versionType,
+                context.l10n.instanceLeaveEmptyUseGlobal,
+              ),
+              (
+                Icons.code,
+                context.l10n.jvmArgs,
+                'VersionAdvanceJvm',
+                _s.jvmArgs,
+                context.l10n.instanceLeaveEmptyUseGlobal,
+              ),
+              (
+                Icons.terminal,
+                context.l10n.gameArgs,
+                'VersionAdvanceGame',
+                _s.gameArgs,
+                context.l10n.instanceLeaveEmptyUseGlobal,
+              ),
+              (Icons.play_circle_outline, context.l10n.preLaunchCommand, 'VersionAdvanceRun', _s.preLaunchCommand, ''),
             ])
               _InstanceTextRow(
                 key: ValueKey(key),
@@ -795,7 +835,7 @@ class _FilesState extends State<_Files> {
     try {
       await moveToTrash(f.path);
       _refresh();
-      if (mounted) toast(context, '已将 ${f.name} 移到回收站');
+      if (mounted) toast(context, context.l10n.instanceMovedRecycleBin(f.name));
     } catch (e) {
       if (mounted) toast(context, errorText(e));
     }
@@ -829,7 +869,9 @@ class _FilesState extends State<_Files> {
               Text(widget.folder.label, style: theme.textTheme.headlineSmall),
               const SizedBox(width: 12),
               Text(
-                isMods ? '${_files.length} 个，已启用 $enabledMods 个' : '${_files.length} 个',
+                isMods
+                    ? context.l10n.instanceTotalEnabled(_files.length, enabledMods)
+                    : context.l10n.instanceItemCount(_files.length),
                 style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
               ),
               const Spacer(),
@@ -837,9 +879,9 @@ class _FilesState extends State<_Files> {
                 SizedBox(
                   width: 200,
                   child: TextField(
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       prefixIcon: Icon(Icons.search),
-                      hintText: '筛选',
+                      hintText: context.l10n.instanceFilter,
                       isDense: true,
                       border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(28))),
                     ),
@@ -851,7 +893,7 @@ class _FilesState extends State<_Files> {
                 FilledButton.tonalIcon(
                   onPressed: () => openLanTransfer(context, instance: widget.info.id, items: {'saves'}),
                   icon: const Icon(Icons.send_outlined, size: 18),
-                  label: const Text('发送存档'),
+                  label: Text(context.l10n.instanceSendWorld),
                 ),
                 const SizedBox(width: 4),
               ],
@@ -860,7 +902,7 @@ class _FilesState extends State<_Files> {
                 FilledButton.tonalIcon(
                   onPressed: widget.onAdd,
                   icon: const Icon(Icons.add, size: 18),
-                  label: Text('添加${widget.folder.label}'),
+                  label: Text(context.l10n.instanceAdd(widget.folder.label)),
                 ),
                 const SizedBox(width: 4),
               ],
@@ -874,13 +916,13 @@ class _FilesState extends State<_Files> {
                     _refresh();
                   },
                   icon: const LoaderIcon(Loader.optifine, size: 18),
-                  label: const Text('添加 OptiFine'),
+                  label: Text(context.l10n.instanceAddOptiFine),
                 ),
-              IconButton(tooltip: '刷新', onPressed: _refresh, icon: const Icon(Icons.refresh)),
+              IconButton(tooltip: context.l10n.fileViewerRefresh, onPressed: _refresh, icon: const Icon(Icons.refresh)),
               TextButton.icon(
                 onPressed: () => openInFileManager(_dir),
                 icon: const Icon(Icons.folder_open),
-                label: const Text('打开文件夹'),
+                label: Text(context.l10n.homeOpenFolder),
               ),
             ],
           ),
@@ -888,7 +930,10 @@ class _FilesState extends State<_Files> {
         Expanded(
           child: shown.isEmpty
               ? Center(
-                  child: Text('这里还没有${widget.folder.label}', style: TextStyle(color: scheme.onSurfaceVariant)),
+                  child: Text(
+                    context.l10n.instanceNoHereYet(widget.folder.label),
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
                 )
               : isShots
               ? GridView.builder(
@@ -939,7 +984,7 @@ class _FilesState extends State<_Files> {
                               : null,
                         ),
                         subtitle: Text(
-                          '${formatDate(f.modified)}${f.isDir ? '' : ' · ${formatSize(f.size)}'}${f.disabled ? ' · 已禁用' : ''}',
+                          '${formatDate(f.modified)}${f.isDir ? '' : ' · ${formatSize(f.size)}'}${f.disabled ? context.l10n.instanceDisabled : ''}',
                         ),
                         onTap: () => openInFileManager(f.path, create: false),
                         trailing: Row(
@@ -947,7 +992,7 @@ class _FilesState extends State<_Files> {
                           children: [
                             if (isMods) Switch(value: !f.disabled, onChanged: (_) => _toggle(f)),
                             IconButton(
-                              tooltip: '移到回收站',
+                              tooltip: context.l10n.instanceMoveRecycleBin,
                               onPressed: () => _trash(f),
                               icon: const Icon(Icons.delete_outline),
                             ),
@@ -978,10 +1023,10 @@ class _Servers extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Text('服务器', style: theme.textTheme.headlineSmall),
+        Text(context.l10n.instanceServers, style: theme.textTheme.headlineSmall),
         const SizedBox(height: 4),
         Text(
-          '游戏内多人游戏列表中保存的服务器（servers.dat）',
+          context.l10n.instanceServersSavedGameMultiplayer,
           style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
         ),
         const SizedBox(height: 16),
@@ -989,7 +1034,7 @@ class _Servers extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(32),
             child: Center(
-              child: Text('还没有保存的服务器', style: TextStyle(color: scheme.onSurfaceVariant)),
+              child: Text(context.l10n.instanceNoSavedServersYet, style: TextStyle(color: scheme.onSurfaceVariant)),
             ),
           ),
         for (final s in servers)
@@ -1039,7 +1084,7 @@ class _ServerPingState extends State<_ServerPing> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Text(
-              s == null ? '无法连接' : '在线 ${s.online}/${s.max} · ${s.latency} ms',
+              s == null ? context.l10n.instanceCantConnect : context.l10n.instanceOnlineMs(s.online, s.max, s.latency),
               style: theme.textTheme.labelMedium?.copyWith(color: s == null ? scheme.error : scheme.primary),
             ),
           ),
@@ -1088,20 +1133,20 @@ class _AddOptiFineDialogState extends State<_AddOptiFineDialog> {
     final scheme = Theme.of(context).colorScheme;
     return AlertDialog(
       icon: const LoaderIcon(Loader.optifine, size: 28),
-      title: const Text('添加 OptiFine'),
+      title: Text(context.l10n.instanceAddOptiFine),
       content: SizedBox(
         width: 460,
         child: FutureBuilder(
           future: _future,
           builder: (context, snap) {
-            if (snap.hasError) return Text('获取 OptiFine 版本失败：${errorText(snap.error!)}');
+            if (snap.hasError) return Text(context.l10n.instanceCouldntGetOptiFineVersions(errorText(snap.error!)));
             if (!snap.hasData) return const LinearProgressIndicator();
             final list = snap.data!;
             if (list.isEmpty) {
               return Text(
                 widget.info.loader == Loader.forge
-                    ? '没有与 Forge 兼容的 OptiFine（${widget.info.gameVersion}）'
-                    : '${widget.info.gameVersion} 没有可用的 OptiFine',
+                    ? context.l10n.instanceNoOptiFineCompatibleForge(widget.info.gameVersion)
+                    : context.l10n.instanceNoOptiFineAvailable(widget.info.gameVersion),
               );
             }
             _version ??= (list.where((v) => v.stable).firstOrNull ?? list.first).version;
@@ -1112,7 +1157,7 @@ class _AddOptiFineDialogState extends State<_AddOptiFineDialog> {
               children: [
                 DropdownMenu<String>(
                   expandedInsets: EdgeInsets.zero,
-                  label: const Text('OptiFine 版本'),
+                  label: Text(context.l10n.commonOptiFineVersion),
                   initialSelection: _version,
                   menuHeight: 300,
                   dropdownMenuEntries: [
@@ -1120,8 +1165,8 @@ class _AddOptiFineDialogState extends State<_AddOptiFineDialog> {
                       DropdownMenuEntry(
                         value: l.version,
                         label:
-                            '${l.label}${l.stable ? '' : '（预览版）'}'
-                            '${widget.info.loader == Loader.forge && (l.requiredForge?.isNotEmpty ?? false) ? ' · 需要 Forge ${l.requiredForge}' : ''}',
+                            '${l.label}${l.stable ? '' : context.l10n.commonPreview}'
+                            '${widget.info.loader == Loader.forge && (l.requiredForge?.isNotEmpty ?? false) ? context.l10n.commonRequiresForge(l.requiredForge ?? '') : ''}',
                       ),
                   ],
                   onSelected: (v) => setState(() => _version = v),
@@ -1139,8 +1184,8 @@ class _AddOptiFineDialogState extends State<_AddOptiFineDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: _running ? null : () => Navigator.pop(context), child: const Text('取消')),
-        FilledButton(onPressed: _running || _version == null ? null : _add, child: const Text('添加')),
+        TextButton(onPressed: _running ? null : () => Navigator.pop(context), child: Text(context.l10n.commonCancel)),
+        FilledButton(onPressed: _running || _version == null ? null : _add, child: Text(context.l10n.oobeAdd)),
       ],
     );
   }

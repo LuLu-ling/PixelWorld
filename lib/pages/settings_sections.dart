@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import '../core/network_check.dart';
+import '../widgets/network_check_panel.dart';
 import '../core/android_storage.dart';
 import 'file_manager_page.dart';
 
@@ -698,9 +700,26 @@ class MiscSection extends StatelessWidget {
             _SelectRow<String>(
               icon: Icons.cloud_download_outlined,
               title: '下载源',
+              subtitle: switch (cfg.downloadSource) {
+                'official' => '只用 Mojang 和各加载器的官方服务器',
+                'bmclapi' => '优先用 BMCLAPI 镜像，失败时回退到官方源',
+                _ =>
+                  '测速选择官方源或 BMCLAPI 镜像中较快的，失败时自动换另一个'
+                      '${DownloadSourcePicker.last == null ? '' : '（当前：${DownloadSourcePicker.preferMirror ? 'BMCLAPI 镜像' : '官方源'}）'}',
+              },
               value: cfg.downloadSource,
-              options: const {'official': '官方源', 'bmclapi': 'BMCLAPI 镜像（官方源失败时自动回退）'},
-              onChanged: (v) => cfg.update({'downloadSource': v}),
+              options: const {'auto': '自动选择', 'official': '官方源', 'bmclapi': 'BMCLAPI 镜像'},
+              onChanged: (v) {
+                cfg.update({'downloadSource': v});
+                if (v == 'auto') DownloadSourcePicker.measure();
+              },
+            ),
+            ListTile(
+              contentPadding: _rowPadding,
+              leading: const Icon(Icons.network_check),
+              title: const Text('网络检测'),
+              subtitle: const Text('测试下载源、正版登录、Modrinth 和更新服务能不能连上、有多快'),
+              trailing: OutlinedButton(onPressed: () => showNetworkCheck(context), child: const Text('开始检测')),
             ),
             ListTile(
               contentPadding: _rowPadding,

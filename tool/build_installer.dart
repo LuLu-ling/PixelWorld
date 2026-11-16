@@ -73,8 +73,8 @@ Future<void> main() async {
   final stage = Directory(p.join(dist.path, name));
   if (stage.existsSync()) await stage.delete(recursive: true);
   await copyTree(Directory(release(arch)), stage);
-  // Flutter 的可执行文件名不能带点，发布时改名（和 lib/installer/installer_core.dart 的 exeName 一起改）
-  await File(p.join(stage.path, 'pcl_pw.exe')).rename(p.join(stage.path, 'PCL.PW.exe'));
+  // Flutter 的可执行文件名不能带空格，发布时改名（和 lib/installer/installer_core.dart 的 exeName 一起改）
+  final mainExe = await File(p.join(stage.path, 'pcl_pw.exe')).rename(p.join(stage.path, 'Pixel World.exe'));
 
   // 给外壳补上版本信息与图标：没有这些元数据的匿名 .NET 程序更容易被杀毒软件误判
   final fileVersion = [...version.split('.'), '0', '0'].take(4).join('.');
@@ -117,8 +117,11 @@ using System.Reflection;
   for (final f in [portable, payload]) {
     if (File(f).existsSync()) File(f).deleteSync();
   }
-  await run(tar, ['-a', '-c', '-f', portable, '-C', dist.path, name]);
   await run(tar, ['-a', '-c', '-f', payload, '-C', stage.path, '.']);
+  // v0.3.3 及以前的便携版更新只认 PCL.PW.exe，便携版里另外放一份（安装包里不放）
+  final legacy = await mainExe.copy(p.join(stage.path, 'PCL.PW.exe'));
+  await run(tar, ['-a', '-c', '-f', portable, '-C', dist.path, name]);
+  await legacy.delete();
 
   final setup = p.join(dist.path, '$name-setup.exe');
   await compile(setup, ['/resource:$payload,payload.zip']);

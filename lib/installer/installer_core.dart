@@ -8,10 +8,10 @@ import '../app_info.dart';
 /// Windows 安装与卸载。安装包外壳（installer/Shell.cs）解压出程序后，
 /// 以 --pw-install 启动本程序显示安装界面；已安装的程序以 --pw-uninstall 启动显示卸载界面。
 
-/// 安装和打包用的主程序文件名。
-/// v0.3.3 及以前的便携版更新只认 PCL.PW.exe，所以要等认得两个名字的版本作为正式版发布之后，
-/// 再改成 Pixel World.exe（同时改 installer/Shell.cs 的 AppExe 和 tool/build_installer.dart）。
-const exeName = 'PCL.PW.exe';
+/// 安装和打包用的主程序文件名（和 installer/Shell.cs 的 AppExe、tool/build_installer.dart 一起改）。
+/// v0.3.3 及以前的便携版更新只认 PCL.PW.exe，所以便携版压缩包里另外带一份 PCL.PW.exe，
+/// 新版本的更新会把它删掉（见 updater.dart 的 portableUpdateScript）。
+const exeName = 'Pixel World.exe';
 
 /// 认得的所有主程序文件名，新名字在前
 const appExeNames = ['Pixel World.exe', 'PCL.PW.exe'];

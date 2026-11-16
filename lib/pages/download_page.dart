@@ -498,7 +498,7 @@ class _InstallPanelState extends State<InstallPanel> {
   /// 加载器选项格子下面的一行小字：加载中 / 不支持 / 默认版本或说明
   String _hint(LoaderKind? k) {
     if (_loading(k)) return '正在获取…';
-    if (_failed.contains(k)) return '获取失败，点击重试';
+    if (_failed.contains(k)) return '连不上 · 重试';
     if (!_available(k)) return '不支持 ${widget.version.id}';
     if (k == null) return '不加装';
     final list = _lists[k] ?? const <LoaderVersion>[];

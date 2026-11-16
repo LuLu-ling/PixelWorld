@@ -21,6 +21,7 @@ import 'version.dart';
 const _forgeMaven = 'https://maven.minecraftforge.net/net/minecraftforge/forge';
 const _neoMaven = 'https://maven.neoforged.net/releases/net/neoforged';
 const _neoApi = 'https://maven.neoforged.net/api/maven/versions/releases/net/neoforged';
+const _bmclapi = 'https://bmclapi2.bangbang93.com';
 
 // ---------- 版本列表 ----------
 
@@ -68,19 +69,69 @@ String? neoForgeGameVersion(String v) {
 }
 
 Future<List<LoaderVersion>> neoForgeVersions(Downloader dl, String gameVersion) async {
+  // 官方仓库在部分网络下连不上，BMCLAPI 有按游戏版本整理的列表；选了镜像时先问镜像
+  final sources = [() => _neoForgeOfficial(dl, gameVersion), () => _neoForgeMirror(dl, gameVersion)];
+  if (dl.useMirror) sources.insert(0, sources.removeLast());
+  Object? error;
+  for (final source in sources) {
+    try {
+      return await source();
+    } catch (e) {
+      error = e;
+    }
+  }
+  throw error!;
+}
+
+/// NeoForge 官方仓库的版本列表（较新的在前）
+Future<List<LoaderVersion>> _neoForgeOfficial(Downloader dl, String gameVersion) async {
   // 1.20.1 的 NeoForge 发布在 net.neoforged:forge 下，版本号形如 1.20.1-47.1.106
   if (gameVersion == '1.20.1') {
     final list = ((await dl.fetchJson('$_neoApi/forge') as Map)['versions'] as List).cast<String>();
     return [
       for (final v in list.reversed)
-        if (v.startsWith('1.20.1-')) LoaderVersion(v, stable: !v.contains('beta'), label: v.substring(7)),
+        if (v.startsWith('1.20.1-')) _neoForge1201(v),
     ];
   }
   final list = ((await dl.fetchJson('$_neoApi/neoforge') as Map)['versions'] as List).cast<String>();
   return [
     for (final v in list.reversed)
-      if (neoForgeGameVersion(v) == gameVersion) LoaderVersion(v, stable: !v.contains('beta') && !v.contains('alpha')),
+      if (neoForgeGameVersion(v) == gameVersion) _neoForgeVersion(v),
   ];
+}
+
+/// BMCLAPI 的 NeoForge 列表：rawVersion 形如 neoforge-26.3.0.103，1.20.1 的形如 1.20.1-47.1.5 或 1.20.1-forge-47.1.105
+Future<List<LoaderVersion>> _neoForgeMirror(Downloader dl, String gameVersion) async {
+  final list = await dl.fetchJson('$_bmclapi/neoforge/list/${Uri.encodeComponent(gameVersion)}') as List;
+  final versions = [
+    for (final e in list.whereType<Map>())
+      if (e['rawVersion'] is String)
+        (e['rawVersion'] as String).replaceFirst(RegExp('^neoforge-'), '').replaceFirst('1.20.1-forge-', '1.20.1-'),
+  ]..sort((a, b) => compareNeoForgeVersions(b, a));
+  return [
+    for (final v in versions)
+      if (gameVersion == '1.20.1' ? v.startsWith('1.20.1-') : neoForgeGameVersion(v) == gameVersion)
+        gameVersion == '1.20.1' ? _neoForge1201(v) : _neoForgeVersion(v),
+  ];
+}
+
+LoaderVersion _neoForge1201(String v) => LoaderVersion(v, stable: !v.contains('beta'), label: v.substring(7));
+
+LoaderVersion _neoForgeVersion(String v) => LoaderVersion(v, stable: !v.contains('beta') && !v.contains('alpha'));
+
+/// 按数字比较 NeoForge 版本号（26.3.0.9 < 26.3.0.10；同号时测试版在前）
+@visibleForTesting
+int compareNeoForgeVersions(String a, String b) {
+  List<int> nums(String v) => [
+    for (final m in RegExp(r'\d+').allMatches(v.split('-beta').first.split('-alpha').first)) int.parse(m.group(0)!),
+  ];
+  final x = nums(a), y = nums(b);
+  for (var i = 0; i < x.length && i < y.length; i++) {
+    if (x[i] != y[i]) return x[i].compareTo(y[i]);
+  }
+  if (x.length != y.length) return x.length.compareTo(y.length);
+  final pa = a.contains('-beta') || a.contains('-alpha'), pb = b.contains('-beta') || b.contains('-alpha');
+  return pa == pb ? 0 : (pa ? -1 : 1);
 }
 
 String _installerUrl(LoaderKind kind, String version) => switch (kind) {

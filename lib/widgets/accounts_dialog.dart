@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_scope.dart';
 import '../core/accounts.dart';
 import '../core/microsoft.dart';
+import '../core/precheck.dart';
 import 'device_login_dialog.dart';
 import 'yggdrasil_login_dialog.dart';
 
@@ -41,6 +42,8 @@ class _AccountsDialogState extends State<_AccountsDialog> {
     final state = AppScope.of(context);
     final scheme = Theme.of(context).colorScheme;
     final selected = state.selectedAccount?.id;
+    // 验证过正版后才能添加离线账户和外置登录（见 precheck.dart）
+    final verified = state.config.hintBuy;
     return AlertDialog(
       title: const Text('账户'),
       content: SizedBox(
@@ -70,32 +73,15 @@ class _AccountsDialogState extends State<_AccountsDialog> {
                   onPressed: () => state.removeAccount(a.id),
                 ),
               ),
+            if (!verified) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: scheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
+                child: Text('$ownershipRequiredHint。', style: TextStyle(color: scheme.onSecondaryContainer)),
+              ),
+            ],
             const SizedBox(height: 16),
-            Text('添加离线账户', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _name,
-                    decoration: InputDecoration(
-                      labelText: '用户名',
-                      errorText: _error,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onSubmitted: (_) => _add(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: FilledButton.tonal(onPressed: _add, child: const Text('添加')),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
             Text('正版账户', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Align(
@@ -118,12 +104,38 @@ class _AccountsDialogState extends State<_AccountsDialog> {
               ),
             ],
             const SizedBox(height: 20),
+            Text('添加离线账户', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _name,
+                    enabled: verified,
+                    decoration: InputDecoration(
+                      labelText: '用户名',
+                      errorText: _error,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: verified ? (_) => _add() : null,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: FilledButton.tonal(onPressed: verified ? _add : null, child: const Text('添加')),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
             Text('第三方账户', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.tonalIcon(
-                onPressed: () => showYggdrasilLogin(context),
+                onPressed: verified ? () => showYggdrasilLogin(context) : null,
                 icon: const Icon(Icons.dns_outlined),
                 label: const Text('外置登录'),
               ),

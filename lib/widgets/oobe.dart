@@ -628,10 +628,12 @@ class _OobePageState extends State<OobePage> {
     final scheme = theme.colorScheme;
     final clientId = state.config.effectiveMsClientId.trim();
     final list = state.accounts.accounts;
+    // 验证过正版后才能添加离线账户和外置登录（见 precheck.dart）
+    final verified = state.config.hintBuy;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _title(context, '添加账户', '玩正版用微软账户；也可以先用离线账户，之后在右上角随时添加。'),
+        _title(context, '添加账户', verified ? '玩正版用微软账户，也可以用离线账户或外置登录。' : '先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。'),
         IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -655,8 +657,8 @@ class _OobePageState extends State<OobePage> {
                 child: _AccountCard(
                   icon: Icons.key_outlined,
                   title: '外置登录',
-                  subtitle: 'LittleSkin 等皮肤站',
-                  onTap: () => showYggdrasilLogin(context),
+                  subtitle: verified ? 'LittleSkin 等皮肤站' : '验证正版后可用',
+                  onTap: verified ? () => showYggdrasilLogin(context) : null,
                 ),
               ),
               const SizedBox(width: 10),
@@ -664,15 +666,15 @@ class _OobePageState extends State<OobePage> {
                 child: _AccountCard(
                   icon: Icons.person_outline,
                   title: '离线账户',
-                  subtitle: '起个名字就能玩单机',
+                  subtitle: verified ? '起个名字就能玩单机' : '验证正版后可用',
                   selected: _offlineOpen,
-                  onTap: () => setState(() => _offlineOpen = true),
+                  onTap: verified ? () => setState(() => _offlineOpen = true) : null,
                 ),
               ),
             ],
           ),
         ),
-        if (_offlineOpen) ...[
+        if (_offlineOpen && verified) ...[
           const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,

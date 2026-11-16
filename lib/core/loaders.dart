@@ -152,6 +152,8 @@ Future<List<LoaderVersion>> fetchLoaderVersions(Downloader dl, LoaderKind kind, 
           LoaderVersion('${b['version']}', stable: b['stream'] == 'RELEASE'),
       ];
     default:
+      // Legacy Fabric 只支持 1.13.2 及以前：新版本不用去问服务器
+      if (kind == LoaderKind.legacyfabric && !legacyFabricMayExist(gameVersion)) return [];
       final list = await dl.fetchJson('${kind.meta}/versions/loader/${Uri.encodeComponent(gameVersion)}') as List;
       return [
         for (final e in list.cast<Map<String, dynamic>>())
@@ -164,6 +166,14 @@ Future<List<LoaderVersion>> fetchLoaderVersions(Downloader dl, LoaderKind kind, 
           ),
       ];
   }
+}
+
+/// Legacy Fabric 可能支持的游戏版本：1.13.2 及以前的正式版，以及其他认不出的版本号（快照等，交给服务器判断）
+bool legacyFabricMayExist(String gameVersion) {
+  final m = RegExp(r'^(\d+)\.(\d+)').firstMatch(gameVersion);
+  if (m == null) return true;
+  final major = int.parse(m.group(1)!), minor = int.parse(m.group(2)!);
+  return major == 1 && minor <= 13;
 }
 
 /// 同 [fetchLoaderVersions]，但连不上时也返回空列表

@@ -10322,6 +10322,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'Serper / Google（需要 Key）'**
   String get aiSearchEngineSerper;
+
+  /// 加载器版本列表获取失败（连不上服务器），点一下重试；手机上要短
+  ///
+  /// In zh, this message translates to:
+  /// **'连不上 · 重试'**
+  String get downloadLoadFailedRetry;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

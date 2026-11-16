@@ -2170,5 +2170,7 @@
   "aiSearchEngineSearxng": "SearXNG（自建或公共实例）",
   "aiSearchEngineTavily": "Tavily（需要 Key）",
   "aiSearchEngineBrave": "Brave Search（需要 Key）",
-  "aiSearchEngineSerper": "Serper / Google（需要 Key）"
+  "aiSearchEngineSerper": "Serper / Google（需要 Key）",
+  "downloadLoadFailedRetry": "连不上 · 重试",
+  "@downloadLoadFailedRetry": {"description": "加载器版本列表获取失败（连不上服务器），点一下重试；手机上要短"}
 }

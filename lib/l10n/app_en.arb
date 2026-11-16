@@ -1702,5 +1702,6 @@
   "aiSearchEngineSearxng": "SearXNG (self-hosted or public instance)",
   "aiSearchEngineTavily": "Tavily (key required)",
   "aiSearchEngineBrave": "Brave Search (key required)",
-  "aiSearchEngineSerper": "Serper / Google (key required)"
+  "aiSearchEngineSerper": "Serper / Google (key required)",
+  "downloadLoadFailedRetry": "Failed · Retry"
 }

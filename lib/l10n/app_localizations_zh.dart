@@ -6074,6 +6074,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiSearchEngineSerper => 'Serper / Google（需要 Key）';
+
+  @override
+  String get downloadLoadFailedRetry => '连不上 · 重试';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -12146,4 +12149,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get aiSearchEngineSerper => 'Serper / Google（需要 Key）';
+
+  @override
+  String get downloadLoadFailedRetry => '連不上 · 重試';
 }

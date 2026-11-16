@@ -1702,5 +1702,6 @@
   "aiSearchEngineSearxng": "SearXNG（自架或公共實例）",
   "aiSearchEngineTavily": "Tavily（需要 Key）",
   "aiSearchEngineBrave": "Brave Search（需要 Key）",
-  "aiSearchEngineSerper": "Serper / Google（需要 Key）"
+  "aiSearchEngineSerper": "Serper / Google（需要 Key）",
+  "downloadLoadFailedRetry": "連不上 · 重試"
 }

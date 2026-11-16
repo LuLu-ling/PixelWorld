@@ -6278,6 +6278,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiSearchEngineSerper => 'Serper / Google (key required)';
+
+  @override
+  String get downloadLoadFailedRetry => 'Failed · Retry';
 }
 
 /// The translations for English, as used in the United Kingdom (`en_GB`).

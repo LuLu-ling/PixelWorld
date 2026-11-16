@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
+import '../core/download.dart' show Downloader;
 import '../core/install.dart';
 import '../core/instance.dart';
 import '../core/loaders.dart';
@@ -376,22 +377,48 @@ class _InstallPanelState extends State<InstallPanel> {
         if (k == LoaderKind.optifine) _pickOptiFine();
         continue;
       }
-      loaderVersions(dl, k, widget.version.id).catchError((_) => <LoaderVersion>[]).then((list) {
-        // 空列表可能是网络失败，不记住，下次重新获取
-        if (list.isNotEmpty) _loaderCache[key] = list;
-        if (!mounted) return;
-        setState(() {
-          _lists[k] = list;
-          if (_choice == k) {
-            // 预选的加载器不支持这个版本时，回到原版
-            if (list.isEmpty) _choice = null;
-            _pickDefault();
-          }
-          if (k == LoaderKind.optifine) _pickOptiFine();
-        });
-      });
+      _fetch(dl, k, key);
     }
   }
+
+  /// 获取一个加载器的版本列表；连不上时记为「获取失败」，点一下可以重试
+  void _fetch(Downloader dl, LoaderKind k, String key) {
+    fetchLoaderVersions(
+      dl,
+      k,
+      widget.version.id,
+    ).then((list) => (list, false)).catchError((_) => (const <LoaderVersion>[], true)).then((r) {
+      final (list, failed) = r;
+      if (!failed) _loaderCache[key] = list;
+      if (!mounted) return;
+      setState(() {
+        if (failed) {
+          _failed.add(k);
+        } else {
+          _failed.remove(k);
+        }
+        _lists[k] = list;
+        if (_choice == k) {
+          // 预选的加载器不支持这个版本时，回到原版
+          if (list.isEmpty) _choice = null;
+          _pickDefault();
+        }
+        if (k == LoaderKind.optifine) _pickOptiFine();
+      });
+    });
+  }
+
+  /// 重新获取「获取失败」的加载器
+  void _retry(LoaderKind k) {
+    setState(() {
+      _lists.remove(k);
+      _failed.remove(k);
+    });
+    _fetch(AppScope.read(context).downloader, k, '${k.name}/${widget.version.id}');
+  }
+
+  /// 获取失败（连不上服务器）的加载器
+  final _failed = <LoaderKind>{};
 
   static final _loaderCache = <String, List<LoaderVersion>>{};
 
@@ -486,6 +513,7 @@ class _InstallPanelState extends State<InstallPanel> {
   /// 加载器选项格子下面的一行小字：加载中 / 不支持 / 默认版本或说明
   String _hint(LoaderKind? k) {
     if (_loading(k)) return context.l10n.homeLoading;
+    if (_failed.contains(k)) return context.l10n.downloadLoadFailedRetry;
     if (!_available(k)) return context.l10n.downloadIsntSupported(widget.version.id);
     if (k == null) return context.l10n.downloadNone;
     final list = _lists[k] ?? const <LoaderVersion>[];
@@ -590,11 +618,14 @@ class _InstallPanelState extends State<InstallPanel> {
                             hint: _hint(k),
                             selected: _choice == k,
                             loading: _loading(k),
-                            enabled: !_loading(k) && _available(k),
-                            onTap: () => setState(() {
-                              _choice = k;
-                              _pickDefault();
-                            }),
+                            enabled: !_loading(k) && (_available(k) || _failed.contains(k)),
+                            onTap: () {
+                              if (k != null && _failed.contains(k)) return _retry(k);
+                              setState(() {
+                                _choice = k;
+                                _pickDefault();
+                              });
+                            },
                           ),
                         ),
                     ],

@@ -1,5 +1,18 @@
 # Pixel World
 
+> Pixel World is a free and open-source (Apache 2.0) third-party launcher for Minecraft: Java Edition, built with Flutter for Windows, macOS, Linux and Android.
+>
+> - **Install and launch** vanilla versions and mod loaders (Forge, NeoForge, Fabric, Quilt, OptiFine and more), with per-version Java, memory and isolation settings.
+> - **Mods and resources** from Modrinth, with automatic dependency installation.
+> - **Fast downloads** from the official servers or the BMCLAPI mirror, with automatic fallback and SHA-1 verification.
+> - **Accounts**: Microsoft account sign-in uses Microsoft's official OAuth device code flow, so the launcher never sees your password; tokens are stored only on your device. Offline and third-party (Yggdrasil / authlib-injector) accounts are also supported.
+> - **No data collection**: no telemetry, no crash-report uploads, no author-run account server. See the [privacy policy](https://pixelworld.zhuzhi.site/docs/privacy.html).
+> - **Android**: built-in game runtime with selectable renderers and touch controls.
+>
+> Downloads: [Releases](https://github.com/zhuzhi-09/PixelWorld/releases) · Website: [pixelworld.zhuzhi.site](https://pixelworld.zhuzhi.site)
+>
+> Minecraft is a trademark of Mojang Studios. Pixel World is not an official Minecraft product and is not approved by or associated with Mojang or Microsoft.
+
 Pixel World 是一个跨平台的 Minecraft 启动器，本项目为轻度使用 PCL 仓储库，界面布局参考 [PCL 社区版（PCL-CE）](https://www.pclc.cc)，视觉上遵循 Google 的 Material Design 3 设计语言，使用 Flutter 开发，目标平台为 Windows、macOS、Linux 与 Android。
 
 > [!IMPORTANT]

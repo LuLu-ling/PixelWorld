@@ -7,6 +7,7 @@ import '../app_info.dart';
 import '../app_state.dart';
 import '../core/accounts.dart';
 import '../core/precheck.dart';
+import 'accounts_dialog.dart';
 
 /// 正版购买劝导与赞助劝导的对话框
 class DialogLaunchPrompts implements LaunchPrompts {
@@ -21,29 +22,25 @@ class DialogLaunchPrompts implements LaunchPrompts {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.verified_user_outlined),
-        title: const Text('支持正版游戏'),
+        title: const Text('需要先验证正版'),
         content: const SizedBox(
           width: 400,
           child: Text(
-            '你还没有登录过正版账号。Minecraft 是付费游戏，请购买正版支持开发者。\n\n'
-            '可以先去购买页面看看，也可以这次先以离线模式开始游戏，或者以试玩模式体验。'
-            '登录一次正版账号后，就不会再出现这个提示了。',
+            'Minecraft 是付费游戏。按照 Mojang 的规定，需要先登录一次购买了 Minecraft 的微软账户，'
+            '才能用离线账户或外置登录开始游戏。\n\n'
+            '验证一次之后，离线账户和外置登录就可以一直使用了。',
           ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, OwnershipChoice.cancel), child: const Text('返回')),
-          TextButton(onPressed: () => Navigator.pop(context, OwnershipChoice.demo), child: const Text('试玩')),
-          TextButton(onPressed: () => Navigator.pop(context, OwnershipChoice.launch), child: const Text('这次先启动')),
-          FilledButton(onPressed: () => Navigator.pop(context, OwnershipChoice.store), child: const Text('带我去商店')),
+          TextButton(onPressed: () => Navigator.pop(context, OwnershipChoice.store), child: const Text('去购买')),
+          FilledButton(onPressed: () => Navigator.pop(context, OwnershipChoice.login), child: const Text('登录微软账户')),
         ],
       ),
     );
-    // 只打开购买页面，不启动游戏
+    // 两个选择都不启动游戏
     if (choice == OwnershipChoice.store) await launchUrl(Uri.parse(buyMinecraftUrl));
-    if (choice == OwnershipChoice.demo && context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('游戏将以试玩模式启动'), behavior: SnackBarBehavior.floating, width: 420));
-    }
+    if (choice == OwnershipChoice.login && context.mounted) await showAccountsDialog(context);
     return choice ?? OwnershipChoice.cancel;
   }
 

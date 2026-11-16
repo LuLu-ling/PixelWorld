@@ -226,6 +226,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<Account> addOfflineAccount(String name) async {
+    if (!config.hintBuy) throw Exception(ownershipRequiredHint);
     final acc = await accounts.addOffline(name);
     await config.update({'selectedAccount': acc.id});
     return acc;
@@ -242,9 +243,11 @@ class AppState extends ChangeNotifier {
 
   Future<void> selectAccount(String id) => config.update({'selectedAccount': id});
 
-  /// 执行登录命令，保存并选中得到的账户。登录过一次正版账号后，不再进行正版购买劝导
+  /// 执行登录命令，保存并选中得到的账户。微软登录会检查是否购买了游戏，登录成功即算验证过正版
   Future<Account> login(LoginCommand command) async {
-    final acc = await accounts.upsert(await command.execute());
+    final result = await command.execute();
+    if (result.type != AccountType.microsoft && !config.hintBuy) throw Exception(ownershipRequiredHint);
+    final acc = await accounts.upsert(result);
     await config.update({'selectedAccount': acc.id, if (acc.type == AccountType.microsoft) 'hintBuy': true});
     return acc;
   }
@@ -446,18 +449,11 @@ class AppState extends ChangeNotifier {
     var acc = selectedAccount;
     if (acc == null) throw Exception('请先添加一个账户');
 
-    // ---- 正版购买劝导与赞助劝导 ----
-    var demo = false;
+    // ---- 正版验证与赞助劝导 ----
+    // 没有验证过正版时不能用离线或外置登录账户启动（对话框里可以去登录或购买）
     if (needsOwnershipCheck(acc, hintBuy: config.hintBuy)) {
-      switch (await prompts.askOwnership()) {
-        // 打开购买页面时不启动游戏
-        case OwnershipChoice.cancel || OwnershipChoice.store:
-          return false;
-        case OwnershipChoice.launch:
-          break;
-        case OwnershipChoice.demo:
-          demo = true;
-      }
+      await prompts.askOwnership();
+      return false;
     }
     final count = config.launchCount + 1;
     if (shouldAskSponsor(count)) unawaited(prompts.askSponsor(count));
@@ -482,6 +478,8 @@ class AppState extends ChangeNotifier {
         return false;
       }
       if (!identical(auth.account, acc)) acc = await accounts.upsert(auth.account);
+      // 微软账户验证通过（令牌过期时会重新获取档案），算作验证过正版
+      if (acc.type == AccountType.microsoft && !cfg.hintBuy) await config.update({'hintBuy': true});
       t.setStage('分析实例');
       final info = await analyzeInstance(g, id);
       final inst = readInstanceSettings(g.versionDir(id));
@@ -541,7 +539,7 @@ class AppState extends ChangeNotifier {
         nativesDir: nativesDir,
         gameDir: gameDir,
         windowSize: size,
-        demo: demo,
+        demo: false,
         classpathHead: android?.lwjglClasspath ?? const [],
         classpathTail: android != null && lwjgl2 ? [android.lwjglx] : const [],
         skipLibrary: android == null ? null : (name) => name.startsWith('org.lwjgl'),
@@ -583,7 +581,6 @@ class AppState extends ChangeNotifier {
         _launcherLog('Java: ${java.path}（安卓版 Java ${java.major}）');
         _launcherLog('内存: ${memory.max.toStringAsFixed(1)} GB');
         _launcherLog('工作目录: $gameDir');
-        if (demo) _launcherLog('以试玩模式启动');
         _launcherLog('渲染比例: ${(cfg.renderScale * 100).round()}%');
         // 版本设置优先，其次全局设置；「自动」按显卡选择
         final gpu = await androidGpu().catchError((_) => AndroidGpu(const {}));
@@ -658,7 +655,6 @@ class AppState extends ChangeNotifier {
         '${memory.initial != null ? '，初始 ${memory.initial!.toStringAsFixed(1)} GB' : ''}',
       );
       _launcherLog('工作目录: $gameDir');
-      if (demo) _launcherLog('以试玩模式启动');
 
       final detached = cfg.afterLaunch == 'exit';
       final proc = await startGame(ctx, args, detached: detached);

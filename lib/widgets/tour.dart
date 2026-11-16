@@ -111,7 +111,7 @@ class _Step {
 
 const _steps = [
   _Step('欢迎使用 Pixel World', '花一分钟认识一下启动器的几个主要地方。随时可以点「跳过」，之后在「设置 → 关于与致谢」里能再看一遍。', page: MainPage.home),
-  _Step('先添加账户', '点这里添加微软正版账户、外置登录（例如 LittleSkin），或者先用离线账户玩。', target: 'top.account'),
+  _Step('先添加账户', '点这里添加微软正版账户；登录过一次正版后，也可以添加外置登录（例如 LittleSkin）和离线账户。', target: 'top.account'),
   _Step(
     '安装游戏',
     '在「下载」里选游戏版本和加载器（Forge、Fabric 等）来安装。装好的一份叫「实例」，同一个版本可以装好几个，存档和模组互不影响。'

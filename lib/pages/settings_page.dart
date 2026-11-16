@@ -124,7 +124,8 @@ class _SettingsPageState extends State<SettingsPage> {
 Size _unscaledSize(BuildContext context) {
   final view = View.of(context);
   final padding = view.padding;
-  final w = view.physicalSize.width - padding.right;
+  // 左右的挖孔都扣掉，和 AppScale 的算法一致
+  final w = view.physicalSize.width - padding.left - padding.right;
   final h = view.physicalSize.height - padding.top - padding.bottom;
   return Size(w, h) / view.devicePixelRatio;
 }

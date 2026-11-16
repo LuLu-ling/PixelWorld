@@ -132,34 +132,43 @@ Future<String> _installLiteLoader(
 
 // ---------- 对外接口 ----------
 
-Future<List<LoaderVersion>> loaderVersions(Downloader dl, LoaderKind kind, String gameVersion) async {
-  if (kind == LoaderKind.forge) return forgeVersions(dl, gameVersion).catchError((_) => <LoaderVersion>[]);
-  if (kind == LoaderKind.optifine) return optiFineVersions(dl, gameVersion).catchError((_) => <LoaderVersion>[]);
-  if (kind == LoaderKind.cleanroom) return cleanroomVersions(dl, gameVersion).catchError((_) => <LoaderVersion>[]);
-  if (kind == LoaderKind.labymod) return labyModVersions(dl, gameVersion).catchError((_) => <LoaderVersion>[]);
-  if (kind == LoaderKind.neoforge) return neoForgeVersions(dl, gameVersion).catchError((_) => <LoaderVersion>[]);
-  if (kind == LoaderKind.liteloader) {
-    return [
-      for (final b in (await _liteLoaderBuilds(dl, gameVersion)).reversed)
-        LoaderVersion('${b['version']}', stable: b['stream'] == 'RELEASE'),
-    ];
-  }
-  try {
-    final list = await dl.fetchJson('${kind.meta}/versions/loader/${Uri.encodeComponent(gameVersion)}') as List;
-    return [
-      for (final e in list.cast<Map<String, dynamic>>())
-        LoaderVersion(
-          '${(e['loader'] as Map)['version']}',
-          // Quilt 没有 stable 字段，按版本号判断
-          stable:
-              ((e['loader'] as Map)['stable'] as bool?) ??
-              !RegExp('beta|alpha|pre|rc', caseSensitive: false).hasMatch('${(e['loader'] as Map)['version']}'),
-        ),
-    ];
-  } catch (_) {
-    return [];
+/// 某个游戏版本可用的加载器版本。空列表表示不支持这个游戏版本；连不上服务器时抛出异常
+/// （下载页据此显示「获取失败」，而不是「不支持」）
+Future<List<LoaderVersion>> fetchLoaderVersions(Downloader dl, LoaderKind kind, String gameVersion) async {
+  switch (kind) {
+    case LoaderKind.forge:
+      return forgeVersions(dl, gameVersion);
+    case LoaderKind.optifine:
+      return optiFineVersions(dl, gameVersion);
+    case LoaderKind.cleanroom:
+      return cleanroomVersions(dl, gameVersion);
+    case LoaderKind.labymod:
+      return labyModVersions(dl, gameVersion);
+    case LoaderKind.neoforge:
+      return neoForgeVersions(dl, gameVersion);
+    case LoaderKind.liteloader:
+      return [
+        for (final b in (await _liteLoaderBuilds(dl, gameVersion)).reversed)
+          LoaderVersion('${b['version']}', stable: b['stream'] == 'RELEASE'),
+      ];
+    default:
+      final list = await dl.fetchJson('${kind.meta}/versions/loader/${Uri.encodeComponent(gameVersion)}') as List;
+      return [
+        for (final e in list.cast<Map<String, dynamic>>())
+          LoaderVersion(
+            '${(e['loader'] as Map)['version']}',
+            // Quilt 没有 stable 字段，按版本号判断
+            stable:
+                ((e['loader'] as Map)['stable'] as bool?) ??
+                !RegExp('beta|alpha|pre|rc', caseSensitive: false).hasMatch('${(e['loader'] as Map)['version']}'),
+          ),
+      ];
   }
 }
+
+/// 同 [fetchLoaderVersions]，但连不上时也返回空列表
+Future<List<LoaderVersion>> loaderVersions(Downloader dl, LoaderKind kind, String gameVersion) =>
+    fetchLoaderVersions(dl, kind, gameVersion).catchError((_) => <LoaderVersion>[]);
 
 Future<String> installLoader(
   GamePaths g,

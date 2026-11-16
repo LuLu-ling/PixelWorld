@@ -2,15 +2,19 @@
 
 源图在 `assets/icon/source/`：
 
-- `cube_blue.jpg`：蓝底版，用于 Windows、macOS、安卓旧版图标和"关于"页（立方体是白色的，浅色背景上需要蓝底）。
-- `cube_transparent.png`：透明版，用于安卓自适应图标前景，背景色是 `#1471FD`；单色主题图标由它的透明通道生成。
+- `cube_transparent.png`：透明底的白色立方体，所有平台的图标都从它生成。
+- `cube_blue.jpg`：最早的蓝底版，现在不再使用，留作参考。
 
-重新生成（Windows PowerShell 5.1）：
+`make_icons.py` 在立方体左侧面印 P、右侧面印 W（按等轴测投影贴到面上，并沿面的法线方向凸起一点，和顶面中间的小方块一致；W 比 P 宽，收窄一些让两边平衡），然后生成：
 
-```powershell
-# 1. 在两个侧面印上 "P C / L ." 和 "PW"
-.\tool\icons\icon_text.ps1 -Src assets\icon\source\cube_blue.jpg -Out $env:TEMP\blue.png
-.\tool\icons\icon_text.ps1 -Src assets\icon\source\cube_transparent.png -Out $env:TEMP\fg.png -Scale 1.05 -TopY 270
-# 2. 生成各平台尺寸
-.\tool\icons\make_icons.ps1 -Blue $env:TEMP\blue.png -Fg $env:TEMP\fg.png -Repo .
+- 启动器内与 Linux：`assets/icon/icon.png`（透明底）
+- 安卓：自适应图标前景、单色主题图标（字母镂空）、旧版图标（白色圆角底）；自适应图标的背景色在 `android/app/src/main/res/values/colors.xml`（白色）
+- Windows：`windows/runner/resources/app_icon.ico`
+- macOS：`macos/Runner/Assets.xcassets/AppIcon.appiconset/`
+- 网站：`docs/icon.png`、`docs/favicon.png`
+
+重新生成（需要 Pillow 和 numpy，字体用 Windows 自带的 Bahnschrift）：
+
+```bash
+python tool/icons/make_icons.py
 ```

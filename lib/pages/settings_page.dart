@@ -556,11 +556,7 @@ class _AboutSection extends StatelessWidget {
             ),
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              // 图标的立方体是白色，用带蓝底的版本，浅色背景上也看得清
-              leading: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.asset('assets/icon/icon.png', width: 40, height: 40),
-              ),
+              leading: Image.asset('assets/icon/icon.png', width: 40, height: 40),
               title: Text('${AppInfo.fullName} ${AppInfo.version}'),
               subtitle: const Text(
                 'Pixel World 是第三方 Minecraft 启动器，本项目为轻度使用 PCL 仓储库，界面布局参考 PCL 社区版（PCL-CE）。'

@@ -252,7 +252,7 @@ class _Rail extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(inset, top, 0, 10),
         child: Column(
           children: [
-            const AppLogo(size: 30),
+            const AppLogo(size: 36),
             const SizedBox(height: 10),
             item(MainPage.home, Icons.rocket_launch_outlined, Icons.rocket_launch, '启动'),
             item(MainPage.download, Icons.download_outlined, Icons.download, '下载'),

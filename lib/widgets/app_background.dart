@@ -101,7 +101,8 @@ class BackgroundController extends ChangeNotifier {
   double get opacity => (_get<num>(BackgroundPrefs.opacityKey)).toDouble();
   String get fit {
     final v = _get<Object?>(BackgroundPrefs.fitKey);
-    return BackgroundPrefs.fits.containsKey(v) ? v as String : 'fill';
+    // 跨区只有电脑上有
+    return BackgroundPrefs.fits.containsKey(v) && (isDesktop || v != 'span') ? v as String : 'fill';
   }
 
   /// 背景暗化的浓度；没有调过时用默认值（深色 35%、浅色 10%，和以前一样）
@@ -115,8 +116,12 @@ class BackgroundController extends ChangeNotifier {
   bool get themeFromImage => _get<bool>(BackgroundPrefs.themeFromImageKey);
   int get seedIndex => (_get<num>(BackgroundPrefs.seedIndexKey)).toInt();
 
-  /// 只在电脑上、并且已经设置并加载好背景图片时启用
-  bool get active => isDesktop && _bgImage != null && _panelImage != null;
+  /// 背景图片是否生效：电脑上一直生效；手机上「标准」首页保持原来的样子（没有背景），
+  /// 只有选了「上下」或「极简」这两种毛玻璃布局时才显示背景
+  bool get enabled => isDesktop || config.homeLayout != 'standard';
+
+  /// 背景图片生效、并且已经加载好时启用
+  bool get active => enabled && _bgImage != null && _panelImage != null;
 
   /// 第一次加载背景（以及从背景取的主题色）已经完成；启动画面等到这时再淡出，避免先闪一下没有背景的界面
   bool get ready => _ready;
@@ -130,7 +135,7 @@ class BackgroundController extends ChangeNotifier {
 
   /// 主题色种子：设了背景、选择跟随背景时用候选色，否则为 null（用手动选的主题色）
   Color? get themeSeed {
-    if (!isDesktop || imagePath.isEmpty || !themeFromImage || _candidates.isEmpty) return null;
+    if (!enabled || imagePath.isEmpty || !themeFromImage || _candidates.isEmpty) return null;
     return _candidates[seedIndex.clamp(0, _candidates.length - 1)];
   }
 
@@ -139,7 +144,7 @@ class BackgroundController extends ChangeNotifier {
 
   void _sync() {
     _trackSpan(isDesktop && fit == 'span' && imagePath.isNotEmpty);
-    final path = isDesktop ? imagePath : '';
+    final path = enabled ? imagePath : '';
     if (path != _loadedPath || blur != _loadedBlur || panelBlur != _loadedPanelBlur) {
       unawaited(_load(path));
     } else {

@@ -112,7 +112,8 @@ class _HomePageState extends State<HomePage> {
       builder: (context, snap) {
         final worlds = snap.data ?? const <RecentWorld>[];
         final latest = version == null ? null : worlds.where((w) => w.versionId == version.id).firstOrNull;
-        if (isDesktop) {
+        // 手机上「标准」布局保持原来的首页；「上下」「极简」两种毛玻璃布局和电脑上一样
+        if (isDesktop || state.config.homeLayout != 'standard') {
           return _DesktopHome(
             state: state,
             version: version,
@@ -1135,7 +1136,7 @@ class _DesktopHomeState extends State<_DesktopHome> {
                             style: TextButton.styleFrom(foregroundColor: muted ?? theme.colorScheme.onSurfaceVariant),
                             iconAlignment: IconAlignment.end,
                             icon: const Icon(Icons.expand_more, size: 18),
-                            label: const Text('向下滚动查看更多'),
+                            label: Text(isDesktop ? '向下滚动查看更多' : '上滑查看更多'),
                           ),
                         ),
                       ),
@@ -1388,7 +1389,7 @@ class _WallpaperFold extends StatelessWidget {
                 style: TextButton.styleFrom(foregroundColor: muted ?? scheme.onSurfaceVariant),
                 iconAlignment: IconAlignment.end,
                 icon: const Icon(Icons.expand_more, size: 18),
-                label: const Text('向下滚动查看更多'),
+                label: Text(isDesktop ? '向下滚动查看更多' : '上滑查看更多'),
               ),
             ),
           ),
@@ -1522,7 +1523,7 @@ class _MinimalFold extends StatelessWidget {
                 style: TextButton.styleFrom(foregroundColor: muted ?? scheme.onSurfaceVariant),
                 iconAlignment: IconAlignment.end,
                 icon: const Icon(Icons.expand_more, size: 18),
-                label: const Text('向下滚动查看更多'),
+                label: Text(isDesktop ? '向下滚动查看更多' : '上滑查看更多'),
               ),
             ),
           ),

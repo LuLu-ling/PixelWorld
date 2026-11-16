@@ -182,30 +182,30 @@ class _AppearanceSection extends StatelessWidget {
             const _ThemeColorSetting(),
           ],
         ),
-        // 背景图片只在电脑上生效
-        if (isDesktop) const _BackgroundSettings(),
+        const _BackgroundSettings(),
         SettingsGroup(
           title: '首页',
           children: [
-            if (isDesktop)
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                leading: const Icon(Icons.dashboard_outlined),
-                title: const Text('首页布局'),
-                subtitle: Text(switch (cfg.homeLayout) {
-                  'split' => '上下：当前实例在顶部，开始游戏和存档在底部，中间留给背景；选背景图片时自动切到这个布局',
-                  'minimal' => '极简：只在底部留一条，放当前实例和开始游戏',
-                  _ => '标准：大卡片、公告与快捷按钮、最近游玩',
-                }),
-                trailing: DropdownButton<String>(
-                  focusColor: Colors.transparent,
-                  value: cfg.homeLayout,
-                  underline: const SizedBox.shrink(),
-                  borderRadius: BorderRadius.circular(12),
-                  items: [for (final e in homeLayouts.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
-                  onChanged: (v) => v == null ? null : cfg.update({'homeLayout': v}),
-                ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              leading: const Icon(Icons.dashboard_outlined),
+              title: const Text('首页布局'),
+              subtitle: Text(switch (cfg.homeLayout) {
+                'split' => '上下：当前实例在顶部，开始游戏和存档在底部，中间留给背景；选背景图片时自动切到这个布局',
+                'minimal' => '极简：只在底部留一条，放当前实例和开始游戏',
+                // 手机上的「标准」就是原来的首页，不显示背景图片
+                _ when !isDesktop => '标准：原来的首页，不显示背景图片；要用背景图片请选「上下」或「极简」',
+                _ => '标准：大卡片、公告与快捷按钮、最近游玩',
+              }),
+              trailing: DropdownButton<String>(
+                focusColor: Colors.transparent,
+                value: cfg.homeLayout,
+                underline: const SizedBox.shrink(),
+                borderRadius: BorderRadius.circular(12),
+                items: [for (final e in homeLayouts.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
+                onChanged: (v) => v == null ? null : cfg.update({'homeLayout': v}),
               ),
+            ),
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               secondary: const Icon(Icons.info_outline),
@@ -238,7 +238,7 @@ class _ThemeColorSetting extends StatelessWidget {
     final state = AppScope.of(context);
     final cfg = state.config;
     final bg = state.background;
-    final hasImage = isDesktop && bg.imagePath.isNotEmpty;
+    final hasImage = bg.enabled && bg.imagePath.isNotEmpty;
     final auto = hasImage && bg.themeFromImage;
     final seed = Theme.of(context).colorScheme.primary;
     return Column(
@@ -297,7 +297,8 @@ class _ThemeColorSetting extends StatelessWidget {
   }
 }
 
-/// 背景图片（电脑端）：选择图片、两种模糊、封面色散、面板不透明度与降低透明度
+/// 背景图片：选择图片、两种模糊、封面色散、面板不透明度与降低透明度。
+/// 手机上只在「上下」「极简」首页布局时生效
 class _BackgroundSettings extends StatelessWidget {
   const _BackgroundSettings();
 
@@ -327,7 +328,11 @@ class _BackgroundSettings extends StatelessWidget {
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           leading: const Icon(Icons.wallpaper_outlined),
           title: const Text('背景图片'),
-          subtitle: Text(has ? '显示在整个窗口后面，界面面板会变成毛玻璃' : '选择一张图片作为启动器的背景（只在电脑上生效）'),
+          subtitle: Text(switch ((has, bg.enabled)) {
+            (true, true) => '显示在整个窗口后面，界面面板会变成毛玻璃',
+            (true, false) => '「标准」首页不显示背景图片，把首页布局换成「上下」或「极简」后生效',
+            _ => '选择一张图片作为启动器的背景，界面面板会变成毛玻璃',
+          }),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -370,7 +375,9 @@ class _BackgroundSettings extends StatelessWidget {
               underline: const SizedBox(),
               borderRadius: BorderRadius.circular(12),
               items: [
-                for (final e in BackgroundPrefs.fits.entries) DropdownMenuItem(value: e.key, child: Text(e.value)),
+                // 跨区（铺满所有屏幕）只有电脑上有
+                for (final e in BackgroundPrefs.fits.entries)
+                  if (isDesktop || e.key != 'span') DropdownMenuItem(value: e.key, child: Text(e.value)),
               ],
               onChanged: (v) => v == null ? null : cfg.update({BackgroundPrefs.fitKey: v}),
             ),

@@ -130,6 +130,12 @@ void main() {
       s = portableUpdateScript(source: src, target: dst, pid: 1);
       expect(s.last, "Start-Process '${p.join(dst, 'Pixel World.exe')}'");
       expect(s.where((c) => c.startsWith('Remove-Item')).single, contains("'${p.join(dst, 'PCL.PW.exe')}'"));
+
+      // 便携版压缩包两个名字都有（PCL.PW.exe 是给旧版本更新用的副本）：用新名字，删掉副本
+      File(p.join(src, 'PCL.PW.exe')).writeAsStringSync('');
+      s = portableUpdateScript(source: src, target: dst, pid: 1);
+      expect(s.last, "Start-Process '${p.join(dst, 'Pixel World.exe')}'");
+      expect(s.where((c) => c.startsWith('Remove-Item')).single, contains("'${p.join(dst, 'PCL.PW.exe')}'"));
     } finally {
       dir.deleteSync(recursive: true);
     }

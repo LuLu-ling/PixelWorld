@@ -10,6 +10,7 @@ import '../app_scope.dart';
 import '../core/config.dart' show homeLayouts;
 import '../platform.dart';
 import '../widgets/theme_color_dialog.dart';
+import '../widgets/tour.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
 import '../widgets/ai_settings.dart';
@@ -544,6 +545,18 @@ class _AboutSection extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(6, 2, 16, 16),
       children: [
+        SettingsGroup(
+          title: '帮助',
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              leading: const Icon(Icons.tour_outlined),
+              title: const Text('新手教程'),
+              subtitle: const Text('再看一遍启动器各个地方的介绍：账户、安装游戏、实例、开始游戏、工具和设置'),
+              trailing: FilledButton.tonal(onPressed: () => startTour(context), child: const Text('开始')),
+            ),
+          ],
+        ),
         SettingsGroup(
           title: '关于',
           children: [

@@ -16,6 +16,7 @@ import 'widgets/app_logo.dart';
 import 'widgets/device_status.dart';
 import 'widgets/shell_layout.dart';
 import 'widgets/storage_location.dart';
+import 'widgets/tour.dart';
 import 'widgets/update_dialog.dart';
 import 'widgets/window_buttons.dart';
 import 'pages/ai_page.dart';
@@ -118,12 +119,21 @@ class _ShellState extends State<Shell> {
     });
     if (!_askedStorage) {
       _askedStorage = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         final ctx = _navKey.currentContext;
-        if (ctx != null && ctx.mounted) askStorageOnFirstRun(ctx);
+        if (ctx == null || !ctx.mounted) return;
+        await askStorageOnFirstRun(ctx);
+        // 第一次打开：等启动画面淡出后开始新手教程
+        await Future<void>.delayed(const Duration(milliseconds: 1200));
+        final again = _navKey.currentContext;
+        if (again != null && again.mounted) startTourOnFirstRun(again);
       });
       // 启动后稍等一会再检查更新，不和首次运行的提示抢
-      Future<void>.delayed(const Duration(seconds: 5), () {
+      Future<void>.delayed(const Duration(seconds: 5), () async {
+        // 第一次打开还没看完新手教程、或者教程正在进行：等它结束再弹更新提示
+        while (tourRunning.value || mounted && !AppScope.read(context).config.tourSeen) {
+          await Future<void>.delayed(const Duration(seconds: 1));
+        }
         final ctx = _navKey.currentContext;
         if (ctx != null && ctx.mounted && AppScope.read(ctx).config.updateAutoCheck) checkUpdates(ctx, manual: false);
       });
@@ -237,12 +247,15 @@ class _Rail extends StatelessWidget {
     // 侧栏加宽到能完整容纳它们，图标从它们下面留出空隙再开始
     final top = Platform.isMacOS ? 64.0 : 10.0;
     final width = Platform.isMacOS ? 84.0 : 76.0;
-    Widget item(MainPage p, IconData icon, IconData active, String label) => _RailItem(
-      icon: icon,
-      activeIcon: active,
-      label: label,
-      selected: page == p && (sub == null || p == MainPage.home && sub == SubPage.instance),
-      onTap: () => onMain(p),
+    Widget item(MainPage p, IconData icon, IconData active, String label) => TourTarget(
+      id: 'rail.${p.name}',
+      child: _RailItem(
+        icon: icon,
+        activeIcon: active,
+        label: label,
+        selected: page == p && (sub == null || p == MainPage.home && sub == SubPage.instance),
+        onTap: () => onMain(p),
+      ),
     );
     return GlassPanel(
       color: scheme.surfaceContainerLow,
@@ -446,7 +459,10 @@ class _TopBarState extends State<_TopBar> {
           children: [
             Expanded(child: titleArea),
             const SizedBox(width: 8),
-            _TasksPill(key: _tasksKey, width: tight ? 168 : (compact ? 200 : 236)),
+            TourTarget(
+              id: 'top.tasks',
+              child: _TasksPill(key: _tasksKey, width: tight ? 168 : (compact ? 200 : 236)),
+            ),
             const SizedBox(width: 4),
             IconButton(
               tooltip: '实例列表',
@@ -461,7 +477,10 @@ class _TopBarState extends State<_TopBar> {
               ),
             if (!isDesktop) ...[const SizedBox(width: 4), const _BarChip(child: DeviceStatus())],
             const SizedBox(width: 6),
-            _AccountChip(avatarOnly: compact),
+            TourTarget(
+              id: 'top.account',
+              child: _AccountChip(avatarOnly: compact),
+            ),
             if (isDesktop && !nativeWindowButtons) ...[const SizedBox(width: 8), const WindowButtons()],
           ],
         ),

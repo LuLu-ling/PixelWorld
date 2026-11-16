@@ -21,6 +21,7 @@ import '../shell.dart';
 import '../widgets/app_background.dart';
 import '../widgets/cover_palette.dart';
 import '../widgets/launch_dialogs.dart';
+import '../widgets/tour.dart';
 import '../widgets/version_icon.dart';
 import 'download_page.dart';
 import 'home_feed.dart';
@@ -290,7 +291,11 @@ class _HeroCard extends StatelessWidget {
                             '切换实例',
                             style: theme.textTheme.labelMedium?.copyWith(color: white.withValues(alpha: .8)),
                           ),
-                          Icon(Icons.expand_more, size: 16, color: white.withValues(alpha: .8)),
+                          TourTarget(
+                            id: 'home.switch',
+                            inkWell: true,
+                            child: Icon(Icons.expand_more, size: 16, color: white.withValues(alpha: .8)),
+                          ),
                         ],
                       ),
                     ),
@@ -341,7 +346,7 @@ class _HeroCard extends StatelessWidget {
                         minimumSize: const Size(0, 44),
                       ),
                       icon: const Icon(Icons.tune, size: 18),
-                      label: const Text('实例设置'),
+                      label: const TourTarget(id: 'home.settings', inkWell: true, child: Text('实例设置')),
                     ),
                     const SizedBox(width: 8),
                     PopupMenuButton<String>(
@@ -516,7 +521,7 @@ class _LaunchButton extends StatelessWidget {
         textStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
       icon: Icon(running ? Icons.stop : Icons.rocket_launch, size: 19),
-      label: Text(running ? '结束游戏' : '开始游戏'),
+      label: TourTarget(id: 'home.launch', inkWell: true, child: Text(running ? '结束游戏' : '开始游戏')),
     );
   }
 }
@@ -1273,7 +1278,14 @@ class _WallpaperFold extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('切换实例', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                        TourTarget(
+                          id: 'home.switch',
+                          inkWell: true,
+                          child: Text(
+                            '切换实例',
+                            style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ),
                         Icon(Icons.expand_more, size: 16, color: scheme.onSurfaceVariant),
                       ],
                     ),
@@ -1295,7 +1307,7 @@ class _WallpaperFold extends StatelessWidget {
               OutlinedButton(
                 onPressed: onSettings,
                 style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
-                child: const Text('实例设置'),
+                child: const TourTarget(id: 'home.settings', inkWell: true, child: Text('实例设置')),
               ),
             ],
           ),
@@ -1475,7 +1487,14 @@ class _MinimalFold extends StatelessWidget {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('切换实例', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                            TourTarget(
+                              id: 'home.switch',
+                              inkWell: true,
+                              child: Text(
+                                '切换实例',
+                                style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                              ),
+                            ),
                             Icon(Icons.expand_more, size: 14, color: scheme.onSurfaceVariant),
                           ],
                         ),
@@ -1491,7 +1510,7 @@ class _MinimalFold extends StatelessWidget {
                 color: scheme.outlineVariant.withValues(alpha: .5),
               ),
               tool(Icons.grid_view_rounded, '全部存档', onSaves),
-              tool(Icons.tune, '实例设置', onSettings),
+              TourTarget(id: 'home.settings', child: tool(Icons.tune, '实例设置', onSettings)),
               PopupMenuButton<VoidCallback?>(
                 tooltip: '更多',
                 icon: Icon(Icons.more_horiz, size: 20, color: scheme.onSurfaceVariant),
@@ -1568,7 +1587,11 @@ class _DockLaunch extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 18),
             child: Row(
               children: [
-                Icon(Icons.rocket_launch, size: 20, color: scheme.onPrimaryFixed),
+                TourTarget(
+                  id: 'home.launch',
+                  inkWell: true,
+                  child: Icon(Icons.rocket_launch, size: 20, color: scheme.onPrimaryFixed),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -1749,7 +1772,14 @@ class _DesktopHero extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('切换实例', style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                      TourTarget(
+                        id: 'home.switch',
+                        inkWell: true,
+                        child: Text(
+                          '切换实例',
+                          style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                      ),
                       Icon(Icons.expand_more, size: 16, color: scheme.onSurfaceVariant),
                     ],
                   ),
@@ -1802,7 +1832,7 @@ class _DesktopHero extends StatelessWidget {
                   onPressed: onSettings,
                   style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
                   icon: const Icon(Icons.tune, size: 18),
-                  label: const Text('实例设置'),
+                  label: const TourTarget(id: 'home.settings', inkWell: true, child: Text('实例设置')),
                 ),
                 const SizedBox(width: 8),
                 PopupMenuButton<String>(

@@ -11,9 +11,11 @@ import 'app_state.dart';
 import 'core/crash.dart';
 import 'platform.dart';
 import 'widgets/accounts_dialog.dart';
+import 'widgets/agreement_dialog.dart';
 import 'widgets/app_background.dart';
 import 'widgets/app_logo.dart';
 import 'widgets/device_status.dart';
+import 'widgets/oobe.dart';
 import 'widgets/shell_layout.dart';
 import 'widgets/storage_location.dart';
 import 'widgets/tour.dart';
@@ -122,16 +124,38 @@ class _ShellState extends State<Shell> {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final ctx = _navKey.currentContext;
         if (ctx == null || !ctx.mounted) return;
-        await askStorageOnFirstRun(ctx);
-        // 第一次打开：等启动画面淡出后开始新手教程
-        await Future<void>.delayed(const Duration(milliseconds: 1200));
+        // 全新安装：全屏的首次设置（协议、外观、游戏文件夹、网络、账户）
+        final oobe = await showOobeIfNeeded(ctx);
+        if (!ctx.mounted) return;
+        if (oobe == null) {
+          // 老用户：协议更新时请用户重新确认（不同意会退出），安卓上没问过存储位置的再问一次
+          await ensureAgreement(ctx);
+          if (!ctx.mounted) return;
+          await askStorageOnFirstRun(ctx);
+        }
+        // 等启动画面（或首次设置）淡出后开始新手教程
+        await Future<void>.delayed(Duration(milliseconds: oobe == null ? 1200 : 400));
         final again = _navKey.currentContext;
-        if (again != null && again.mounted) startTourOnFirstRun(again);
+        if (again == null || !again.mounted) return;
+        if (oobe?.download == true) {
+          // 「去安装第一个实例」：看完教程（如果要看）再打开下载页
+          if (oobe!.tour) {
+            startTour(again, onClose: () => _goMain(MainPage.download));
+          } else {
+            _goMain(MainPage.download);
+          }
+        } else {
+          startTourOnFirstRun(again);
+        }
       });
       // 启动后稍等一会再检查更新，不和首次运行的提示抢
       Future<void>.delayed(const Duration(seconds: 5), () async {
-        // 第一次打开还没看完新手教程、或者教程正在进行：等它结束再弹更新提示
-        while (tourRunning.value || mounted && !AppScope.read(context).config.tourSeen) {
+        // 还在首次设置、还没同意用户协议、第一次打开还没看完新手教程、或者教程正在进行：等它们结束再弹更新提示
+        while (tourRunning.value ||
+            mounted &&
+                (!AppScope.read(context).config.oobeDone ||
+                    AppScope.read(context).config.agreementVersion < agreementVersion ||
+                    !AppScope.read(context).config.tourSeen)) {
           await Future<void>.delayed(const Duration(seconds: 1));
         }
         final ctx = _navKey.currentContext;

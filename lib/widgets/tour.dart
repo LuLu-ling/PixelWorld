@@ -134,8 +134,8 @@ OverlayEntry? _entry;
 /// 教程正在进行（自动检查更新等弹窗等它结束再出来）
 final tourRunning = ValueNotifier<bool>(false);
 
-/// 开始新手教程（[context] 要在主窗口里面，用来切换页面）
-void startTour(BuildContext context) {
+/// 开始新手教程（[context] 要在主窗口里面，用来切换页面）；[onClose] 在教程结束或跳过后调用
+void startTour(BuildContext context, {VoidCallback? onClose}) {
   if (_entry != null) return;
   final nav = ShellNav.maybeOf(context);
   final overlay = Overlay.of(context, rootOverlay: true);
@@ -154,6 +154,7 @@ void startTour(BuildContext context) {
         _entry = null;
         tourRunning.value = false;
         config.update({'tourSeen': true});
+        onClose?.call();
       },
     ),
   );

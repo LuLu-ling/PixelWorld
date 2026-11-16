@@ -10,6 +10,7 @@ import '../app_scope.dart';
 import '../core/config.dart' show homeLayouts;
 import '../platform.dart';
 import '../widgets/theme_color_dialog.dart';
+import '../widgets/agreement_dialog.dart';
 import '../widgets/tour.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
@@ -555,6 +556,20 @@ class _AboutSection extends StatelessWidget {
               subtitle: const Text('再看一遍启动器各个地方的介绍：账户、安装游戏、实例、开始游戏、工具和设置'),
               trailing: FilledButton.tonal(onPressed: () => startTour(context), child: const Text('开始')),
             ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              leading: const Icon(Icons.gavel_outlined),
+              title: const Text('用户协议'),
+              subtitle: const Text('使用规则、第三方内容与免责声明'),
+              trailing: TextButton(onPressed: () => showAgreement(context), child: const Text('查看')),
+            ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: const Text('隐私说明'),
+              subtitle: const Text('不收集你的信息；保存在本地的内容与会连接的服务'),
+              trailing: TextButton(onPressed: () => showAgreement(context, tab: 1), child: const Text('查看')),
+            ),
           ],
         ),
         SettingsGroup(
@@ -582,7 +597,8 @@ class _AboutSection extends StatelessWidget {
               subtitle: const Text(
                 'Pixel World 是第三方 Minecraft 启动器，本项目为轻度使用 PCL 仓储库，界面布局参考 PCL 社区版（PCL-CE）。'
                 'PCL 由龙腾猫跃开发，本软件与 PCL 及其作者无关，也不代表 PCL 官方。'
-                '请勿就本软件的问题打扰 PCL 作者。',
+                '请勿就本软件的问题打扰 PCL 作者。'
+                '本软件不是 Mojang 或 Microsoft 的官方产品，未经它们认可，也与它们没有关联；Minecraft 是 Mojang Synergies AB 的商标。',
               ),
             ),
             link(Icons.code, '源代码', 'Pixel World 以 Apache-2.0 协议开源', AppInfo.repoUrl, action: '打开'),

@@ -163,7 +163,18 @@ class _VersionsViewState extends State<_VersionsView> {
             ),
           );
         }
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        if (!snap.hasData) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 14),
+                Text('正在获取版本列表…', style: TextStyle(color: scheme.onSurfaceVariant)),
+              ],
+            ),
+          );
+        }
         final data = snap.data!;
         final q = _query.trim().toLowerCase();
         final list = data.list.where(_match).where((v) => q.isEmpty || v.id.toLowerCase().contains(q)).toList();
@@ -338,11 +349,25 @@ class _InstallPanelState extends State<InstallPanel> {
     super.dispose();
   }
 
-  /// 各加载器分别加载，先返回的先显示（LiteLoader 的官方服务器较慢）
+  /// 各加载器分别加载，先返回的先显示（LiteLoader 的官方服务器较慢）。
+  /// 获取到的列表在这次运行中记住，再次选中同一个游戏版本时直接显示
   void _load() {
     final dl = AppScope.read(context).downloader;
     for (final k in LoaderKind.values) {
-      loaderVersions(dl, k, widget.version.id).then((list) {
+      final key = '${k.name}/${widget.version.id}';
+      final cached = _loaderCache[key];
+      if (cached != null) {
+        _lists[k] = cached;
+        if (_choice == k) {
+          if (cached.isEmpty) _choice = null;
+          _pickDefault();
+        }
+        if (k == LoaderKind.optifine) _pickOptiFine();
+        continue;
+      }
+      loaderVersions(dl, k, widget.version.id).catchError((_) => <LoaderVersion>[]).then((list) {
+        // 空列表可能是网络失败，不记住，下次重新获取
+        if (list.isNotEmpty) _loaderCache[key] = list;
         if (!mounted) return;
         setState(() {
           _lists[k] = list;
@@ -356,6 +381,8 @@ class _InstallPanelState extends State<InstallPanel> {
       });
     }
   }
+
+  static final _loaderCache = <String, List<LoaderVersion>>{};
 
   bool _loading(LoaderKind? k) => k != null && !_lists.containsKey(k);
 
@@ -480,7 +507,27 @@ class _InstallPanelState extends State<InstallPanel> {
                     widget.version.releaseTime.split('T').first,
                     style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
                   ),
+                  const Spacer(),
+                  if (_lists.length < LoaderKind.values.length)
+                    Text(
+                      '正在获取加载器 ${_lists.length}/${LoaderKind.values.length}',
+                      style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
                 ],
+              ),
+              // 网络慢时各加载器的版本号要一会才出来：顶部一条进度，全部获取完就收起
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                child: _lists.length < LoaderKind.values.length
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: LinearProgressIndicator(
+                          value: _lists.isEmpty ? null : _lists.length / LoaderKind.values.length,
+                          minHeight: 3,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      )
+                    : const SizedBox(width: double.infinity),
               ),
               const SizedBox(height: 10),
               SizedBox(

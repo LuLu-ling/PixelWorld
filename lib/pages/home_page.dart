@@ -126,8 +126,9 @@ class _HomePageState extends State<HomePage> {
             onManageMods: version == null ? null : () => _openInstance('mods'),
             onLog: () => ShellNav.of(context).open(SubPage.log),
             onFolder: version == null ? null : _openFolder,
-            // 装模组：打开当前实例的模组页，直接进入「添加模组」（只显示适配这个实例的模组）
-            onInstallMods: version == null
+            // 装模组：打开当前实例的模组页，直接进入「添加模组」（只显示适配这个实例的模组）；
+            // 原版等不能装模组的实例没有模组页，仍然去下载页的模组分类
+            onInstallMods: version == null || !version.modable
                 ? () {
                     downloadTabRequest.value = 'mods';
                     ShellNav.of(context).goMain(MainPage.download);
@@ -154,7 +155,7 @@ class _HomePageState extends State<HomePage> {
                   onFolder: version == null ? null : _openFolder,
                 ),
                 right: _SidePanel(
-                  onInstallMods: version == null
+                  onInstallMods: version == null || !version.modable
                       ? () {
                           downloadTabRequest.value = 'mods';
                           ShellNav.of(context).goMain(MainPage.download);
@@ -276,7 +277,8 @@ class _HeroCard extends StatelessWidget {
                   color: Colors.white.withValues(alpha: .1),
                   borderRadius: BorderRadius.circular(8),
                   child: InkWell(
-                    onTap: onVersions,
+                    onTap: () {},
+                    onTapUp: (d) => showInstanceMenu(context, state, onVersions, at: d.globalPosition),
                     borderRadius: BorderRadius.circular(8),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

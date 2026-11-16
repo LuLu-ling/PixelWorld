@@ -38,7 +38,10 @@ class AppScale extends StatelessWidget {
   Widget build(BuildContext context) {
     final content = LayoutBuilder(
       builder: (context, c) {
-        final s = scale > 0 ? scale : autoUiScale(c.biggest);
+        // 横屏时挖孔在左边：侧栏背景铺进去但内容从挖孔右边开始，算「自动」比例时也扣掉，
+        // 这样手机倒过来拿（挖孔在左或在右）界面大小一样
+        final cutoutLeft = isDesktop ? 0.0 : MediaQuery.paddingOf(context).left;
+        final s = scale > 0 ? scale : autoUiScale(Size(c.maxWidth - cutoutLeft, c.maxHeight));
         if ((s - 1).abs() < .001) return child;
         final mq = MediaQuery.of(context);
         final size = Size(c.maxWidth / s, c.maxHeight / s);
@@ -62,4 +65,3 @@ class AppScale extends StatelessWidget {
     return isDesktop ? content : SafeArea(left: false, child: content);
   }
 }
-

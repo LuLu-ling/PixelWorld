@@ -615,27 +615,31 @@ class _FileManagerPageState extends State<FileManagerPage> {
                 if (v != null) _open(v);
               },
             ),
+            // 和设置等页面一样：启用背景图片时右边整块放在毛玻璃面板上
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            p.basename(_dir).isEmpty ? _dir : p.basename(_dir),
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium,
+              child: ContentPanel(
+                padding: const EdgeInsets.only(top: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              p.basename(_dir).isEmpty ? _dir : p.basename(_dir),
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium,
+                            ),
                           ),
-                        ),
-                        ...actions,
-                      ],
+                          ...actions,
+                        ],
+                      ),
                     ),
-                  ),
-                  Expanded(child: content),
-                ],
+                    Expanded(child: content),
+                  ],
+                ),
               ),
             ),
           ],

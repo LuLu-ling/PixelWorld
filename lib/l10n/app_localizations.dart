@@ -589,6 +589,12 @@ abstract class AppLocalizations {
   /// **'极简：只在底部留一条，放当前实例和开始游戏'**
   String get homeLayoutMinimalHint;
 
+  /// No description provided for @homeLayoutStandardMobileHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'标准：原来的首页，不显示背景图片；要用背景图片请选「上下」或「极简」'**
+  String get homeLayoutStandardMobileHint;
+
   /// No description provided for @homeHints.
   ///
   /// In zh, this message translates to:
@@ -640,8 +646,14 @@ abstract class AppLocalizations {
   /// No description provided for @bgImageUnset.
   ///
   /// In zh, this message translates to:
-  /// **'选择一张图片作为启动器的背景（只在电脑上生效）'**
+  /// **'选择一张图片作为启动器的背景，界面面板会变成毛玻璃'**
   String get bgImageUnset;
+
+  /// No description provided for @bgImageInactive.
+  ///
+  /// In zh, this message translates to:
+  /// **'「标准」首页不显示背景图片，把首页布局换成「上下」或「极简」后生效'**
+  String get bgImageInactive;
 
   /// No description provided for @bgImageChange.
   ///
@@ -817,6 +829,54 @@ abstract class AppLocalizations {
   /// **'保留背景图片，但面板几乎不透明，适合图片很花或者想要更清楚的文字'**
   String get bgSolidHint;
 
+  /// No description provided for @helpGroup.
+  ///
+  /// In zh, this message translates to:
+  /// **'帮助'**
+  String get helpGroup;
+
+  /// No description provided for @helpTour.
+  ///
+  /// In zh, this message translates to:
+  /// **'新手教程'**
+  String get helpTour;
+
+  /// No description provided for @helpTourHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'再看一遍启动器各个地方的介绍：账户、安装游戏、实例、开始游戏、工具和设置'**
+  String get helpTourHint;
+
+  /// No description provided for @helpTourStart.
+  ///
+  /// In zh, this message translates to:
+  /// **'开始'**
+  String get helpTourStart;
+
+  /// No description provided for @helpTerms.
+  ///
+  /// In zh, this message translates to:
+  /// **'用户协议'**
+  String get helpTerms;
+
+  /// No description provided for @helpTermsHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用规则、第三方内容与免责声明'**
+  String get helpTermsHint;
+
+  /// No description provided for @helpPrivacy.
+  ///
+  /// In zh, this message translates to:
+  /// **'隐私说明'**
+  String get helpPrivacy;
+
+  /// No description provided for @helpPrivacyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'不收集你的信息；保存在本地的内容与会连接的服务'**
+  String get helpPrivacyHint;
+
   /// No description provided for @aboutDeveloper.
   ///
   /// In zh, this message translates to:
@@ -838,7 +898,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutDisclaimer.
   ///
   /// In zh, this message translates to:
-  /// **'Pixel World 是第三方 Minecraft 启动器，本项目为轻度使用 PCL 仓储库，界面布局参考 PCL 社区版（PCL-CE）。PCL 由龙腾猫跃开发，本软件与 PCL 及其作者无关，也不代表 PCL 官方。请勿就本软件的问题打扰 PCL 作者。'**
+  /// **'Pixel World 是第三方 Minecraft 启动器，本项目为轻度使用 PCL 仓储库，界面布局参考 PCL 社区版（PCL-CE）。PCL 由龙腾猫跃开发，本软件与 PCL 及其作者无关，也不代表 PCL 官方。请勿就本软件的问题打扰 PCL 作者。本软件不是 Mojang 或 Microsoft 的官方产品，未经它们认可，也与它们没有关联；Minecraft 是 Mojang Synergies AB 的商标。'**
   String get aboutDisclaimer;
 
   /// No description provided for @aboutSource.
@@ -1477,6 +1537,12 @@ abstract class AppLocalizations {
   /// **'下载源'**
   String get downloadSource;
 
+  /// No description provided for @downloadSourceAuto.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动选择'**
+  String get downloadSourceAuto;
+
   /// No description provided for @downloadSourceOfficial.
   ///
   /// In zh, this message translates to:
@@ -1486,8 +1552,50 @@ abstract class AppLocalizations {
   /// No description provided for @downloadSourceMirror.
   ///
   /// In zh, this message translates to:
-  /// **'BMCLAPI 镜像（官方源失败时自动回退）'**
+  /// **'BMCLAPI 镜像'**
   String get downloadSourceMirror;
+
+  /// No description provided for @downloadSourceAutoHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'测速选择官方源或 BMCLAPI 镜像中较快的，失败时自动换另一个'**
+  String get downloadSourceAutoHint;
+
+  /// No description provided for @downloadSourceOfficialHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'只用 Mojang 和各加载器的官方服务器'**
+  String get downloadSourceOfficialHint;
+
+  /// No description provided for @downloadSourceMirrorHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'优先用 BMCLAPI 镜像，失败时回退到官方源'**
+  String get downloadSourceMirrorHint;
+
+  /// No description provided for @downloadSourceCurrent.
+  ///
+  /// In zh, this message translates to:
+  /// **'（当前：{source}）'**
+  String downloadSourceCurrent(String source);
+
+  /// No description provided for @networkCheck.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络检测'**
+  String get networkCheck;
+
+  /// No description provided for @networkCheckHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'测试下载源、正版登录、Modrinth 和更新服务能不能连上、有多快'**
+  String get networkCheckHint;
+
+  /// No description provided for @networkCheckStart.
+  ///
+  /// In zh, this message translates to:
+  /// **'开始检测'**
+  String get networkCheckStart;
 
   /// No description provided for @downloadConcurrency.
   ///

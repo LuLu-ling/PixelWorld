@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import '../app_info.dart';
+import 'network_check.dart';
 
 const _bmclapi = 'https://bmclapi2.bangbang93.com';
 
@@ -43,25 +44,35 @@ class DownloadItem {
   final int? size;
 }
 
-/// 下载器。下载源（官方 / BMCLAPI）与并发数来自设置。
+/// 下载器。下载源（官方 / BMCLAPI / 自动选择）与并发数来自设置。
 class Downloader {
-  Downloader({required this.useMirror, required this.concurrency});
+  /// [auto] 为 true 时按测速结果在官方源和镜像之间选（见 [DownloadSourcePicker]），
+  /// 失败时两边互相回退；否则按 [useMirror] 固定使用一边（镜像失败时仍回退到官方源）
+  // 参数名保持 useMirror（调用方和测试都在用），字段是私有的，不能用初始化形参
+  // ignore: prefer_initializing_formals
+  Downloader({bool useMirror = false, this.auto = false, required this.concurrency}) : _useMirror = useMirror;
 
-  final bool useMirror;
+  final bool _useMirror;
+  final bool auto;
   final int concurrency;
+
+  /// 这次下载优先用镜像
+  bool get useMirror => auto ? DownloadSourcePicker.preferMirror : _useMirror;
+
+  /// [url] 的镜像地址；没有对应镜像时返回 null
+  static String? _mirrorOf(String url) {
+    for (final (from, to) in _mirrors) {
+      if (url.startsWith(from)) return to + url.substring(from.length);
+    }
+    return null;
+  }
 
   static final _client = HttpClient()
     ..userAgent = '${AppInfo.name}/${AppInfo.version}'
     ..connectionTimeout = const Duration(seconds: 20);
 
   /// 根据下载源设置把官方地址替换为镜像地址
-  String mirror(String url) {
-    if (!useMirror) return url;
-    for (final (from, to) in _mirrors) {
-      if (url.startsWith(from)) return to + url.substring(from.length);
-    }
-    return url;
-  }
+  String mirror(String url) => useMirror ? (_mirrorOf(url) ?? url) : url;
 
   /// 低于这个速度视为分到了慢节点（字节/秒），断开重连
   static const _slowSpeed = 64 * 1024;
@@ -69,55 +80,77 @@ class Downloader {
   static const _chunkCount = 4;
 
   Future<List<int>> _get(String url, {int retries = 3, bool Function()? cancelled, String? range}) async {
-    // 镜像失败时回退到官方源；GitHub 地址再依次尝试 ghproxy 等镜像
-    final candidates = <String>{mirror(url), if (mirror(url) != url) url, ...githubMirrorsFor(url)}.toList();
+    // 镜像失败时回退到官方源；自动选择时官方源失败也回退到镜像；GitHub 地址再依次尝试 ghproxy 等镜像
+    final mirrored = _mirrorOf(url);
+    final first = mirror(url);
+    final candidates = <String>{
+      first,
+      if (first != url) url,
+      if (auto && mirrored != null && first == url) mirrored,
+      ...githubMirrorsFor(url),
+    }.toList();
     Object? lastErr;
     for (final target in candidates) {
-      // BMCLAPI 会重定向到随机的社区节点，个别节点的证书链不完整（不发送中间证书），
-      // 系统浏览器能自动补全而 Dart 不能；重新请求会分到另一个节点，所以握手失败时多试几次
-      var handshakeRetries = 6;
-      for (var i = 0; i < retries; i++) {
-        // 最后一次尝试不再按速度断开，避免网络本身慢时永远下不完
-        final checkSpeed = i < retries - 1;
-        try {
-          final req = await _client.getUrl(Uri.parse(target));
-          if (range != null) req.headers.set(HttpHeaders.rangeHeader, range);
-          final res = await req.close().timeout(const Duration(seconds: 30));
-          final ok = range == null ? res.statusCode == 200 : res.statusCode == 206;
-          if (ok) {
-            final b = BytesBuilder(copy: false);
-            final sw = Stopwatch()..start();
-            await for (final chunk in res.timeout(const Duration(seconds: 20))) {
-              if (cancelled?.call() ?? false) throw const _Cancelled();
-              b.add(chunk);
-              final secs = sw.elapsedMilliseconds / 1000;
-              if (checkSpeed && secs > 8 && b.length / secs < _slowSpeed) {
-                throw HttpException('下载速度过慢，更换节点重试：$target');
-              }
-            }
-            return b.takeBytes();
-          }
-          await res.drain<void>();
-          if (range != null && res.statusCode == 200) throw const _RangeUnsupported();
-          lastErr = HttpException('HTTP ${res.statusCode} $target');
-          if (res.statusCode == 404) break;
-        } on _Cancelled {
-          rethrow;
-        } on _RangeUnsupported {
-          rethrow;
-        } on HandshakeException catch (e) {
-          lastErr = e;
-          if (handshakeRetries-- > 0) {
-            i--;
-            continue;
-          }
-        } catch (e) {
-          lastErr = e;
+      final (data, err) = await _try(target, retries, cancelled, range);
+      if (data != null) {
+        // 自动选择：优先的一边失败、换另一边成功了，这次运行里改为优先另一边
+        if (auto && mirrored != null && target != first) {
+          DownloadSourcePicker.reportFallback(mirrorWorked: target == mirrored);
         }
-        await Future<void>.delayed(Duration(milliseconds: 500 * (i + 1)));
+        return data;
       }
+      lastErr = err;
     }
     throw lastErr ?? Exception('下载失败：$url');
+  }
+
+  /// 从一个地址下载，失败时重试 [retries] 次；返回（数据，最后的错误）
+  Future<(List<int>?, Object?)> _try(String target, int retries, bool Function()? cancelled, String? range) async {
+    Object? lastErr;
+    // BMCLAPI 会重定向到随机的社区节点，个别节点的证书链不完整（不发送中间证书），
+    // 系统浏览器能自动补全而 Dart 不能；重新请求会分到另一个节点，所以握手失败时多试几次
+    var handshakeRetries = 6;
+    for (var i = 0; i < retries; i++) {
+      // 最后一次尝试不再按速度断开，避免网络本身慢时永远下不完
+      final checkSpeed = i < retries - 1;
+      try {
+        final req = await _client.getUrl(Uri.parse(target));
+        if (range != null) req.headers.set(HttpHeaders.rangeHeader, range);
+        final res = await req.close().timeout(const Duration(seconds: 30));
+        final ok = range == null ? res.statusCode == 200 : res.statusCode == 206;
+        if (ok) {
+          final b = BytesBuilder(copy: false);
+          final sw = Stopwatch()..start();
+          await for (final chunk in res.timeout(const Duration(seconds: 20))) {
+            if (cancelled?.call() ?? false) throw const _Cancelled();
+            b.add(chunk);
+            final secs = sw.elapsedMilliseconds / 1000;
+            if (checkSpeed && secs > 8 && b.length / secs < _slowSpeed) {
+              throw HttpException('下载速度过慢，更换节点重试：$target');
+            }
+          }
+          return (b.takeBytes(), null);
+        }
+        await res.drain<void>();
+        if (range != null && res.statusCode == 200) throw const _RangeUnsupported();
+        lastErr = HttpException('HTTP ${res.statusCode} $target');
+        if (res.statusCode == 404) break;
+      } on _Cancelled {
+        rethrow;
+      } on _RangeUnsupported {
+        rethrow;
+      } on HandshakeException catch (e) {
+        lastErr = e;
+        if (handshakeRetries-- > 0) {
+          i--;
+          continue;
+        }
+      } catch (e) {
+        lastErr = e;
+      }
+      await Future<void>.delayed(Duration(milliseconds: 500 * (i + 1)));
+    }
+    return (null, lastErr);
   }
 
   Future<dynamic> fetchJson(String url) async => jsonDecode(utf8.decode(await _get(url)));

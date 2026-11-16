@@ -36,6 +36,13 @@ extension SettingLabels on AppLocalizations {
     3 => isolationModableUnstable,
     _ => isolationAll,
   };
+
+  /// 首页布局名称（见 config.dart 的 homeLayouts）
+  String homeLayoutName(String layout) => switch (layout) {
+    'split' => homeLayoutSplit,
+    'minimal' => homeLayoutMinimal,
+    _ => homeLayoutStandard,
+  };
 }
 
 /// MaterialApp 的多语言配置

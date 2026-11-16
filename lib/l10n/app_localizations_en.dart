@@ -278,6 +278,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeLayoutMinimalHint => 'Minimal: a single bar at the bottom with the current instance and Play';
 
   @override
+  String get homeLayoutStandardMobileHint =>
+      'Standard: the original home page, without the background image; choose Split or Minimal to use a background image';
+
+  @override
   String get homeHints => 'Show tips';
 
   @override
@@ -304,7 +308,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bgImageSet => 'Shown behind the whole window; panels turn into frosted glass';
 
   @override
-  String get bgImageUnset => 'Choose an image as the launcher background (desktop only)';
+  String get bgImageUnset => 'Choose an image as the launcher background; panels turn into frosted glass';
+
+  @override
+  String get bgImageInactive =>
+      'The Standard home page doesn\'t show the background image; switch the home layout to Split or Minimal to use it';
 
   @override
   String get bgImageChange => 'Change…';
@@ -399,6 +407,32 @@ class AppLocalizationsEn extends AppLocalizations {
       'Keeps the background image but makes panels almost opaque, for busy images or clearer text';
 
   @override
+  String get helpGroup => 'Help';
+
+  @override
+  String get helpTour => 'Guided tour';
+
+  @override
+  String get helpTourHint =>
+      'Walk through the launcher again: accounts, installing games, instances, playing, tools and settings';
+
+  @override
+  String get helpTourStart => 'Start';
+
+  @override
+  String get helpTerms => 'Terms of use';
+
+  @override
+  String get helpTermsHint => 'Usage rules, third-party content and disclaimers';
+
+  @override
+  String get helpPrivacy => 'Privacy notice';
+
+  @override
+  String get helpPrivacyHint =>
+      'Nothing about you is collected; what is stored locally and which services are contacted';
+
+  @override
   String get aboutDeveloper => 'Developer of Pixel World';
 
   @override
@@ -411,7 +445,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutDisclaimer =>
-      'Pixel World is a third-party Minecraft launcher. This project makes light use of the PCL repository, and its layout is based on PCL Community Edition (PCL-CE). PCL is developed by LTCat (龙腾猫跃). This software is not affiliated with PCL or its author and does not represent PCL. Please don\'t contact the PCL author about issues with this software.';
+      'Pixel World is a third-party Minecraft launcher. This project makes light use of the PCL repository, and its layout is based on PCL Community Edition (PCL-CE). PCL is developed by LTCat (龙腾猫跃). This software is not affiliated with PCL or its author and does not represent PCL. Please don\'t contact the PCL author about issues with this software. This software is not an official product of Mojang or Microsoft and is not endorsed by or affiliated with them; Minecraft is a trademark of Mojang Synergies AB.';
 
   @override
   String get aboutSource => 'Source code';
@@ -766,10 +800,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadSource => 'Download source';
 
   @override
+  String get downloadSourceAuto => 'Automatic';
+
+  @override
   String get downloadSourceOfficial => 'Official';
 
   @override
-  String get downloadSourceMirror => 'BMCLAPI mirror (falls back automatically when the official source fails)';
+  String get downloadSourceMirror => 'BMCLAPI mirror';
+
+  @override
+  String get downloadSourceAutoHint =>
+      'Picks whichever of the official source and the BMCLAPI mirror is faster, and switches to the other on failure';
+
+  @override
+  String get downloadSourceOfficialHint => 'Only uses the official servers of Mojang and each mod loader';
+
+  @override
+  String get downloadSourceMirrorHint => 'Prefers the BMCLAPI mirror and falls back to the official source on failure';
+
+  @override
+  String downloadSourceCurrent(String source) {
+    return ' (currently $source)';
+  }
+
+  @override
+  String get networkCheck => 'Network check';
+
+  @override
+  String get networkCheckHint =>
+      'Tests whether the download sources, Microsoft sign-in, Modrinth and the update service can be reached, and how fast';
+
+  @override
+  String get networkCheckStart => 'Run check';
 
   @override
   String get downloadConcurrency => 'Simultaneous downloads';

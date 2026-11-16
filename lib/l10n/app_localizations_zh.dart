@@ -269,6 +269,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeLayoutMinimalHint => '极简：只在底部留一条，放当前实例和开始游戏';
 
   @override
+  String get homeLayoutStandardMobileHint => '标准：原来的首页，不显示背景图片；要用背景图片请选「上下」或「极简」';
+
+  @override
   String get homeHints => '显示使用提示';
 
   @override
@@ -295,7 +298,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bgImageSet => '显示在整个窗口后面，界面面板会变成毛玻璃';
 
   @override
-  String get bgImageUnset => '选择一张图片作为启动器的背景（只在电脑上生效）';
+  String get bgImageUnset => '选择一张图片作为启动器的背景，界面面板会变成毛玻璃';
+
+  @override
+  String get bgImageInactive => '「标准」首页不显示背景图片，把首页布局换成「上下」或「极简」后生效';
 
   @override
   String get bgImageChange => '换一张…';
@@ -385,6 +391,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bgSolidHint => '保留背景图片，但面板几乎不透明，适合图片很花或者想要更清楚的文字';
 
   @override
+  String get helpGroup => '帮助';
+
+  @override
+  String get helpTour => '新手教程';
+
+  @override
+  String get helpTourHint => '再看一遍启动器各个地方的介绍：账户、安装游戏、实例、开始游戏、工具和设置';
+
+  @override
+  String get helpTourStart => '开始';
+
+  @override
+  String get helpTerms => '用户协议';
+
+  @override
+  String get helpTermsHint => '使用规则、第三方内容与免责声明';
+
+  @override
+  String get helpPrivacy => '隐私说明';
+
+  @override
+  String get helpPrivacyHint => '不收集你的信息；保存在本地的内容与会连接的服务';
+
+  @override
   String get aboutDeveloper => 'Pixel World 的开发者';
 
   @override
@@ -397,7 +427,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutDisclaimer =>
-      'Pixel World 是第三方 Minecraft 启动器，本项目为轻度使用 PCL 仓储库，界面布局参考 PCL 社区版（PCL-CE）。PCL 由龙腾猫跃开发，本软件与 PCL 及其作者无关，也不代表 PCL 官方。请勿就本软件的问题打扰 PCL 作者。';
+      'Pixel World 是第三方 Minecraft 启动器，本项目为轻度使用 PCL 仓储库，界面布局参考 PCL 社区版（PCL-CE）。PCL 由龙腾猫跃开发，本软件与 PCL 及其作者无关，也不代表 PCL 官方。请勿就本软件的问题打扰 PCL 作者。本软件不是 Mojang 或 Microsoft 的官方产品，未经它们认可，也与它们没有关联；Minecraft 是 Mojang Synergies AB 的商标。';
 
   @override
   String get aboutSource => '源代码';
@@ -744,10 +774,36 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadSource => '下载源';
 
   @override
+  String get downloadSourceAuto => '自动选择';
+
+  @override
   String get downloadSourceOfficial => '官方源';
 
   @override
-  String get downloadSourceMirror => 'BMCLAPI 镜像（官方源失败时自动回退）';
+  String get downloadSourceMirror => 'BMCLAPI 镜像';
+
+  @override
+  String get downloadSourceAutoHint => '测速选择官方源或 BMCLAPI 镜像中较快的，失败时自动换另一个';
+
+  @override
+  String get downloadSourceOfficialHint => '只用 Mojang 和各加载器的官方服务器';
+
+  @override
+  String get downloadSourceMirrorHint => '优先用 BMCLAPI 镜像，失败时回退到官方源';
+
+  @override
+  String downloadSourceCurrent(String source) {
+    return '（当前：$source）';
+  }
+
+  @override
+  String get networkCheck => '网络检测';
+
+  @override
+  String get networkCheckHint => '测试下载源、正版登录、Modrinth 和更新服务能不能连上、有多快';
+
+  @override
+  String get networkCheckStart => '开始检测';
 
   @override
   String get downloadConcurrency => '同时下载的文件数';
@@ -1032,6 +1088,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get homeLayoutMinimalHint => '極簡：只在底部留一條，放目前實例和開始遊戲';
 
   @override
+  String get homeLayoutStandardMobileHint => '標準：原來的首頁，不顯示背景圖片；要使用背景圖片請選「上下」或「極簡」';
+
+  @override
   String get homeHints => '顯示使用提示';
 
   @override
@@ -1058,7 +1117,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get bgImageSet => '顯示在整個視窗後面，介面面板會變成毛玻璃';
 
   @override
-  String get bgImageUnset => '選擇一張圖片作為啟動器的背景（只在電腦上生效）';
+  String get bgImageUnset => '選擇一張圖片作為啟動器的背景，介面面板會變成毛玻璃';
+
+  @override
+  String get bgImageInactive => '「標準」首頁不顯示背景圖片，把首頁版面換成「上下」或「極簡」後生效';
 
   @override
   String get bgImageChange => '換一張…';
@@ -1148,6 +1210,30 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get bgSolidHint => '保留背景圖片，但面板幾乎不透明，適合圖片很花或者想要更清楚的文字';
 
   @override
+  String get helpGroup => '說明';
+
+  @override
+  String get helpTour => '新手教學';
+
+  @override
+  String get helpTourHint => '再看一遍啟動器各個地方的介紹：帳戶、安裝遊戲、實例、開始遊戲、工具和設定';
+
+  @override
+  String get helpTourStart => '開始';
+
+  @override
+  String get helpTerms => '使用者協議';
+
+  @override
+  String get helpTermsHint => '使用規則、第三方內容與免責聲明';
+
+  @override
+  String get helpPrivacy => '隱私說明';
+
+  @override
+  String get helpPrivacyHint => '不收集你的資訊；儲存在本機的內容與會連線的服務';
+
+  @override
   String get aboutDeveloper => 'Pixel World 的開發者';
 
   @override
@@ -1160,7 +1246,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get aboutDisclaimer =>
-      'Pixel World 是第三方 Minecraft 啟動器，本專案為輕度使用 PCL 存放庫，介面版面參考 PCL 社群版（PCL-CE）。PCL 由龍騰貓躍開發，本軟體與 PCL 及其作者無關，也不代表 PCL 官方。請勿就本軟體的問題打擾 PCL 作者。';
+      'Pixel World 是第三方 Minecraft 啟動器，本專案為輕度使用 PCL 存放庫，介面版面參考 PCL 社群版（PCL-CE）。PCL 由龍騰貓躍開發，本軟體與 PCL 及其作者無關，也不代表 PCL 官方。請勿就本軟體的問題打擾 PCL 作者。本軟體不是 Mojang 或 Microsoft 的官方產品，未經它們認可，也與它們沒有關聯；Minecraft 是 Mojang Synergies AB 的商標。';
 
   @override
   String get aboutSource => '原始碼';
@@ -1507,10 +1593,36 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get downloadSource => '下載來源';
 
   @override
+  String get downloadSourceAuto => '自動選擇';
+
+  @override
   String get downloadSourceOfficial => '官方來源';
 
   @override
-  String get downloadSourceMirror => 'BMCLAPI 鏡像（官方來源失敗時自動回退）';
+  String get downloadSourceMirror => 'BMCLAPI 鏡像';
+
+  @override
+  String get downloadSourceAutoHint => '測速選擇官方來源或 BMCLAPI 鏡像中較快的，失敗時自動換另一個';
+
+  @override
+  String get downloadSourceOfficialHint => '只使用 Mojang 和各載入器的官方伺服器';
+
+  @override
+  String get downloadSourceMirrorHint => '優先使用 BMCLAPI 鏡像，失敗時回退到官方來源';
+
+  @override
+  String downloadSourceCurrent(String source) {
+    return '（目前：$source）';
+  }
+
+  @override
+  String get networkCheck => '網路檢測';
+
+  @override
+  String get networkCheckHint => '測試下載來源、正版登入、Modrinth 和更新服務能否連線、速度多快';
+
+  @override
+  String get networkCheckStart => '開始檢測';
 
   @override
   String get downloadConcurrency => '同時下載的檔案數';

@@ -12,11 +12,14 @@ import 'core/crash.dart';
 import 'l10n/l10n.dart';
 import 'platform.dart';
 import 'widgets/accounts_dialog.dart';
+import 'widgets/agreement_dialog.dart';
 import 'widgets/app_background.dart';
 import 'widgets/app_logo.dart';
 import 'widgets/device_status.dart';
+import 'widgets/oobe.dart';
 import 'widgets/shell_layout.dart';
 import 'widgets/storage_location.dart';
+import 'widgets/tour.dart';
 import 'widgets/update_dialog.dart';
 import 'widgets/window_buttons.dart';
 import 'pages/ai_page.dart';
@@ -119,12 +122,43 @@ class _ShellState extends State<Shell> {
     });
     if (!_askedStorage) {
       _askedStorage = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         final ctx = _navKey.currentContext;
-        if (ctx != null && ctx.mounted) askStorageOnFirstRun(ctx);
+        if (ctx == null || !ctx.mounted) return;
+        // 全新安装：全屏的首次设置（协议、外观、游戏文件夹、网络、账户）
+        final oobe = await showOobeIfNeeded(ctx);
+        if (!ctx.mounted) return;
+        if (oobe == null) {
+          // 老用户：协议更新时请用户重新确认（不同意会退出），安卓上没问过存储位置的再问一次
+          await ensureAgreement(ctx);
+          if (!ctx.mounted) return;
+          await askStorageOnFirstRun(ctx);
+        }
+        // 等启动画面（或首次设置）淡出后开始新手教程
+        await Future<void>.delayed(Duration(milliseconds: oobe == null ? 1200 : 400));
+        final again = _navKey.currentContext;
+        if (again == null || !again.mounted) return;
+        if (oobe?.download == true) {
+          // 「去安装第一个实例」：看完教程（如果要看）再打开下载页
+          if (oobe!.tour) {
+            startTour(again, onClose: () => _goMain(MainPage.download));
+          } else {
+            _goMain(MainPage.download);
+          }
+        } else {
+          startTourOnFirstRun(again);
+        }
       });
       // 启动后稍等一会再检查更新，不和首次运行的提示抢
-      Future<void>.delayed(const Duration(seconds: 5), () {
+      Future<void>.delayed(const Duration(seconds: 5), () async {
+        // 还在首次设置、还没同意用户协议、第一次打开还没看完新手教程、或者教程正在进行：等它们结束再弹更新提示
+        while (tourRunning.value ||
+            mounted &&
+                (!AppScope.read(context).config.oobeDone ||
+                    AppScope.read(context).config.agreementVersion < agreementVersion ||
+                    !AppScope.read(context).config.tourSeen)) {
+          await Future<void>.delayed(const Duration(seconds: 1));
+        }
         final ctx = _navKey.currentContext;
         if (ctx != null && ctx.mounted && AppScope.read(ctx).config.updateAutoCheck) checkUpdates(ctx, manual: false);
       });
@@ -239,12 +273,15 @@ class _Rail extends StatelessWidget {
     final top = Platform.isMacOS ? 64.0 : 10.0;
     final width = Platform.isMacOS ? 84.0 : 76.0;
     final l = context.l10n;
-    Widget item(MainPage p, IconData icon, IconData active, [String? label]) => _RailItem(
-      icon: icon,
-      activeIcon: active,
-      label: label ?? _mainTitle(l, p),
-      selected: page == p && (sub == null || p == MainPage.home && sub == SubPage.instance),
-      onTap: () => onMain(p),
+    Widget item(MainPage p, IconData icon, IconData active, [String? label]) => TourTarget(
+      id: 'rail.${p.name}',
+      child: _RailItem(
+        icon: icon,
+        activeIcon: active,
+        label: label ?? _mainTitle(l, p),
+        selected: page == p && (sub == null || p == MainPage.home && sub == SubPage.instance),
+        onTap: () => onMain(p),
+      ),
     );
     return GlassPanel(
       color: scheme.surfaceContainerLow,
@@ -449,7 +486,10 @@ class _TopBarState extends State<_TopBar> {
           children: [
             Expanded(child: titleArea),
             const SizedBox(width: 8),
-            _TasksPill(key: _tasksKey, width: tight ? 168 : (compact ? 200 : 236)),
+            TourTarget(
+              id: 'top.tasks',
+              child: _TasksPill(key: _tasksKey, width: tight ? 168 : (compact ? 200 : 236)),
+            ),
             const SizedBox(width: 4),
             IconButton(
               tooltip: l.tooltipInstances,
@@ -464,7 +504,10 @@ class _TopBarState extends State<_TopBar> {
               ),
             if (!isDesktop) ...[const SizedBox(width: 4), const _BarChip(child: DeviceStatus())],
             const SizedBox(width: 6),
-            _AccountChip(avatarOnly: compact),
+            TourTarget(
+              id: 'top.account',
+              child: _AccountChip(avatarOnly: compact),
+            ),
             if (isDesktop && !nativeWindowButtons) ...[const SizedBox(width: 8), const WindowButtons()],
           ],
         ),

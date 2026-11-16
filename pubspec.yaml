@@ -49,6 +49,8 @@ flutter:
   # 图标源图在 assets/icon/source/，只供 tool/icons/make_icons.py 生成图标用，不打包
   assets:
     - assets/icon/icon.png
+    # 用户协议与隐私说明（lib/widgets/agreement_dialog.dart）
+    - assets/legal/
     # Apple 芯片的 Mac 上运行 1.13～1.18 用的 GLFW（lib/core/mac_glfw.dart）
     - assets/macos/libglfw.3.dylib
     # 首页的更新日志（与发布说明同一份文件，见 lib/core/changelog.dart）

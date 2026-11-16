@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import '../core/network_check.dart';
+import '../widgets/network_check_panel.dart';
 import '../core/android_storage.dart';
 import 'file_manager_page.dart';
 
@@ -735,9 +737,30 @@ class MiscSection extends StatelessWidget {
             _SelectRow<String>(
               icon: Icons.cloud_download_outlined,
               title: l.downloadSource,
+              subtitle: switch (cfg.downloadSource) {
+                'official' => l.downloadSourceOfficialHint,
+                'bmclapi' => l.downloadSourceMirrorHint,
+                _ =>
+                  '${l.downloadSourceAutoHint}'
+                      '${DownloadSourcePicker.last == null ? '' : l.downloadSourceCurrent(DownloadSourcePicker.preferMirror ? l.downloadSourceMirror : l.downloadSourceOfficial)}',
+              },
               value: cfg.downloadSource,
-              options: {'official': l.downloadSourceOfficial, 'bmclapi': l.downloadSourceMirror},
-              onChanged: (v) => cfg.update({'downloadSource': v}),
+              options: {
+                'auto': l.downloadSourceAuto,
+                'official': l.downloadSourceOfficial,
+                'bmclapi': l.downloadSourceMirror,
+              },
+              onChanged: (v) {
+                cfg.update({'downloadSource': v});
+                if (v == 'auto') DownloadSourcePicker.measure();
+              },
+            ),
+            ListTile(
+              contentPadding: _rowPadding,
+              leading: const Icon(Icons.network_check),
+              title: Text(l.networkCheck),
+              subtitle: Text(l.networkCheckHint),
+              trailing: OutlinedButton(onPressed: () => showNetworkCheck(context), child: Text(l.networkCheckStart)),
             ),
             ListTile(
               contentPadding: _rowPadding,

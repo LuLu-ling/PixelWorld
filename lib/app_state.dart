@@ -24,6 +24,7 @@ import 'core/android_runtime.dart';
 import 'core/version.dart' show VersionJson, needsAppleSiliconGlfw;
 import 'core/crash.dart';
 import 'core/download.dart';
+import 'core/network_check.dart';
 import 'core/extra_loaders.dart';
 import 'core/install.dart';
 import 'core/instance_files.dart';
@@ -71,6 +72,8 @@ class AppState extends ChangeNotifier {
   static Future<AppState> create() async {
     await Paths.init();
     final s = AppState._(LauncherConfig.load(), AccountStore.load());
+    // 下载源「自动选择」：后台测一下官方源和镜像哪个快
+    if (s.config.downloadSource == 'auto') unawaited(DownloadSourcePicker.measure());
     await s.refreshVersions();
     return s;
   }
@@ -182,8 +185,11 @@ class AppState extends ChangeNotifier {
   /// 最近的游戏日志（最多保留 5000 行）
   final log = ValueNotifier<List<String>>(const []);
 
-  Downloader get downloader =>
-      Downloader(useMirror: config.downloadSource == 'bmclapi', concurrency: config.concurrency);
+  Downloader get downloader => Downloader(
+    useMirror: config.downloadSource == 'bmclapi',
+    auto: config.downloadSource == 'auto',
+    concurrency: config.concurrency,
+  );
 
   Account? get selectedAccount => accounts.find(config.selectedAccount);
 

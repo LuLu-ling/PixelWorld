@@ -11,6 +11,8 @@ import '../core/config.dart' show homeLayouts;
 import '../l10n/l10n.dart';
 import '../platform.dart';
 import '../widgets/theme_color_dialog.dart';
+import '../widgets/agreement_dialog.dart';
+import '../widgets/tour.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
 import '../widgets/ai_settings.dart';
@@ -121,7 +123,8 @@ class _SettingsPageState extends State<SettingsPage> {
 Size _unscaledSize(BuildContext context) {
   final view = View.of(context);
   final padding = view.padding;
-  final w = view.physicalSize.width - padding.right;
+  // 左右的挖孔都扣掉，和 AppScale 的算法一致
+  final w = view.physicalSize.width - padding.left - padding.right;
   final h = view.physicalSize.height - padding.top - padding.bottom;
   return Size(w, h) / view.devicePixelRatio;
 }
@@ -177,40 +180,30 @@ class _AppearanceSection extends StatelessWidget {
             const _ThemeColorSetting(),
           ],
         ),
-        // 背景图片只在电脑上生效
-        if (isDesktop) const _BackgroundSettings(),
+        const _BackgroundSettings(),
         SettingsGroup(
           title: l.homeGroup,
           children: [
-            if (isDesktop)
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                leading: const Icon(Icons.dashboard_outlined),
-                title: Text(l.homeLayout),
-                subtitle: Text(switch (cfg.homeLayout) {
-                  'split' => l.homeLayoutSplitHint,
-                  'minimal' => l.homeLayoutMinimalHint,
-                  _ => l.homeLayoutStandardHint,
-                }),
-                trailing: DropdownButton<String>(
-                  focusColor: Colors.transparent,
-                  value: cfg.homeLayout,
-                  underline: const SizedBox.shrink(),
-                  borderRadius: BorderRadius.circular(12),
-                  items: [
-                    for (final v in homeLayouts)
-                      DropdownMenuItem(
-                        value: v,
-                        child: Text(switch (v) {
-                          'split' => l.homeLayoutSplit,
-                          'minimal' => l.homeLayoutMinimal,
-                          _ => l.homeLayoutStandard,
-                        }),
-                      ),
-                  ],
-                  onChanged: (v) => v == null ? null : cfg.update({'homeLayout': v}),
-                ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              leading: const Icon(Icons.dashboard_outlined),
+              title: Text(l.homeLayout),
+              subtitle: Text(switch (cfg.homeLayout) {
+                'split' => l.homeLayoutSplitHint,
+                'minimal' => l.homeLayoutMinimalHint,
+                // 手机上的「标准」就是原来的首页，不显示背景图片
+                _ when !isDesktop => l.homeLayoutStandardMobileHint,
+                _ => l.homeLayoutStandardHint,
+              }),
+              trailing: DropdownButton<String>(
+                focusColor: Colors.transparent,
+                value: cfg.homeLayout,
+                underline: const SizedBox.shrink(),
+                borderRadius: BorderRadius.circular(12),
+                items: [for (final v in homeLayouts) DropdownMenuItem(value: v, child: Text(l.homeLayoutName(v)))],
+                onChanged: (v) => v == null ? null : cfg.update({'homeLayout': v}),
               ),
+            ),
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               secondary: const Icon(Icons.info_outline),
@@ -243,7 +236,7 @@ class _ThemeColorSetting extends StatelessWidget {
     final state = AppScope.of(context);
     final cfg = state.config;
     final bg = state.background;
-    final hasImage = isDesktop && bg.imagePath.isNotEmpty;
+    final hasImage = bg.enabled && bg.imagePath.isNotEmpty;
     final auto = hasImage && bg.themeFromImage;
     final seed = Theme.of(context).colorScheme.primary;
     final l = context.l10n;
@@ -303,7 +296,8 @@ class _ThemeColorSetting extends StatelessWidget {
   }
 }
 
-/// 背景图片（电脑端）：选择图片、两种模糊、封面色散、面板不透明度与降低透明度
+/// 背景图片：选择图片、两种模糊、封面色散、面板不透明度与降低透明度。
+/// 手机上只在「上下」「极简」首页布局时生效
 class _BackgroundSettings extends StatelessWidget {
   const _BackgroundSettings();
 
@@ -339,7 +333,11 @@ class _BackgroundSettings extends StatelessWidget {
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           leading: const Icon(Icons.wallpaper_outlined),
           title: Text(l.bgImage),
-          subtitle: Text(has ? l.bgImageSet : l.bgImageUnset),
+          subtitle: Text(switch ((has, bg.enabled)) {
+            (true, true) => l.bgImageSet,
+            (true, false) => l.bgImageInactive,
+            _ => l.bgImageUnset,
+          }),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -385,18 +383,20 @@ class _BackgroundSettings extends StatelessWidget {
               underline: const SizedBox(),
               borderRadius: BorderRadius.circular(12),
               items: [
+                // 跨区（铺满所有屏幕）只有电脑上有
                 for (final v in BackgroundPrefs.fits)
-                  DropdownMenuItem(
-                    value: v,
-                    child: Text(switch (v) {
-                      'fit' => l.bgFitFit,
-                      'stretch' => l.bgFitStretch,
-                      'tile' => l.bgFitTile,
-                      'center' => l.bgFitCenter,
-                      'span' => l.bgFitSpan,
-                      _ => l.bgFitFill,
-                    }),
-                  ),
+                  if (isDesktop || v != 'span')
+                    DropdownMenuItem(
+                      value: v,
+                      child: Text(switch (v) {
+                        'fit' => l.bgFitFit,
+                        'stretch' => l.bgFitStretch,
+                        'tile' => l.bgFitTile,
+                        'center' => l.bgFitCenter,
+                        'span' => l.bgFitSpan,
+                        _ => l.bgFitFill,
+                      }),
+                    ),
               ],
               onChanged: (v) => v == null ? null : cfg.update({BackgroundPrefs.fitKey: v}),
             ),
@@ -562,6 +562,32 @@ class _AboutSection extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(6, 2, 16, 16),
       children: [
+        SettingsGroup(
+          title: l.helpGroup,
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              leading: const Icon(Icons.tour_outlined),
+              title: Text(l.helpTour),
+              subtitle: Text(l.helpTourHint),
+              trailing: FilledButton.tonal(onPressed: () => startTour(context), child: Text(l.helpTourStart)),
+            ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              leading: const Icon(Icons.gavel_outlined),
+              title: Text(l.helpTerms),
+              subtitle: Text(l.helpTermsHint),
+              trailing: TextButton(onPressed: () => showAgreement(context), child: Text(l.commonView)),
+            ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: Text(l.helpPrivacy),
+              subtitle: Text(l.helpPrivacyHint),
+              trailing: TextButton(onPressed: () => showAgreement(context, tab: 1), child: Text(l.commonView)),
+            ),
+          ],
+        ),
         SettingsGroup(
           title: l.settingsGroupAbout,
           children: [

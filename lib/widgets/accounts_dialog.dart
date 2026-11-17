@@ -42,6 +42,8 @@ class _AccountsDialogState extends State<_AccountsDialog> {
     final state = AppScope.of(context);
     final scheme = Theme.of(context).colorScheme;
     final selected = state.selectedAccount?.id;
+    // 验证过正版后才能添加离线账户和外置登录（见 precheck.dart）
+    final verified = state.config.hintBuy;
     return AlertDialog(
       title: Text(context.l10n.oobeAccount),
       content: SizedBox(
@@ -71,32 +73,18 @@ class _AccountsDialogState extends State<_AccountsDialog> {
                   onPressed: () => state.removeAccount(a.id),
                 ),
               ),
+            if (!verified) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: scheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
+                child: Text(
+                  context.l10n.precheckOwnershipRequired,
+                  style: TextStyle(color: scheme.onSecondaryContainer),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
-            Text(context.l10n.accountsDialogAddOfflineAccount, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _name,
-                    decoration: InputDecoration(
-                      labelText: context.l10n.accountsDialogUsername,
-                      errorText: _error,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onSubmitted: (_) => _add(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: FilledButton.tonal(onPressed: _add, child: Text(context.l10n.oobeAdd)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
             Text(context.l10n.accountsDialogMicrosoftAccounts, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Align(
@@ -119,12 +107,38 @@ class _AccountsDialogState extends State<_AccountsDialog> {
               ),
             ],
             const SizedBox(height: 20),
+            Text(context.l10n.accountsDialogAddOfflineAccount, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _name,
+                    enabled: verified,
+                    decoration: InputDecoration(
+                      labelText: context.l10n.accountsDialogUsername,
+                      errorText: _error,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: verified ? (_) => _add() : null,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: FilledButton.tonal(onPressed: verified ? _add : null, child: Text(context.l10n.oobeAdd)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
             Text(context.l10n.accountsDialogThirdPartyAccounts, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.tonalIcon(
-                onPressed: () => showYggdrasilLogin(context),
+                onPressed: verified ? () => showYggdrasilLogin(context) : null,
                 icon: const Icon(Icons.dns_outlined),
                 label: Text(context.l10n.oobeExternalSign),
               ),

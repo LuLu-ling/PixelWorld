@@ -380,8 +380,6 @@ Future<PclImportResult> importFromPcl(
           final acc = await store.importAccount(converted);
           result.accounts++;
           if (i == lastUsed) patch['selectedAccount'] = acc.id;
-          // 导入了正版账号，与登录过一次正版账号等同
-          if (acc.type == AccountType.microsoft) patch['hintBuy'] = true;
         }
       }
     } catch (e) {

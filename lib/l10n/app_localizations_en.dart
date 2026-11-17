@@ -1046,10 +1046,6 @@ class AppLocalizationsEn extends AppLocalizations {
       '“Automatic” uses the faster one first and switches to the other on failure.';
 
   @override
-  String get oobeUseMicrosoftAccountPlay =>
-      'Use a Microsoft account to play the full game, or start with an offline account and add more later from the top-right corner.';
-
-  @override
   String get oobeMicrosoftAccount => 'Microsoft account';
 
   @override
@@ -1149,7 +1145,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tourClickHereAddMicrosoft =>
-      'Click here to add a Microsoft account or an external account (e.g. LittleSkin), or start with an offline account.';
+      'Click here to add a Microsoft account; after signing in with it once, you can also add external accounts (e.g. LittleSkin) and offline accounts.';
 
   @override
   String get tourInstallGame => 'Install the game';
@@ -1347,25 +1343,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get storageLocationBrowseImportCopyDelete =>
       'Browse, import, copy or delete game files; deleted files go to the recycle bin first';
-
-  @override
-  String get launchDialogsSupportFullGame => 'Support the full game';
-
-  @override
-  String get launchDialogsYouHaventSignedMicrosoft =>
-      'You haven\'t signed in with a Microsoft account yet. Minecraft is a paid game; please buy it to support its developers.\n\nYou can look at the store page first, start in offline mode just this once, or try the demo. Once you\'ve signed in with a Microsoft account, this message won\'t appear again.';
-
-  @override
-  String get launchDialogsDemo => 'Demo';
-
-  @override
-  String get launchDialogsLaunchTime => 'Launch this time';
-
-  @override
-  String get launchDialogsTakeMeStore => 'Take me to the store';
-
-  @override
-  String get launchDialogsGameWillStartDemo => 'The game will start in demo mode';
 
   @override
   String get launchDialogsJavaVersionMayIncompatible => 'The Java version may be incompatible';
@@ -4060,9 +4037,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get appStateLaunchingDemoMode => 'Launching in demo mode';
-
-  @override
   String appStateRenderScale(Object renderScale) {
     return 'Render scale: $renderScale%';
   }
@@ -6281,6 +6255,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get downloadLoadFailedRetry => 'Failed · Retry';
+
+  @override
+  String get precheckOwnershipRequired =>
+      'Sign in once with a Microsoft account that owns Minecraft to use offline and external accounts.';
+
+  @override
+  String get launchDialogsVerifyOwnershipFirst => 'Verify game ownership first';
+
+  @override
+  String get launchDialogsOwnershipRequiredBody =>
+      'Minecraft is a paid game. Mojang requires you to sign in once with a Microsoft account that owns Minecraft before playing with offline or external accounts.\n\nAfter verifying once, offline and external accounts stay available.';
+
+  @override
+  String get launchDialogsBuyGame => 'Buy the game';
+
+  @override
+  String get launchDialogsSignInMicrosoft => 'Sign in with Microsoft';
+
+  @override
+  String get oobeAccountHintVerified =>
+      'Use a Microsoft account to play the full game, or an offline or external account.';
+
+  @override
+  String get oobeAccountHintUnverified =>
+      'Sign in first with a Microsoft account that owns Minecraft; after that, offline and external accounts work too.';
+
+  @override
+  String get oobeAvailableAfterVerification => 'Available after verifying ownership';
 }
 
 /// The translations for English, as used in the United Kingdom (`en_GB`).
@@ -6426,10 +6428,6 @@ class AppLocalizationsEnGb extends AppLocalizationsEn {
   @override
   String get aiSettingsSummarizeEarlierMessagesOnce =>
       'Summarise earlier messages once the limit is exceeded, to save cost';
-
-  @override
-  String get aiMcpSettingsStoredEncryptedDeviceOnly =>
-      'Stored encrypted on this device and only sent to this service (Authorisation: Bearer)';
 
   @override
   String get appStateAnalyzeInstance => 'Analyse instance';

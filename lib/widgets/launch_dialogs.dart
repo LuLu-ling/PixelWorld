@@ -8,6 +8,7 @@ import '../app_state.dart';
 import '../core/accounts.dart';
 import '../core/precheck.dart';
 import '../l10n/l10n.dart';
+import 'accounts_dialog.dart';
 
 /// 正版购买劝导与赞助劝导的对话框
 class DialogLaunchPrompts implements LaunchPrompts {
@@ -22,39 +23,27 @@ class DialogLaunchPrompts implements LaunchPrompts {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.verified_user_outlined),
-        title: Text(context.l10n.launchDialogsSupportFullGame),
-        content: SizedBox(width: 400, child: Text(context.l10n.launchDialogsYouHaventSignedMicrosoft)),
+        title: Text(context.l10n.launchDialogsVerifyOwnershipFirst),
+        content: SizedBox(width: 400, child: Text(context.l10n.launchDialogsOwnershipRequiredBody)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, OwnershipChoice.cancel),
             child: Text(context.l10n.tooltipBack),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, OwnershipChoice.demo),
-            child: Text(context.l10n.launchDialogsDemo),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, OwnershipChoice.launch),
-            child: Text(context.l10n.launchDialogsLaunchTime),
+            onPressed: () => Navigator.pop(context, OwnershipChoice.store),
+            child: Text(context.l10n.launchDialogsBuyGame),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, OwnershipChoice.store),
-            child: Text(context.l10n.launchDialogsTakeMeStore),
+            onPressed: () => Navigator.pop(context, OwnershipChoice.login),
+            child: Text(context.l10n.launchDialogsSignInMicrosoft),
           ),
         ],
       ),
     );
-    // 只打开购买页面，不启动游戏
+    // 两个选择都不启动游戏
     if (choice == OwnershipChoice.store) await launchUrl(Uri.parse(buyMinecraftUrl));
-    if (choice == OwnershipChoice.demo && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.launchDialogsGameWillStartDemo),
-          behavior: SnackBarBehavior.floating,
-          width: 420,
-        ),
-      );
-    }
+    if (choice == OwnershipChoice.login && context.mounted) await showAccountsDialog(context);
     return choice ?? OwnershipChoice.cancel;
   }
 

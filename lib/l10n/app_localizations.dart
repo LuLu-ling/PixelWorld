@@ -1981,12 +1981,6 @@ abstract class AppLocalizations {
   /// **'「自动选择」会优先用更快的一边，失败时自动换另一边。'**
   String get oobeAutomaticUsesFasterOne;
 
-  /// No description provided for @oobeUseMicrosoftAccountPlay.
-  ///
-  /// In zh, this message translates to:
-  /// **'玩正版用微软账户；也可以先用离线账户，之后在右上角随时添加。'**
-  String get oobeUseMicrosoftAccountPlay;
-
   /// No description provided for @oobeMicrosoftAccount.
   ///
   /// In zh, this message translates to:
@@ -2176,7 +2170,7 @@ abstract class AppLocalizations {
   /// No description provided for @tourClickHereAddMicrosoft.
   ///
   /// In zh, this message translates to:
-  /// **'点这里添加微软正版账户、外置登录（例如 LittleSkin），或者先用离线账户玩。'**
+  /// **'点这里添加微软正版账户；登录过一次正版后，也可以添加外置登录（例如 LittleSkin）和离线账户。'**
   String get tourClickHereAddMicrosoft;
 
   /// No description provided for @tourInstallGame.
@@ -2502,42 +2496,6 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'浏览、导入、复制或删除游戏文件；删除的文件会先放进回收站'**
   String get storageLocationBrowseImportCopyDelete;
-
-  /// No description provided for @launchDialogsSupportFullGame.
-  ///
-  /// In zh, this message translates to:
-  /// **'支持正版游戏'**
-  String get launchDialogsSupportFullGame;
-
-  /// No description provided for @launchDialogsYouHaventSignedMicrosoft.
-  ///
-  /// In zh, this message translates to:
-  /// **'你还没有登录过正版账号。Minecraft 是付费游戏，请购买正版支持开发者。\n\n可以先去购买页面看看，也可以这次先以离线模式开始游戏，或者以试玩模式体验。登录一次正版账号后，就不会再出现这个提示了。'**
-  String get launchDialogsYouHaventSignedMicrosoft;
-
-  /// No description provided for @launchDialogsDemo.
-  ///
-  /// In zh, this message translates to:
-  /// **'试玩'**
-  String get launchDialogsDemo;
-
-  /// No description provided for @launchDialogsLaunchTime.
-  ///
-  /// In zh, this message translates to:
-  /// **'这次先启动'**
-  String get launchDialogsLaunchTime;
-
-  /// No description provided for @launchDialogsTakeMeStore.
-  ///
-  /// In zh, this message translates to:
-  /// **'带我去商店'**
-  String get launchDialogsTakeMeStore;
-
-  /// No description provided for @launchDialogsGameWillStartDemo.
-  ///
-  /// In zh, this message translates to:
-  /// **'游戏将以试玩模式启动'**
-  String get launchDialogsGameWillStartDemo;
 
   /// No description provided for @launchDialogsJavaVersionMayIncompatible.
   ///
@@ -6973,12 +6931,6 @@ abstract class AppLocalizations {
   /// **'工作目录: {gameDir}'**
   String appStateWorkingDirectory(Object gameDir);
 
-  /// No description provided for @appStateLaunchingDemoMode.
-  ///
-  /// In zh, this message translates to:
-  /// **'以试玩模式启动'**
-  String get appStateLaunchingDemoMode;
-
   /// No description provided for @appStateRenderScale.
   ///
   /// In zh, this message translates to:
@@ -10328,6 +10280,54 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'连不上 · 重试'**
   String get downloadLoadFailedRetry;
+
+  /// No description provided for @precheckOwnershipRequired.
+  ///
+  /// In zh, this message translates to:
+  /// **'先登录一次购买了 Minecraft 的微软账户，才能使用离线账户和外置登录。'**
+  String get precheckOwnershipRequired;
+
+  /// No description provided for @launchDialogsVerifyOwnershipFirst.
+  ///
+  /// In zh, this message translates to:
+  /// **'需要先验证正版'**
+  String get launchDialogsVerifyOwnershipFirst;
+
+  /// No description provided for @launchDialogsOwnershipRequiredBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'Minecraft 是付费游戏。按照 Mojang 的规定，需要先登录一次购买了 Minecraft 的微软账户，才能用离线账户或外置登录开始游戏。\n\n验证一次之后，离线账户和外置登录就可以一直使用了。'**
+  String get launchDialogsOwnershipRequiredBody;
+
+  /// No description provided for @launchDialogsBuyGame.
+  ///
+  /// In zh, this message translates to:
+  /// **'去购买'**
+  String get launchDialogsBuyGame;
+
+  /// No description provided for @launchDialogsSignInMicrosoft.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录微软账户'**
+  String get launchDialogsSignInMicrosoft;
+
+  /// No description provided for @oobeAccountHintVerified.
+  ///
+  /// In zh, this message translates to:
+  /// **'玩正版用微软账户，也可以用离线账户或外置登录。'**
+  String get oobeAccountHintVerified;
+
+  /// No description provided for @oobeAccountHintUnverified.
+  ///
+  /// In zh, this message translates to:
+  /// **'先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。'**
+  String get oobeAccountHintUnverified;
+
+  /// No description provided for @oobeAvailableAfterVerification.
+  ///
+  /// In zh, this message translates to:
+  /// **'验证正版后可用'**
+  String get oobeAvailableAfterVerification;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

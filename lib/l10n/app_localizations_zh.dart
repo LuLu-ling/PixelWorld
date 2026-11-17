@@ -1007,9 +1007,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get oobeAutomaticUsesFasterOne => '「自动选择」会优先用更快的一边，失败时自动换另一边。';
 
   @override
-  String get oobeUseMicrosoftAccountPlay => '玩正版用微软账户；也可以先用离线账户，之后在右上角随时添加。';
-
-  @override
   String get oobeMicrosoftAccount => '微软账户';
 
   @override
@@ -1107,7 +1104,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tourAddAccountFirst => '先添加账户';
 
   @override
-  String get tourClickHereAddMicrosoft => '点这里添加微软正版账户、外置登录（例如 LittleSkin），或者先用离线账户玩。';
+  String get tourClickHereAddMicrosoft => '点这里添加微软正版账户；登录过一次正版后，也可以添加外置登录（例如 LittleSkin）和离线账户。';
 
   @override
   String get tourInstallGame => '安装游戏';
@@ -1285,25 +1282,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageLocationBrowseImportCopyDelete => '浏览、导入、复制或删除游戏文件；删除的文件会先放进回收站';
-
-  @override
-  String get launchDialogsSupportFullGame => '支持正版游戏';
-
-  @override
-  String get launchDialogsYouHaventSignedMicrosoft =>
-      '你还没有登录过正版账号。Minecraft 是付费游戏，请购买正版支持开发者。\n\n可以先去购买页面看看，也可以这次先以离线模式开始游戏，或者以试玩模式体验。登录一次正版账号后，就不会再出现这个提示了。';
-
-  @override
-  String get launchDialogsDemo => '试玩';
-
-  @override
-  String get launchDialogsLaunchTime => '这次先启动';
-
-  @override
-  String get launchDialogsTakeMeStore => '带我去商店';
-
-  @override
-  String get launchDialogsGameWillStartDemo => '游戏将以试玩模式启动';
 
   @override
   String get launchDialogsJavaVersionMayIncompatible => 'Java 版本可能不兼容';
@@ -3905,9 +3883,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get appStateLaunchingDemoMode => '以试玩模式启动';
-
-  @override
   String appStateRenderScale(Object renderScale) {
     return '渲染比例: $renderScale%';
   }
@@ -6077,6 +6052,31 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get downloadLoadFailedRetry => '连不上 · 重试';
+
+  @override
+  String get precheckOwnershipRequired => '先登录一次购买了 Minecraft 的微软账户，才能使用离线账户和外置登录。';
+
+  @override
+  String get launchDialogsVerifyOwnershipFirst => '需要先验证正版';
+
+  @override
+  String get launchDialogsOwnershipRequiredBody =>
+      'Minecraft 是付费游戏。按照 Mojang 的规定，需要先登录一次购买了 Minecraft 的微软账户，才能用离线账户或外置登录开始游戏。\n\n验证一次之后，离线账户和外置登录就可以一直使用了。';
+
+  @override
+  String get launchDialogsBuyGame => '去购买';
+
+  @override
+  String get launchDialogsSignInMicrosoft => '登录微软账户';
+
+  @override
+  String get oobeAccountHintVerified => '玩正版用微软账户，也可以用离线账户或外置登录。';
+
+  @override
+  String get oobeAccountHintUnverified => '先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。';
+
+  @override
+  String get oobeAvailableAfterVerification => '验证正版后可用';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -7082,9 +7082,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get oobeAutomaticUsesFasterOne => '「自動選擇」會優先用更快的一邊，失敗時自動換另一邊。';
 
   @override
-  String get oobeUseMicrosoftAccountPlay => '玩正版用微軟帳戶；也可以先用離線帳戶，之後在右上角隨時新增。';
-
-  @override
   String get oobeMicrosoftAccount => '微軟帳戶';
 
   @override
@@ -7182,7 +7179,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get tourAddAccountFirst => '先新增帳戶';
 
   @override
-  String get tourClickHereAddMicrosoft => '點這裡新增微軟正版帳戶、外置登入（例如 LittleSkin），或者先用離線帳戶玩。';
+  String get tourClickHereAddMicrosoft => '點這裡新增微軟正版帳戶；登入過一次正版後，也可以新增外置登入（例如 LittleSkin）和離線帳戶。';
 
   @override
   String get tourInstallGame => '安裝遊戲';
@@ -7360,25 +7357,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageLocationBrowseImportCopyDelete => '瀏覽、匯入、複製或刪除遊戲檔案；刪除的檔案會先放進資源回收筒';
-
-  @override
-  String get launchDialogsSupportFullGame => '支援正版遊戲';
-
-  @override
-  String get launchDialogsYouHaventSignedMicrosoft =>
-      '你還沒有登入過正版帳號。Minecraft 是付費遊戲，請購買正版支援開發者。\n\n可以先去購買頁面看看，也可以這次先以離線模式開始遊戲，或者以試玩模式體驗。登入一次正版帳號後，就不會再出現這個提示了。';
-
-  @override
-  String get launchDialogsDemo => '試玩';
-
-  @override
-  String get launchDialogsLaunchTime => '這次先啟動';
-
-  @override
-  String get launchDialogsTakeMeStore => '帶我去商店';
-
-  @override
-  String get launchDialogsGameWillStartDemo => '遊戲將以試玩模式啟動';
 
   @override
   String get launchDialogsJavaVersionMayIncompatible => 'Java 版本可能不相容';
@@ -9980,9 +9958,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get appStateLaunchingDemoMode => '以試玩模式啟動';
-
-  @override
   String appStateRenderScale(Object renderScale) {
     return '渲染比例: $renderScale%';
   }
@@ -12152,4 +12127,29 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get downloadLoadFailedRetry => '連不上 · 重試';
+
+  @override
+  String get precheckOwnershipRequired => '先登入一次購買了 Minecraft 的微軟帳戶，才能使用離線帳戶和外置登入。';
+
+  @override
+  String get launchDialogsVerifyOwnershipFirst => '需要先驗證正版';
+
+  @override
+  String get launchDialogsOwnershipRequiredBody =>
+      'Minecraft 是付費遊戲。按照 Mojang 的規定，需要先登入一次購買了 Minecraft 的微軟帳戶，才能用離線帳戶或外置登入開始遊戲。\n\n驗證一次之後，離線帳戶和外置登入就可以一直使用了。';
+
+  @override
+  String get launchDialogsBuyGame => '去購買';
+
+  @override
+  String get launchDialogsSignInMicrosoft => '登入微軟帳戶';
+
+  @override
+  String get oobeAccountHintVerified => '玩正版用微軟帳戶，也可以用離線帳戶或外置登入。';
+
+  @override
+  String get oobeAccountHintUnverified => '先登入購買了 Minecraft 的微軟帳戶，之後也能用離線帳戶和外置登入。';
+
+  @override
+  String get oobeAvailableAfterVerification => '驗證正版後可用';
 }

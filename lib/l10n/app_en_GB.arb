@@ -42,7 +42,6 @@
   "aiEarlierPartsWereSummarized": " (earlier parts were summarised)",
   "aiConversationAboveWasSummarized": "The conversation above was summarised",
   "aiSettingsSummarizeEarlierMessagesOnce": "Summarise earlier messages once the limit is exceeded, to save cost",
-  "aiMcpSettingsStoredEncryptedDeviceOnly": "Stored encrypted on this device and only sent to this service (Authorisation: Bearer)",
   "aiMonthDay": "{day}/{month}",
   "appStateAnalyzeInstance": "Analyse instance",
   "javaJava8ArchiveHas": "The Java 8 archive has an unrecognised layout",

@@ -660,10 +660,16 @@ class _OobePageState extends State<OobePage> {
     final scheme = theme.colorScheme;
     final clientId = state.config.effectiveMsClientId.trim();
     final list = state.accounts.accounts;
+    // 验证过正版后才能添加离线账户和外置登录（见 precheck.dart）
+    final verified = state.config.hintBuy;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _title(context, context.l10n.accountAdd, context.l10n.oobeUseMicrosoftAccountPlay),
+        _title(
+          context,
+          context.l10n.accountAdd,
+          verified ? context.l10n.oobeAccountHintVerified : context.l10n.oobeAccountHintUnverified,
+        ),
         IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -689,8 +695,10 @@ class _OobePageState extends State<OobePage> {
                 child: _AccountCard(
                   icon: Icons.key_outlined,
                   title: context.l10n.oobeExternalSign,
-                  subtitle: context.l10n.oobeLittleSkinOtherSkinSites,
-                  onTap: () => showYggdrasilLogin(context),
+                  subtitle: verified
+                      ? context.l10n.oobeLittleSkinOtherSkinSites
+                      : context.l10n.oobeAvailableAfterVerification,
+                  onTap: verified ? () => showYggdrasilLogin(context) : null,
                 ),
               ),
               const SizedBox(width: 10),
@@ -698,15 +706,15 @@ class _OobePageState extends State<OobePage> {
                 child: _AccountCard(
                   icon: Icons.person_outline,
                   title: context.l10n.oobeOfflineAccount,
-                  subtitle: context.l10n.oobeJustPickNamePlay,
+                  subtitle: verified ? context.l10n.oobeJustPickNamePlay : context.l10n.oobeAvailableAfterVerification,
                   selected: _offlineOpen,
-                  onTap: () => setState(() => _offlineOpen = true),
+                  onTap: verified ? () => setState(() => _offlineOpen = true) : null,
                 ),
               ),
             ],
           ),
         ),
-        if (_offlineOpen) ...[
+        if (_offlineOpen && verified) ...[
           const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,

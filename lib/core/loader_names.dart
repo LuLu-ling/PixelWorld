@@ -1,9 +1,10 @@
 import 'instance.dart';
+import 'i18n/strings.dart';
 
 // 加载器的显示名称与版本的简短描述（界面与 AI 工具共用）
 
-const loaderNames = {
-  Loader.vanilla: '原版',
+Map<Loader, String> get loaderNames => {
+  Loader.vanilla: tr.downloadVanilla,
   Loader.fabric: 'Fabric',
   Loader.legacyfabric: 'Legacy Fabric',
   Loader.quilt: 'Quilt',
@@ -13,7 +14,7 @@ const loaderNames = {
   Loader.liteloader: 'LiteLoader',
   Loader.optifine: 'OptiFine',
   Loader.labymod: 'LabyMod',
-  Loader.unknown: '未知',
+  Loader.unknown: tr.loaderNamesUnknown,
 };
 
 /// 版本的标题：自动生成的文件夹名（如 fabric-loader-0.20.1-1.21.4）显示成「1.21.4 Fabric」，
@@ -23,7 +24,10 @@ String versionTitle(InstanceInfo v) => isGeneratedVersionName(v.id) ? friendlyVe
 /// 「1.21.4 Fabric」「1.12.2 Forge + OptiFine」「26.3 原版」
 String friendlyVersionName(InstanceInfo v) {
   final parts = <String>[
-    if (v.loader == Loader.vanilla) (v.nonRelease ? '快照' : '原版') else loaderNames[v.loader]!,
+    if (v.loader == Loader.vanilla)
+      (v.nonRelease ? tr.homeFeedSnapshot : tr.downloadVanilla)
+    else
+      loaderNames[v.loader]!,
     for (final a in v.addons)
       if (a != v.loader) loaderNames[a]!,
   ];
@@ -41,7 +45,10 @@ bool isGeneratedVersionName(String id) => _generatedName.hasMatch(id);
 /// 版本的简短描述，例如「Fabric · 1.20.1」「Forge + OptiFine · 1.12.2」
 String describeVersion(InstanceInfo v) {
   final parts = <String>[
-    if (v.loader == Loader.vanilla) (v.nonRelease ? '快照' : '原版') else loaderNames[v.loader]!,
+    if (v.loader == Loader.vanilla)
+      (v.nonRelease ? tr.homeFeedSnapshot : tr.downloadVanilla)
+    else
+      loaderNames[v.loader]!,
     for (final a in v.addons)
       if (a != v.loader) loaderNames[a]!,
   ];

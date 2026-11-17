@@ -3,6 +3,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/docs.dart';
+import '../l10n/l10n.dart';
 
 /// 工具页的「使用文档」：从官网抓取文档并在启动器内重排显示，断网时使用缓存。
 class DocsPage extends StatefulWidget {
@@ -82,18 +83,22 @@ class _DocsPageState extends State<DocsPage> {
                       children: [
                         Text(page.title, style: theme.textTheme.titleMedium),
                         Text(
-                          '来自 pixelworld.zhuzhi.site · 断网时显示最近一次缓存',
+                          context.l10n.docsFromPixelworldZhuzhiSite,
                           style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    tooltip: '在浏览器打开',
+                    tooltip: context.l10n.docsOpenBrowser,
                     onPressed: () => _open(docPageUrl(page.id)),
                     icon: const Icon(Icons.open_in_new),
                   ),
-                  IconButton(tooltip: '刷新', onPressed: _reload, icon: const Icon(Icons.refresh)),
+                  IconButton(
+                    tooltip: context.l10n.fileViewerRefresh,
+                    onPressed: _reload,
+                    icon: const Icon(Icons.refresh),
+                  ),
                 ],
               ),
             ),
@@ -152,8 +157,11 @@ class _DocsPageState extends State<DocsPage> {
                   Wrap(
                     spacing: 8,
                     children: [
-                      FilledButton.tonal(onPressed: _reload, child: const Text('重试')),
-                      TextButton(onPressed: () => _open(docPageUrl(docPages[_index].id)), child: const Text('在浏览器打开')),
+                      FilledButton.tonal(onPressed: _reload, child: Text(context.l10n.deviceLoginDialogRetry)),
+                      TextButton(
+                        onPressed: () => _open(docPageUrl(docPages[_index].id)),
+                        child: Text(context.l10n.docsOpenBrowser),
+                      ),
                     ],
                   ),
                 ],

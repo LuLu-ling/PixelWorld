@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 const _presetColors = <int>[
   0xFF2F6B4F,
   0xFF1370F3,
@@ -84,10 +86,7 @@ class _ColorDot extends StatelessWidget {
         height: 36,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(
-            color: selected ? scheme.onSurface : scheme.outlineVariant,
-            width: selected ? 3 : 1,
-          ),
+          border: Border.all(color: selected ? scheme.onSurface : scheme.outlineVariant, width: selected ? 3 : 1),
         ),
         padding: const EdgeInsets.all(2),
         child: ClipOval(child: child),
@@ -128,7 +127,7 @@ class _CustomColorDialogState extends State<_CustomColorDialog> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return AlertDialog(
-      title: const Text('自定义主题色'),
+      title: Text(context.l10n.themeColorDialogCustomThemeColor),
       content: SizedBox(
         width: 380,
         child: Column(
@@ -151,15 +150,18 @@ class _CustomColorDialogState extends State<_CustomColorDialog> {
               ],
             ),
             const SizedBox(height: 16),
-            _channel('红', _red, (v) => setState(() => _red = v)),
-            _channel('绿', _green, (v) => setState(() => _green = v)),
-            _channel('蓝', _blue, (v) => setState(() => _blue = v)),
+            _channel(context.l10n.themeColorDialogR, _red, (v) => setState(() => _red = v)),
+            _channel(context.l10n.themeColorDialogG, _green, (v) => setState(() => _green = v)),
+            _channel(context.l10n.themeColorDialogB, _blue, (v) => setState(() => _blue = v)),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-        FilledButton(onPressed: () => Navigator.pop(context, _color.toARGB32()), child: const Text('使用')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel)),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _color.toARGB32()),
+          child: Text(context.l10n.themeColorDialogUse),
+        ),
       ],
     );
   }

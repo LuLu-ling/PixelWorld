@@ -5,15 +5,16 @@ import '../accounts.dart';
 import 'auth.dart';
 import 'authlib_injector.dart';
 import 'yggdrasil_api.dart';
+import '../i18n/strings.dart';
 
 /// 登录结果没有选定角色时，选一个角色并用它刷新令牌（authlib-injector 启动器规范「添加账户」）
 Future<YggdrasilSession> _bindProfile(YggdrasilClient c, YggdrasilSession s, ProfileChooser choose) async {
   if (s.selected != null) return s;
-  if (s.available.isEmpty) throw Exception('该账户还没有角色，请先到皮肤站创建角色');
+  if (s.available.isEmpty) throw Exception(tr.yggdrasilAccountHasNoProfile);
   final pick = s.available.length == 1 ? s.available.single : await choose(s.available);
   if (pick == null) throw const LoginCancelled();
   final r = await c.refresh(s.accessToken, s.clientToken, select: pick);
-  if (r.selected == null) throw const YggdrasilException('验证服务器没有返回所选角色');
+  if (r.selected == null) throw YggdrasilException(tr.yggdrasilAuthenticationServerDidntReturn);
   return r;
 }
 
@@ -78,7 +79,7 @@ class YggdrasilAuth implements AccountAuth {
     }
     final password = await prompts.askPassword(acc);
     if (password == null) throw const LoginCancelled();
-    final gone = Exception('角色 ${acc.name} 已不在该账户下，请重新添加账户');
+    final gone = Exception(tr.yggdrasilProfileNoLongerBelongs(acc.name));
     final s = await _bindProfile(
       c,
       await c.authenticate(acc.login ?? '', password, clientToken),

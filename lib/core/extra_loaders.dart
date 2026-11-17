@@ -11,6 +11,7 @@ import 'loaders.dart';
 import 'paths.dart';
 import 'task.dart';
 import 'version.dart';
+import 'i18n/strings.dart';
 
 // ---------- OptiFine ----------
 //
@@ -53,7 +54,7 @@ Future<void> installOptiFineAsMod(
   final cut = version.lastIndexOf('_');
   final entry = (await optiFineVersions(dl, gameVersion)).where((v) => v.version == version).firstOrNull;
   final fileName = entry?.fileName ?? 'OptiFine_${gameVersion}_$version.jar';
-  task.setStage('下载 OptiFine');
+  task.setStage(tr.extraLoadersDownloadOptiFine);
   final tmp = Paths.tempFile(fileName);
   await dl.downloadFile(
     DownloadItem(
@@ -62,12 +63,12 @@ Future<void> installOptiFineAsMod(
     ),
   );
   task.beginStep(installStep(component));
-  task.setStage('放入 mods 文件夹');
+  task.setStage(tr.extraLoadersPutIntoModsFolder);
   final target = File(p.join(gameDir, 'mods', fileName));
   await target.parent.create(recursive: true);
   await tmp.copy(target.path);
   await tmp.delete();
-  task.output('已放入 ${target.path}');
+  task.output(tr.extraLoadersPutInto(target.path));
 }
 
 Future<String> installOptiFine(
@@ -86,7 +87,7 @@ Future<String> installOptiFine(
   final cut = version.lastIndexOf('_');
   final type = version.substring(0, cut);
   final patch = version.substring(cut + 1);
-  task.setStage('下载 OptiFine 安装包');
+  task.setStage(tr.extraLoadersDownloadOptiFineInstaller);
   final installer = Paths.tempFile('optifine-$gameVersion-$version.jar');
   await dl.downloadFile(DownloadItem(url: '$_bmclapi/optifine/$gameVersion/$type/$patch', path: installer.path));
 
@@ -102,7 +103,7 @@ Future<String> installOptiFine(
     final libFile = File(p.join(g.libraries, mavenPath(libName)));
     await libFile.parent.create(recursive: true);
     if (zip.findFile('optifine/Patcher.class') != null) {
-      task.setStage('生成 OptiFine 库');
+      task.setStage(tr.extraLoadersGenerateOptiFineLibrary);
       final vanilla = await resolveVersion(g, gameVersion);
       if (libFile.existsSync()) await libFile.delete();
       final r = await runJava(
@@ -116,7 +117,7 @@ Future<String> installOptiFine(
       if (r.code != 0 || !libFile.existsSync() || libFile.lengthSync() == 0) {
         final tail = r.output.trim().split('\n').reversed.take(6).toList().reversed.join('\n');
         if (libFile.existsSync()) await libFile.delete();
-        throw Exception('OptiFine Patcher 运行失败（退出代码 ${r.code}）\n$tail');
+        throw Exception(tr.extraLoadersOptiFinePatcherFailedExit(r.code, tail));
       }
     } else {
       await installer.copy(libFile.path);
@@ -135,7 +136,7 @@ Future<String> installOptiFine(
     if (ofTxt != null) {
       final lwVersion = utf8.decode(ofTxt.content).trim();
       final lwJar = zip.findFile('launchwrapper-of-$lwVersion.jar');
-      if (lwJar == null) throw Exception('OptiFine 安装包已损坏：找不到 launchwrapper-of-$lwVersion.jar');
+      if (lwJar == null) throw Exception(tr.extraLoadersOptiFineInstallerCorruptedLaunchwrapper(lwVersion));
       final lwName = 'optifine:launchwrapper-of:$lwVersion';
       final lwFile = File(p.join(g.libraries, mavenPath(lwName)));
       await lwFile.parent.create(recursive: true);
@@ -218,7 +219,8 @@ Future<List<LoaderVersion>> labyModVersions(Downloader dl, String gameVersion) a
         LoaderVersion(
           '$channel:${m['commitReference']}:${m['labyModVersion']}',
           stable: channel == 'production',
-          label: '4.${m['labyModVersion']}（${channel == 'production' ? '正式版' : '快照'}）',
+          label:
+              '4.${m['labyModVersion']}${tr.commonParenthesized(channel == 'production' ? tr.updateChannelStable : tr.homeFeedSnapshot)}',
         ),
       );
     } catch (_) {
@@ -239,7 +241,7 @@ Future<String> installLabyMod(
   final [channel, commit, labyVersion] = version.split(':');
   final component = loaderComponent(LoaderKind.labymod, gameVersion, version);
   task.beginStep(downloadStep(component));
-  task.setStage('获取 LabyMod 版本清单');
+  task.setStage(tr.extraLoadersGetLabyModVersionList);
   final manifest = await dl.fetchJson(
     '$_laby/download/manifest/labymod4/$channel/$gameVersion/$commit.json',
   ) as Map<String, dynamic>;

@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'i18n/strings.dart';
+
 /// 一次游戏运行的信息，游戏退出后用于收集崩溃现场
 class GameRun {
   GameRun({
@@ -41,10 +43,13 @@ class GameRun {
 
 /// 一段日志（已截取、已去除隐私信息）
 class LogSource {
-  const LogSource(this.name, this.text);
+  const LogSource(this.name, this.text, {this.gameOutput = false});
 
   final String name;
   final String text;
+
+  /// 游戏自己的输出（不算崩溃证据）；名称会随界面语言变化，判断时用这个标记
+  final bool gameOutput;
 }
 
 /// 本地规则找到的问题
@@ -75,27 +80,27 @@ class CrashReport {
   String? sessionId;
 
   /// 游戏是否真的崩溃了（有崩溃报告、JVM 错误日志，或日志里有已知问题）
-  bool get hasEvidence => sources.any((s) => s.name != '游戏输出') || findings.isNotEmpty;
+  bool get hasEvidence => sources.any((s) => !s.gameOutput) || findings.isNotEmpty;
 
   /// 发送给 AI 的内容
   String toPrompt() {
     final b = StringBuffer();
     if (environment.isNotEmpty) {
-      b.writeln('## 环境');
+      b.writeln(tr.crashEnvironment);
       for (final e in environment) {
         b.writeln('- $e');
       }
       b.writeln();
     }
     if (findings.isNotEmpty) {
-      b.writeln('## 启动器本地规则的初步判断');
+      b.writeln(tr.crashInitialFindingsFromLaunchers);
       for (final f in findings) {
-        b.writeln('- ${f.title}：${f.detail}');
+        b.writeln('- ${f.title}${tr.commonColon}${f.detail}');
       }
       b.writeln();
     }
     if (mods.isNotEmpty) {
-      b.writeln('## 已启用的模组文件（${mods.length} 个）');
+      b.writeln(tr.crashEnabledModFiles(mods.length));
       b.writeln(mods.join('\n'));
       b.writeln();
     }
@@ -133,20 +138,20 @@ Future<CrashReport> collectCrash(GameRun run, List<String> output) async {
 
   final report = newest(p.join(run.gameDir, 'crash-reports'), (n) => n.endsWith('.txt'));
   if (report != null) {
-    sources.add(LogSource('崩溃报告 ${p.basename(report.path)}', r.apply(_head(await _read(report), 20000))));
+    sources.add(LogSource(tr.crashCrashReport(p.basename(report.path)), r.apply(_head(await _read(report), 20000))));
   }
   final hsErr = newest(run.gameDir, (n) => n.startsWith('hs_err_pid') && n.endsWith('.log'));
   if (hsErr != null) {
     // JVM 错误日志的开头说明了出错的位置（例如显卡驱动的 dll）
     final lines = (await _read(hsErr)).split(RegExp(r'\r?\n'));
-    sources.add(LogSource('JVM 错误日志 ${p.basename(hsErr.path)}', r.apply(lines.take(80).join('\n'))));
+    sources.add(LogSource(tr.crashJVMErrorLog(p.basename(hsErr.path)), r.apply(lines.take(80).join('\n'))));
   }
   var text = output.join('\n');
   if (text.trim().isEmpty) {
     final latest = File(p.join(run.gameDir, 'logs', 'latest.log'));
     if (latest.existsSync() && latest.statSync().modified.isAfter(since)) text = await _read(latest);
   }
-  if (text.trim().isNotEmpty) sources.add(LogSource('游戏输出', r.apply(excerptLog(text))));
+  if (text.trim().isNotEmpty) sources.add(LogSource(tr.crashGameOutput, r.apply(excerptLog(text)), gameOutput: true));
 
   final modsDir = Directory(p.join(run.gameDir, 'mods'));
   final mods = modsDir.existsSync()
@@ -157,12 +162,12 @@ Future<CrashReport> collectCrash(GameRun run, List<String> output) async {
   return CrashReport(
     title: run.versionId,
     environment: [
-      '实例：${run.versionId}（${run.description}）',
-      if (run.loaderLibs.isNotEmpty) '加载器：${run.loaderLibs.join('，')}',
-      'Java：${run.javaMajor}（${r.apply(run.javaPath)}）',
-      '分配内存：${run.memoryGb.toStringAsFixed(1)} GB',
-      '系统：${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
-      if (run.exitCode != null) '退出代码：${run.exitCode}',
+      tr.crashInstance(run.versionId, run.description),
+      if (run.loaderLibs.isNotEmpty) tr.crashLoader(run.loaderLibs.join(tr.commonListSeparator)),
+      'Java${tr.commonColon}${run.javaMajor}${tr.commonParenthesized(r.apply(run.javaPath))}',
+      tr.crashAllocatedMemoryGB(run.memoryGb.toStringAsFixed(1)),
+      tr.crashSystem(Platform.operatingSystem, Platform.operatingSystemVersion),
+      if (run.exitCode != null) tr.crashExitCode(run.exitCode ?? ''),
     ],
     sources: sources,
     mods: mods.map(r.apply).toList(),
@@ -172,7 +177,7 @@ Future<CrashReport> collectCrash(GameRun run, List<String> output) async {
 /// 用户手动提供的日志
 CrashReport reportFromText(String name, String text, Redactor r) => CrashReport(
   title: name,
-  environment: ['系统：${Platform.operatingSystem} ${Platform.operatingSystemVersion}'],
+  environment: [tr.crashSystem(Platform.operatingSystem, Platform.operatingSystemVersion)],
   sources: [LogSource(name, r.apply(excerptLog(text)))],
 );
 
@@ -183,7 +188,8 @@ Future<String> _read(File f) async {
   return utf8.decode(bytes.length > max ? bytes.sublist(bytes.length - max) : bytes, allowMalformed: true);
 }
 
-String _head(String s, int max) => s.length <= max ? s : '${s.substring(0, max)}\n...（以下省略 ${s.length - max} 个字符）';
+String _head(String s, int max) =>
+    s.length <= max ? s : tr.crashMoreCharactersOmitted(s.substring(0, max), s.length - max);
 
 // ---------- 截取 ----------
 
@@ -203,11 +209,11 @@ String excerptLog(String text, {int budget = 24000, int tail = 150}) {
       repeat++;
       continue;
     }
-    if (repeat > 0) lines.add('（上一行重复 $repeat 次）');
+    if (repeat > 0) lines.add(tr.crashPreviousLineRepeatedTimes(repeat));
     repeat = 0;
     lines.add(l);
   }
-  if (repeat > 0) lines.add('（上一行重复 $repeat 次）');
+  if (repeat > 0) lines.add(tr.crashPreviousLineRepeatedTimes(repeat));
   if (lines.join('\n').length <= budget) return lines.join('\n');
 
   final keep = List.filled(lines.length, false);
@@ -230,7 +236,7 @@ String excerptLog(String text, {int budget = 24000, int tail = 150}) {
   var skipped = 0;
   for (var i = 0; i < lines.length; i++) {
     if (keep[i]) {
-      if (skipped > 0) parts.add('...（省略 $skipped 行）');
+      if (skipped > 0) parts.add(tr.crashLinesOmitted(skipped));
       skipped = 0;
       parts.add(lines[i]);
     } else {
@@ -242,7 +248,7 @@ String excerptLog(String text, {int budget = 24000, int tail = 150}) {
     // 仍然太长：保留开头的错误与结尾
     final head = out.substring(0, budget * 2 ~/ 5);
     final end = out.substring(out.length - budget * 3 ~/ 5);
-    out = '$head\n...（中间省略 ${out.length - budget} 个字符）\n$end';
+    out = tr.crashCharactersOmitted(head, out.length - budget, end);
   }
   return out;
 }
@@ -274,16 +280,18 @@ class Redactor {
 
   String apply(String s) {
     for (final t in _tokens) {
-      s = s.replaceAll(t, '<令牌>');
+      s = s.replaceAll(t, tr.crashToken);
     }
-    s = s.replaceAll(_jwt, '<令牌>').replaceAllMapped(_tokenArg, (m) => '${m[1]} <令牌>');
+    s = s.replaceAll(_jwt, tr.crashToken).replaceAllMapped(_tokenArg, (m) => tr.crashToken2(m[1] ?? ''));
     for (final u in _uuids) {
       s = s.replaceAll(RegExp(RegExp.escape(u), caseSensitive: false), '<UUID>');
     }
     for (final n in _names) {
-      s = s.replaceAll(RegExp('(?<![\\w])${RegExp.escape(n)}(?![\\w])'), '<玩家>');
+      s = s.replaceAll(RegExp('(?<![\\w])${RegExp.escape(n)}(?![\\w])'), tr.crashPlayer);
     }
-    s = s.replaceAllMapped(_home, (m) => '${m[1]}<用户>').replaceAllMapped(_unixHome, (m) => '${m[1]}<用户>');
+    s = s
+        .replaceAllMapped(_home, (m) => tr.crashUser(m[1] ?? ''))
+        .replaceAllMapped(_unixHome, (m) => tr.crashUser(m[1] ?? ''));
     s = s.replaceAllMapped(_ip, (m) {
       final parts = [for (var i = 1; i <= 4; i++) int.parse(m[i]!)];
       if (parts.any((x) => x > 255)) return m[0]!;
@@ -315,27 +323,26 @@ List<Finding> analyzeLogs(String text) {
   if (version != null) {
     out.add(
       Finding(
-        'Java 版本过低',
-        '需要 Java ${int.parse(version[1]!) - 44} 或更高，当前 Java 只支持到 Java ${int.parse(version[2]!) - 44}。'
-            '请在实例设置中选择更新的 Java。',
+        tr.crashJavaVersionTooOld,
+        tr.crashJavaNewerRequiredBut(int.parse(version[1]!) - 44, int.parse(version[2]!) - 44),
         grep(RegExp('UnsupportedClassVersionError')),
       ),
     );
   } else {
-    rule(RegExp('UnsupportedClassVersionError'), 'Java 版本过低', '有模组或游戏文件需要更新的 Java，请在实例设置中选择更新的 Java。');
+    rule(RegExp('UnsupportedClassVersionError'), tr.crashJavaVersionTooOld, tr.crashSomeModsGameFiles);
   }
   rule(
     RegExp(r'AppClassLoader cannot be cast to (class )?java\.net\.URLClassLoader'),
-    '需要 Java 8',
-    '旧版 Forge（1.12.2 及更早）只能在 Java 8 上运行，请在实例设置中选择 Java 8。',
+    tr.crashJava8Required,
+    tr.crashOldForge112,
   );
 
   // 内存
-  rule(RegExp(r'java\.lang\.OutOfMemoryError'), '内存不足', '游戏可用的内存不够。可以在实例设置中加大内存，或减少模组、光影与高清材质。');
+  rule(RegExp(r'java\.lang\.OutOfMemoryError'), tr.crashOutMemory, tr.crashGameDoesntHaveEnough);
   rule(
     RegExp(r'Could not reserve enough space|Initial heap size set to a larger value|Invalid maximum heap size'),
-    '内存设置无效',
-    '分配的内存超出了系统或 32 位 Java 的上限，请调小内存，或换用 64 位 Java。',
+    tr.crashInvalidMemorySetting,
+    tr.crashAllocatedMemoryExceedsLimit,
   );
 
   // 模组依赖与冲突
@@ -343,31 +350,31 @@ List<Finding> analyzeLogs(String text) {
     RegExp(
       r'requires .*(which is missing|but only the wrong version is present)|Missing or unsupported mandatory dependencies|Missing Mods:|Mod ID: .*Requested by',
     ),
-    '缺少前置模组或版本不对',
-    '有模组需要的前置模组没有安装，或版本不符合要求。按下面的日志行安装或更新对应模组。',
+    tr.crashMissingWrongDependency,
+    tr.crashModsRequiredDependencyIsnt,
   );
   rule(
     RegExp(
       r'Duplicate mod|DuplicateModsFoundException|Found duplicate mods|duplicate mods? found',
       caseSensitive: false,
     ),
-    '模组重复',
-    '同一个模组装了多份（可能是不同版本），请删除多余的文件。',
+    tr.crashDuplicateMods,
+    tr.crashSameModInstalledMore,
   );
   rule(
     RegExp(
       r'Mixin apply failed|MixinApplyError|InvalidMixinException|Mixin transformation of .* failed|MixinTransformerError',
     ),
-    'Mixin 注入失败',
-    '通常是模组之间不兼容，或模组与当前 Minecraft、加载器版本不匹配。日志中会写出出错的模组。',
+    tr.crashMixinInjectionFailed,
+    tr.crashUsuallyModsIncompatibleEach,
   );
   rule(
     RegExp(
       r'is a Forge mod|requires Forge|NeoForge mod.*Fabric|fabric.*not compatible with (Neo)?Forge',
       caseSensitive: false,
     ),
-    '模组与加载器不匹配',
-    '装了其他加载器的模组，例如在 Fabric 上装了 Forge 模组。',
+    tr.crashModsDontMatchLoader,
+    tr.crashModsAnotherLoaderInstalled,
   );
 
   // OptiFine
@@ -376,8 +383,8 @@ List<Finding> analyzeLogs(String text) {
       r'(optifine|OptiFine).*(NoSuchMethodError|NoSuchFieldError|ClassNotFoundException|IllegalAccess)|(NoSuchMethodError|NoSuchFieldError).*optifine',
       caseSensitive: false,
     ),
-    'OptiFine 不兼容',
-    'OptiFine 与当前的 Forge 或其他模组不兼容。可以换用 OptiFine 要求的 Forge 版本，或移除 OptiFine。',
+    tr.crashOptiFineIncompatible,
+    tr.crashOptiFineIsntCompatibleCurrent,
   );
 
   // 显卡与驱动
@@ -386,13 +393,17 @@ List<Finding> analyzeLogs(String text) {
       r'Pixel format not accelerated|GLFW error 65542|WGL: The driver does not appear to support OpenGL|No OpenGL context|Failed to create (the )?display|OpenGL 3\.2 .*not supported|EXCEPTION_ACCESS_VIOLATION.*(ig[0-9a-z]+icd|atio6axx|nvoglv)|(ig[0-9a-z]+icd(32|64)|atio6axx|atig6pxx|nvoglv(32|64))\.dll',
       caseSensitive: false,
     ),
-    '显卡驱动问题',
-    '显卡驱动不支持或出错。请到显卡厂商官网更新驱动；笔记本可以让游戏使用独立显卡。',
+    tr.crashGraphicsDriverProblem,
+    tr.crashGraphicsDriverDoesntSupport,
   );
 
   // 其他
-  rule(RegExp(r'Could not find or load main class'), '找不到主类', '游戏文件可能不完整，或路径中含有特殊字符。可以尝试补全文件或换一个不含特殊字符的文件夹。');
-  rule(RegExp(r'Manually triggered debug crash'), '手动触发的崩溃', '这是按住 F3 + C 触发的调试崩溃，不是错误。');
-  rule(RegExp(r'Suspected Mods?:\s*(?!NONE|None|Unknown)\S'), '崩溃报告怀疑的模组', '崩溃报告指出了可能导致崩溃的模组，可以先禁用它试试。');
+  rule(RegExp(r'Could not find or load main class'), tr.crashMainClassNotFound, tr.crashGameFilesMayIncomplete);
+  rule(RegExp(r'Manually triggered debug crash'), tr.crashManuallyTriggeredCrash, tr.crashDebugCrashTriggeredHolding);
+  rule(
+    RegExp(r'Suspected Mods?:\s*(?!NONE|None|Unknown)\S'),
+    tr.crashModSuspectedCrashReport,
+    tr.crashCrashReportNamesMod,
+  );
   return out;
 }

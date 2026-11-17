@@ -12,6 +12,7 @@ import '../core/instance_files.dart';
 import 'ai_settings.dart';
 import 'app_background.dart';
 import 'file_viewer.dart';
+import '../l10n/l10n.dart';
 
 /// 会修改文件的工作区工具：侧边栏「本次对话的文件」从这些调用里收集
 const _fileTools = {'ws_write', 'ws_edit', 'ws_move'};
@@ -37,7 +38,7 @@ Future<void> openAgentFile(BuildContext context, String root, String path) async
   final f = await resolveAgentFile(AppScope.read(context), root, path);
   if (!context.mounted) return;
   if (f == null) {
-    toast(context, '文件已经不在了：$path');
+    toast(context, context.l10n.aiSidePanelFileGone(path));
     return;
   }
   await showFileViewer(context, f);
@@ -105,7 +106,7 @@ class AiSidePanel extends StatelessWidget {
     );
 
     final context0 = s == null || !ai.ready ? null : chats.contextOf(s, ai);
-    final engine = searchEngines[cfg.aiSearchEngine]?.split('（').first ?? '内置';
+    final engine = searchEngines[cfg.aiSearchEngine]?.split(RegExp(r'（| \(')).first ?? context.l10n.commonBuilt;
 
     return Material(
       // 启用背景图片时外面已经是毛玻璃面板，这里不再画底色
@@ -116,26 +117,34 @@ class AiSidePanel extends StatelessWidget {
           if (onClose != null)
             Align(
               alignment: Alignment.centerRight,
-              child: IconButton(tooltip: '收起侧边栏', onPressed: onClose, icon: const Icon(Icons.close)),
+              child: IconButton(
+                tooltip: context.l10n.commonHideSidePanel,
+                onPressed: onClose,
+                icon: const Icon(Icons.close),
+              ),
             ),
-          section('环境', [
+          section(context.l10n.diagnoseEnvironment, [
             row(
               Icons.smart_toy_outlined,
-              ai.ready ? ai.model : '还没有设置模型',
-              trailing: ai.ready ? ai.host : '设置',
+              ai.ready ? ai.model : context.l10n.aiSidePanelNoModelSetUp,
+              trailing: ai.ready ? ai.host : context.l10n.navSettings,
               onTap: () => showAiSettingsDialog(context),
             ),
-            row(Icons.sports_esports_outlined, state.selectedVersion?.id ?? '没有选择实例', trailing: '当前实例'),
+            row(
+              Icons.sports_esports_outlined,
+              state.selectedVersion?.id ?? context.l10n.aiSidePanelNoInstanceSelected,
+              trailing: context.l10n.homeCurrentInstance,
+            ),
             row(
               Icons.folder_special_outlined,
-              'AI 工作区',
-              trailing: cfg.aiTools && cfg.aiWorkspace ? '开' : '关',
+              context.l10n.commonAIWorkspace,
+              trailing: cfg.aiTools && cfg.aiWorkspace ? context.l10n.aiSidePanelText : context.l10n.aiSidePanelOff,
               onTap: () => showAiSettingsDialog(context, section: 'aiWorkspace'),
             ),
             row(
               Icons.travel_explore,
-              '联网搜索',
-              trailing: cfg.aiTools && cfg.aiWeb ? engine : '关',
+              context.l10n.commonWebSearch,
+              trailing: cfg.aiTools && cfg.aiWeb ? engine : context.l10n.aiSidePanelOff,
               onTap: () => showAiSettingsDialog(context, section: 'aiWorkspace'),
             ),
             // 外部 MCP 服务：连接后显示工具数，失败时显示原因
@@ -150,10 +159,10 @@ class AiSidePanel extends StatelessWidget {
                           Icons.extension_outlined,
                           s.name,
                           trailing: s.error != null
-                              ? '连接失败'
+                              ? context.l10n.networkCheckPanelConnectionFailed
                               : s.toolCount != null
-                              ? '${s.toolCount} 个工具'
-                              : '未连接',
+                              ? context.l10n.commonTools(s.toolCount ?? 0)
+                              : context.l10n.aiSidePanelNotConnected,
                           color: s.error != null ? scheme.error : null,
                           onTap: () => showAiSettingsDialog(context, section: 'aiTools'),
                         ),
@@ -163,7 +172,7 @@ class AiSidePanel extends StatelessWidget {
           ]),
           if (context0 != null)
             section(
-              '上下文',
+              context.l10n.aiSidePanelContext,
               [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
@@ -173,12 +182,14 @@ class AiSidePanel extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            '${(context0.used / context0.window * 100).clamp(0, 100).toStringAsFixed(0)}% 已用',
+                            context.l10n.aiSidePanelUsed(
+                              (context0.used / context0.window * 100).clamp(0, 100).toStringAsFixed(0),
+                            ),
                             style: theme.textTheme.bodyMedium,
                           ),
                           const Spacer(),
                           Text(
-                            '${context0.estimated ? '约 ' : ''}${_k(context0.used)} / ${_k(context0.window)}',
+                            '${context0.estimated ? context.l10n.commonAbout : ''}${_k(context0.used)} / ${_k(context0.window)}',
                             style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
                           ),
                         ],
@@ -196,15 +207,15 @@ class AiSidePanel extends StatelessWidget {
               ],
               action: TextButton(
                 onPressed: !busy && chats.canCompact(s!) ? () => chats.compact(s, ai) : null,
-                child: const Text('压缩'),
+                child: Text(context.l10n.aiSidePanelCompact),
               ),
             ),
-          section('本次对话的文件', [
+          section(context.l10n.aiSidePanelFilesConversation, [
             if (files.isEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
                 child: Text(
-                  'AI 在这次对话里写入或修改的文件会出现在这里',
+                  context.l10n.aiSidePanelFilesAIWritesChanges,
                   style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                 ),
               )
@@ -281,11 +292,11 @@ class _WorkspaceFilesState extends State<_WorkspaceFiles> {
     setState(() => _files = out.take(30).toList());
   }
 
-  static String _ago(DateTime t) {
+  static String _ago(AppLocalizations l, DateTime t) {
     final d = DateTime.now().difference(t);
-    if (d.inMinutes < 1) return '刚刚';
-    if (d.inHours < 1) return '${d.inMinutes} 分钟前';
-    if (d.inDays < 1) return '${d.inHours} 小时前';
+    if (d.inMinutes < 1) return l.formatJustNow;
+    if (d.inHours < 1) return l.homeOtherMinutesAgo(d.inMinutes);
+    if (d.inDays < 1) return l.formatOtherHoursAgo(d.inHours);
     return '${t.month}/${t.day}';
   }
 
@@ -293,13 +304,13 @@ class _WorkspaceFilesState extends State<_WorkspaceFiles> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return widget.section(
-      '工作区',
+      context.l10n.aiSidePanelWorkspace,
       [
         if (_files.isEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
             child: Text(
-              '还是空的。可以让 AI 把整理结果写到这里',
+              context.l10n.aiSidePanelStillEmptyYouCan,
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           )
@@ -308,7 +319,7 @@ class _WorkspaceFilesState extends State<_WorkspaceFiles> {
             widget.row(
               _iconFor(rel),
               rel,
-              trailing: _ago(modified),
+              trailing: _ago(context.l10n, modified),
               onTap: () => openAgentFile(context, 'workspace', rel),
             ),
       ],
@@ -316,13 +327,13 @@ class _WorkspaceFilesState extends State<_WorkspaceFiles> {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            tooltip: '刷新',
+            tooltip: context.l10n.fileViewerRefresh,
             visualDensity: VisualDensity.compact,
             onPressed: _scan,
             icon: const Icon(Icons.refresh, size: 18),
           ),
           IconButton(
-            tooltip: '打开文件夹',
+            tooltip: context.l10n.homeOpenFolder,
             visualDensity: VisualDensity.compact,
             onPressed: () => openInFileManager(aiWorkspaceDir),
             icon: const Icon(Icons.folder_open_outlined, size: 18),

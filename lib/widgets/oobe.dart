@@ -11,6 +11,7 @@ import '../core/config.dart' show homeLayouts;
 import '../core/microsoft.dart';
 import '../core/network_check.dart';
 import '../core/pcl_import.dart';
+import '../l10n/l10n.dart';
 import '../pages/file_manager_page.dart';
 import '../platform.dart';
 import 'agreement_dialog.dart';
@@ -21,6 +22,7 @@ import 'storage_location.dart';
 import 'theme_color_dialog.dart';
 import 'window_buttons.dart';
 import 'yggdrasil_login_dialog.dart';
+import '../core/i18n/strings.dart';
 
 /// 首次设置走完后要做的事
 class OobeResult {
@@ -47,7 +49,18 @@ Future<OobeResult?> showOobeIfNeeded(BuildContext context) async {
   );
 }
 
-const _steps = ['欢迎', '用户协议', '外观', '游戏文件夹', '网络', '账户', '完成'];
+/// 首次设置的步数（[_steps] 是各步的标题）
+const _stepCount = 7;
+
+List<String> _steps(AppLocalizations l) => [
+  l.oobeWelcome,
+  l.helpTerms,
+  l.oobeAppearance,
+  l.oobeGameFolder,
+  l.oobeNetwork,
+  l.oobeAccount,
+  l.oobeDone,
+];
 
 class OobePage extends StatefulWidget {
   const OobePage({super.key});
@@ -107,7 +120,7 @@ class _OobePageState extends State<OobePage> {
         }
         if (!mounted) return;
     }
-    if (_step < _steps.length - 1) _go(_step + 1);
+    if (_step < _stepCount - 1) _go(_step + 1);
   }
 
   /// 「游戏文件夹」这一步点下一步时才真正生效（要申请权限、导入）
@@ -127,9 +140,9 @@ class _OobePageState extends State<OobePage> {
         try {
           final r = await importFromPcl(state.config, state.accounts, settings: true, folders: true, accounts: true);
           await state.refreshVersions();
-          _folderNote = '已从 PCL-CE 导入：游戏文件夹 ${r.folders} 个，账户 ${r.accounts} 个';
+          _folderNote = tr.oobeImportedFromPCLCE(r.folders, r.accounts);
         } catch (e) {
-          _folderNote = '从 PCL-CE 导入失败：$e';
+          _folderNote = tr.oobeCouldntImportFromPCL(e);
         }
     }
   }
@@ -168,7 +181,7 @@ class _OobePageState extends State<OobePage> {
       agreed: _agreed,
       compact: _phone,
       onGo: _go,
-      onSkip: _step == _steps.length - 1 ? null : _skipAll,
+      onSkip: _step == _stepCount - 1 ? null : _skipAll,
     );
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -233,21 +246,21 @@ class _OobePageState extends State<OobePage> {
 
   Widget _foot(BuildContext context) {
     final theme = Theme.of(context);
-    final last = _step == _steps.length - 1;
+    final last = _step == _stepCount - 1;
     final hint = switch (_step) {
-      0 => _phone ? '约 1 分钟' : '共 6 步，约 1 分钟',
-      1 => _agreed ? '' : '勾选同意后才能继续',
-      2 || 3 || 4 || 5 => '之后都可以在「设置」里改',
+      0 => _phone ? context.l10n.oobeAbout1Minute : context.l10n.oobe6StepsAbout1,
+      1 => _agreed ? '' : context.l10n.oobeAcceptAgreementContinue,
+      2 || 3 || 4 || 5 => context.l10n.oobeYouCanChangeAll,
       _ => '',
     };
     return Row(
       children: [
         if (_step > 0) ...[
-          OutlinedButton(onPressed: _busy ? null : () => _go(_step - 1), child: const Text('上一步')),
+          OutlinedButton(onPressed: _busy ? null : () => _go(_step - 1), child: Text(context.l10n.commonBack)),
           const SizedBox(width: 12),
         ],
         if (_step == 1) ...[
-          TextButton(onPressed: _decline, child: const Text('不同意并退出')),
+          TextButton(onPressed: _decline, child: Text(context.l10n.commonDeclineQuit)),
           const Spacer(),
         ] else
           Expanded(
@@ -258,18 +271,24 @@ class _OobePageState extends State<OobePage> {
             ),
           ),
         if (last) ...[
-          OutlinedButton(onPressed: () => _finish(download: true), child: const Text('去安装第一个实例')),
+          OutlinedButton(
+            onPressed: () => _finish(download: true),
+            child: Text(context.l10n.oobeInstallYourFirstInstance),
+          ),
           const SizedBox(width: 10),
-          FilledButton(onPressed: () => _finish(download: false), child: const Text('进入启动器')),
+          FilledButton(onPressed: () => _finish(download: false), child: Text(context.l10n.oobeOpenLauncher)),
         ] else
           FilledButton(
             onPressed: _busy || (_step == 1 && !_agreed) ? null : _next,
             child: _busy
                 ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
                 : Text(switch (_step) {
-                    0 => '开始设置',
-                    5 => AppScope.of(context).accounts.accounts.isEmpty ? '跳过' : '下一步',
-                    _ => '下一步',
+                    0 => context.l10n.oobeStartSetup,
+                    5 =>
+                      AppScope.of(context).accounts.accounts.isEmpty
+                          ? context.l10n.commonSkip
+                          : context.l10n.commonNext,
+                    _ => context.l10n.commonNext,
                   }),
           ),
       ],
@@ -334,16 +353,16 @@ class _OobePageState extends State<OobePage> {
         children: [
           AppLogo(size: _phone ? 56 : 80),
           SizedBox(height: _phone ? 8 : 16),
-          _title(context, '欢迎使用 Pixel World', '免费、开源的 Minecraft 启动器。花一两分钟完成几项设置，之后都可以在「设置」里改。'),
+          _title(context, context.l10n.commonWelcomePixelWorld, context.l10n.oobeFreeOpenSourceMinecraft),
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                feat(Icons.layers_outlined, '安装与管理', '原版和各种加载器，一个版本可以装多个实例，模组、存档各管各的。'),
+                feat(Icons.layers_outlined, context.l10n.oobeInstallManage, context.l10n.oobeVanillaEveryModLoader),
                 const SizedBox(width: 10),
-                feat(Icons.travel_explore, '模组与资源', '在启动器里直接找模组、整合包、资源包和光影。'),
+                feat(Icons.travel_explore, context.l10n.oobeModsResources, context.l10n.oobeFindModsModpacksResource),
                 const SizedBox(width: 10),
-                feat(Icons.forum_outlined, 'AI 排障', '游戏崩了，让 AI 读日志找原因。'),
+                feat(Icons.forum_outlined, context.l10n.oobeAITroubleshooting, context.l10n.oobeGameCrashedLetAI),
               ],
             ),
           ),
@@ -358,16 +377,11 @@ class _OobePageState extends State<OobePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _title(context, '用户协议与隐私说明', '继续之前，请阅读并同意下面两份文件。'),
+        _title(context, context.l10n.commonTermsUsePrivacyNotice, context.l10n.oobeBeforeYouContinuePlease),
         Container(
           padding: EdgeInsets.symmetric(horizontal: 14, vertical: _phone ? 8 : 12),
           decoration: BoxDecoration(color: scheme.surfaceContainer, borderRadius: BorderRadius.circular(12)),
-          child: Text(
-            '· 本软件免费开源，按原样提供；不是 Mojang、Microsoft 或 PCL 的官方产品。\n'
-            '· 我们不收集你的信息，账户和设置只保存在你的设备上。\n'
-            '· 游戏、模组等内容来自第三方，下载时直接连接它们。',
-            style: theme.textTheme.bodySmall?.copyWith(height: 1.6),
-          ),
+          child: Text(context.l10n.oobeSoftwareFreeOpenSource, style: theme.textTheme.bodySmall?.copyWith(height: 1.6)),
         ),
         const SizedBox(height: 8),
         DefaultTabController(
@@ -375,12 +389,12 @@ class _OobePageState extends State<OobePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const TabBar(
+              TabBar(
                 tabAlignment: TabAlignment.start,
                 isScrollable: true,
                 tabs: [
-                  Tab(text: '用户协议'),
-                  Tab(text: '隐私说明'),
+                  Tab(text: context.l10n.helpTerms),
+                  Tab(text: context.l10n.helpPrivacy),
                 ],
               ),
               Container(
@@ -400,7 +414,7 @@ class _OobePageState extends State<OobePage> {
           controlAffinity: ListTileControlAffinity.leading,
           contentPadding: EdgeInsets.zero,
           dense: _phone,
-          title: const Text('我已阅读并同意《用户协议》和《隐私说明》'),
+          title: Text(context.l10n.oobeIHaveReadAccept),
         ),
       ],
     );
@@ -414,26 +428,32 @@ class _OobePageState extends State<OobePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _title(context, '外观', _phone ? '选一个顺眼的样子。手机上的「标准」就是原来的首页；背景图片只在「上下」「极简」里显示。' : '选一个顺眼的样子。'),
+        _title(
+          context,
+          context.l10n.oobeAppearance,
+          _phone ? context.l10n.oobePickLookYouLike : context.l10n.oobePickLookYouLike2,
+        ),
         _Group(
           children: [
             _Row(
-              title: '颜色模式',
-              subtitle: '启动器界面的明暗',
+              title: context.l10n.colorMode,
+              subtitle: context.l10n.oobeLightDarkLauncherAppearance,
               trailing: SegmentedButton<String>(
                 showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: 'system', label: Text('跟随系统')),
-                  ButtonSegment(value: 'light', label: Text('浅色')),
-                  ButtonSegment(value: 'dark', label: Text('深色')),
+                segments: [
+                  ButtonSegment(value: 'system', label: Text(context.l10n.themeSystem)),
+                  ButtonSegment(value: 'light', label: Text(context.l10n.themeLight)),
+                  ButtonSegment(value: 'dark', label: Text(context.l10n.themeDark)),
                 ],
                 selected: {cfg.themeMode},
                 onSelectionChanged: (s) => cfg.update({'themeMode': s.first}),
               ),
             ),
             _Row(
-              title: '背景图片',
-              subtitle: hasImage ? '已选择 · 面板会变成毛玻璃，主题色跟随图片' : '可选：选一张图片放在启动器后面',
+              title: context.l10n.bgImage,
+              subtitle: hasImage
+                  ? context.l10n.oobeSelectedPanelsBecomeFrosted
+                  : context.l10n.oobeOptionalChooseImageShow,
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -443,9 +463,12 @@ class _OobePageState extends State<OobePage> {
                       child: Image.file(File(bg.imagePath), width: 64, height: 36, fit: BoxFit.cover, cacheWidth: 160),
                     ),
                     const SizedBox(width: 8),
-                    OutlinedButton(onPressed: bg.clearImage, child: const Text('移除')),
+                    OutlinedButton(onPressed: bg.clearImage, child: Text(context.l10n.bgImageRemove)),
                   ] else
-                    FilledButton.tonal(onPressed: () => _pickBackground(context), child: const Text('选择图片…')),
+                    FilledButton.tonal(
+                      onPressed: () => _pickBackground(context),
+                      child: Text(context.l10n.bgImageChoose),
+                    ),
                 ],
               ),
             ),
@@ -455,7 +478,7 @@ class _OobePageState extends State<OobePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('主题色', style: Theme.of(context).textTheme.bodyLarge),
+                    Text(context.l10n.themeColor, style: Theme.of(context).textTheme.bodyLarge),
                     const SizedBox(height: 8),
                     ThemeColorPicker(current: cfg.themeColor, onChanged: (c) => cfg.update({'themeColor': c})),
                   ],
@@ -464,22 +487,22 @@ class _OobePageState extends State<OobePage> {
           ],
         ),
         const SizedBox(height: 14),
-        _GroupTitle('首页布局'),
+        _GroupTitle(context.l10n.homeLayout),
         IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final (i, e) in homeLayouts.entries.indexed) ...[
+              for (final (i, kind) in homeLayouts.indexed) ...[
                 if (i > 0) const SizedBox(width: 10),
                 Expanded(
                   child: _LayoutCard(
-                    kind: e.key,
-                    name: e.value,
-                    selected: cfg.homeLayout == e.key,
-                    wallpaper: hasImage && !(_phone && e.key == 'standard'),
+                    kind: kind,
+                    name: context.l10n.homeLayoutName(kind),
+                    selected: cfg.homeLayout == kind,
+                    wallpaper: hasImage && !(_phone && kind == 'standard'),
                     compact: _phone,
-                    recommended: e.key == 'split' && hasImage,
-                    onTap: () => cfg.update({'homeLayout': e.key}),
+                    recommended: kind == 'split' && hasImage,
+                    onTap: () => cfg.update({'homeLayout': kind}),
                   ),
                 ),
               ],
@@ -492,12 +515,16 @@ class _OobePageState extends State<OobePage> {
 
   Future<void> _pickBackground(BuildContext context) async {
     final bg = AppScope.read(context).background;
-    final path = await pickFile(context, extensions: const ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'], label: '图片');
+    final path = await pickFile(
+      context,
+      extensions: const ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'],
+      label: context.l10n.bgImageFiles,
+    );
     if (path == null) return;
     try {
       await bg.setImage(path);
     } catch (e) {
-      if (context.mounted) toast(context, '无法使用这张图片：$e');
+      if (context.mounted) toast(context, context.l10n.oobeCantUseImage(e));
     }
   }
 
@@ -506,31 +533,36 @@ class _OobePageState extends State<OobePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _title(context, '游戏文件夹', '游戏、实例、模组和存档都放在这里。之后可以在「设置 → 游戏管理」里添加更多文件夹。'),
+        _title(context, context.l10n.oobeGameFolder, context.l10n.oobeGamesInstancesModsWorlds),
         _Option(
           selected: _folder == 'default',
-          title: '使用默认文件夹',
-          tag: '推荐',
+          title: context.l10n.oobeUseDefaultFolder,
+          tag: context.l10n.themeRecommended,
           subtitle: cfg.gameDir,
           onTap: () => setState(() => _folder = 'default'),
         ),
         _Option(
           selected: _folder == 'existing',
-          title: '使用已有的 .minecraft 文件夹',
-          subtitle: '以前用别的启动器装过游戏？直接选那个文件夹，里面的版本和存档都能用。',
+          title: context.l10n.oobeUseExistingMinecraftFolder,
+          subtitle: context.l10n.oobeInstalledGameAnotherLauncher,
           onTap: () async {
             setState(() => _folder = 'existing');
             if (_existingDir == null) await _pickExisting();
           },
-          extra: _folder == 'existing' ? _PathRow(path: _existingDir ?? '还没有选择', onPick: _pickExisting) : null,
+          extra: _folder == 'existing'
+              ? _PathRow(path: _existingDir ?? context.l10n.oobeNotChosenYet, onPick: _pickExisting)
+              : null,
         ),
         if (_pcl.found)
           _Option(
             selected: _folder == 'pcl',
-            title: '从 PCL-CE 导入',
-            tag: '检测到 PCL-CE',
+            title: context.l10n.pclImport,
+            tag: context.l10n.oobePCLCEDetected,
             grayTag: true,
-            subtitle: '导入 PCL-CE 的游戏文件夹（${_pcl.folders} 个）${_pcl.hasAccounts ? '、账户' : ''}和启动设置。',
+            subtitle: context.l10n.oobeImportsPCLCEGame(
+              _pcl.folders,
+              _pcl.hasAccounts ? context.l10n.oobeAccounts : '',
+            ),
             onTap: () => setState(() => _folder = 'pcl'),
           ),
         if (_folderNote != null)
@@ -552,18 +584,18 @@ class _OobePageState extends State<OobePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _title(context, '游戏文件放在哪里？', '之后可以在「设置 → 游戏管理」里更改。'),
+        _title(context, context.l10n.oobeWhereShouldGameFiles, context.l10n.oobeYouCanChangeLater),
         _Option(
           selected: _shared,
-          title: '手机存储',
-          tag: '推荐',
-          subtitle: '放在「Pixel World/.minecraft」。卸载或重装启动器后游戏和存档仍然保留，也能用其他应用管理。需要授予「所有文件访问权限」。',
+          title: context.l10n.oobePhoneStorage,
+          tag: context.l10n.themeRecommended,
+          subtitle: context.l10n.oobeStoredPixelWorldMinecraft,
           onTap: () => setState(() => _shared = true),
         ),
         _Option(
           selected: !_shared,
-          title: '应用内部',
-          subtitle: '不需要权限，但卸载启动器时游戏和存档会一起删除。',
+          title: context.l10n.oobeAppStorage,
+          subtitle: context.l10n.oobeNoPermissionNeededBut,
           onTap: () => setState(() => _shared = false),
         ),
       ],
@@ -573,20 +605,20 @@ class _OobePageState extends State<OobePage> {
   Widget _network(BuildContext context) {
     final cfg = AppScope.of(context).config;
     final auto = switch (_preferMirror) {
-      null => '测速后决定',
-      true => '测速结果：BMCLAPI 镜像更快',
-      false => '测速结果：官方源更快',
+      null => context.l10n.oobeDecidedAfterSpeedTest,
+      true => context.l10n.oobeSpeedTestBMCLAPIMirror,
+      false => context.l10n.oobeSpeedTestOfficialSource,
     };
     final options = [
-      ('auto', '自动选择', auto, '推荐'),
-      ('bmclapi', 'BMCLAPI 镜像', '国内一般更快', null),
-      ('official', '官方源', '只用官方服务器', null),
+      ('auto', context.l10n.downloadSourceAuto, auto, context.l10n.themeRecommended),
+      ('bmclapi', context.l10n.downloadSourceMirror, context.l10n.oobeUsuallyFasterMainlandChina, null),
+      ('official', context.l10n.downloadSourceOfficial, context.l10n.oobeOfficialServersOnly, null),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _title(context, '网络', '选择从哪里下载游戏文件。下面会自动检测各项服务的连接情况。'),
-        _GroupTitle('下载源'),
+        _title(context, context.l10n.oobeNetwork, context.l10n.oobeChooseWhereDownloadGame),
+        _GroupTitle(context.l10n.downloadSource),
         IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -613,7 +645,7 @@ class _OobePageState extends State<OobePage> {
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Text(
-              '「自动选择」会优先用更快的一边，失败时自动换另一边。',
+              context.l10n.oobeAutomaticUsesFasterOne,
               style: Theme.of(context).textTheme.bodySmall
                   ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
@@ -633,7 +665,11 @@ class _OobePageState extends State<OobePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _title(context, '添加账户', verified ? '玩正版用微软账户，也可以用离线账户或外置登录。' : '先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。'),
+        _title(
+          context,
+          context.l10n.accountAdd,
+          verified ? context.l10n.oobeAccountHintVerified : context.l10n.oobeAccountHintUnverified,
+        ),
         IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -641,13 +677,15 @@ class _OobePageState extends State<OobePage> {
               Expanded(
                 child: _AccountCard(
                   icon: Icons.window,
-                  title: '微软账户',
-                  subtitle: clientId.isEmpty ? '需要先在「设置 → 其他」填写 Client ID' : '正版登录，可以进正版服务器',
+                  title: context.l10n.oobeMicrosoftAccount,
+                  subtitle: clientId.isEmpty
+                      ? context.l10n.oobeSetClientIDSettings
+                      : context.l10n.oobeOfficialSignLetsYou,
                   onTap: clientId.isEmpty
                       ? null
                       : () => showDeviceLogin(
                           context,
-                          title: '微软登录',
+                          title: context.l10n.commonSignMicrosoft,
                           create: (onCode) => MicrosoftLogin(clientId, onCode),
                         ),
                 ),
@@ -656,8 +694,10 @@ class _OobePageState extends State<OobePage> {
               Expanded(
                 child: _AccountCard(
                   icon: Icons.key_outlined,
-                  title: '外置登录',
-                  subtitle: verified ? 'LittleSkin 等皮肤站' : '验证正版后可用',
+                  title: context.l10n.oobeExternalSign,
+                  subtitle: verified
+                      ? context.l10n.oobeLittleSkinOtherSkinSites
+                      : context.l10n.oobeAvailableAfterVerification,
                   onTap: verified ? () => showYggdrasilLogin(context) : null,
                 ),
               ),
@@ -665,8 +705,8 @@ class _OobePageState extends State<OobePage> {
               Expanded(
                 child: _AccountCard(
                   icon: Icons.person_outline,
-                  title: '离线账户',
-                  subtitle: verified ? '起个名字就能玩单机' : '验证正版后可用',
+                  title: context.l10n.oobeOfflineAccount,
+                  subtitle: verified ? context.l10n.oobeJustPickNamePlay : context.l10n.oobeAvailableAfterVerification,
                   selected: _offlineOpen,
                   onTap: verified ? () => setState(() => _offlineOpen = true) : null,
                 ),
@@ -684,8 +724,8 @@ class _OobePageState extends State<OobePage> {
                   controller: _offlineName,
                   autofocus: true,
                   decoration: InputDecoration(
-                    labelText: '离线用户名',
-                    hintText: '3～16 个字母、数字或下划线',
+                    labelText: context.l10n.oobeOfflineUsername,
+                    hintText: context.l10n.oobe316LettersDigits,
                     errorText: _offlineError,
                     border: const OutlineInputBorder(),
                     isDense: true,
@@ -696,14 +736,14 @@ class _OobePageState extends State<OobePage> {
               const SizedBox(width: 8),
               Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: FilledButton.tonal(onPressed: _addOffline, child: const Text('添加')),
+                child: FilledButton.tonal(onPressed: _addOffline, child: Text(context.l10n.oobeAdd)),
               ),
             ],
           ),
         ],
         if (list.isNotEmpty) ...[
           const SizedBox(height: 14),
-          _GroupTitle('已添加'),
+          _GroupTitle(context.l10n.oobeAdded),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -720,7 +760,7 @@ class _OobePageState extends State<OobePage> {
           ),
         ],
         const SizedBox(height: 10),
-        Text('不想现在添加也可以直接下一步。', style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline)),
+        Text(context.l10n.oobeYouCanAlsoSkip, style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline)),
       ],
     );
   }
@@ -746,19 +786,25 @@ class _OobePageState extends State<OobePage> {
     final scheme = theme.colorScheme;
     final account = state.selectedAccount;
     String mode() => switch (cfg.themeMode) {
-      'light' => '浅色',
-      'dark' => '深色',
-      _ => '跟随系统',
+      'light' => context.l10n.themeLight,
+      'dark' => context.l10n.themeDark,
+      _ => context.l10n.themeSystem,
     };
     final source = switch (cfg.downloadSource) {
-      'bmclapi' => 'BMCLAPI 镜像',
-      'official' => '官方源',
+      'bmclapi' => context.l10n.downloadSourceMirror,
+      'official' => context.l10n.downloadSourceOfficial,
       _ =>
         DownloadSourcePicker.last == null
-            ? '自动选择'
-            : '自动选择（当前：${DownloadSourcePicker.preferMirror ? 'BMCLAPI 镜像' : '官方源'}）',
+            ? context.l10n.downloadSourceAuto
+            : context.l10n.oobeAutomaticCurrently(
+                DownloadSourcePicker.preferMirror
+                    ? context.l10n.downloadSourceMirror
+                    : context.l10n.downloadSourceOfficial,
+              ),
     };
-    final folder = Platform.isAndroid ? (AndroidStorage.isShared(cfg.gameDir) ? '手机存储' : '应用内部') : cfg.gameDir;
+    final folder = Platform.isAndroid
+        ? (AndroidStorage.isShared(cfg.gameDir) ? context.l10n.oobePhoneStorage : context.l10n.oobeAppStorage)
+        : cfg.gameDir;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -773,13 +819,23 @@ class _OobePageState extends State<OobePage> {
           ),
         ),
         SizedBox(height: _phone ? 8 : 14),
-        _title(context, '准备好了', '下面是你的选择，点「修改」可以回去改。'),
+        _title(context, context.l10n.commonAllSet, context.l10n.oobeHereYourChoicesClick),
         _Group(
           children: [
-            _Summary('外观', '${mode()} · ${homeLayouts[cfg.homeLayout]}布局', () => _go(2)),
-            _Summary('游戏文件夹', folder, () => _go(3)),
-            _Summary('下载源', source, () => _go(4)),
-            _Summary('账户', account == null ? '还没有添加' : '${account.name}（${account.typeLabel}）', () => _go(5)),
+            _Summary(
+              context.l10n.oobeAppearance,
+              context.l10n.oobeLayout(mode(), context.l10n.homeLayoutName(cfg.homeLayout)),
+              () => _go(2),
+            ),
+            _Summary(context.l10n.oobeGameFolder, folder, () => _go(3)),
+            _Summary(context.l10n.downloadSource, source, () => _go(4)),
+            _Summary(
+              context.l10n.oobeAccount,
+              account == null
+                  ? context.l10n.oobeNoneYet
+                  : '${account.name}${context.l10n.commonParenthesized(account.typeLabel)}',
+              () => _go(5),
+            ),
           ],
         ),
         const SizedBox(height: 6),
@@ -789,8 +845,8 @@ class _OobePageState extends State<OobePage> {
           controlAffinity: ListTileControlAffinity.leading,
           contentPadding: EdgeInsets.zero,
           dense: _phone,
-          title: const Text('进入后看一遍新手教程'),
-          subtitle: const Text('大约 30 秒；之后可以在「设置 → 关于与致谢 → 帮助」里再看'),
+          title: Text(context.l10n.oobeTakeGuidedTourAfter),
+          subtitle: Text(context.l10n.oobeAbout30SecondsYou),
         ),
       ],
     );
@@ -838,13 +894,16 @@ class _Side extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Pixel World', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                Text('首次设置', style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline)),
+                Text(
+                  context.l10n.oobeFirstTimeSetup,
+                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline),
+                ),
               ],
             ),
           ],
         ),
         SizedBox(height: compact ? 12 : 24),
-        for (final (i, t) in _steps.indexed)
+        for (final (i, t) in _steps(context.l10n).indexed)
           _StepItem(
             index: i,
             label: t,
@@ -858,19 +917,19 @@ class _Side extends StatelessWidget {
         if (onSkip != null && !compact)
           Text.rich(
             TextSpan(
-              text: '不想现在设置？',
+              text: context.l10n.oobeDontWantSetThings,
               children: [
                 WidgetSpan(
                   alignment: PlaceholderAlignment.middle,
                   child: InkWell(
                     onTap: onSkip,
                     child: Text(
-                      '全部用默认',
+                      context.l10n.oobeUseAllDefaults,
                       style: theme.textTheme.bodySmall?.copyWith(color: scheme.primary, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
-                TextSpan(text: agreed ? '' : '（仍需同意协议）'),
+                TextSpan(text: agreed ? '' : context.l10n.oobeYouStillNeedAccept),
               ],
             ),
             style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline),
@@ -1053,7 +1112,7 @@ class _Summary extends StatelessWidget {
           Expanded(
             child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium),
           ),
-          TextButton(onPressed: onEdit, child: const Text('修改')),
+          TextButton(onPressed: onEdit, child: Text(context.l10n.oobeChange)),
         ],
       ),
     );
@@ -1191,7 +1250,7 @@ class _PathRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        OutlinedButton(onPressed: onPick, child: const Text('选择…')),
+        OutlinedButton(onPressed: onPick, child: Text(context.l10n.oobeChoose)),
       ],
     );
   }
@@ -1272,7 +1331,11 @@ class _LayoutCard extends StatelessWidget {
   final bool recommended;
   final VoidCallback onTap;
 
-  static const _desc = {'standard': '大卡片、公告与快捷按钮、最近游玩', 'split': '实例在顶部，开始游戏在底部，中间留给背景', 'minimal': '只在底部留一条'};
+  static Map<String, String> _desc(AppLocalizations l) => {
+    'standard': l.oobeLargeCardAnnouncementsShortcuts,
+    'split': l.oobeInstanceAtTopPlay,
+    'minimal': l.oobeSingleBarAtBottom,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -1374,11 +1437,14 @@ class _LayoutCard extends StatelessWidget {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(name, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-                  if (recommended) const _Tag('推荐'),
+                  if (recommended) _Tag(context.l10n.themeRecommended),
                 ],
               ),
               if (!compact)
-                Text(_desc[kind]!, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                Text(
+                  _desc(context.l10n)[kind]!,
+                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                ),
             ],
           ),
         ),

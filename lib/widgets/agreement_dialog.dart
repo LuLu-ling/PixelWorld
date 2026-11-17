@@ -6,6 +6,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_scope.dart';
+import '../l10n/l10n.dart';
 
 /// 用户协议与隐私说明的版本：改了 assets/legal 里的内容就加 1，启动时会请用户重新确认
 const agreementVersion = 1;
@@ -70,28 +71,31 @@ class _AgreementDialog extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    confirm ? (updated ? '用户协议与隐私说明已更新' : '欢迎使用 Pixel World') : '用户协议与隐私说明',
+                    confirm
+                        ? (updated
+                              ? context.l10n.agreementDialogTermsUsePrivacyNotice
+                              : context.l10n.commonWelcomePixelWorld)
+                        : context.l10n.commonTermsUsePrivacyNotice,
                     style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                   ),
                   if (confirm) ...[
                     const SizedBox(height: 6),
                     Text(
-                      '使用前请阅读下面的用户协议和隐私说明。简单来说：本软件免费开源，按原样提供；'
-                      '我们不收集你的信息，账户和设置都只保存在你的设备上；游戏和模组来自第三方。',
+                      context.l10n.agreementDialogPleaseReadTermsUse,
                       style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   ],
                   const SizedBox(height: 8),
-                  const TabBar(
+                  TabBar(
                     tabs: [
-                      Tab(text: '用户协议'),
-                      Tab(text: '隐私说明'),
+                      Tab(text: context.l10n.helpTerms),
+                      Tab(text: context.l10n.helpPrivacy),
                     ],
                   ),
                   Flexible(
                     child: SizedBox(
                       height: 420,
-                      child: TabBarView(children: const [LegalText('terms'), LegalText('privacy')]),
+                      child: TabBarView(children: [LegalText('terms'), LegalText('privacy')]),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -99,11 +103,22 @@ class _AgreementDialog extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: confirm
                         ? [
-                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('不同意并退出')),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: Text(context.l10n.commonDeclineQuit),
+                            ),
                             const SizedBox(width: 8),
-                            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('同意并继续')),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: Text(context.l10n.agreementDialogAcceptContinue),
+                            ),
                           ]
-                        : [FilledButton.tonal(onPressed: () => Navigator.pop(context), child: const Text('关闭'))],
+                        : [
+                            FilledButton.tonal(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text(context.l10n.windowClose),
+                            ),
+                          ],
                   ),
                 ],
               ),

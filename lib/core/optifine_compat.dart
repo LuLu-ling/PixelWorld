@@ -1,5 +1,6 @@
 import 'instance.dart';
 import 'loaders.dart';
+import 'i18n/strings.dart';
 
 /// OptiFine 与加载器的搭配（参照 PCL：有加载器时 OptiFine 作为模组放进 mods）
 
@@ -20,12 +21,12 @@ List<LoaderVersion> optiFineFor(Loader loader, List<LoaderVersion> all) =>
 
 /// 选择 OptiFine 时的说明
 String optiFineNote(Loader loader, LoaderVersion? v) => switch (loader) {
-  Loader.vanilla => '将安装为独立的 OptiFine 版本',
-  Loader.forge when v?.requiredForge?.isNotEmpty ?? false => '作为模组放进 mods；适配 Forge ${v!.requiredForge}，较新的 Forge 可能不兼容',
-  Loader.forge => '作为模组放进 mods',
-  Loader.neoforge => '作为模组放进 mods；OptiFine 官方不支持 NeoForge，可能无法加载',
-  Loader.fabric || Loader.quilt || Loader.legacyfabric => '作为模组放进 mods；还需要另外安装 OptiFabric 模组才能加载',
-  _ => '作为模组放进 mods',
+  Loader.vanilla => tr.optifineCompatWillInstalledAsSeparate,
+  Loader.forge when v?.requiredForge?.isNotEmpty ?? false => tr.optifineCompatGoesIntoModsAs(v!.requiredForge ?? ''),
+  Loader.forge => tr.optifineCompatGoesIntoModsAs2,
+  Loader.neoforge => tr.optifineCompatGoesIntoModsAs3,
+  Loader.fabric || Loader.quilt || Loader.legacyfabric => tr.optifineCompatGoesIntoModsAs4,
+  _ => tr.optifineCompatGoesIntoModsAs2,
 };
 
 Loader loaderOfKind(LoaderKind? k) => k == null ? Loader.vanilla : Loader.values.byName(k.name);

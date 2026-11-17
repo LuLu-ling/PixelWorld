@@ -15,6 +15,7 @@ import 'ai_tools.dart';
 import 'mcp_client.dart';
 import 'web_tools.dart';
 import 'workspace_tools.dart';
+import '../i18n/strings.dart';
 
 // 应用内 AI 的统一工具出入口。
 // 启动器自己的操作也按 MCP 服务组织（游戏管理、AI 工作区、联网搜索），与用户添加的外部 MCP 服务并列；
@@ -24,12 +25,14 @@ import 'workspace_tools.dart';
 // 外部服务的工具说明和结果都不可信，只当作数据交给模型。
 
 enum McpPolicy {
-  ask('每次询问'),
-  readOnly('只读（直接拒绝修改）');
+  ask,
+  readOnly;
 
-  const McpPolicy(this.label);
-
-  final String label;
+  /// 界面上的名称（随界面语言）
+  String get label => switch (this) {
+    ask => tr.mcpHubAskEveryTime,
+    readOnly => tr.mcpHubReadOnlyRejectChanges,
+  };
 
   static McpPolicy parse(Object? v) => values.where((x) => x.name == v).firstOrNull ?? ask;
 }
@@ -68,12 +71,19 @@ abstract class McpServer {
 
 /// 启动器自己的操作，直接在进程内执行
 class BuiltinMcpServer extends McpServer {
-  BuiltinMcpServer(this.id, this.name, this._defs, {this.promptText});
+  BuiltinMcpServer(this.id, String name, this._defs, {this.promptText}) : _name = (() => name);
+
+  /// 名称随界面语言变化的服务：每次读取名称时重新生成
+  BuiltinMcpServer.localized(this.id, this._name, this._defs, {this.promptText});
 
   @override
   final String id;
+
+  /// 名称每次读取时按当前界面语言生成（服务在启动时就创建，那时还没确定界面语言）
+  final String Function() _name;
+
   @override
-  final String name;
+  String get name => _name();
   final List<AiToolDef> Function() _defs;
   final Future<String?> Function()? promptText;
 
@@ -119,7 +129,7 @@ class ExternalMcpServer extends McpServer {
   @override
   String get id => config.id;
   @override
-  String get name => config.name;
+  String get name => config.displayName;
   @override
   bool get builtin => false;
   @override
@@ -174,11 +184,11 @@ class ExternalMcpServer extends McpServer {
             prepare: (args) async {
               final shown = jsonEncode(args);
               return ToolPlan(
-                '调用「$name」的 ${t.name}',
+                tr.mcpHubCall(name, t.name),
                 () async => '$_untrusted\n${await _call(t.name, args)}',
                 details: [
-                  if (t.readOnly) '服务声明这个工具只读取，不做修改',
-                  '参数：${shown.length > 400 ? '${shown.substring(0, 400)}…' : shown}',
+                  if (t.readOnly) tr.mcpHubServiceDeclaresToolRead,
+                  tr.mcpHubArguments(shown.length > 400 ? '${shown.substring(0, 400)}…' : shown),
                 ],
               );
             },
@@ -195,7 +205,10 @@ class ExternalMcpServer extends McpServer {
     try {
       return await (await _ensure()).callTool(tool, args);
     } on McpError catch (e) {
-      final broken = e.message.contains('退出') || e.message.contains('连不上') || e.message.contains('HTTP 404');
+      final broken =
+          e.message.contains(tr.mcpHubExited) ||
+          e.message.contains(tr.mcpHubUnreachable) ||
+          e.message.contains('HTTP 404');
       if (!broken) rethrow;
       await _drop();
       return (await _ensure()).callTool(tool, args);
@@ -228,9 +241,9 @@ Future<McpTransport> openMcpTransport(McpServerConfig c, AppState state) async {
     if (bad != null) throw McpError(bad);
     return McpHttpTransport(Uri.parse(c.url.trim()), token: McpSecret.load(c.id));
   }
-  if (Platform.isAndroid) throw McpError('安卓上暂时还不能运行本机 jar 服务，可以改用远程（HTTP）服务');
+  if (Platform.isAndroid) throw McpError(tr.mcpHubLocalJarServicesCant);
   final jar = File(c.jar);
-  if (!jar.existsSync()) throw McpError('找不到 jar 文件：${c.jar}');
+  if (!jar.existsSync()) throw McpError(tr.mcpHubJarFileNotFound(c.jar));
   final java = await ensureJava(
     VersionJson({
       'id': 'mcp-${c.id}',
@@ -239,7 +252,7 @@ Future<McpTransport> openMcpTransport(McpServerConfig c, AppState state) async {
     const JavaAuto(),
     '',
     state.downloader,
-    TaskProgress('准备 MCP 服务的 Java'),
+    TaskProgress(tr.mcpHubPrepareJavaMCPService),
   );
   final proc = await Process.start(java.path, ['-jar', jar.path, ...c.args], workingDirectory: p.dirname(jar.path));
   return McpStdioTransport(proc);
@@ -275,14 +288,19 @@ class McpHub {
   final AppState state;
   final AiToolbox toolbox;
 
-  late final game = BuiltinMcpServer('game', '游戏管理', () => toolbox.gameDefs);
-  late final workspace = BuiltinMcpServer(
+  late final game = BuiltinMcpServer.localized('game', () => tr.settingsManage, () => toolbox.gameDefs);
+  late final workspace = BuiltinMcpServer.localized(
     'workspace',
-    'AI 工作区',
+    () => tr.commonAIWorkspace,
     () => toolbox.workspaceDefs,
     promptText: () => workspacePrompt(state),
   );
-  late final web = BuiltinMcpServer('web', '联网搜索', () => toolbox.webDefs, promptText: () async => webPrompt);
+  late final web = BuiltinMcpServer.localized(
+    'web',
+    () => tr.commonWebSearch,
+    () => toolbox.webDefs,
+    promptText: () async => webPrompt,
+  );
 
   final _external = <String, ExternalMcpServer>{};
   final _cache = <String, HubTool>{};
@@ -323,7 +341,7 @@ class McpHub {
 
   /// 列出一个服务的工具；失败或超时时返回空列表，原因记在服务上
   Future<List<HubTool>> _toolsOf(McpServer s) => s.tools().timeout(const Duration(seconds: 40)).catchError((Object e) {
-    if (s is ExternalMcpServer) s._error = e is TimeoutException ? '连接超时' : '$e';
+    if (s is ExternalMcpServer) s._error = e is TimeoutException ? tr.toolboxConnectionTimedOut : '$e';
     return <HubTool>[];
   });
 

@@ -12,21 +12,25 @@ import 'package:path/path.dart' as p;
 import '../app_info.dart';
 import '../installer/installer_core.dart' show appExeNames;
 import 'site_api.dart';
+import 'i18n/strings.dart';
 
 /// 启动器的更新通道，对应 GitHub Releases 中的三类发布（见 .github/workflows/release.yml）
 enum UpdateChannel {
   /// 不带「-」的 v* 标签
-  stable('正式版'),
+  stable,
 
   /// 所有 v* 标签，包括 v0.4.0-beta 这样的预发布
-  preview('预览版'),
+  preview,
 
   /// main 分支的每次更新，标签固定为 nightly
-  nightly('Nightly');
+  nightly;
 
-  const UpdateChannel(this.label);
-
-  final String label;
+  /// 界面上的名称（随界面语言）
+  String get label => switch (this) {
+    stable => tr.updateChannelStable,
+    preview => tr.updateChannelPreview,
+    nightly => 'Nightly',
+  };
 
   static UpdateChannel parse(String s) =>
       values.where((c) => c.name == s).firstOrNull ??
@@ -203,8 +207,8 @@ Future<List<Release>> fetchReleases() async {
   req.headers.set(HttpHeaders.acceptHeader, 'application/vnd.github+json');
   final res = await req.close().timeout(const Duration(seconds: 30));
   final body = await res.transform(utf8.decoder).join();
-  if (res.statusCode == 403 || res.statusCode == 429) throw Exception('GitHub 访问次数超出限制，请稍后再试');
-  if (res.statusCode != 200) throw Exception('无法获取更新信息（HTTP ${res.statusCode}）');
+  if (res.statusCode == 403 || res.statusCode == 429) throw Exception(tr.updaterGitHubRateLimitExceeded);
+  if (res.statusCode != 200) throw Exception(tr.updaterCouldntGetUpdateInfo(res.statusCode));
   return [for (final j in (jsonDecode(body) as List).whereType<Map<String, dynamic>>()) Release.fromJson(j)];
 }
 
@@ -219,7 +223,7 @@ Future<Release?> checkForUpdate(UpdateChannel channel) async {
 /// 安卓上没有「安装未知应用」权限。安装包已经下载好，授权后可以继续安装，不需要重新下载
 class InstallPermissionException implements Exception {
   @override
-  String toString() => '需要允许安装未知应用';
+  String toString() => tr.updaterInstallingUnknownAppsNeeds;
 }
 
 /// 下载发布文件到临时文件夹，核对大小与 SHA-256。
@@ -244,7 +248,7 @@ Future<File> downloadAsset(
   final res = await req.close().timeout(const Duration(seconds: 30));
   if (res.statusCode != 200) {
     await res.drain<void>();
-    throw Exception('下载失败（HTTP ${res.statusCode}）');
+    throw Exception(tr.downloadDownloadFailedHTTP(res.statusCode));
   }
   final total = asset.size > 0 ? asset.size : res.contentLength;
   final sink = tmp.openWrite();
@@ -264,11 +268,11 @@ Future<File> downloadAsset(
   }
   if (asset.size > 0 && received != asset.size) {
     await tmp.delete();
-    throw Exception('下载不完整（$received / ${asset.size} 字节）');
+    throw Exception(tr.updaterIncompleteDownloadBytes(received, asset.size));
   }
   if (asset.sha256 != null && digest.value.toString() != asset.sha256) {
     await tmp.delete();
-    throw Exception('文件校验失败（SHA-256 不匹配）');
+    throw Exception(tr.updaterFileVerificationFailedSHA);
   }
   if (out.existsSync()) await out.delete();
   final file = await tmp.rename(out.path);
@@ -322,7 +326,7 @@ Future<void> applyUpdate(File file) async {
     await Process.run('open', [file.path]);
     return;
   }
-  if (!Platform.isWindows) throw UnsupportedError('这个平台暂不支持自动更新');
+  if (!Platform.isWindows) throw UnsupportedError(tr.updaterAutomaticUpdatesArentSupported);
   if (file.path.endsWith('.exe')) {
     await Process.start(file.path, const [], mode: ProcessStartMode.detached);
     return;
@@ -350,7 +354,7 @@ Future<void> applyUpdate(File file) async {
 List<String> portableUpdateScript({required String source, required String target, required int pid}) {
   String q(String s) => "'${s.replaceAll("'", "''")}'";
   final name = appExeNames.where((n) => File(p.join(source, n)).existsSync()).firstOrNull;
-  if (name == null) throw Exception('更新包中找不到主程序（${appExeNames.join(' 或 ')}）');
+  if (name == null) throw Exception(tr.updaterUpdatePackageDoesntContain(appExeNames.join(tr.updaterText)));
   return [
     'Wait-Process -Id $pid -ErrorAction SilentlyContinue',
     'Start-Sleep -Milliseconds 500',

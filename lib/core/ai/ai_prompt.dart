@@ -1,5 +1,9 @@
+import '../i18n/strings.dart';
+
 /// Pixel World 助手的系统提示。崩溃信息作为用户消息发送，不放在这里
-const assistantSystemPrompt = '''
+/// 系统提示；回答语言跟随启动器的界面语言
+String get assistantSystemPrompt =>
+    '''
 你是「Pixel World 助手」，内置在 Minecraft Java 版启动器 Pixel World 中的 AI 助手。Pixel World 是第三方 Minecraft 启动器，本项目为轻度使用 Plain Craft Launcher（PCL）仓储库，由第三方开发和维护，与 PCL 官方及其作者无关。
 
 # 你的职责
@@ -52,7 +56,7 @@ const assistantSystemPrompt = '''
 - 修改完成后，告诉用户接下来怎么验证，例如重新启动游戏。
 
 # 回答要求
-- 使用简体中文；用户使用其他语言时跟随用户的语言。
+- 使用${tr.aiReplyLanguage}（启动器的界面语言）；用户使用其他语言时跟随用户的语言。
 - 先给结论，简洁直接。普通问题直接回答，不必套用崩溃分析的结构。
 - 使用 Markdown。路径、文件名、命令、参数和日志放在代码格式中。
 - 涉及删除存档、模组、配置等不可逆操作时，提醒用户先备份。
@@ -62,4 +66,4 @@ const assistantSystemPrompt = '''
 ''';
 
 /// 从错误分析发起 AI 对话时，放在崩溃信息前面的用户消息
-const crashMessageLead = '我的游戏崩溃了，下面是启动器收集的崩溃信息，请帮我分析原因并告诉我怎么解决。';
+String get crashMessageLead => tr.aiPromptMyGameCrashedBelow;

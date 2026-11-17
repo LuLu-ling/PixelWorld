@@ -7,6 +7,7 @@ import '../core/ai/agent_root.dart';
 import '../core/ai/web_tools.dart';
 import '../core/instance_files.dart';
 import '../pages/file_manager_page.dart';
+import '../l10n/l10n.dart';
 
 /// AI 设置里的「工作区」和「联网」部分（在「允许 AI 操作游戏文件」打开时显示）
 class AiWorkspaceSettings extends StatefulWidget {
@@ -40,14 +41,14 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
 
   Future<void> _addRoot() async {
     final cfg = AppScope.read(context).config;
-    final path = await pickFolder(context, confirm: '让 AI 访问这个文件夹');
+    final path = await pickFolder(context, confirm: context.l10n.aiWorkspaceSettingsLetAIAccessFolder);
     if (path == null || !mounted) return;
     final dir = Directory(path);
     if (!dir.existsSync()) return;
     final real = dir.resolveSymbolicLinksSync();
     final roots = cfg.aiUserRoots;
     if (roots.any((r) => r['path'] == real)) {
-      toast(context, '这个文件夹已经添加过了');
+      toast(context, context.l10n.aiWorkspaceSettingsFolderHasAlreadyBeen);
       return;
     }
     // 磁盘根目录等于整个盘都交给 AI，单独确认
@@ -56,11 +57,14 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('允许访问整个磁盘？'),
-          content: Text('$real 是磁盘的根目录，AI 将能看到其中所有文件。建议只添加需要的文件夹。'),
+          title: Text(context.l10n.aiWorkspaceSettingsAllowAccessWholeDrive),
+          content: Text(context.l10n.aiWorkspaceSettingsRootDriveSoAI(real)),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('仍然添加')),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(context.l10n.commonCancel)),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(context.l10n.aiWorkspaceSettingsAddAnyway),
+            ),
           ],
         ),
       );
@@ -82,10 +86,7 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
     await cfg.update({
       'aiUserRoots': [
         for (final r in cfg.aiUserRoots)
-          if (r['id'] != id)
-            r
-          else if (change != null)
-            {...r, ...change},
+          if (r['id'] != id) r else if (change != null) {...r, ...change},
       ],
     });
   }
@@ -102,8 +103,8 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
       children: [
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('AI 工作区'),
-          subtitle: const Text('AI 有一个自己的文件夹可以随意读写，并能查看当前实例的游戏文件（只读）'),
+          title: Text(context.l10n.commonAIWorkspace),
+          subtitle: Text(context.l10n.aiWorkspaceSettingsAIHasItsOwn),
           value: cfg.aiWorkspace,
           onChanged: (v) => cfg.update({'aiWorkspace': v}),
         ),
@@ -111,7 +112,9 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
           Padding(
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(
-              Platform.isAndroid ? '授予「所有文件访问」后，AI 也能读写系统下载目录。' : '还可以添加其他文件夹；默认只读，打开「允许修改」后 AI 才能改动其中的文件。',
+              Platform.isAndroid
+                  ? context.l10n.aiWorkspaceSettingsAfterGrantingAllFiles
+                  : context.l10n.aiWorkspaceSettingsYouCanAddOther,
               style: muted,
             ),
           ),
@@ -125,10 +128,10 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('允许修改', style: muted),
+                  Text(context.l10n.aiWorkspaceSettingsAllowChanges, style: muted),
                   Switch(value: r['writable'] == true, onChanged: (v) => _updateRoot('${r['id']}', {'writable': v})),
                   IconButton(
-                    tooltip: '移除（不会删除文件夹）',
+                    tooltip: context.l10n.aiWorkspaceSettingsRemoveFolderIsntDeleted,
                     onPressed: () => _updateRoot('${r['id']}', null),
                     icon: const Icon(Icons.close, size: 20),
                   ),
@@ -138,11 +141,15 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
           Wrap(
             spacing: 8,
             children: [
-              OutlinedButton.icon(onPressed: _addRoot, icon: const Icon(Icons.create_new_folder_outlined, size: 18), label: const Text('添加文件夹')),
+              OutlinedButton.icon(
+                onPressed: _addRoot,
+                icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+                label: Text(context.l10n.versionsAddFolder),
+              ),
               TextButton.icon(
                 onPressed: () => openInFileManager(aiWorkspaceDir),
                 icon: const Icon(Icons.folder_open_outlined, size: 18),
-                label: const Text('打开工作区'),
+                label: Text(context.l10n.aiWorkspaceSettingsOpenWorkspace),
               ),
             ],
           ),
@@ -150,8 +157,8 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
         ],
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('联网搜索'),
-          subtitle: const Text('AI 可以搜索网页、打开网址、查 Minecraft Wiki；请求会跟随系统代理'),
+          title: Text(context.l10n.commonWebSearch),
+          subtitle: Text(context.l10n.aiWorkspaceSettingsAICanSearchWeb),
           value: cfg.aiWeb,
           onChanged: (v) => cfg.update({'aiWeb': v}),
         ),
@@ -159,7 +166,10 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
           DropdownButtonFormField<String>(
             initialValue: engine,
             isExpanded: true,
-            decoration: const InputDecoration(labelText: '搜索引擎', border: OutlineInputBorder()),
+            decoration: InputDecoration(
+              labelText: context.l10n.aiWorkspaceSettingsSearchEngine,
+              border: const OutlineInputBorder(),
+            ),
             items: [for (final e in searchEngines.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
             onChanged: (v) {
               cfg.update({'aiSearchEngine': v ?? 'auto'});
@@ -171,10 +181,10 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
             const SizedBox(height: 12),
             TextField(
               controller: _searchUrl,
-              decoration: const InputDecoration(
-                labelText: 'SearXNG 地址',
+              decoration: InputDecoration(
+                labelText: context.l10n.aiWorkspaceSettingsSearXNGURL,
                 hintText: 'https://searx.example.com',
-                helperText: '实例需要开启 JSON 格式输出',
+                helperText: context.l10n.aiWorkspaceSettingsInstanceNeedsJSONOutput,
                 border: OutlineInputBorder(),
               ),
               onChanged: (v) => cfg.update({'aiSearchUrl': v.trim()}),
@@ -186,10 +196,12 @@ class _AiWorkspaceSettingsState extends State<AiWorkspaceSettings> {
               controller: _searchKey,
               obscureText: !_showKey,
               decoration: InputDecoration(
-                labelText: engine == 'exa' ? 'Exa 的 API Key（可以不填）' : '搜索服务的 API Key',
+                labelText: engine == 'exa'
+                    ? context.l10n.aiWorkspaceSettingsExaAPIKeyOptional
+                    : context.l10n.aiWorkspaceSettingsSearchServiceAPIKey,
                 helperText: engine == 'exa'
-                    ? '不填也能用，有频率限制；填了之后额度更高。只会发给 Exa'
-                    : '和模型的 Key 分开保存，只会发给所选的搜索服务',
+                    ? context.l10n.aiWorkspaceSettingsWorksWithoutOneRate
+                    : context.l10n.aiWorkspaceSettingsStoredSeparatelyFromModels,
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
                   onPressed: () => setState(() => _showKey = !_showKey),

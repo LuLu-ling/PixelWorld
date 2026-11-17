@@ -1,9 +1,10 @@
-/// 下载量等数字：1.2 万、3.0 亿
-String formatCount(int n) {
-  if (n >= 100000000) return '${(n / 100000000).toStringAsFixed(1)} 亿';
-  if (n >= 10000) return '${(n / 10000).toStringAsFixed(1)} 万';
-  return '$n';
-}
+import 'package:intl/intl.dart';
+
+import '../l10n/l10n.dart';
+
+/// 下载量等数字，按界面语言缩写：1.2万、1.2K
+String formatCount(AppLocalizations l, int n) =>
+    NumberFormat.compact(locale: l.localeName == 'zh_Hant' ? 'zh_TW' : l.localeName).format(n);
 
 String formatSize(int bytes) {
   if (bytes >= 1 << 30) return '${(bytes / (1 << 30)).toStringAsFixed(1)} GB';
@@ -13,15 +14,15 @@ String formatSize(int bytes) {
 }
 
 /// 3 天前、2 个月前
-String timeAgo(String iso) {
+String timeAgo(AppLocalizations l, String iso) {
   final t = DateTime.tryParse(iso);
   if (t == null) return '';
   final d = DateTime.now().difference(t);
-  if (d.inDays >= 365) return '${d.inDays ~/ 365} 年前';
-  if (d.inDays >= 30) return '${d.inDays ~/ 30} 个月前';
-  if (d.inDays >= 1) return '${d.inDays} 天前';
-  if (d.inHours >= 1) return '${d.inHours} 小时前';
-  return '刚刚';
+  if (d.inDays >= 365) return l.formatOtherYearsAgo(d.inDays ~/ 365);
+  if (d.inDays >= 30) return l.formatOtherMonthsAgo(d.inDays ~/ 30);
+  if (d.inDays >= 1) return l.formatOtherDaysAgo(d.inDays);
+  if (d.inHours >= 1) return l.formatOtherHoursAgo(d.inHours);
+  return l.formatJustNow;
 }
 
 String formatDate(DateTime t) =>

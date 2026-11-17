@@ -6,19 +6,26 @@ import 'package:path/path.dart' as p;
 
 import 'android_storage.dart';
 import 'paths.dart';
+import 'i18n/strings.dart';
 
 /// 版本运行目录下的资源文件夹
 enum InstanceFolder {
-  saves('存档'),
-  screenshots('截图'),
-  mods('模组'),
-  resourcepacks('资源包'),
-  shaderpacks('光影包'),
-  schematics('投影');
+  saves,
+  screenshots,
+  mods,
+  resourcepacks,
+  shaderpacks,
+  schematics;
 
-  const InstanceFolder(this.label);
-
-  final String label;
+  /// 界面上的名称（随界面语言）
+  String get label => switch (this) {
+    saves => tr.instanceWorlds,
+    screenshots => tr.instanceScreenshots,
+    mods => tr.homeMods,
+    resourcepacks => tr.commonResourcePacks,
+    shaderpacks => tr.modrinthShaderPacks,
+    schematics => tr.instanceSchematics,
+  };
 }
 
 class InstanceFile {
@@ -68,7 +75,7 @@ Future<void> Function(String path)? mobileFileManager;
 Future<void> openInFileManager(String path, {bool create = true}) async {
   if (create && p.extension(path).isEmpty) await Directory(path).create(recursive: true);
   if (Platform.isAndroid || Platform.isIOS) {
-    if (mobileFileManager == null) throw Exception('手机上暂时不能打开文件夹');
+    if (mobileFileManager == null) throw Exception(tr.instanceFilesFoldersCantOpenedPhones);
     return mobileFileManager!(path);
   }
   if (Platform.isWindows) {
@@ -99,13 +106,13 @@ Future<void> moveToTrash(String path) async {
       '-Command',
       "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::$kind('$escaped', 'OnlyErrorDialogs', 'SendToRecycleBin')",
     ]);
-    if (r.exitCode != 0) throw Exception('无法移到回收站：${r.stderr}');
+    if (r.exitCode != 0) throw Exception(tr.instanceFilesCouldntMoveRecycleBin(r.stderr));
   } else if (Platform.isMacOS) {
     final r = await Process.run('osascript', ['-e', 'tell application "Finder" to delete POSIX file "$path"']);
-    if (r.exitCode != 0) throw Exception('无法移到废纸篓');
+    if (r.exitCode != 0) throw Exception(tr.instanceFilesCouldntMoveTrash);
   } else {
     final r = await Process.run('gio', ['trash', path]);
-    if (r.exitCode != 0) throw Exception('无法移到回收站');
+    if (r.exitCode != 0) throw Exception(tr.instanceFilesCouldntMoveRecycleBin2);
   }
 }
 
@@ -168,7 +175,7 @@ Object? _readNbt(Uint8List buf) {
       case 12:
         pos += 4 + data.getInt32(pos) * 8;
       default:
-        throw Exception('未知的 NBT 类型 $type');
+        throw Exception(tr.instanceFilesUnknownNBTType(type));
     }
     return null;
   }

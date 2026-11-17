@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart';
 
+import 'i18n/strings.dart';
+
 /// 用系统机制加密本地保存的令牌与 API Key。
 /// Windows 使用 DPAPI（与当前用户绑定，Electron 的 safeStorage 也是这样做的）。
 /// 其他平台暂未接入系统密钥库，[protect] 原样返回，数据只受应用私有目录的权限保护
@@ -35,7 +37,7 @@ abstract final class SecureData {
       final ok = encrypt
           ? CryptProtectData(input, null, extra, null, 0, output).value
           : CryptUnprotectData(input, null, extra, null, 0, output).value;
-      if (!ok) throw Exception(encrypt ? '加密失败' : '解密失败');
+      if (!ok) throw Exception(encrypt ? tr.secureEncryptionFailed : tr.secureDecryptionFailed);
       try {
         return Uint8List.fromList(output.ref.pbData.asTypedList(output.ref.cbData));
       } finally {

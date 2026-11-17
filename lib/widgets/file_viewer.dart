@@ -10,6 +10,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../app_scope.dart';
 import '../core/instance_files.dart';
 import '../platform.dart';
+import '../l10n/l10n.dart';
+import '../core/i18n/strings.dart';
 
 const _viewerMaxBytes = 2 * 1024 * 1024;
 
@@ -55,7 +57,7 @@ class _FileViewerState extends State<FileViewer> {
   /// 读取文本；二进制或太大时返回 null
   Future<String?> _load() async {
     final f = widget.file;
-    if (!await f.exists()) throw const FileSystemException('文件不存在');
+    if (!await f.exists()) throw FileSystemException(tr.fileViewerFileDoesntExist);
     if (await f.length() > _viewerMaxBytes) return null;
     final bytes = await f.readAsBytes();
     if (bytes.take(8192).contains(0)) return null;
@@ -74,42 +76,44 @@ class _FileViewerState extends State<FileViewer> {
         children: [
           Icon(_isMarkdown ? Icons.article_outlined : Icons.description_outlined, color: scheme.primary, size: 20),
           const SizedBox(width: 10),
-          Expanded(child: Text(name, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium)),
+          Expanded(
+            child: Text(name, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
+          ),
           if (_isMarkdown)
             SegmentedButton<bool>(
               showSelectedIcon: false,
               style: const ButtonStyle(visualDensity: VisualDensity.compact),
-              segments: const [
-                ButtonSegment(value: false, label: Text('预览')),
-                ButtonSegment(value: true, label: Text('源码')),
+              segments: [
+                ButtonSegment(value: false, label: Text(context.l10n.fileViewerPreview)),
+                ButtonSegment(value: true, label: Text(context.l10n.fileViewerSource)),
               ],
               selected: {_source},
               onSelectionChanged: (v) => setState(() => _source = v.first),
             ),
           IconButton(
-            tooltip: '刷新',
+            tooltip: context.l10n.fileViewerRefresh,
             onPressed: () => setState(() => _text = _load()),
             icon: const Icon(Icons.refresh),
           ),
           FutureBuilder<String?>(
             future: _text,
             builder: (context, snap) => IconButton(
-              tooltip: '复制全文',
+              tooltip: context.l10n.fileViewerCopyAll,
               onPressed: snap.data == null
                   ? null
                   : () {
                       Clipboard.setData(ClipboardData(text: snap.data!));
-                      toast(context, '已复制');
+                      toast(context, context.l10n.fileViewerCopied);
                     },
               icon: const Icon(Icons.copy_outlined),
             ),
           ),
           IconButton(
-            tooltip: '在文件管理器中打开',
+            tooltip: context.l10n.fileViewerShowFileManager,
             onPressed: () => openInFileManager(p.dirname(widget.file.path), create: false),
             icon: const Icon(Icons.folder_open_outlined),
           ),
-          if (isDesktop) IconButton(tooltip: '关闭', onPressed: close, icon: const Icon(Icons.close)),
+          if (isDesktop) IconButton(tooltip: context.l10n.windowClose, onPressed: close, icon: const Icon(Icons.close)),
         ],
       ),
     );
@@ -117,11 +121,11 @@ class _FileViewerState extends State<FileViewer> {
       future: _text,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-        if (snap.hasError) return Center(child: Text('打不开：${snap.error}'));
+        if (snap.hasError) return Center(child: Text(context.l10n.fileViewerCantOpen(snap.error!)));
         final text = snap.data;
         if (text == null) {
           return Center(
-            child: Text('这个文件不是文本，或者超过 2 MB，不能在这里查看', style: TextStyle(color: scheme.onSurfaceVariant)),
+            child: Text(context.l10n.fileViewerFileIsntTextLarger, style: TextStyle(color: scheme.onSurfaceVariant)),
           );
         }
         if (_isMarkdown && !_source) {
@@ -138,7 +142,10 @@ class _FileViewerState extends State<FileViewer> {
             styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
               p: theme.textTheme.bodyMedium?.copyWith(height: 1.65),
               code: _mono.copyWith(backgroundColor: scheme.surfaceContainerHighest),
-              codeblockDecoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8)),
+              codeblockDecoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
               tableBorder: TableBorder.all(color: scheme.outlineVariant),
             ),
           );
@@ -157,7 +164,11 @@ class _FileViewerState extends State<FileViewer> {
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [header, const Divider(height: 1), Expanded(child: body)],
+      children: [
+        header,
+        const Divider(height: 1),
+        Expanded(child: body),
+      ],
     );
   }
 }

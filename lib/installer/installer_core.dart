@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../app_info.dart';
+import '../core/i18n/strings.dart';
 
 /// Windows 安装与卸载。安装包外壳（installer/Shell.cs）解压出程序后，
 /// 以 --pw-install 启动本程序显示安装界面；已安装的程序以 --pw-uninstall 启动显示卸载界面。
@@ -149,7 +150,7 @@ Future<void> _ensureNotRunning(String dir) async {
       final raf = await exe.open(mode: FileMode.append);
       await raf.close();
     } catch (_) {
-      throw Exception('${AppInfo.name} 正在运行，请先关闭它再安装');
+      throw Exception(tr.installerCoreRunningCloseBeforeInstalling(AppInfo.name));
     }
   }
 }
@@ -164,7 +165,7 @@ Future<void> _createShortcut(String path, String target, String cwd) async {
         "\$s.TargetPath = '${q(target)}'; \$s.WorkingDirectory = '${q(cwd)}'; "
         "\$s.Description = '${AppInfo.fullName}'; \$s.Save()",
   ]);
-  if (r.exitCode != 0) throw Exception('无法创建快捷方式：$path');
+  if (r.exitCode != 0) throw Exception(tr.installerCoreCouldntCreateShortcut(path));
 }
 
 Future<void> _writeRegistry(String dir, int size) async {
@@ -182,7 +183,7 @@ Future<void> _writeRegistry(String dir, int size) async {
   ];
   for (final (name, type, data) in values) {
     final r = await Process.run('reg.exe', ['add', _regKey, '/v', name, '/t', type, '/d', data, '/f']);
-    if (r.exitCode != 0) throw Exception('写入卸载信息失败');
+    if (r.exitCode != 0) throw Exception(tr.installerCoreCouldntWriteUninstallInformation);
   }
 }
 
@@ -192,7 +193,7 @@ Future<void> install(
   required bool startMenuShortcut,
   required void Function(String stage, double? value) report,
 }) async {
-  if (sameDir(dir, sourceDir)) throw Exception('不能安装到安装程序所在的文件夹');
+  if (sameDir(dir, sourceDir)) throw Exception(tr.installerCoreCantInstallIntoInstallers);
   await _ensureNotRunning(dir);
 
   final previous = readManifest(dir);
@@ -203,7 +204,7 @@ Future<void> install(
     var done = 0;
     for (final f in files) {
       final rel = p.relative(f.path, from: sourceDir);
-      report('正在复制 ${p.basename(rel)}', total == 0 ? 0 : done / total);
+      report(tr.installerCoreCopying(p.basename(rel)), total == 0 ? 0 : done / total);
       final target = File(p.join(dir, rel));
       await target.parent.create(recursive: true);
       await f.copy(target.path);
@@ -216,7 +217,7 @@ Future<void> install(
     rethrow;
   }
 
-  report('正在完成安装…', null);
+  report(tr.installerCoreFinishingInstallation, null);
   if (previous != null) {
     final keep = copied.map((f) => f.toLowerCase()).toSet();
     await _removeFiles(dir, previous.files.where((f) => !keep.contains(f.toLowerCase())).toList());
@@ -241,7 +242,7 @@ Future<void> install(
 /// 运行中的程序删不掉自己，把清单交给临时目录里的清理程序，等本程序退出后删除
 Future<void> startCleanup(String dir, {required bool removeData}) async {
   final manifest = readManifest(dir);
-  if (manifest == null) throw Exception('找不到安装清单，无法确定要删除哪些文件');
+  if (manifest == null) throw Exception(tr.installerCoreInstallManifestWasntFound);
 
   final parents = <String>{dir};
   for (final f in manifest.files) {

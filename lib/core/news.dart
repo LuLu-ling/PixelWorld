@@ -4,6 +4,7 @@ import 'dart:io';
 import '../app_info.dart';
 import 'download.dart';
 import 'install.dart';
+import 'i18n/strings.dart';
 
 /// 首页的 Minecraft 版本动态：取官方版本列表中最新的几个正式版与快照，
 /// 再从中文 Minecraft Wiki 读取对应版本页面的简介与配图。
@@ -56,7 +57,7 @@ Future<Map<String, ({String summary, String? image})>> _wikiExtracts(List<String
   );
   final res = await (await _client.getUrl(uri)).close().timeout(const Duration(seconds: 20));
   final body = await res.transform(utf8.decoder).join();
-  if (res.statusCode != 200) throw Exception('Minecraft Wiki 请求失败（${res.statusCode}）');
+  if (res.statusCode != 200) throw Exception(tr.newsMinecraftWikiRequestFailed(res.statusCode));
   final query = (jsonDecode(body) as Map<String, dynamic>)['query'] as Map<String, dynamic>? ?? {};
   // 重定向后的标题映射回请求时的标题
   final redirects = {

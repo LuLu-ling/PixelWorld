@@ -71,8 +71,7 @@ class CoverPalette {
   }
 
   /// 由主色组成的纯色背景（界面默认不用渐变）
-  Decoration background({BorderRadius? borderRadius}) =>
-      BoxDecoration(borderRadius: borderRadius, color: colors[0]);
+  Decoration background({BorderRadius? borderRadius}) => BoxDecoration(borderRadius: borderRadius, color: colors[0]);
 }
 
 /// 封面背景：有封面时用取出的主色，否则用主题色压暗后的颜色；都是纯色

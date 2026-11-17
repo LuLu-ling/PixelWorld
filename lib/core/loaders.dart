@@ -5,6 +5,7 @@ import 'install.dart';
 import 'paths.dart';
 import 'task.dart';
 import 'version.dart';
+import 'i18n/strings.dart';
 
 /// 可以在原版之上直接安装的加载器
 enum LoaderKind {
@@ -89,10 +90,10 @@ Future<String> _installLiteLoader(
   String? name,
 }) async {
   final build = (await _liteLoaderBuilds(dl, gameVersion)).where((b) => b['version'] == version).firstOrNull;
-  if (build == null) throw Exception('找不到 LiteLoader $version');
+  if (build == null) throw Exception(tr.loadersLiteLoaderNotFound(version));
   await ensureVanilla(g, gameVersion, dl, task);
   final parent = await readVersionJson(g, gameVersion);
-  if (parent.minecraftArguments == null) throw Exception('LiteLoader 只支持 1.12.2 及更早的版本');
+  if (parent.minecraftArguments == null) throw Exception(tr.loadersLiteLoaderOnlySupports1);
   task.beginStep(downloadStep(loaderComponent(LoaderKind.liteloader, gameVersion, version)));
 
   final liteName = 'com.mumfrey:liteloader:${build['version']}';
@@ -126,7 +127,7 @@ Future<String> _installLiteLoader(
     ],
   });
   task.beginStep(installStep(loaderComponent(LoaderKind.liteloader, gameVersion, version)));
-  task.setStage('安装 LiteLoader');
+  task.setStage(tr.loadersInstallLiteLoader);
   return saveVersionJson(g, json, dl, task, name: name);
 }
 
@@ -197,7 +198,7 @@ Future<String> installLoader(
   }
   await ensureVanilla(g, gameVersion, dl, task);
   task.beginStep(downloadStep(loaderComponent(kind, gameVersion, loaderVersion)));
-  task.setStage('获取 ${kind.label} 配置');
+  task.setStage(tr.loadersGetConfiguration(kind.label));
   final profile = await dl.fetchJson(
     '${kind.meta}/versions/loader/${Uri.encodeComponent(gameVersion)}/${Uri.encodeComponent(loaderVersion)}/profile/json',
   );

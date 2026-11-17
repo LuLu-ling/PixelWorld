@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 
 import '../core/instance.dart';
 import 'loader_icon.dart';
+import '../core/i18n/strings.dart';
 
 /// 版本的自定义图标：`versions/<id>/PCL/Logo.png`（与 PCL-CE 的自定义图标位置相同）
 String versionLogoPath(String versionDir) => p.join(versionDir, 'PCL', 'Logo.png');
@@ -63,10 +64,10 @@ class VersionIcon extends StatelessWidget {
 /// 让用户选一张图片作为版本图标；返回是否已更换
 Future<bool> pickVersionLogo(String versionDir) async {
   final file = await openFile(
-    acceptedTypeGroups: const [
-      XTypeGroup(label: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif']),
+    acceptedTypeGroups: [
+      XTypeGroup(label: tr.bgImageFiles, extensions: const ['png', 'jpg', 'jpeg', 'webp', 'gif']),
     ],
-    confirmButtonText: '选择',
+    confirmButtonText: tr.commonChoose,
   );
   if (file == null) return false;
   final target = File(versionLogoPath(versionDir));

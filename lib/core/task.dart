@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'i18n/strings.dart';
+
 enum TaskState { running, success, failed, cancelled }
 
 enum TaskStepState { pending, running, done, failed, cancelled }
@@ -11,7 +13,7 @@ class TaskCancelled implements Exception {
   const TaskCancelled();
 
   @override
-  String toString() => '任务已中断';
+  String toString() => tr.commonTaskCanceled;
 }
 
 class TaskStep {
@@ -52,7 +54,7 @@ class TaskProgress extends ChangeNotifier {
   void cancel() {
     if (!canCancel || state != TaskState.running || _cancelled) return;
     _cancelled = true;
-    _append('正在中断任务…');
+    _append(tr.taskCancelingTask);
     notifyListeners();
   }
 
@@ -149,7 +151,7 @@ class TaskProgress extends ChangeNotifier {
     final first = total == 0 && t > 0;
     done = d;
     total = t;
-    if (first) _append('共 $t 个文件需要下载');
+    if (first) _append(tr.taskFilesDownload(t));
     notifyListeners();
   }
 
@@ -176,7 +178,7 @@ class TaskProgress extends ChangeNotifier {
     }
     state = TaskState.success;
     endedAt = DateTime.now();
-    _append('完成');
+    _append(tr.oobeDone);
     notifyListeners();
   }
 
@@ -189,7 +191,7 @@ class TaskProgress extends ChangeNotifier {
     state = TaskState.failed;
     endedAt = DateTime.now();
     error = '$e'.replaceFirst(RegExp(r'^Exception: ?'), '');
-    _append('失败：$error');
+    _append(tr.taskFailed(error ?? ''));
     notifyListeners();
   }
 
@@ -225,7 +227,7 @@ class TaskProgress extends ChangeNotifier {
     state = TaskState.cancelled;
     endedAt = DateTime.now();
     error = null;
-    _append('已中断');
+    _append(tr.tasksCanceled);
     notifyListeners();
   }
 }

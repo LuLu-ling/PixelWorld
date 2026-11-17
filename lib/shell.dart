@@ -9,6 +9,7 @@ import 'app_scope.dart';
 import 'core/accounts.dart';
 import 'app_state.dart';
 import 'core/crash.dart';
+import 'l10n/l10n.dart';
 import 'platform.dart';
 import 'widgets/accounts_dialog.dart';
 import 'widgets/agreement_dialog.dart';
@@ -43,21 +44,21 @@ enum MainPage { home, download, settings, tools, ai, files }
 /// 从主页面进入的子页面：顶栏显示返回按钮和标题
 enum SubPage { versions, log, instance, tasks, diagnose }
 
-const _subTitles = {
-  SubPage.versions: '实例',
-  SubPage.log: '游戏日志',
-  SubPage.instance: '实例详情',
-  SubPage.tasks: '任务',
-  SubPage.diagnose: '错误分析',
+String _subTitle(AppLocalizations l, SubPage p) => switch (p) {
+  SubPage.versions => l.subVersions,
+  SubPage.log => l.subLog,
+  SubPage.instance => l.subInstance,
+  SubPage.tasks => l.subTasks,
+  SubPage.diagnose => l.subDiagnose,
 };
 
-const _mainTitles = {
-  MainPage.home: '启动',
-  MainPage.download: '下载',
-  MainPage.settings: '设置',
-  MainPage.tools: '工具',
-  MainPage.ai: 'AI 助手',
-  MainPage.files: '文件',
+String _mainTitle(AppLocalizations l, MainPage p) => switch (p) {
+  MainPage.home => l.navHome,
+  MainPage.download => l.navDownload,
+  MainPage.settings => l.navSettings,
+  MainPage.tools => l.navTools,
+  MainPage.ai => l.navAiAssistant,
+  MainPage.files => l.navFiles,
 };
 
 /// 页面切换，供各页面打开子页面或返回
@@ -272,12 +273,13 @@ class _Rail extends StatelessWidget {
     // 侧栏加宽到能完整容纳它们，图标从它们下面留出空隙再开始
     final top = Platform.isMacOS ? 64.0 : 10.0;
     final width = Platform.isMacOS ? 84.0 : 76.0;
-    Widget item(MainPage p, IconData icon, IconData active, String label) => TourTarget(
+    final l = context.l10n;
+    Widget item(MainPage p, IconData icon, IconData active, [String? label]) => TourTarget(
       id: 'rail.${p.name}',
       child: _RailItem(
         icon: icon,
         activeIcon: active,
-        label: label,
+        label: label ?? _mainTitle(l, p),
         selected: page == p && (sub == null || p == MainPage.home && sub == SubPage.instance),
         onTap: () => onMain(p),
       ),
@@ -294,12 +296,12 @@ class _Rail extends StatelessWidget {
             children: [
               const AppLogo(size: 36),
               const SizedBox(height: 10),
-              item(MainPage.home, Icons.rocket_launch_outlined, Icons.rocket_launch, '启动'),
-              item(MainPage.download, Icons.download_outlined, Icons.download, '下载'),
-              item(MainPage.tools, Icons.construction_outlined, Icons.construction, '工具'),
+              item(MainPage.home, Icons.rocket_launch_outlined, Icons.rocket_launch),
+              item(MainPage.download, Icons.download_outlined, Icons.download),
+              item(MainPage.tools, Icons.construction_outlined, Icons.construction),
               // 手机上的内置文件管理器（电脑上打开文件夹用系统的资源管理器）
-              if (!isDesktop) item(MainPage.files, Icons.folder_outlined, Icons.folder, '文件'),
-              item(MainPage.settings, Icons.settings_outlined, Icons.settings, '设置'),
+              if (!isDesktop) item(MainPage.files, Icons.folder_outlined, Icons.folder),
+              item(MainPage.settings, Icons.settings_outlined, Icons.settings),
               item(MainPage.ai, Icons.chat_bubble_outline, Icons.chat_bubble, 'AI'),
             ],
           ),
@@ -421,14 +423,15 @@ class _TopBarState extends State<_TopBar> {
     final scheme = theme.colorScheme;
     final state = AppScope.of(context);
     final sub = widget.sub;
+    final l = context.l10n;
     // 启用背景图片时 fg、muted 是统一的黑字或白字，要显式写进字体样式（主题字体自带颜色会盖掉外层的默认颜色）
     Widget title(Color? fg, Color? muted) {
       if (sub != null) {
-        final text = sub == SubPage.instance ? '实例详情' : _subTitles[sub]!;
+        final text = _subTitle(l, sub);
         return Row(
           children: [
             IconButton(
-              tooltip: '返回',
+              tooltip: l.tooltipBack,
               onPressed: widget.onBack,
               icon: Icon(Icons.arrow_back, size: 20, color: fg),
             ),
@@ -447,12 +450,12 @@ class _TopBarState extends State<_TopBar> {
           TextSpan(
             children: [
               TextSpan(
-                text: greeting(state.selectedAccount?.name),
+                text: greeting(l, state.selectedAccount?.name),
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               if (!compact)
                 TextSpan(
-                  text: '  准备好冒险了吗？',
+                  text: '  ${l.greetingAdventure}',
                   style: theme.textTheme.bodySmall?.copyWith(color: muted ?? scheme.onSurfaceVariant),
                 ),
             ],
@@ -463,7 +466,7 @@ class _TopBarState extends State<_TopBar> {
         );
       } else {
         return Text(
-          _mainTitles[widget.page]!,
+          _mainTitle(l, widget.page),
           style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: fg),
         );
       }
@@ -493,13 +496,13 @@ class _TopBarState extends State<_TopBar> {
             ),
             const SizedBox(width: 4),
             IconButton(
-              tooltip: '实例列表',
+              tooltip: l.tooltipInstances,
               onPressed: () => ShellNav.of(context).open(SubPage.versions),
               icon: const Icon(Icons.search, size: 21),
             ),
             if (!tight)
               IconButton(
-                tooltip: '公告',
+                tooltip: l.tooltipNotices,
                 onPressed: () => showNoticesDialog(context),
                 icon: const Icon(Icons.notifications_none_outlined, size: 21),
               ),
@@ -518,18 +521,18 @@ class _TopBarState extends State<_TopBar> {
 }
 
 /// 首页问候语
-String greeting(String? name) {
+String greeting(AppLocalizations l, String? name) {
   final h = DateTime.now().hour;
   final when = h < 5
-      ? '夜深了'
+      ? l.greetingLateNight
       : h < 11
-      ? '早上好'
+      ? l.greetingMorning
       : h < 13
-      ? '中午好'
+      ? l.greetingNoon
       : h < 18
-      ? '下午好'
-      : '晚上好';
-  return name == null ? when : '$when，$name';
+      ? l.greetingAfternoon
+      : l.greetingEvening;
+  return name == null ? when : l.greetingWithName(when, name);
 }
 
 /// 顶栏里统一样式的小块按钮
@@ -579,6 +582,7 @@ class _TasksPill extends StatelessWidget {
     final state = AppScope.of(context);
     final running = state.runningTasks;
     final task = running.firstOrNull;
+    final l = context.l10n;
     // 没有后台任务但游戏在运行时显示运行中的实例数（点击仍进入任务页）
     final games = state.gameState == GameState.running ? 1 : 0;
     return SizedBox(
@@ -597,7 +601,7 @@ class _TasksPill extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      games > 0 ? '$games 个游戏实例运行中' : '当前无后台任务',
+                      games > 0 ? l.tasksGamesRunning(games) : l.tasksIdle,
                       style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   ),
@@ -616,7 +620,7 @@ class _TasksPill extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            running.length > 1 ? '${task.title} · 共 ${running.length} 个任务' : task.title,
+                            running.length > 1 ? l.tasksMore(task.title, running.length) : task.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.labelMedium?.copyWith(color: scheme.onPrimaryContainer),
@@ -653,11 +657,12 @@ class _AccountChip extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final account = AppScope.of(context).selectedAccount;
+    final l = context.l10n;
     final kind = switch (account?.type) {
       null => '',
-      AccountType.microsoft => ' · 正版',
-      AccountType.offline => ' · 离线',
-      _ => ' · ${account!.serverName ?? '外置'}',
+      AccountType.microsoft => ' · ${l.accountMicrosoft}',
+      AccountType.offline => ' · ${l.accountOffline}',
+      _ => ' · ${account!.serverName ?? l.accountExternal}',
     };
     final chip = _BarChip(
       onTap: () => showAccountsDialog(context),
@@ -683,7 +688,7 @@ class _AccountChip extends StatelessWidget {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 140),
               child: Text(
-                account == null ? '添加账户' : '${account.name}$kind',
+                account == null ? l.accountAdd : '${account.name}$kind',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelMedium,
@@ -692,6 +697,6 @@ class _AccountChip extends StatelessWidget {
         ],
       ),
     );
-    return Tooltip(message: account == null ? '添加账户' : '${account.name}$kind', child: chip);
+    return Tooltip(message: account == null ? l.accountAdd : '${account.name}$kind', child: chip);
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/network_check.dart';
+import '../l10n/l10n.dart';
 
 /// 网络检测：同时测各项服务，一行一项显示结果，最后说明「自动选择」会用哪个下载源。
 /// 用于首次设置和「设置 → 下载」
@@ -67,7 +68,9 @@ class _NetworkCheckPanelState extends State<NetworkCheckPanel> {
             title: Text(t.name),
             subtitle: Text(t.purpose),
             trailing: Text(
-              _results[t.id] == null ? (_running ? '检测中…' : '') : describeNet(_results[t.id]!),
+              _results[t.id] == null
+                  ? (_running ? context.l10n.networkCheckPanelChecking : '')
+                  : describeNet(_results[t.id]!),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: _results[t.id]?.ok == false ? scheme.error : scheme.onSurfaceVariant,
               ),
@@ -80,21 +83,26 @@ class _NetworkCheckPanelState extends State<NetworkCheckPanel> {
               Expanded(
                 child: Text(
                   _running || official == null || mirror == null
-                      ? '正在检测，最多 8 秒'
+                      ? context.l10n.networkCheckPanelCheckingUp8Seconds
                       : [
                           if (!official.ok && !mirror.ok)
-                            '两个下载源都连不上，请检查网络或代理设置'
+                            context.l10n.networkCheckPanelNeitherDownloadSourceCan
                           else
-                            '「自动选择」会优先使用${DownloadSourcePicker.decide(official, mirror) ? ' BMCLAPI 镜像' : '官方源'}，失败时自动换另一个',
-                          if (failed > 0 && (official.ok || mirror.ok)) '有 $failed 项连接失败，相关功能可能用不了',
-                        ].join('；'),
+                            context.l10n.networkCheckPanelAutomaticWillPreferSwitch(
+                              DownloadSourcePicker.decide(official, mirror)
+                                  ? context.l10n.networkCheckPanelBMCLAPIMirror
+                                  : context.l10n.downloadSourceOfficial,
+                            ),
+                          if (failed > 0 && (official.ok || mirror.ok))
+                            context.l10n.networkCheckPanelOtherConnectionsFailedRelated(failed),
+                        ].join(context.l10n.commonClauseSeparator),
                   style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                 ),
               ),
               TextButton.icon(
                 onPressed: _running ? null : _run,
                 icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('重新检测'),
+                label: Text(context.l10n.networkCheckPanelCheckAgain),
               ),
             ],
           ),
@@ -103,12 +111,12 @@ class _NetworkCheckPanelState extends State<NetworkCheckPanel> {
     );
   }
 
-  static const _short = {
-    'official': '官方源',
+  static Map<String, String> _short(AppLocalizations l) => {
+    'official': l.downloadSourceOfficial,
     'bmclapi': 'BMCLAPI',
-    'microsoft': '微软登录',
+    'microsoft': l.commonSignMicrosoft,
     'modrinth': 'Modrinth',
-    'update': '启动器更新',
+    'update': l.networkCheckPanelLauncherUpdates,
   };
 
   Widget _compact(ThemeData theme, int failed) {
@@ -121,15 +129,15 @@ class _NetworkCheckPanelState extends State<NetworkCheckPanel> {
       children: [
         Row(
           children: [
-            Text('网络检测', style: small.copyWith(color: scheme.onSurfaceVariant)),
+            Text(context.l10n.networkCheck, style: small.copyWith(color: scheme.onSurfaceVariant)),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 !done
-                    ? '检测中，最多 8 秒'
+                    ? context.l10n.networkCheckPanelCheckingUp8Seconds2
                     : failed == 0
-                    ? '全部正常'
-                    : '有 $failed 项连接失败，相关功能可能用不了',
+                    ? context.l10n.networkCheckPanelAllGood
+                    : context.l10n.networkCheckPanelOtherConnectionsFailedRelated(failed),
                 overflow: TextOverflow.ellipsis,
                 style: small.copyWith(color: failed > 0 && done ? scheme.error : scheme.outline),
               ),
@@ -138,7 +146,7 @@ class _NetworkCheckPanelState extends State<NetworkCheckPanel> {
               onPressed: _running ? null : _run,
               style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('重新检测'),
+              label: Text(context.l10n.networkCheckPanelCheckAgain),
             ),
           ],
         ),
@@ -164,9 +172,9 @@ class _NetworkCheckPanelState extends State<NetworkCheckPanel> {
     final scheme = theme.colorScheme;
     final small = theme.textTheme.bodySmall!;
     final value = r == null
-        ? (_running ? '检测中…' : '')
+        ? (_running ? context.l10n.networkCheckPanelChecking : '')
         : !r.ok
-        ? '连接失败'
+        ? context.l10n.networkCheckPanelConnectionFailed
         : wide
         ? describeNet(r)
         : describeNet(r).replaceFirst(' · ', '\n');
@@ -189,7 +197,7 @@ class _NetworkCheckPanelState extends State<NetworkCheckPanel> {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  wide ? t.name : _short[t.id] ?? t.name,
+                  wide ? t.name : _short(context.l10n)[t.id] ?? t.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: small.copyWith(fontWeight: FontWeight.w600, color: scheme.onSurface),
@@ -229,9 +237,9 @@ class _NetworkCheckPanelState extends State<NetworkCheckPanel> {
 Future<void> showNetworkCheck(BuildContext context) => showDialog<void>(
   context: context,
   builder: (context) => AlertDialog(
-    title: const Text('网络检测'),
+    title: Text(context.l10n.networkCheck),
     contentPadding: const EdgeInsets.fromLTRB(8, 16, 8, 0),
     content: const SizedBox(width: 520, child: SingleChildScrollView(child: NetworkCheckPanel())),
-    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('关闭'))],
+    actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.windowClose))],
   ),
 );

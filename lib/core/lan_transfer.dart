@@ -19,6 +19,7 @@ import 'backup.dart';
 import 'instance_config.dart';
 import 'paths.dart';
 import 'safe_path.dart';
+import 'i18n/strings.dart';
 
 const transferManifestName = 'pclpw-transfer.json';
 const transferPath = '/pclpw/transfer';
@@ -31,14 +32,14 @@ const transferMaxBytes = 32 * 1024 * 1024 * 1024;
 const transferMaxFailures = 3;
 
 /// 可以单独传输的运行目录内容（名称 → 显示文字）
-const transferItems = {
-  'mods': '模组',
-  'config': '模组配置',
-  'saves': '存档',
-  'resourcepacks': '资源包',
-  'shaderpacks': '光影包',
-  'options.txt': '游戏设置',
-  'screenshots': '截图',
+Map<String, String> get transferItems => {
+  'mods': tr.homeMods,
+  'config': tr.lanTransferModConfigs,
+  'saves': tr.instanceWorlds,
+  'resourcepacks': tr.commonResourcePacks,
+  'shaderpacks': tr.modrinthShaderPacks,
+  'options.txt': tr.lanTransferGameOptions,
+  'screenshots': tr.instanceScreenshots,
 };
 
 /// 打包整个版本时跳过的内容：日志、崩溃报告、解压出的本地库，接收方用不到
@@ -107,31 +108,37 @@ class TransferManifest {
   };
 
   static TransferManifest parse(Map<String, dynamic> j) {
-    if (j['format'] != 2) throw TransferException('不支持的传输格式，请把两边的启动器更新到同一版本');
+    if (j['format'] != 2) throw TransferException(tr.lanTransferUnsupportedTransferFormatUpdate);
     final version = j['version'];
     final items = j['items'];
     final files = j['files'];
-    if (version is! String || items is! List || files is! Map) throw TransferException('传输清单无效');
+    if (version is! String || items is! List || files is! Map) {
+      throw TransferException(tr.lanTransferInvalidTransferManifest);
+    }
     splitRelative(version); // 版本名只能是一级合法的文件夹名
-    if (version.contains('/') || version.contains('\\')) throw TransferException('实例名无效：$version');
+    if (version.contains('/') || version.contains('\\')) {
+      throw TransferException(tr.lanTransferInvalidInstanceName(version));
+    }
     final parents = (j['parents'] as List? ?? const []).whereType<String>().toList();
     for (final id in parents) {
-      if (splitRelative(id).length != 1 || id == version) throw TransferException('依赖版本名无效：$id');
+      if (splitRelative(id).length != 1 || id == version) {
+        throw TransferException(tr.lanTransferInvalidDependencyVersionName(id));
+      }
     }
     final names = items.whereType<String>().toList();
     if (names.length != items.length || names.any((n) => !transferItems.containsKey(n))) {
-      throw TransferException('传输清单中有不支持的内容');
+      throw TransferException(tr.lanTransferTransferManifestContainsUnsupported);
     }
     final sizes = <String, int>{};
     for (final e in files.entries) {
       final v = e.value;
-      if (e.key is! String || v is! int || v < 0) throw TransferException('传输清单无效');
+      if (e.key is! String || v is! int || v < 0) throw TransferException(tr.lanTransferInvalidTransferManifest);
       sizes[e.key as String] = v;
     }
     return TransferManifest(
       wholeVersion: j['wholeVersion'] == true,
       version: version,
-      from: (j['from'] as String?) ?? '未知设备',
+      from: (j['from'] as String?) ?? tr.lanTransferUnknownDevice,
       items: names,
       files: sizes,
       parents: parents,
@@ -165,7 +172,7 @@ Future<File> packTransfer({
   void Function(int files)? onFile,
 }) async {
   final isolated = p.equals(versionDir, gameDir);
-  if (!wholeVersion && items.isEmpty) throw TransferException('请至少选择一项内容');
+  if (!wholeVersion && items.isEmpty) throw TransferException(tr.lanTransferChooseAtLeastOne);
   final out = Paths.tempFile('transfer.zip');
   final sizes = <String, int>{};
   final included = <String>[];
@@ -221,7 +228,7 @@ Future<File> packTransfer({
         await addTree(gameDir, item, 'game/');
       }
     }
-    if (sizes.isEmpty) throw TransferException('选中的内容都不存在');
+    if (sizes.isEmpty) throw TransferException(tr.lanTransferNoneSelectedItemsExist);
     final manifest = TransferManifest(
       wholeVersion: wholeVersion,
       version: version,
@@ -258,12 +265,12 @@ TransferManifest checkTransfer(String zip) {
   try {
     final archive = ZipDecoder().decodeStream(input);
     final m = archive.findFile(transferManifestName);
-    if (m == null) throw TransferException('收到的文件不是 Pixel World 的传输包');
+    if (m == null) throw TransferException(tr.lanTransferReceivedFileIsntPixel);
     final Map<String, dynamic> json;
     try {
       json = jsonDecode(utf8.decode(m.readBytes() ?? const [])) as Map<String, dynamic>;
     } catch (_) {
-      throw TransferException('传输清单无法读取');
+      throw TransferException(tr.lanTransferTransferManifestCantRead);
     }
     final manifest = TransferManifest.parse(json);
     final seen = <String>{};
@@ -272,7 +279,7 @@ TransferManifest checkTransfer(String zip) {
       _checkEntry(manifest, f);
       seen.add(f.name);
     }
-    if (seen.length != manifest.files.length) throw TransferException('传输包缺少文件，可能没有传输完整');
+    if (seen.length != manifest.files.length) throw TransferException(tr.lanTransferTransferPackageMissingFiles);
     return manifest;
   } finally {
     input.closeSync();
@@ -281,27 +288,31 @@ TransferManifest checkTransfer(String zip) {
 
 /// 返回条目解压后的相对路径：整个版本时相对 versions 文件夹，部分内容时相对运行目录
 String _checkEntry(TransferManifest m, ArchiveFile f) {
-  if (f.isSymbolicLink) throw TransferException('传输包中有符号链接：${f.name}');
+  if (f.isSymbolicLink) throw TransferException(tr.lanTransferTransferPackageContainsSymbolic(f.name));
   final want = m.files[f.name];
-  if (want == null) throw TransferException('传输包中有清单以外的文件：${f.name}');
-  if (f.size > want) throw TransferException('文件大小与清单不符：${f.name}');
+  if (want == null) throw TransferException(tr.lanTransferTransferPackageContainsFile(f.name));
+  if (f.size > want) throw TransferException(tr.lanTransferFileSizeDoesntMatch(f.name));
   final String rel;
   if (f.name.startsWith('version/')) {
-    if (!m.wholeVersion) throw TransferException('传输包无效：${f.name}');
+    if (!m.wholeVersion) throw TransferException(tr.lanTransferInvalidTransferPackage(f.name));
     rel = '${m.version}/${splitRelative(f.name.substring('version/'.length)).join('/')}';
   } else if (f.name.startsWith('parent/')) {
     final parts = splitRelative(f.name.substring('parent/'.length));
     if (!m.wholeVersion || parts.length != 2 || !m.parents.contains(parts[0])) {
-      throw TransferException('传输包无效：${f.name}');
+      throw TransferException(tr.lanTransferInvalidTransferPackage(f.name));
     }
-    if (parts[1] != '${parts[0]}.json' && parts[1] != '${parts[0]}.jar') throw TransferException('传输包无效：${f.name}');
+    if (parts[1] != '${parts[0]}.json' && parts[1] != '${parts[0]}.jar') {
+      throw TransferException(tr.lanTransferInvalidTransferPackage(f.name));
+    }
     rel = parts.join('/');
   } else if (f.name.startsWith('game/')) {
     final r = splitRelative(f.name.substring('game/'.length)).join('/');
-    if (!m.items.contains(r.split('/').first)) throw TransferException('传输包中有清单以外的文件：${f.name}');
+    if (!m.items.contains(r.split('/').first)) {
+      throw TransferException(tr.lanTransferTransferPackageContainsFile(f.name));
+    }
     rel = m.wholeVersion ? '${m.version}/$r' : r;
   } else {
-    throw TransferException('传输包无效：${f.name}');
+    throw TransferException(tr.lanTransferInvalidTransferPackage(f.name));
   }
   return rel;
 }
@@ -314,7 +325,7 @@ Future<void> _extract(
   void Function(int total, int done)? onProgress,
 ) async {
   if (FileSystemEntity.typeSync(staging, followLinks: false) != FileSystemEntityType.notFound) {
-    throw TransferException('临时文件夹已存在：$staging');
+    throw TransferException(tr.commonTemporaryFolderAlreadyExists(staging));
   }
   await Directory(staging).create(recursive: true);
   final input = InputFileStream(zip);
@@ -326,7 +337,7 @@ Future<void> _extract(
       if (f.name == transferManifestName || !f.isFile) continue;
       final rel = _checkEntry(m, f);
       final abs = resolveInside(staging, rel);
-      if (File(abs).existsSync()) throw TransferException('传输包中有重复的文件：$rel');
+      if (File(abs).existsSync()) throw TransferException(tr.lanTransferTransferPackageContainsDuplicate(rel));
       await Directory(p.dirname(abs)).create(recursive: true);
       final out = OutputFileStream(abs);
       try {
@@ -334,7 +345,7 @@ Future<void> _extract(
       } finally {
         await out.close();
       }
-      if (File(abs).lengthSync() != m.files[f.name]) throw TransferException('文件大小与清单不符：$rel');
+      if (File(abs).lengthSync() != m.files[f.name]) throw TransferException(tr.lanTransferFileSizeDoesntMatch2(rel));
       done += m.files[f.name]!;
       onProgress?.call(total, done);
       // 让界面有机会刷新进度
@@ -359,18 +370,18 @@ Future<String> importTransferVersion(
   String gameRoot, {
   void Function(int total, int done)? onProgress,
 }) async {
-  if (!m.wholeVersion) throw TransferException('这个传输包不是整个实例');
+  if (!m.wholeVersion) throw TransferException(tr.lanTransferTransferPackageIsntWhole);
   final id = m.version;
   final versions = p.join(gameRoot, 'versions');
   final dest = p.join(versions, id);
   if (FileSystemEntity.typeSync(dest, followLinks: false) != FileSystemEntityType.notFound) {
-    throw TransferException('已经有名为「$id」的实例，请先在实例设置里重命名或删除它');
+    throw TransferException(tr.lanTransferInstanceNamedAlreadyExists(id));
   }
   final staging = p.join(versions, '.pclpw-import-${_stamp()}');
   try {
     await _extract(zip, m, staging, onProgress);
     final main = p.join(staging, id);
-    if (!File(p.join(main, '$id.json')).existsSync()) throw TransferException('传输包中没有版本文件 $id.json');
+    if (!File(p.join(main, '$id.json')).existsSync()) throw TransferException(tr.lanTransferTransferPackageHasNo(id));
     for (final parent in m.parents) {
       final to = p.join(versions, parent);
       if (FileSystemEntity.typeSync(to, followLinks: false) != FileSystemEntityType.notFound) continue;
@@ -394,7 +405,7 @@ Future<String?> importTransferFiles(
   required String backupDir,
   void Function(int total, int done)? onProgress,
 }) async {
-  if (m.wholeVersion) throw TransferException('这个传输包是整个实例，请导入为新实例');
+  if (m.wholeVersion) throw TransferException(tr.lanTransferTransferPackageWholeInstance);
   final staging = p.join(gameDir, '.pclpw-import-${_stamp()}');
   String? backup;
   try {
@@ -531,8 +542,8 @@ class TransferServer {
     if (_sameCode(given, code)) return true;
     _failures++;
     final left = transferMaxFailures - _failures;
-    final msg = left > 0 ? '配对码不正确，还可以再试 $left 次' : '配对码错误次数太多，对方已停止接收';
-    if (left <= 0) onStopped('配对码错误次数太多，已停止接收。需要时重新开始接收，会生成新的配对码。');
+    final msg = left > 0 ? tr.lanTransferWrongPairingCodeAttempts(left) : tr.lanTransferTooManyWrongPairing;
+    if (left <= 0) onStopped(tr.lanTransferTooManyWrongPairing2);
     await _reply(req, 403, msg);
     if (left <= 0) unawaited(close());
     return false;
@@ -546,10 +557,10 @@ class TransferServer {
     }
     if (req.uri.path != transferPath || req.method != 'POST') return _reply(req, 404, '');
     if (!await _auth(req)) return;
-    if (_busy) return _reply(req, 409, '对方正在接收另一个传输，请稍后再试');
+    if (_busy) return _reply(req, 409, tr.lanTransferOtherDeviceReceivingAnother);
     final total = req.contentLength;
-    if (total <= 0) return _reply(req, 411, '缺少文件大小');
-    if (total > transferMaxBytes) return _reply(req, 413, '文件太大，单次最多 32 GB');
+    if (total <= 0) return _reply(req, 411, tr.lanTransferMissingFileSize);
+    if (total > transferMaxBytes) return _reply(req, 413, tr.lanTransferFileTooLargeAt);
     _busy = true;
     final file = Paths.tempFile('received.zip');
     var ok = false;
@@ -559,24 +570,24 @@ class TransferServer {
       try {
         await for (final chunk in req) {
           got += chunk.length;
-          if (got > total) throw TransferException('收到的数据比声明的多');
+          if (got > total) throw TransferException(tr.lanTransferReceivedMoreDataThan);
           sink.add(chunk);
           if (!progress.isClosed) progress.add((total, got));
         }
       } finally {
         await sink.close();
       }
-      if (got != total) throw TransferException('传输中断，只收到 $got / $total 字节');
+      if (got != total) throw TransferException(tr.lanTransferTransferInterruptedOnlyBytes(got, total));
       final manifest = await Future(() => checkTransfer(file.path));
       ok = true;
       onReceived(ReceivedTransfer(file, manifest, addr));
-      await _reply(req, 200, '对方已收到，等待对方确认导入');
+      await _reply(req, 200, tr.lanTransferReceivedOtherDeviceWaiting);
     } on TransferException catch (e) {
       await _reply(req, 400, e.message);
     } on UnsafePathException catch (e) {
       await _reply(req, 400, e.message);
     } catch (e) {
-      await _reply(req, 400, '接收失败：$e');
+      await _reply(req, 400, tr.lanTransferReceivingFailed(e));
     } finally {
       _busy = false;
       if (!ok && file.existsSync()) file.deleteSync();
@@ -590,7 +601,7 @@ Uri parseTransferAddress(String input) {
   final m = RegExp(r'^([0-9.]+):(\d{1,5})$').firstMatch(s);
   final ip = m == null ? null : InternetAddress.tryParse(m.group(1)!);
   final port = m == null ? 0 : int.parse(m.group(2)!);
-  if (ip == null || port <= 0 || port > 65535) throw TransferException('地址格式应为「IP:端口」，例如 192.168.1.5:43567');
+  if (ip == null || port <= 0 || port > 65535) throw TransferException(tr.lanTransferAddressShouldIPPort);
   return Uri(scheme: 'http', host: ip.address, port: port);
 }
 
@@ -606,10 +617,12 @@ Future<String> transferHello(Uri base, String code) async {
     req.headers.set('x-pclpw-code', code.trim());
     final res = await req.close();
     final body = await res.transform(utf8.decoder).join();
-    if (res.statusCode != 200) throw TransferException(body.isEmpty ? '连接失败（${res.statusCode}）' : body);
-    return (jsonDecode(body) as Map<String, dynamic>)['name'] as String? ?? '对方设备';
+    if (res.statusCode != 200) {
+      throw TransferException(body.isEmpty ? tr.lanTransferConnectionFailed(res.statusCode) : body);
+    }
+    return (jsonDecode(body) as Map<String, dynamic>)['name'] as String? ?? tr.lanTransferOtherDevice;
   } on SocketException {
-    throw TransferException('连不上 ${base.host}:${base.port}。请确认两台设备在同一个局域网，对方正在接收，且防火墙允许 Pixel World 联网');
+    throw TransferException(tr.lanTransferCantReachMakeSure(base.host, base.port));
   } finally {
     client.close(force: true);
   }
@@ -634,12 +647,14 @@ Future<String> transferSend(Uri base, String code, File zip, {void Function(int 
     );
     final res = await req.close();
     final body = await res.transform(utf8.decoder).join();
-    if (res.statusCode != 200) throw TransferException(body.isEmpty ? '发送失败（${res.statusCode}）' : body);
+    if (res.statusCode != 200) {
+      throw TransferException(body.isEmpty ? tr.lanTransferSendingFailed2(res.statusCode) : body);
+    }
     return body;
   } on SocketException catch (e) {
-    throw TransferException('传输中断：${e.message}');
+    throw TransferException(tr.lanTransferTransferInterrupted(e.message));
   } on HttpException catch (e) {
-    throw TransferException('传输中断：${e.message}');
+    throw TransferException(tr.lanTransferTransferInterrupted(e.message));
   } finally {
     client.close(force: true);
   }

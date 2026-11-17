@@ -13,6 +13,7 @@ import 'ai_tools.dart';
 import 'mcp_hub.dart';
 import '../paths.dart';
 import '../safe_write.dart';
+import '../i18n/strings.dart';
 
 /// 工具调用的结果状态
 enum ToolStatus { done, denied, error, cancelled }
@@ -286,7 +287,7 @@ class ChatStore extends ChangeNotifier {
         if (e is AiText) out.write(e.text);
       }
       final summary = out.toString().trim();
-      if (summary.isEmpty) throw AiException('模型没有返回摘要');
+      if (summary.isEmpty) throw AiException(tr.aiChatModelReturnedNoSummary);
       s
         ..summary = summary
         ..summaryUntil = cut
@@ -294,7 +295,7 @@ class ChatStore extends ChangeNotifier {
       await _save(s);
       return true;
     } catch (e) {
-      _errors[s.id] = '压缩上下文失败：$e';
+      _errors[s.id] = tr.aiChatCouldntCompactContext(e);
       return false;
     } finally {
       _compacting.remove(s.id);
@@ -326,7 +327,7 @@ class ChatStore extends ChangeNotifier {
   /// 第一条消息的第一行作为标题
   static String titleFrom(String text) {
     final line = text.trim().split('\n').first.trim();
-    return line.length > 30 ? '${line.substring(0, 30)}…' : (line.isEmpty ? '新对话' : line);
+    return line.length > 30 ? '${line.substring(0, 30)}…' : (line.isEmpty ? tr.aiNewChat : line);
   }
 
   /// 发送消息；session 为 null 时新建会话。返回消息所在的会话
@@ -483,7 +484,7 @@ class ChatStore extends ChangeNotifier {
           notifyListeners();
         }
       }
-      _errors[s.id] = '这一轮的操作次数过多，已暂停。可以发送消息让 AI 继续';
+      _errors[s.id] = tr.aiChatTooManyActionsRound;
     } catch (e) {
       if (!stopped()) _errors[s.id] = '$e';
     } finally {
@@ -492,7 +493,9 @@ class ChatStore extends ChangeNotifier {
         // 失败时保留已生成的文字
         final partial = _streaming.remove(s.id) ?? '';
         if (partial.isNotEmpty) {
-          s.messages.add(ChatMessage('assistant', _errors.containsKey(s.id) ? '$partial\n\n（回答中断）' : partial));
+          s.messages.add(
+            ChatMessage('assistant', _errors.containsKey(s.id) ? tr.aiChatAnswerInterrupted(partial) : partial),
+          );
         }
         s.updated = DateTime.now();
         unawaited(_save(s));
@@ -521,7 +524,7 @@ class ChatStore extends ChangeNotifier {
         );
     var cancelled = false;
     try {
-      if (h == null) return result(ToolStatus.error, '没有可用的工具');
+      if (h == null) return result(ToolStatus.error, tr.aiChatNoToolsAvailable);
       // 所有工具（内置服务与外部 MCP 服务）都经 McpHub 调用；服务的权限（只读时直接拒绝）也在那里处理，
       // 这里只负责向用户确认
       final out = await h.call(
@@ -581,7 +584,7 @@ class ChatStore extends ChangeNotifier {
     _gen[s.id] = (_gen[s.id] ?? 0) + 1;
     _busy.remove(s.id);
     final partial = _streaming.remove(s.id) ?? '';
-    if (partial.isNotEmpty) s.messages.add(ChatMessage('assistant', '$partial\n\n（已停止）'));
+    if (partial.isNotEmpty) s.messages.add(ChatMessage('assistant', tr.aiChatStopped(partial)));
     // 等待确认的操作视为取消（发送下一条消息时会补上「已取消」的结果）
     for (final m in _pending.values.toList()) {
       if (m.waiting) m._decision!.complete(false);

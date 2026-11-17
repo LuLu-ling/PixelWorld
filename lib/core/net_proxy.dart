@@ -96,9 +96,9 @@ class SystemProxy {
   final http = pick('HTTP');
   final https = pick('HTTPS');
   if (http == null && https == null) return null;
-  final bypass = RegExp(r'^\s*\d+\s*:\s*(\S+)$', multiLine: true)
-      .allMatches(out.split('ExceptionsList').skip(1).join().split('}').first)
-      .map((m) => m.group(1)!)
-      .toList();
+  final bypass = RegExp(
+    r'^\s*\d+\s*:\s*(\S+)$',
+    multiLine: true,
+  ).allMatches(out.split('ExceptionsList').skip(1).join().split('}').first).map((m) => m.group(1)!).toList();
   return (http: http, https: https, bypass: bypass);
 }

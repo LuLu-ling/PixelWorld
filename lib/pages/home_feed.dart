@@ -9,6 +9,7 @@ import '../core/news.dart';
 import '../core/site_api.dart';
 import '../core/updater.dart';
 import '../widgets/app_background.dart';
+import '../l10n/l10n.dart';
 
 /// 首页提示：正在使用的版本与免费声明（参照 PCL-CE 首页的提示）
 class HomeHints extends StatelessWidget {
@@ -25,16 +26,14 @@ class HomeHints extends StatelessWidget {
       children: [
         _Hint(
           icon: Icons.info_outline,
-          text:
-              '你正在使用 ${AppInfo.name} ${AppInfo.version} 测试版。这是第三方 Minecraft 启动器，'
-              '功能还在完善中，遇到问题请到 GitHub 反馈。',
-          action: ('反馈问题', '${AppInfo.repoUrl}/issues'),
+          text: context.l10n.homeFeedYoureUsingBetaThird(AppInfo.name, AppInfo.version),
+          action: (context.l10n.homeFeedReportProblem, '${AppInfo.repoUrl}/issues'),
         ),
         const SizedBox(height: 8),
         _Hint(
           icon: Icons.volunteer_activism_outlined,
-          text: '本软件完全免费、开源。如果你是付费购买或下载的，那么你可能被骗了，请向卖家申请退款，并从 GitHub 获取正版。',
-          action: ('获取正版', '${AppInfo.repoUrl}/releases'),
+          text: context.l10n.homeFeedSoftwareCompletelyFreeOpen,
+          action: (context.l10n.homeFeedGetGenuineVersion, '${AppInfo.repoUrl}/releases'),
           warning: true,
         ),
       ],
@@ -81,15 +80,15 @@ class _CompactHints extends StatelessWidget {
                 Expanded(
                   child: Text(
                     [
-                      if (showBeta) '${AppInfo.name} ${AppInfo.version} 测试版，功能还在完善中，遇到问题请到 GitHub 反馈。',
-                      '本软件完全免费、开源。如果你是付费获得的，请向卖家申请退款，并从 GitHub 获取正版。',
+                      if (showBeta) context.l10n.homeFeedBetaThatsStillBeing(AppInfo.name, AppInfo.version),
+                      context.l10n.homeFeedSoftwareCompletelyFreeOpen2,
                     ].join('\n'),
                     style: style,
                   ),
                 ),
                 if (showBeta)
                   IconButton(
-                    tooltip: '关闭测试版提示（免费声明会保留）',
+                    tooltip: context.l10n.homeFeedHideBetaNoticeFree,
                     onPressed: () => cfg.update({'dismissedBetaHint': AppInfo.version}),
                     visualDensity: VisualDensity.compact,
                     iconSize: 16,
@@ -100,8 +99,8 @@ class _CompactHints extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (showBeta) link('反馈问题', '${AppInfo.repoUrl}/issues'),
-                link('获取正版', '${AppInfo.repoUrl}/releases'),
+                if (showBeta) link(context.l10n.homeFeedReportProblem, '${AppInfo.repoUrl}/issues'),
+                link(context.l10n.homeFeedGetGenuineVersion, '${AppInfo.repoUrl}/releases'),
               ],
             ),
           ],
@@ -195,7 +194,10 @@ class _ChangelogHintState extends State<ChangelogHint> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '更新日志 · v$version${AppInfo.channel == 'nightly' ? '（Nightly）' : ''}',
+                              context.l10n.homeFeedChangelogV(
+                                version,
+                                AppInfo.channel == 'nightly' ? context.l10n.commonParenthesized('Nightly') : '',
+                              ),
                               style: theme.textTheme.titleSmall?.copyWith(color: fg, fontWeight: FontWeight.bold),
                             ),
                             if (!_expanded && summary.isNotEmpty)
@@ -210,10 +212,10 @@ class _ChangelogHintState extends State<ChangelogHint> {
                       ),
                       TextButton(
                         onPressed: () => setState(() => _expanded = !_expanded),
-                        child: Text(_expanded ? '收起' : '展开'),
+                        child: Text(_expanded ? context.l10n.homeFeedCollapse : context.l10n.homeFeedExpand),
                       ),
                       IconButton(
-                        tooltip: '关闭',
+                        tooltip: context.l10n.windowClose,
                         onPressed: () => cfg.update({'dismissedChangelog': version}),
                         icon: Icon(Icons.close, size: 20, color: fg),
                       ),
@@ -254,7 +256,7 @@ class _ChangelogHintState extends State<ChangelogHint> {
 Future<void> showNoticesDialog(BuildContext context) => showDialog<void>(
   context: context,
   builder: (ctx) => AlertDialog(
-    title: const Text('公告'),
+    title: Text(context.l10n.tooltipNotices),
     content: const SizedBox(
       width: 560,
       child: SingleChildScrollView(
@@ -265,7 +267,7 @@ Future<void> showNoticesDialog(BuildContext context) => showDialog<void>(
         ),
       ),
     ),
-    actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('关闭'))],
+    actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.windowClose))],
   ),
 );
 
@@ -308,7 +310,9 @@ class _HomeNoticesState extends State<HomeNotices> {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Text(
-              snap.connectionState == ConnectionState.waiting ? '正在获取公告…' : '暂无公告',
+              snap.connectionState == ConnectionState.waiting
+                  ? context.l10n.homeFeedLoadingAnnouncements
+                  : context.l10n.commonNoAnnouncements,
               style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
@@ -401,11 +405,11 @@ class _NoticeCard extends StatelessWidget {
             if (url != null)
               TextButton(
                 onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
-                child: Text(notice.urlText ?? '查看详情'),
+                child: Text(notice.urlText ?? context.l10n.homeFeedViewDetails),
               ),
             if (notice.dismissible)
               IconButton(
-                tooltip: '关闭',
+                tooltip: context.l10n.windowClose,
                 onPressed: onDismiss,
                 icon: Icon(Icons.close, size: 20, color: fg),
               ),
@@ -444,15 +448,18 @@ class _VersionNewsFeedState extends State<VersionNewsFeed> {
                 child: OnBackground(
                   builder: (context, fg, muted) => Row(
                     children: [
-                      Text('Minecraft 版本动态', style: theme.textTheme.titleMedium?.copyWith(color: fg)),
+                      Text(
+                        context.l10n.homeFeedMinecraftVersionNews,
+                        style: theme.textTheme.titleMedium?.copyWith(color: fg),
+                      ),
                       const SizedBox(width: 8),
                       Text(
-                        '来自 Minecraft Wiki',
+                        context.l10n.homeFeedFromMinecraftWiki,
                         style: theme.textTheme.labelSmall?.copyWith(color: muted ?? scheme.onSurfaceVariant),
                       ),
                       const Spacer(),
                       IconButton(
-                        tooltip: '刷新',
+                        tooltip: context.l10n.fileViewerRefresh,
                         onPressed: () => setState(() => _future = loadVersionNews(AppScope.read(context).downloader)),
                         icon: Icon(Icons.refresh, size: 20, color: fg),
                       ),
@@ -470,8 +477,10 @@ class _VersionNewsFeedState extends State<VersionNewsFeed> {
               return Padding(
                 padding: const EdgeInsets.all(16),
                 child: OnBackground(
-                  builder: (context, _, muted) =>
-                      Text('加载失败：${errorText(snap.error!)}', style: TextStyle(color: muted ?? scheme.onSurfaceVariant)),
+                  builder: (context, _, muted) => Text(
+                    context.l10n.homeFeedCouldntLoad(errorText(snap.error!)),
+                    style: TextStyle(color: muted ?? scheme.onSurfaceVariant),
+                  ),
                 ),
               );
             }
@@ -536,7 +545,7 @@ class _NewsCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              release ? '正式版' : '快照',
+                              release ? context.l10n.updateChannelStable : context.l10n.homeFeedSnapshot,
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: release ? scheme.onPrimaryContainer : scheme.onSecondaryContainer,
                               ),
@@ -554,7 +563,7 @@ class _NewsCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        news.summary.isEmpty ? 'Minecraft Wiki 还没有这个版本的介绍，点击查看页面。' : news.summary,
+                        news.summary.isEmpty ? context.l10n.homeFeedMinecraftWikiDoesntHave : news.summary,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),

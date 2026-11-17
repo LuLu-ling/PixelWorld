@@ -9,16 +9,17 @@ import '../config.dart';
 import '../paths.dart';
 import '../secure.dart';
 import '../safe_write.dart';
+import '../i18n/strings.dart';
 
 /// 接口格式：OpenAI 兼容（DeepSeek、通义千问、Kimi、OpenRouter、Ollama 等）或 Anthropic
 enum AiProvider { openai, anthropic }
 
 /// 常用服务的预设：接口地址与推荐的模型（2026-11 按各家文档核对）。
 /// 模型更新很快，设置页可以从接口获取最新的模型列表
-const aiPresets = [
+List<({String label, AiProvider provider, String url, String model})> get aiPresets => [
   (label: 'DeepSeek', provider: AiProvider.openai, url: 'https://api.deepseek.com/v1', model: 'deepseek-flash'),
   (
-    label: '通义千问',
+    label: tr.aiClientQwen,
     provider: AiProvider.openai,
     url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     model: 'qwen3.8-flash',
@@ -27,7 +28,7 @@ const aiPresets = [
   (label: 'OpenRouter', provider: AiProvider.openai, url: 'https://openrouter.ai/api/v1', model: ''),
   (label: 'OpenAI', provider: AiProvider.openai, url: 'https://api.openai.com/v1', model: ''),
   (label: 'Claude', provider: AiProvider.anthropic, url: 'https://api.anthropic.com', model: 'claude-opus-5-5'),
-  (label: 'Ollama（本机）', provider: AiProvider.openai, url: 'http://localhost:11434/v1', model: ''),
+  (label: tr.aiClientOllamaLocal, provider: AiProvider.openai, url: 'http://localhost:11434/v1', model: ''),
 ];
 
 class AiSettings {
@@ -165,7 +166,7 @@ final _nonChat = RegExp(
 /// 从接口获取可用的模型：OpenAI 兼容接口为 GET /models，Anthropic 为 GET /v1/models（新的在前）
 Future<List<String>> aiListModels(AiSettings s) async {
   final base = s.baseUrl.trim().replaceFirst(RegExp(r'/+$'), '');
-  if (base.isEmpty) throw AiException('请先填写接口地址');
+  if (base.isEmpty) throw AiException(tr.aiClientEnterAPIAddressFirst);
   final anthropic = s.provider == AiProvider.anthropic;
   final url = Uri.parse(anthropic ? '${base.endsWith('/v1') ? base : '$base/v1'}/models?limit=1000' : '$base/models');
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
@@ -179,7 +180,9 @@ Future<List<String>> aiListModels(AiSettings s) async {
     }
     final res = await req.close().timeout(const Duration(seconds: 20));
     final body = await res.transform(utf8.decoder).join();
-    if (res.statusCode != 200) throw AiException('获取模型列表失败：${_describeError(res.statusCode, body, s)}');
+    if (res.statusCode != 200) {
+      throw AiException(tr.aiClientCouldntGetModelList(_describeError(res.statusCode, body, s)));
+    }
     final data = (jsonDecode(body) as Map)['data'] as List? ?? const [];
     final models = data.whereType<Map>().where((m) => m['id'] != null).toList();
     // OpenAI 兼容接口按创建时间从新到旧排列（有时间时）
@@ -191,13 +194,13 @@ Future<List<String>> aiListModels(AiSettings s) async {
         if (!_nonChat.hasMatch('${m['id']}')) '${m['id']}',
     ];
   } on SocketException catch (e) {
-    throw AiException('无法连接 ${s.host}：${e.message}');
+    throw AiException(tr.aiClientCantConnect(s.host, e.message));
   } on HandshakeException {
-    throw AiException('与 ${s.host} 的安全连接失败');
+    throw AiException(tr.aiClientSecureConnectionFailed(s.host));
   } on FormatException {
-    throw AiException('接口返回的不是模型列表，请检查接口地址');
+    throw AiException(tr.aiClientAPIDidntReturnModel);
   } on TimeoutException {
-    throw AiException('连接 ${s.host} 超时');
+    throw AiException(tr.aiClientConnectionTimedOut(s.host));
   } finally {
     client.close(force: true);
   }
@@ -437,9 +440,9 @@ Stream<AiEvent> aiStream(
                 parseArgs(calls[k]!.args.toString()),
               ),
           ];
-    if (stop == 'refusal') throw AiException('模型拒绝回答这个请求');
-    if (text.isEmpty && toolCalls.isEmpty) throw AiException('模型没有返回内容，请检查接口地址和模型名');
-    if (stop == 'max_tokens' || stop == 'length') yield AiText('\n\n（回答达到长度上限，已截断）');
+    if (stop == 'refusal') throw AiException(tr.aiClientModelRefusedAnswerRequest);
+    if (text.isEmpty && toolCalls.isEmpty) throw AiException(tr.aiClientModelReturnedNothingCheck);
+    if (stop == 'max_tokens' || stop == 'length') yield AiText(tr.aiClientAnswerHitLengthLimit);
     yield AiTurnEnd(
       AiMessage(
         'assistant',
@@ -453,13 +456,13 @@ Stream<AiEvent> aiStream(
       outputTokens: outputTokens,
     );
   } on SocketException catch (e) {
-    throw AiException('与 ${s.host} 的连接中断：${e.message}');
+    throw AiException(tr.aiClientConnectionWasInterrupted(s.host, e.message));
   } on HttpException catch (e) {
-    throw AiException('与 ${s.host} 的连接中断：${e.message}');
+    throw AiException(tr.aiClientConnectionWasInterrupted(s.host, e.message));
   } on HandshakeException {
-    throw AiException('与 ${s.host} 的安全连接失败，请检查接口地址或网络代理');
+    throw AiException(tr.aiClientSecureConnectionFailedCheck(s.host));
   } on TimeoutException {
-    throw AiException('${s.host} 长时间没有响应，请稍后重试');
+    throw AiException(tr.aiClientHasntRespondedLongTime(s.host));
   } finally {
     client.close(force: true);
   }
@@ -496,12 +499,12 @@ Future<HttpClientResponse> _post(HttpClient client, Uri url, Map<String, dynamic
       final after = int.tryParse(res.headers.value('retry-after') ?? '');
       if (after != null && after > 0 && after <= 30) wait = Duration(seconds: after);
     } on SocketException catch (e) {
-      if (attempt >= 2) throw AiException('无法连接 ${s.host}：${e.message}');
+      if (attempt >= 2) throw AiException(tr.aiClientCantConnect(s.host, e.message));
     } on HttpException catch (e) {
       // 服务端在返回响应头之前断开（回答还没开始），可以安全重试
-      if (attempt >= 2) throw AiException('与 ${s.host} 的连接中断：${e.message}');
+      if (attempt >= 2) throw AiException(tr.aiClientConnectionWasInterrupted(s.host, e.message));
     } on TimeoutException {
-      throw AiException('${s.host} 长时间没有响应，请稍后重试');
+      throw AiException(tr.aiClientHasntRespondedLongTime(s.host));
     }
     await Future<void>.delayed(wait);
   }
@@ -513,32 +516,32 @@ String _describeError(int? status, String body, AiSettings s) {
   final lower = raw.toLowerCase();
   String? hint;
   if (RegExp(r'context.?length|context window|too many tokens|prompt is too long|input.*too long').hasMatch(lower)) {
-    hint = '对话内容超出了模型能处理的长度，请点对话上方的「压缩上下文」按钮，或新建一个对话';
+    hint = tr.aiClientConversationLongerThanModel;
   } else if (RegExp(
     r'model.*(not.?exist|not.?found|does not exist|invalid)|unknown model|no such model|supported.*model names?|model names? .*you passed',
   ).hasMatch(lower)) {
-    hint = '模型「${s.model}」不存在或不可用，请检查模型名，或点模型旁的按钮获取可用的模型';
+    hint = tr.aiClientModelDoesntExistIsnt(s.model);
   } else if (RegExp(r'insufficient.?balance|insufficient_quota|余额|quota|billing|credit').hasMatch(lower) ||
       status == 402) {
-    hint = '账户余额或额度不足，请到服务商的控制台充值或检查额度';
+    hint = tr.aiClientInsufficientBalanceQuotaTop;
   } else if (RegExp(r'overload').hasMatch(lower)) {
-    hint = 'AI 服务当前过载，请稍后重试';
+    hint = tr.aiClientAIServiceOverloadedPlease;
   } else {
     hint = switch (status) {
-      400 || 422 => '请求被拒绝，可能是这个模型或服务商不支持当前的请求方式',
-      401 => 'API Key 无效或已过期，请在设置中检查',
-      403 => '没有权限使用这个模型或接口，请检查账户权限或地区限制',
-      404 => '接口地址或模型不存在，请检查接口地址（OpenAI 兼容接口通常以 /v1 结尾）',
-      408 || 504 => 'AI 服务响应超时，请稍后重试',
-      413 => '发送的内容太长，请新建一个对话',
-      429 => '请求太频繁，请稍后再试',
-      500 || 502 || 503 || 529 => 'AI 服务暂时不可用，请稍后重试',
+      400 || 422 => tr.aiClientRequestRejectedModelProvider,
+      401 => tr.aiClientAPIKeyInvalidExpired,
+      403 => tr.aiClientNoPermissionUseModel,
+      404 => tr.aiClientAPIAddressModelDoesnt,
+      408 || 504 => tr.aiClientAIServiceTimedOut,
+      413 => tr.aiClientContentSentTooLong,
+      429 => tr.aiClientTooManyRequestsPlease,
+      500 || 502 || 503 || 529 => tr.aiClientAIServiceTemporarilyUnavailable,
       _ => null,
     };
   }
   final code = status == null ? '' : 'HTTP $status';
-  if (hint == null) return '请求失败（$code）：$raw';
-  return '$hint（${[code, raw].where((e) => e.isNotEmpty).join('：')}）';
+  if (hint == null) return tr.aiClientRequestFailed(code, raw);
+  return '$hint${tr.commonParenthesized([code, raw].where((e) => e.isNotEmpty).join(tr.commonColon))}';
 }
 
 /// 从错误响应中取出说明文字
@@ -553,5 +556,5 @@ String _errorMessage(String body) {
     // 不是 JSON
   }
   final t = body.trim();
-  return t.isEmpty ? '没有返回说明' : (t.length > 300 ? '${t.substring(0, 300)}…' : t);
+  return t.isEmpty ? tr.aiClientNoDetailsReturned : (t.length > 300 ? '${t.substring(0, 300)}…' : t);
 }

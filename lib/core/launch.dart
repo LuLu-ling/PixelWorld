@@ -15,6 +15,7 @@ import 'java.dart';
 import 'memory.dart';
 import 'paths.dart';
 import 'version.dart';
+import 'i18n/strings.dart';
 
 final _sep = Platform.isWindows ? ';' : ':';
 bool _isAscii(String s) => s.codeUnits.every((c) => c < 0x80);
@@ -276,7 +277,8 @@ Future<void> prepareOptions(LauncherConfig cfg, String gameDir, String? releaseT
     final time = releaseTime == null ? null : DateTime.tryParse(releaseTime);
     final current = readCatIni(file)['lang'] ?? 'none';
     final useLauncher = current.toLowerCase() == 'none' || !Directory(p.join(gameDir, 'saves')).existsSync();
-    final locale = Platform.localeName.split('.').first;
+    // 选了界面语言时与它一致，否则用系统语言
+    final locale = cfg.language.gameLocale ?? Platform.localeName.split('.').first;
     var lang = 'none';
     // 1.1 之前没有语言选项；1.1~1.10 需要大写地区（zh_CN），之后为小写
     if (!(time != null && time.isAfter(DateTime(2000)) && !time.isAfter(DateTime(2011, 11, 18)))) {
@@ -342,7 +344,7 @@ Future<void> setGpuPreference(String javaPath) async {
 /// 启动前自定义命令，在游戏文件夹中执行
 Future<void> runPreLaunch(String command, bool wait, String cwd, void Function(String) log) async {
   if (command.trim().isEmpty) return;
-  log('执行启动前命令：$command');
+  log(tr.launchRunningPreLaunchCommand(command));
   final proc = await Process.start(
     Platform.isWindows ? 'cmd.exe' : '/bin/sh',
     Platform.isWindows ? ['/c', command] : ['-c', command],

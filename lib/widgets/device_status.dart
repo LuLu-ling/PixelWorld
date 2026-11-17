@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/l10n.dart';
+
 /// 手机上的电量与网络状态。启动器全屏时系统状态栏被隐藏，显示在标题栏里
 class DeviceStatus extends StatefulWidget {
   const DeviceStatus({super.key});
@@ -73,10 +75,10 @@ class _DeviceStatusState extends State<DeviceStatus> with WidgetsBindingObserver
 
   (IconData, String) get _networkInfo => switch (_network) {
     'wifi' => (Icons.wifi, 'Wi-Fi'),
-    'cellular' => (Icons.signal_cellular_alt, '移动数据'),
-    'ethernet' => (Icons.settings_ethernet, '有线网络'),
-    'other' => (Icons.public, '已联网'),
-    _ => (Icons.wifi_off, '未联网'),
+    'cellular' => (Icons.signal_cellular_alt, context.l10n.deviceStatusMobileData),
+    'ethernet' => (Icons.settings_ethernet, context.l10n.deviceStatusEthernet),
+    'other' => (Icons.public, context.l10n.deviceStatusConnected),
+    _ => (Icons.wifi_off, context.l10n.deviceStatusOffline),
   };
 
   @override
@@ -92,12 +94,12 @@ class _DeviceStatusState extends State<DeviceStatus> with WidgetsBindingObserver
         ? scheme.primary
         : scheme.onSurfaceVariant;
     final batteryLabel = _full
-        ? '已充满'
+        ? context.l10n.deviceStatusFullyCharged
         : _charging
-        ? '正在充电'
+        ? context.l10n.deviceStatusCharging
         : _plugged
-        ? '已接通电源'
-        : '电量';
+        ? context.l10n.deviceStatusPlugged
+        : context.l10n.deviceStatusBattery;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -111,15 +113,9 @@ class _DeviceStatusState extends State<DeviceStatus> with WidgetsBindingObserver
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              RotatedBox(
-                quarterTurns: 1,
-                child: Icon(_batteryIcon, size: 18, color: color),
-              ),
+              RotatedBox(quarterTurns: 1, child: Icon(_batteryIcon, size: 18, color: color)),
               const SizedBox(width: 2),
-              Text(
-                _battery == null ? '--' : '$_battery%',
-                style: theme.textTheme.labelMedium?.copyWith(color: color),
-              ),
+              Text(_battery == null ? '--' : '$_battery%', style: theme.textTheme.labelMedium?.copyWith(color: color)),
             ],
           ),
         ),

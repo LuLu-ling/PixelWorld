@@ -12,10 +12,12 @@ import '../app_scope.dart';
 import '../app_state.dart' show GameState;
 import '../core/android_runtime.dart';
 import '../core/config.dart';
+import '../core/i18n/change_language_command.dart';
 import '../core/java.dart';
 import '../core/memory.dart';
 import '../core/task.dart';
 import '../core/updater.dart';
+import '../l10n/l10n.dart';
 import '../platform.dart';
 import '../widgets/format.dart';
 import '../widgets/maintenance_actions.dart';
@@ -52,6 +54,8 @@ class _SelectRow<T> extends StatelessWidget {
       title: Text(title),
       subtitle: subtitle == null ? null : Text(subtitle!),
       trailing: DropdownMenu<T>(
+        // 只在创建时读取 initialSelection；所选项的文字变了（例如切换语言）时重新创建
+        key: ValueKey(options[value]),
         width: 240,
         initialSelection: value,
         requestFocusOnTap: false,
@@ -200,14 +204,15 @@ class _RenderScaleRowState extends State<_RenderScaleRow> {
     // 屏幕的实际像素（横屏），与界面缩放无关
     final screen = View.of(context).physicalSize;
     final w = (screen.longestSide * value).round(), h = (screen.shortestSide * value).round();
+    final l = context.l10n;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       leading: const Icon(Icons.aspect_ratio),
-      title: Text('渲染比例：${(value * 100).round()}%'),
+      title: Text(l.renderScale((value * 100).round())),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('游戏分辨率 $w × $h。降低后画面更模糊，但帧率更高、发热更少'),
+          Text(l.renderScaleHint(w, h)),
           Slider(
             value: value,
             min: 0.25,
@@ -249,17 +254,18 @@ class _RendererRowState extends State<_RendererRow> {
     final pref = cfg.androidRenderer;
     final gpu = _gpu;
     final auto = gpu == null ? null : resolveAndroidRenderer('auto', gpu);
+    final l = context.l10n;
     return ListTile(
       contentPadding: _rowPadding,
       leading: const Icon(Icons.memory),
-      title: const Text('渲染器'),
+      title: Text(l.renderer),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(androidRendererHints[pref] ?? ''),
-          if (gpu != null) Text('显卡：$gpu'),
-          if (pref == 'auto' && auto != null) Text('当前会使用：${androidRenderers[auto.renderer]}（${auto.reason}）'),
-          const Text('可以在实例设置里为单个实例另选渲染器'),
+          if (gpu != null) Text(l.rendererGpu('$gpu')),
+          if (pref == 'auto' && auto != null) Text(l.rendererAuto('${androidRenderers[auto.renderer]}', auto.reason)),
+          Text(l.rendererPerInstance),
         ],
       ),
       trailing: DropdownMenu<String>(
@@ -284,18 +290,19 @@ class LaunchSection extends StatelessWidget {
     final state = AppScope.of(context);
     final cfg = state.config;
     final set = cfg.update;
+    final l = context.l10n;
     return ListView(
       padding: const EdgeInsets.all(28),
       children: [
         SettingsGroup(
-          title: '启动',
+          title: l.settingsLaunch,
           children: [
             _SelectRow<int>(
               icon: Icons.call_split,
-              title: '实例隔离',
-              subtitle: '新实例首次启动时按此规则决定，之后在实例设置中单独修改',
+              title: l.isolation,
+              subtitle: l.isolationHint,
               value: cfg.isolationMode,
-              options: isolationModes,
+              options: {for (final m in isolationModes) m: l.isolationMode(m)},
               onChanged: (v) => set({'isolationMode': v}),
             ),
             // 手机上游戏总是全屏，调的是渲染分辨率
@@ -304,51 +311,51 @@ class LaunchSection extends StatelessWidget {
             if (Platform.isAndroid)
               _SwitchRow(
                 icon: Icons.dashboard_outlined,
-                title: '游戏内叠加层',
-                subtitle: '在游戏画面上显示一个可拖动的小球，点开可以看基础信息、问 AI',
+                title: l.gameHud,
+                subtitle: l.gameHudHint,
                 value: cfg.gameHud,
                 onChanged: (v) => set({'gameHud': v}),
               ),
             if (Platform.isAndroid && cfg.gameHud)
               _SwitchRow(
                 icon: Icons.auto_awesome_outlined,
-                title: '游戏内 AI',
-                subtitle: '在小球菜单里显示「问 AI」，使用「设置 → AI 排障」里的接口和模型',
+                title: l.gameHudAi,
+                subtitle: l.gameHudAiHint,
                 value: cfg.gameHudAi,
                 onChanged: (v) => set({'gameHudAi': v}),
               ),
             if (Platform.isAndroid && cfg.gameHud && cfg.gameHudAi)
               _SwitchRow(
                 icon: Icons.article_outlined,
-                title: '提问时附带最近日志',
-                subtitle: '把游戏日志末尾一起发给 AI，方便排查崩溃；日志可能包含服务器地址和聊天内容',
+                title: l.gameHudAiLog,
+                subtitle: l.gameHudAiLogHint,
                 value: cfg.gameHudAiLog,
                 onChanged: (v) => set({'gameHudAiLog': v}),
               ),
             if (isDesktop)
               _SelectRow<String>(
                 icon: Icons.crop_landscape,
-                title: '游戏窗口',
+                title: l.gameWindow,
                 value: cfg.windowMode,
-                options: const {
-                  'default': '默认（854 × 480）',
-                  'launcher': '与启动器一致',
-                  'maximized': '最大化',
-                  'fullscreen': '全屏',
-                  'custom': '自定义大小',
+                options: {
+                  'default': l.gameWindowDefault,
+                  'launcher': l.gameWindowLauncher,
+                  'maximized': l.gameWindowMaximized,
+                  'fullscreen': l.gameWindowFullscreen,
+                  'custom': l.gameWindowCustom,
                 },
                 onChanged: (v) => set({'windowMode': v}),
               ),
             if (isDesktop && cfg.windowMode == 'custom') ...[
               _TextRow(
                 icon: Icons.width_normal_outlined,
-                title: '窗口宽度',
+                title: l.gameWindowWidth,
                 value: '${cfg.windowWidth}',
                 onSaved: (v) => set({'windowWidth': int.tryParse(v) ?? cfg.windowWidth}),
               ),
               _TextRow(
                 icon: Icons.height,
-                title: '窗口高度',
+                title: l.gameWindowHeight,
                 value: '${cfg.windowHeight}',
                 onSaved: (v) => set({'windowHeight': int.tryParse(v) ?? cfg.windowHeight}),
               ),
@@ -357,36 +364,41 @@ class LaunchSection extends StatelessWidget {
             if (isDesktop)
               _SelectRow<String>(
                 icon: Icons.rocket_launch_outlined,
-                title: '游戏启动后',
+                title: l.afterLaunch,
                 value: cfg.afterLaunch,
-                options: const {
-                  'keep': '保持不变',
-                  'minimizeAndReopen': '最小化，游戏退出后恢复',
-                  'hideAndReopen': '隐藏，游戏退出后恢复',
-                  'hideAndExit': '隐藏，游戏退出后关闭',
-                  'exit': '直接关闭启动器',
+                options: {
+                  'keep': l.afterLaunchKeep,
+                  'minimizeAndReopen': l.afterLaunchMinimize,
+                  'hideAndReopen': l.afterLaunchHide,
+                  'hideAndExit': l.afterLaunchHideExit,
+                  'exit': l.afterLaunchExit,
                 },
                 onChanged: (v) => set({'afterLaunch': v}),
               ),
             if (isDesktop)
               _SelectRow<String>(
                 icon: Icons.speed,
-                title: '进程优先级',
+                title: l.priority,
                 value: cfg.processPriority,
-                options: const {'high': '高', 'aboveNormal': '较高', 'normal': '中', 'belowNormal': '较低'},
+                options: {
+                  'high': l.priorityHigh,
+                  'aboveNormal': l.priorityAboveNormal,
+                  'normal': l.priorityNormal,
+                  'belowNormal': l.priorityBelowNormal,
+                },
                 onChanged: (v) => set({'processPriority': v}),
               ),
             _TextRow(
               icon: Icons.label_outline,
-              title: '版本类型显示',
-              subtitle: '显示在游戏主界面左下角，留空则不显示',
+              title: l.versionType,
+              subtitle: l.versionTypeHint,
               value: cfg.versionType,
               onSaved: (v) => set({'versionType': v}),
             ),
             _SwitchRow(
               icon: Icons.translate,
-              title: '自动设置游戏语言',
-              subtitle: '新实例或没有存档时，把游戏语言设为与启动器一致',
+              title: l.autoGameLanguage,
+              subtitle: l.autoGameLanguageHint,
               value: cfg.autoGameLanguage,
               onChanged: (v) => set({'autoGameLanguage': v}),
             ),
@@ -394,18 +406,18 @@ class LaunchSection extends StatelessWidget {
         ),
         const _MemoryGroup(),
         SettingsGroup(
-          title: '高级',
+          title: l.advanced,
           children: [
             _TextRow(
               icon: Icons.code,
-              title: 'JVM 参数',
+              title: l.jvmArgs,
               value: cfg.jvmArgs,
               wide: true,
               onSaved: (v) => set({'jvmArgs': v.trim().isEmpty ? defaultJvmArgs : v}),
             ),
             _TextRow(
               icon: Icons.terminal,
-              title: '游戏参数',
+              title: l.gameArgs,
               value: cfg.gameArgs,
               hint: '--demo',
               wide: true,
@@ -413,29 +425,29 @@ class LaunchSection extends StatelessWidget {
             ),
             _TextRow(
               icon: Icons.play_circle_outline,
-              title: '启动前执行命令',
-              subtitle: '在游戏文件夹中执行',
+              title: l.preLaunchCommand,
+              subtitle: l.preLaunchCommandHint,
               value: cfg.preLaunchCommand,
               wide: true,
               onSaved: (v) => set({'preLaunchCommand': v}),
             ),
             _SwitchRow(
               icon: Icons.hourglass_bottom,
-              title: '等待命令执行完毕再启动游戏',
+              title: l.preLaunchWait,
               value: cfg.preLaunchWait,
               onChanged: (v) => set({'preLaunchWait': v}),
             ),
             _SelectRow<String>(
               icon: Icons.lan_outlined,
-              title: '网络协议偏好',
+              title: l.ipStack,
               value: cfg.preferredIpStack,
-              options: const {'default': '默认', 'v4': '优先 IPv4', 'v6': '优先 IPv6'},
+              options: {'default': l.commonDefault, 'v4': l.ipStackV4, 'v6': l.ipStackV6},
               onChanged: (v) => set({'preferredIpStack': v}),
             ),
             _SwitchRow(
               icon: Icons.memory,
-              title: '使用高性能显卡',
-              subtitle: '仅 Windows：让 Java 使用独立显卡',
+              title: l.gpuPreference,
+              subtitle: l.gpuPreferenceHint,
               value: cfg.gpuPreference,
               onChanged: (v) => set({'gpuPreference': v}),
             ),
@@ -458,21 +470,25 @@ class _MemoryGroup extends StatelessWidget {
     final mem = state.memoryPreview();
     final maxTick = maxTickFor(mem.total);
     final tick = cfg.memoryTick.clamp(1, maxTick);
+    final l = context.l10n;
     return SettingsGroup(
-      title: '游戏内存',
+      title: l.memory,
       children: [
         ListTile(
           contentPadding: _rowPadding,
           leading: const Icon(Icons.memory_outlined),
-          title: const Text('分配方式'),
+          title: Text(l.memoryMode),
           subtitle: Text(
-            '将分配 ${mem.allocated.toStringAsFixed(1)} GB · '
-            '系统空闲 ${mem.free.toStringAsFixed(1)} / ${mem.total.toStringAsFixed(1)} GB',
+            l.memorySummary(
+              mem.allocated.toStringAsFixed(1),
+              mem.free.toStringAsFixed(1),
+              mem.total.toStringAsFixed(1),
+            ),
           ),
           trailing: SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'auto', label: Text('自动')),
-              ButtonSegment(value: 'custom', label: Text('自定义')),
+            segments: [
+              ButtonSegment(value: 'auto', label: Text(l.commonAuto)),
+              ButtonSegment(value: 'custom', label: Text(l.commonCustom)),
             ],
             selected: {cfg.memoryMode},
             onSelectionChanged: (s) => cfg.update({'memoryMode': s.first}),
@@ -508,8 +524,8 @@ class _MemoryGroup extends StatelessWidget {
         SwitchListTile(
           contentPadding: _rowPadding,
           secondary: const Icon(Icons.lock_outline),
-          title: const Text('锁定内存'),
-          subtitle: const Text('初始内存与最大内存相同（-Xms 等于 -Xmx）'),
+          title: Text(l.memoryLock),
+          subtitle: Text(l.memoryLockHint),
           value: cfg.lockMemory,
           onChanged: (v) => cfg.update({'lockMemory': v}),
         ),
@@ -540,7 +556,7 @@ class _JavaSectionState extends State<JavaSection> {
     if (path == null || !mounted) return;
     final info = await probeJava(path);
     if (!mounted) return;
-    if (info == null) return toast(context, '无法运行这个 Java');
+    if (info == null) return toast(context, context.l10n.javaUnusable);
     await AppScope.read(context).config.update({'javaPath': path});
     setState(() => _javas = listJavas());
   }
@@ -550,6 +566,7 @@ class _JavaSectionState extends State<JavaSection> {
     if (Platform.isAndroid) return const _AndroidJavaSection();
     final cfg = AppScope.of(context).config;
     final scheme = Theme.of(context).colorScheme;
+    final l = context.l10n;
     return RadioGroup<String>(
       groupValue: cfg.javaPath,
       onChanged: (v) => cfg.update({'javaPath': v ?? ''}),
@@ -562,8 +579,8 @@ class _JavaSectionState extends State<JavaSection> {
               RadioListTile<String>(
                 contentPadding: _rowPadding,
                 value: '',
-                title: const Text('自动选择'),
-                subtitle: const Text('按版本要求选择，找不到时自动下载 Mojang 提供的 Java'),
+                title: Text(l.javaAuto),
+                subtitle: Text(l.javaAutoHint),
               ),
               FutureBuilder(
                 future: _javas,
@@ -579,14 +596,14 @@ class _JavaSectionState extends State<JavaSection> {
                         RadioListTile<String>(
                           contentPadding: _rowPadding,
                           value: j.path,
-                          title: Text('Java ${j.major}（${j.version}）${j.managed ? ' · 启动器下载' : ''}'),
+                          title: Text([l.javaEntry(j.major, j.version), if (j.managed) l.javaManaged].join(' · ')),
                           subtitle: Text(j.path, overflow: TextOverflow.ellipsis),
                         ),
                       if (cfg.javaPath.isNotEmpty && !paths.contains(cfg.javaPath))
                         RadioListTile<String>(
                           contentPadding: _rowPadding,
                           value: cfg.javaPath,
-                          title: const Text('手动指定'),
+                          title: Text(l.javaManual),
                           subtitle: Text(cfg.javaPath, overflow: TextOverflow.ellipsis),
                         ),
                     ],
@@ -597,16 +614,12 @@ class _JavaSectionState extends State<JavaSection> {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 child: Row(
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: _pick,
-                      icon: const Icon(Icons.folder_open),
-                      label: const Text('手动选择'),
-                    ),
+                    OutlinedButton.icon(onPressed: _pick, icon: const Icon(Icons.folder_open), label: Text(l.javaPick)),
                     const SizedBox(width: 12),
                     TextButton.icon(
                       onPressed: () => setState(() => _javas = listJavas()),
                       icon: const Icon(Icons.refresh),
-                      label: const Text('重新检测'),
+                      label: Text(l.javaRescan),
                     ),
                   ],
                 ),
@@ -614,7 +627,7 @@ class _JavaSectionState extends State<JavaSection> {
             ],
           ),
           Text(
-            '实例设置里可以为单个实例指定 Java，优先于这里的设置。',
+            l.javaPerInstance,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
@@ -630,38 +643,55 @@ class MiscSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cfg = AppScope.of(context).config;
+    final state = AppScope.of(context);
+    final cfg = state.config;
+    final l = context.l10n;
+    final commit = AppInfo.commit.substring(0, AppInfo.commit.length.clamp(0, 7));
     return ListView(
       padding: const EdgeInsets.all(28),
       children: [
         SettingsGroup(
-          title: '更新',
+          title: l.languageGroup,
+          children: [
+            _SelectRow<AppLanguage>(
+              icon: Icons.translate,
+              title: l.language,
+              subtitle: l.languageHint,
+              value: state.language.current,
+              options: {for (final lang in AppLanguage.values) lang: lang.label(l)},
+              onChanged: (v) => ChangeLanguageCommand(state.language, v).execute(),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          title: l.updates,
           children: [
             _SelectRow<UpdateChannel>(
               icon: Icons.alt_route,
-              title: '更新通道',
-              subtitle: '正式版最稳定；预览版包含测试中的版本；Nightly 为 main 分支的每次更新，可能不稳定',
+              title: l.updateChannel,
+              subtitle: l.updateChannelHint,
               value: UpdateChannel.parse(cfg.updateChannel),
               options: {for (final c in UpdateChannel.values) c: c.label},
               onChanged: (v) => cfg.update({'updateChannel': v.name, 'updateSkipped': ''}),
             ),
             _SwitchRow(
               icon: Icons.update,
-              title: '启动时检查更新',
+              title: l.updateAutoCheck,
               value: cfg.updateAutoCheck,
               onChanged: (v) => cfg.update({'updateAutoCheck': v}),
             ),
             ListTile(
               contentPadding: _rowPadding,
               leading: const Icon(Icons.system_update_alt),
-              title: const Text('检查更新'),
+              title: Text(l.updateCheck),
               subtitle: Text(
-                '当前版本 ${AppInfo.version}'
-                '${AppInfo.commit.isEmpty ? '（本地构建）' : '（${AppInfo.channel}，${AppInfo.commit.substring(0, AppInfo.commit.length.clamp(0, 7))}）'}',
+                AppInfo.commit.isEmpty
+                    ? l.updateCurrentLocal(AppInfo.version)
+                    : l.updateCurrentBuild(AppInfo.version, AppInfo.channel, commit),
               ),
               trailing: FilledButton.tonal(
                 onPressed: () => checkUpdates(context, manual: true),
-                child: const Text('检查'),
+                child: Text(l.updateCheckButton),
               ),
             ),
           ],
@@ -672,43 +702,47 @@ class MiscSection extends StatelessWidget {
             ListTile(
               contentPadding: _rowPadding,
               leading: const Icon(Icons.move_down),
-              title: const Text('从 PCL-CE 导入'),
-              subtitle: const Text('导入启动设置、游戏文件夹与账户；实例独立设置两者直接共用'),
-              trailing: FilledButton.tonal(onPressed: () => showPclImport(context), child: const Text('导入')),
+              title: Text(l.pclImport),
+              subtitle: Text(l.pclImportHint),
+              trailing: FilledButton.tonal(onPressed: () => showPclImport(context), child: Text(l.pclImportButton)),
             ),
           ],
         ),
         if (Platform.isWindows)
           SettingsGroup(
-            title: '系统',
+            title: l.system,
             children: [
               ListTile(
                 contentPadding: _rowPadding,
                 leading: const Icon(Icons.shortcut),
-                title: const Text('创建桌面快捷方式'),
-                subtitle: const Text('在桌面创建启动器的快捷方式'),
+                title: Text(l.shortcut),
+                subtitle: Text(l.shortcutHint),
                 trailing: FilledButton.tonal(
                   onPressed: () => createShortcutWithToast(context),
-                  child: const Text('创建'),
+                  child: Text(l.shortcutButton),
                 ),
               ),
             ],
           ),
         SettingsGroup(
-          title: '下载',
+          title: l.commonDownload,
           children: [
             _SelectRow<String>(
               icon: Icons.cloud_download_outlined,
-              title: '下载源',
+              title: l.downloadSource,
               subtitle: switch (cfg.downloadSource) {
-                'official' => '只用 Mojang 和各加载器的官方服务器',
-                'bmclapi' => '优先用 BMCLAPI 镜像，失败时回退到官方源',
+                'official' => l.downloadSourceOfficialHint,
+                'bmclapi' => l.downloadSourceMirrorHint,
                 _ =>
-                  '测速选择官方源或 BMCLAPI 镜像中较快的，失败时自动换另一个'
-                      '${DownloadSourcePicker.last == null ? '' : '（当前：${DownloadSourcePicker.preferMirror ? 'BMCLAPI 镜像' : '官方源'}）'}',
+                  '${l.downloadSourceAutoHint}'
+                      '${DownloadSourcePicker.last == null ? '' : l.downloadSourceCurrent(DownloadSourcePicker.preferMirror ? l.downloadSourceMirror : l.downloadSourceOfficial)}',
               },
               value: cfg.downloadSource,
-              options: const {'auto': '自动选择', 'official': '官方源', 'bmclapi': 'BMCLAPI 镜像'},
+              options: {
+                'auto': l.downloadSourceAuto,
+                'official': l.downloadSourceOfficial,
+                'bmclapi': l.downloadSourceMirror,
+              },
               onChanged: (v) {
                 cfg.update({'downloadSource': v});
                 if (v == 'auto') DownloadSourcePicker.measure();
@@ -717,14 +751,14 @@ class MiscSection extends StatelessWidget {
             ListTile(
               contentPadding: _rowPadding,
               leading: const Icon(Icons.network_check),
-              title: const Text('网络检测'),
-              subtitle: const Text('测试下载源、正版登录、Modrinth 和更新服务能不能连上、有多快'),
-              trailing: OutlinedButton(onPressed: () => showNetworkCheck(context), child: const Text('开始检测')),
+              title: Text(l.networkCheck),
+              subtitle: Text(l.networkCheckHint),
+              trailing: OutlinedButton(onPressed: () => showNetworkCheck(context), child: Text(l.networkCheckStart)),
             ),
             ListTile(
               contentPadding: _rowPadding,
               leading: const Icon(Icons.stacked_line_chart),
-              title: const Text('同时下载的文件数'),
+              title: Text(l.downloadConcurrency),
               trailing: SizedBox(
                 width: 240,
                 child: Slider(
@@ -740,15 +774,15 @@ class MiscSection extends StatelessWidget {
           ],
         ),
         SettingsGroup(
-          title: '正版登录',
+          title: l.msLogin,
           children: [
             _TextRow(
               icon: Icons.key_outlined,
-              title: 'Azure 应用 Client ID',
-              subtitle: '微软登录需要 Azure 公共客户端应用；留空时使用启动器内置的 Client ID',
+              title: l.msClientId,
+              subtitle: l.msClientIdHint,
               // 只显示用户自己填的 ID；内置 ID 不回显到输入框
               value: cfg.msClientId,
-              hint: AppInfo.msClientId.isEmpty ? '未填写' : '留空时使用内置 Client ID',
+              hint: AppInfo.msClientId.isEmpty ? l.msClientIdEmpty : l.msClientIdBuiltIn,
               wide: true,
               onSaved: (v) => cfg.update({'msClientId': v.trim()}),
             ),
@@ -789,16 +823,18 @@ class _AndroidJavaSectionState extends State<_AndroidJavaSection> {
   Future<void> _download(int major) async {
     final state = AppScope.read(context);
     final existed = androidJavaAt(androidJavaHome(major)) != null;
-    final t = TaskProgress('下载 Java $major（安卓版）', steps: const ['下载'], canCancel: true);
+    final l = context.l10n;
+    final step = l.commonDownload;
+    final t = TaskProgress(l.javaAndroidTask(major), steps: [step], canCancel: true);
     if (!existed) t.registerCleanupPath(androidJavaHome(major));
     setState(() => _busy.add(major));
     try {
       await state.track(t, () async {
-        t.beginStep('下载');
+        t.beginStep(step);
         await installAndroidJava(major, state.downloader, t);
       });
     } catch (e) {
-      if (mounted) toast(context, '下载 Java $major 失败：${errorText(e)}');
+      if (mounted) toast(context, l.javaDownloadFailed(major, errorText(e)));
     } finally {
       if (mounted) setState(() => _busy.remove(major));
       await _refresh();
@@ -810,11 +846,11 @@ class _AndroidJavaSectionState extends State<_AndroidJavaSection> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('删除 Java $major？'),
-        content: const Text('之后需要时会重新下载。指定使用它的实例要重新选择 Java，或改为自动选择。'),
+        title: Text(context.l10n.javaDeleteTitle(major)),
+        content: Text(context.l10n.javaDeleteBody),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('删除')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(context.l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(context.l10n.commonDelete)),
         ],
       ),
     );
@@ -824,7 +860,7 @@ class _AndroidJavaSectionState extends State<_AndroidJavaSection> {
       await deleteAndroidJava(major);
       if (state.config.javaPath == androidJavaHome(major)) await state.config.update({'javaPath': ''});
     } catch (e) {
-      if (mounted) toast(context, '删除失败：${errorText(e)}');
+      if (mounted) toast(context, context.l10n.commonDeleteFailed(errorText(e)));
     } finally {
       if (mounted) setState(() => _busy.remove(major));
       await _refresh();
@@ -838,6 +874,7 @@ class _AndroidJavaSectionState extends State<_AndroidJavaSection> {
     final scheme = Theme.of(context).colorScheme;
     // 游戏或安装器运行时不能删除 Java
     final inUse = state.gameState != GameState.idle || state.runningTasks.isNotEmpty;
+    final l = context.l10n;
     return RadioGroup<String>(
       groupValue: cfg.javaPath,
       onChanged: (v) => cfg.update({'javaPath': v ?? ''}),
@@ -847,11 +884,11 @@ class _AndroidJavaSectionState extends State<_AndroidJavaSection> {
           SettingsGroup(
             title: 'Java',
             children: [
-              const RadioListTile<String>(
+              RadioListTile<String>(
                 contentPadding: _rowPadding,
                 value: '',
-                title: Text('自动选择'),
-                subtitle: Text('按版本要求选择 Java 8 / 17 / 21 / 25，没有安装时自动下载'),
+                title: Text(l.javaAuto),
+                subtitle: Text(l.javaAndroidAutoHint),
               ),
               for (final m in androidJavaMajors)
                 if (_sizes.containsKey(m))
@@ -859,11 +896,11 @@ class _AndroidJavaSectionState extends State<_AndroidJavaSection> {
                     contentPadding: _rowPadding,
                     value: androidJavaHome(m),
                     title: Text('Java $m'),
-                    subtitle: Text('已安装 · ${formatSize(_sizes[m]!)}'),
+                    subtitle: Text(l.javaInstalled(formatSize(_sizes[m]!))),
                     secondary: _busy.contains(m)
                         ? const SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 2))
                         : IconButton(
-                            tooltip: inUse ? '游戏或任务运行时不能删除' : '删除',
+                            tooltip: inUse ? l.javaInUse : l.commonDelete,
                             onPressed: inUse ? null : () => _delete(m),
                             icon: const Icon(Icons.delete_outline),
                           ),
@@ -873,23 +910,22 @@ class _AndroidJavaSectionState extends State<_AndroidJavaSection> {
                     contentPadding: _rowPadding,
                     leading: const SizedBox(width: 24),
                     title: Text('Java $m'),
-                    subtitle: const Text('未安装'),
+                    subtitle: Text(l.javaNotInstalled),
                     trailing: _busy.contains(m)
                         ? const SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                        : FilledButton.tonal(onPressed: () => _download(m), child: const Text('下载')),
+                        : FilledButton.tonal(onPressed: () => _download(m), child: Text(l.commonDownload)),
                   ),
               if (cfg.javaPath.isNotEmpty && !androidJavaMajors.any((m) => androidJavaHome(m) == cfg.javaPath))
                 RadioListTile<String>(
                   contentPadding: _rowPadding,
                   value: cfg.javaPath,
-                  title: const Text('手动指定（安卓上不可用）'),
+                  title: Text(l.javaManualAndroid),
                   subtitle: Text(cfg.javaPath, overflow: TextOverflow.ellipsis),
                 ),
             ],
           ),
           Text(
-            '安卓版 Java 来自 AngelAuraMC 的 OpenJDK 构建（GPLv2 + Classpath Exception）。'
-            '实例设置里可以为单个实例指定 Java，优先于这里的设置。',
+            l.javaAndroidNote,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],

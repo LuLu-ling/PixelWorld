@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../i18n/strings.dart';
+
 /// 已知模型的上下文长度（按各家文档核对；未知的模型返回 null，使用设置中的值或默认值）
 int? knownContextWindow(String model) {
   final m = model.toLowerCase();
@@ -29,7 +31,8 @@ const promptOverheadTokens = 3500;
 const keepRecentTurns = 2;
 
 /// 压缩上下文时使用的系统提示
-const compactSystemPrompt = '''
+String get compactSystemPrompt =>
+    '''
 你负责为 Minecraft 启动器 Pixel World 的 AI 助手压缩对话记录。把给出的较早对话整理成摘要，之后的对话会用这份摘要代替原文继续进行。
 
 摘要要保留：
@@ -39,7 +42,7 @@ const compactSystemPrompt = '''
 - 已经执行的操作及结果，包括用户拒绝或取消的操作；
 - 尚未解决的问题和计划的下一步。
 
-要求：只根据对话内容整理，不要补充或推测；去掉寒暄和重复内容；用简体中文和条目列表；不超过 1000 字。如果给出了已有的摘要，把它和新的对话合并成一份完整的摘要。只输出摘要本身。
+要求：只根据对话内容整理，不要补充或推测；去掉寒暄和重复内容；用${tr.aiReplyLanguage}和条目列表；不超过 1000 字。如果给出了已有的摘要，把它和新的对话合并成一份完整的摘要。只输出摘要本身。
 ''';
 
 /// 放在压缩后的历史最前面，告诉模型这是摘要

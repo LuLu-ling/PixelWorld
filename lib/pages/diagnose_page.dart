@@ -7,6 +7,7 @@ import '../shell.dart';
 import 'ai_page.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
+import '../l10n/l10n.dart';
 
 const _mono = TextStyle(
   fontFamily: 'Consolas',
@@ -28,17 +29,20 @@ Future<void> showCrashDialog(BuildContext context, CrashReport report) async {
     context: context,
     builder: (context) => AlertDialog(
       icon: Icon(Icons.error_outline, color: theme.colorScheme.error),
-      title: const Text('游戏崩溃了'),
+      title: Text(context.l10n.diagnoseGameCrashed),
       content: SizedBox(
         width: 480,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${report.title} 非正常退出。'),
+            Text(context.l10n.diagnoseExitedAbnormally(report.title)),
             const SizedBox(height: 12),
             if (report.findings.isEmpty)
-              Text('没有匹配到已知的问题，可以查看日志，或使用 AI 分析。', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))
+              Text(
+                context.l10n.diagnoseNoKnownProblemMatched,
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              )
             else
               for (final f in report.findings.take(3))
                 Padding(
@@ -47,7 +51,7 @@ Future<void> showCrashDialog(BuildContext context, CrashReport report) async {
                     TextSpan(
                       children: [
                         TextSpan(
-                          text: '${f.title}：',
+                          text: '${f.title}${context.l10n.commonColon}',
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         TextSpan(text: f.detail),
@@ -59,13 +63,13 @@ Future<void> showCrashDialog(BuildContext context, CrashReport report) async {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('关闭')),
-        TextButton(onPressed: () => Navigator.pop(context, 'log'), child: const Text('查看日志')),
-        TextButton(onPressed: () => Navigator.pop(context, 'diagnose'), child: const Text('错误分析')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.windowClose)),
+        TextButton(onPressed: () => Navigator.pop(context, 'log'), child: Text(context.l10n.commonViewLog)),
+        TextButton(onPressed: () => Navigator.pop(context, 'diagnose'), child: Text(context.l10n.subDiagnose)),
         FilledButton.icon(
           onPressed: () => Navigator.pop(context, 'ai'),
           icon: const Icon(Icons.auto_awesome, size: 18),
-          label: const Text('AI 分析'),
+          label: Text(context.l10n.diagnoseAIAnalysis),
         ),
       ],
     ),
@@ -87,7 +91,7 @@ class DiagnosePage extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     if (report == null) {
-      return const ContentPanel(child: Center(child: Text('没有要分析的内容')));
+      return ContentPanel(child: Center(child: Text(context.l10n.diagnoseNothingAnalyze)));
     }
     final ai = AiSettings.load(state.config);
     final session = report.sessionId == null ? null : state.chats.byId(report.sessionId!);
@@ -99,7 +103,7 @@ class DiagnosePage extends StatelessWidget {
           padding: const EdgeInsets.all(28),
           children: [
             SettingsGroup(
-              title: '环境',
+              title: context.l10n.diagnoseEnvironment,
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
@@ -108,14 +112,14 @@ class DiagnosePage extends StatelessWidget {
               ],
             ),
             SettingsGroup(
-              title: '初步判断',
+              title: context.l10n.diagnoseInitialFindings,
               children: [
                 if (report.findings.isEmpty)
-                  const ListTile(
+                  ListTile(
                     contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                     leading: Icon(Icons.help_outline),
-                    title: Text('没有匹配到已知的问题'),
-                    subtitle: Text('可以使用下面的 AI 分析，或查看日志摘录自行判断'),
+                    title: Text(context.l10n.diagnoseNoKnownProblemMatched2),
+                    subtitle: Text(context.l10n.diagnoseUseAIAnalysisBelow),
                   ),
                 for (final f in report.findings)
                   ListTile(
@@ -136,39 +140,43 @@ class DiagnosePage extends StatelessWidget {
               ],
             ),
             SettingsGroup(
-              title: 'AI 分析',
+              title: context.l10n.diagnoseAIAnalysis,
               children: [
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   leading: Icon(Icons.auto_awesome, color: scheme.primary),
-                  title: Text(session != null ? '已有 AI 对话' : '用 AI 分析'),
+                  title: Text(
+                    session != null ? context.l10n.diagnoseExistingAIConversation : context.l10n.diagnoseAnalyzeAI,
+                  ),
                   subtitle: Text(
                     session != null
-                        ? '在 AI 页面继续这次崩溃的对话'
+                        ? context.l10n.diagnoseContinueCrashsConversationAI
                         : ai.ready
-                        ? '新建一个对话，把下面的日志摘录与环境信息发送给 ${ai.host}（${ai.model}）'
-                        : '使用你自己的 AI 服务分析日志，需要先填写接口地址、模型和 API Key',
+                        ? context.l10n.diagnoseStartsNewConversationSends(ai.host, ai.model)
+                        : context.l10n.diagnoseAnalyzeLogYourOwn,
                   ),
                   trailing: FilledButton.tonal(
                     onPressed: () => startAiDiagnosis(context, report),
-                    child: Text(session != null ? '查看对话' : 'AI 分析'),
+                    child: Text(
+                      session != null ? context.l10n.diagnoseViewConversation : context.l10n.diagnoseAIAnalysis,
+                    ),
                   ),
                 ),
               ],
             ),
             SettingsGroup(
-              title: '日志摘录',
+              title: context.l10n.diagnoseLogExcerpt,
               children: [
                 if (report.sources.isEmpty)
-                  const ListTile(
+                  ListTile(
                     contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    title: Text('没有找到日志'),
+                    title: Text(context.l10n.diagnoseNoLogsFound),
                   ),
                 for (final s in report.sources)
                   ExpansionTile(
                     tilePadding: const EdgeInsets.symmetric(horizontal: 20),
                     title: Text(s.name),
-                    subtitle: Text('${s.text.length} 个字符，已截取并去除隐私信息'),
+                    subtitle: Text(context.l10n.diagnoseCharactersTrimmedPrivateInformation(s.text.length)),
                     childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                     children: [
                       Container(
@@ -186,8 +194,8 @@ class DiagnosePage extends StatelessWidget {
                 if (report.mods.isNotEmpty)
                   ExpansionTile(
                     tilePadding: const EdgeInsets.symmetric(horizontal: 20),
-                    title: const Text('模组列表'),
-                    subtitle: Text('${report.mods.length} 个已启用的模组'),
+                    title: Text(context.l10n.diagnoseModList),
+                    subtitle: Text(context.l10n.diagnoseOtherEnabledMods(report.mods.length)),
                     childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                     children: [
                       Align(

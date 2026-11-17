@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import '../app_info.dart';
+import 'i18n/strings.dart';
 
 /// 网络检测：测各个服务能不能连上、多快。「自动选择」下载源用它在官方源和 BMCLAPI 之间选快的，
 /// 首次设置和「设置 → 下载」里的网络检测也用它。
@@ -41,31 +42,36 @@ class NetTarget {
 }
 
 /// 两个下载源测同一个文件（游戏版本列表，一百多 KB），速度可以直接比较
-const officialProbe = NetTarget(
+NetTarget get officialProbe => NetTarget(
   'official',
-  'Mojang 官方源',
-  '下载游戏和运行库',
+  tr.networkCheckMojangOfficial,
+  tr.networkCheckGameLibraryDownloads,
   'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json',
 );
-const mirrorProbe = NetTarget(
+NetTarget get mirrorProbe => NetTarget(
   'bmclapi',
-  'BMCLAPI 镜像',
-  '国内下载游戏、加载器',
+  tr.downloadSourceMirror,
+  tr.networkCheckGameLoaderDownloadsMainland,
   'https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json',
 );
 
 /// 网络检测的全部项目
-final netTargets = [
+List<NetTarget> get netTargets => [
   officialProbe,
   mirrorProbe,
-  const NetTarget(
+  NetTarget(
     'microsoft',
-    'Microsoft 登录',
-    '正版账户登录',
+    tr.networkCheckMicrosoftSign,
+    tr.networkCheckMicrosoftAccountSign,
     'https://login.microsoftonline.com/consumers/v2.0/.well-known/openid-configuration',
   ),
-  const NetTarget('modrinth', 'Modrinth', '模组、整合包、资源包', 'https://api.modrinth.com/v2/tag/loader'),
-  NetTarget('update', 'Pixel World 更新', '检查更新、公告和文档', '${AppInfo.siteApiBases.first}/update.json'),
+  NetTarget('modrinth', 'Modrinth', tr.networkCheckModsModpacksResourcePacks, 'https://api.modrinth.com/v2/tag/loader'),
+  NetTarget(
+    'update',
+    tr.networkCheckPixelWorldUpdates,
+    tr.networkCheckUpdateChecksAnnouncementsDocs,
+    '${AppInfo.siteApiBases.first}/update.json',
+  ),
 ];
 
 const _sampleBytes = 512 * 1024;
@@ -94,11 +100,11 @@ Future<NetResult> probe(String url, {Duration timeout = const Duration(seconds: 
       return NetResult.ok(latency: latency, bytes: bytes, elapsed: sw.elapsed - latency);
     }().timeout(timeout);
   } on TimeoutException {
-    return const NetResult.failed('超时');
+    return NetResult.failed(tr.networkCheckTimedOut);
   } on SocketException catch (e) {
-    return NetResult.failed(e.osError?.message ?? '无法连接');
+    return NetResult.failed(e.osError?.message ?? tr.instanceCantConnect);
   } on HandshakeException {
-    return const NetResult.failed('安全连接失败');
+    return NetResult.failed(tr.networkCheckSecureConnectionFailed);
   } catch (e) {
     return NetResult.failed('$e');
   }
@@ -150,7 +156,7 @@ class DownloadSourcePicker {
 
 /// 显示用：延迟和速度
 String describeNet(NetResult r) {
-  if (!r.ok) return '连接失败（${r.error}）';
+  if (!r.ok) return tr.networkCheckConnectionFailed(r.error ?? '');
   final ms = r.latency!.inMilliseconds;
   final speed = r.speed;
   final s = speed >= 1024 * 1024

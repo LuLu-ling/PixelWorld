@@ -8,18 +8,19 @@ import 'package:path/path.dart' as p;
 
 import '../app_info.dart';
 import 'paths.dart';
+import 'i18n/strings.dart';
 
 /// 文档页面；id 对应 `https://pixelworld.zhuzhi.site/docs/<id>.html`
-const docPages = [
-  (id: 'index', title: '总览'),
-  (id: 'install', title: '下载与安装'),
-  (id: 'first-run', title: '第一次启动'),
-  (id: 'versions', title: '版本与加载器'),
-  (id: 'resources', title: '模组与资源'),
-  (id: 'android', title: '安卓版'),
-  (id: 'ai', title: 'AI 排障'),
-  (id: 'troubleshooting', title: '常见问题与排错'),
-  (id: 'api', title: '启动器接口'),
+List<({String id, String title})> get docPages => [
+  (id: 'index', title: tr.docsOverview),
+  (id: 'install', title: tr.docsDownloadInstall),
+  (id: 'first-run', title: tr.docsFirstLaunch),
+  (id: 'versions', title: tr.docsVersionsLoaders),
+  (id: 'resources', title: tr.oobeModsResources),
+  (id: 'android', title: tr.docsAndroid),
+  (id: 'ai', title: tr.oobeAITroubleshooting),
+  (id: 'troubleshooting', title: tr.docsFAQTroubleshooting),
+  (id: 'api', title: tr.docsLauncherAPI),
 ];
 
 const docSite = 'https://pixelworld.zhuzhi.site/docs';
@@ -42,7 +43,7 @@ Future<String> loadDocMarkdown(String id) async {
     try {
       final html = await _get('$base/$id.html');
       final md = htmlToMarkdown(html);
-      if (md.trim().isEmpty) throw Exception('文档内容为空');
+      if (md.trim().isEmpty) throw Exception(tr.docsDocumentEmpty);
       await cache.parent.create(recursive: true);
       await cache.writeAsString(md);
       return md;
@@ -51,7 +52,7 @@ Future<String> loadDocMarkdown(String id) async {
     }
   }
   if (cache.existsSync()) return cache.readAsStringSync();
-  throw Exception('无法获取文档（${error ?? '没有缓存'}），请检查网络后重试');
+  throw Exception(tr.docsCouldntLoadDocsCheck(error ?? tr.docsNoCache));
 }
 
 Future<String> _get(String url) async {

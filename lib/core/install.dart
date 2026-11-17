@@ -8,6 +8,7 @@ import 'paths.dart';
 import 'task.dart';
 import 'instance.dart';
 import 'version.dart';
+import 'i18n/strings.dart';
 
 /// 补全版本运行所需的文件（客户端、依赖库、日志配置、资源），启动前调用。
 /// [resourcesDir] 是旧版本按原文件名展开资源的目录（map_to_resources），即实际运行目录下的 resources。
@@ -45,7 +46,7 @@ Future<VersionJson> ensureVersionFiles(
     items.add(DownloadItem(url: lib.url, path: lib.path, sha1: lib.sha1, size: lib.size));
   }
   if (missingLocal.isNotEmpty) {
-    throw Exception('缺少由安装器生成的文件：${missingLocal.take(3).join('、')}，请重新安装这个实例');
+    throw Exception(tr.installFilesGeneratedInstallerMissing(missingLocal.take(3).join(tr.commonListSeparator)));
   }
 
   // 日志配置（修复 Log4Shell）
@@ -61,7 +62,7 @@ Future<VersionJson> ensureVersionFiles(
     );
   }
 
-  task.setStage('下载游戏本体与依赖库');
+  task.setStage(tr.installDownloadGameLibraries);
   await dl.downloadAll(items, task.progress, cancelled: () => task.cancelled);
 
   // 继承的版本使用自己文件夹里的游戏 jar 副本
@@ -77,7 +78,7 @@ Future<VersionJson> ensureVersionFiles(
   // 资源文件
   final ai = v.assetIndex;
   if (ai != null) {
-    task.setStage('下载资源索引');
+    task.setStage(tr.installDownloadAssetIndex);
     final indexItem = DownloadItem(
       url: '${ai['url']}',
       path: p.join(g.assets, 'indexes', '${ai['id']}.json'),
@@ -98,13 +99,13 @@ Future<VersionJson> ensureVersionFiles(
         ),
       );
     }).toList();
-    task.setStage('下载资源文件');
+    task.setStage(tr.installDownloadAssets);
     await dl.downloadAll([for (final o in objects) o.item], task.progress, cancelled: () => task.cancelled);
 
     // 旧版本资源需要按原文件名展开
     final mapToResources = index['map_to_resources'] == true;
     if (index['virtual'] == true || mapToResources) {
-      task.setStage('整理旧版资源');
+      task.setStage(tr.installOrganizeLegacyAssets);
       final target = mapToResources ? resourcesDir() : p.join(g.assets, 'virtual', '${ai['id']}');
       for (final o in objects) {
         final dest = File(p.join(target, o.name));
@@ -175,9 +176,9 @@ Future<({List<RemoteVersion> list, String latestRelease, String latestSnapshot})
 String checkVersionName(GamePaths g, String name) {
   final n = name.trim();
   if (n.isEmpty || n.length > 64 || RegExp(r'[\/:*?"<>|]').hasMatch(n) || n == '.' || n == '..') {
-    throw Exception(r'实例名称不能为空，且不能包含 \ / : * ? " < > |');
+    throw Exception(tr.installInstanceNameCantEmpty);
   }
-  if (Directory(g.versionDir(n)).existsSync()) throw Exception('已存在名为 $n 的实例');
+  if (Directory(g.versionDir(n)).existsSync()) throw Exception(tr.installInstanceNamedAlreadyExists(n));
   return n;
 }
 
@@ -195,14 +196,14 @@ Future<String> saveVersionJson(GamePaths g, VersionJson json, Downloader dl, Tas
 }
 
 /// 任务步骤名称：每个组件分为下载与安装两步
-String downloadStep(String component) => '下载 $component';
-String installStep(String component) => '安装 $component';
+String downloadStep(String component) => tr.installDownload(component);
+String installStep(String component) => tr.installInstall(component);
 
 Future<String> installVanilla(GamePaths g, String id, Downloader dl, TaskProgress task, {String? name}) async {
   task.beginStep(downloadStep('Minecraft $id'));
-  task.setStage('获取版本信息');
+  task.setStage(tr.installGetVersionInfo);
   final entry = (await remoteVersions(dl)).list.where((v) => v.id == id).firstOrNull;
-  if (entry == null) throw Exception('找不到版本 $id');
+  if (entry == null) throw Exception(tr.installVersionNotFound(id));
   final json = VersionJson(await dl.fetchJson(entry.url) as Map<String, dynamic>);
   final result = await saveVersionJson(g, json, dl, task, name: name != null && name != id ? name : null);
   task.beginStep(installStep('Minecraft $id'));
@@ -224,7 +225,7 @@ Future<void> ensureVanilla(GamePaths g, String gameVersion, Downloader dl, TaskP
     return;
   }
   if (await Downloader.isComplete(item)) return;
-  task.setStage('下载 Minecraft $gameVersion 本体');
+  task.setStage(tr.installDownloadMinecraft(gameVersion));
   await dl.downloadAll([item], task.progress, cancelled: () => task.cancelled);
 }
 

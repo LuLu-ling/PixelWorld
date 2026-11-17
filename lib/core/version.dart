@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'paths.dart';
+import 'i18n/strings.dart';
 
 /// Mojang 版本 JSON。字段较多且各加载器写法不一，直接包装 Map 读取。
 class VersionJson {
@@ -108,7 +109,7 @@ String _libKey(String name) {
 
 Future<VersionJson> readVersionJson(GamePaths g, String id) async {
   final f = File(g.versionJson(id));
-  if (!f.existsSync()) throw Exception('版本 $id 未安装');
+  if (!f.existsSync()) throw Exception(tr.versionVersionIsntInstalled(id));
   final raw = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
   return VersionJson(raw..['_folder'] = id);
 }

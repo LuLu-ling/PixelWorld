@@ -1,7 +1,9 @@
+import 'core/i18n/strings.dart';
+
 /// 名称与外部链接。名称规则见仓库根目录的 PCL-GUIDE.md。
 abstract final class AppInfo {
   static const name = 'Pixel World';
-  static const fullName = 'Pixel World 启动器';
+  static String get fullName => tr.appInfoPixelWorldLauncher;
 
   /// 新 UI 使用的品牌名；正式改名时再统一替换 [name]
   static const brandName = 'Pixel World';

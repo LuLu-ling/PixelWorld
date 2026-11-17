@@ -6,6 +6,7 @@ import 'authlib_injector.dart';
 import 'http_json.dart';
 import 'oauth.dart';
 import 'yggdrasil_api.dart';
+import '../i18n/strings.dart';
 
 /// Yggdrasil Connect：基于 OpenID Connect 的外置登录。用设备代码流取得访问令牌，
 /// 访问令牌直接作为游戏的 accessToken 交给 authlib-injector
@@ -48,11 +49,13 @@ class _Provider {
   static Future<_Provider> discover(YggdrasilServer server) async {
     final url = server.openIdConfigurationUrl;
     // Yggdrasil Connect 只允许 HTTPS
-    if (url == null || !url.startsWith('https://')) throw Exception('${server.name} 不支持 Yggdrasil Connect');
+    if (url == null || !url.startsWith('https://')) {
+      throw Exception(tr.yggdrasilConnectDoesntSupportYggdrasilConnect(server.name));
+    }
     final r = await requestJson('GET', url);
     final scopes = (r.map['scopes_supported'] as List?) ?? const [];
     if (!r.ok || r.map['token_endpoint'] == null || !YggdrasilConnect._requiredScopes.every(scopes.contains)) {
-      throw Exception('${server.name} 的 Yggdrasil Connect 配置无效');
+      throw Exception(tr.yggdrasilConnectHasInvalidYggdrasilConnect(server.name));
     }
     return _Provider(server, r.map);
   }
@@ -61,7 +64,7 @@ class _Provider {
   String get clientId =>
       YggdrasilConnect.clientIdFor(server.root) ??
       sharedClientId ??
-      (throw Exception('启动器尚未在 ${server.name} 注册应用，暂时无法使用 OAuth 登录'));
+      (throw Exception(tr.yggdrasilConnectLauncherHasntRegisteredApp(server.name)));
 
   OAuthClient oauth(String clientId) =>
       OAuthClient(clientId: clientId, tokenEndpoint: tokenEndpoint, deviceEndpoint: deviceEndpoint);
@@ -74,7 +77,7 @@ class _Provider {
 /// ID 令牌是经 HTTPS 直接从令牌端点取得的，按 OpenID Connect Core 3.1.3.7 可以用 TLS 代替签名验证
 GameProfile? idTokenProfile(String idToken, {required String issuer, required String clientId, DateTime? now}) {
   final parts = idToken.split('.');
-  if (parts.length != 3) throw const FormatException('ID 令牌格式错误');
+  if (parts.length != 3) throw FormatException(tr.yggdrasilConnectMalformedIDToken);
   final claims = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1])))) as Map<String, dynamic>;
   final aud = claims['aud'];
   final t = (now ?? DateTime.now()).millisecondsSinceEpoch ~/ 1000;
@@ -83,7 +86,7 @@ GameProfile? idTokenProfile(String idToken, {required String issuer, required St
       !(aud == clientId || (aud is List && aud.contains(clientId))) ||
       ((claims['exp'] as num?) ?? 0) < t - skew ||
       ((claims['iat'] as num?) ?? 0) > t + skew) {
-    throw Exception('ID 令牌无效（签发者、受众或有效期不符）');
+    throw Exception(tr.yggdrasilConnectInvalidIDTokenIssuer);
   }
   return GameProfile.tryParse(claims['selectedProfile']);
 }
@@ -103,10 +106,10 @@ class ConnectLogin implements LoginCommand {
   @override
   Future<Account> execute() async {
     final op = await _Provider.discover(await YggdrasilServer.resolve(site));
-    if (op.deviceEndpoint == null) throw Exception('${op.server.name} 不支持设备代码登录');
+    if (op.deviceEndpoint == null) throw Exception(tr.yggdrasilConnectDoesntSupportDeviceCode(op.server.name));
     final clientId = op.clientId;
     final t = await op.oauth(clientId).deviceLogin(YggdrasilConnect.scope, onCode, cancelled: () => _cancelled);
-    final profile = op.profileFrom(t.idToken, clientId) ?? (throw Exception('授权时没有选择角色'));
+    final profile = op.profileFrom(t.idToken, clientId) ?? (throw Exception(tr.yggdrasilConnectNoProfileWasChosen));
     return Account(
       id: newId(),
       type: AccountType.yggdrasilConnect,
@@ -134,7 +137,7 @@ class ConnectAuth implements AccountAuth {
 
   Future<Account> _refreshIfNeeded(Account acc) async {
     if ((acc.expiresAt ?? 0) > DateTime.now().millisecondsSinceEpoch + 5 * 60000) return acc;
-    final expired = Exception('${acc.typeLabel} 账户 ${acc.name} 的授权已过期，请在账户中重新登录');
+    final expired = Exception(tr.yggdrasilConnectAuthorizationAccountHasExpired(acc.typeLabel, acc.name));
     if (acc.refreshToken == null) throw expired;
     final op = await _Provider.discover(await YggdrasilServer.fetch(acc.server!));
     final clientId = acc.clientToken ?? op.clientId;

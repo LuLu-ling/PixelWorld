@@ -9,6 +9,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import 'safe_path.dart';
+import 'i18n/strings.dart';
 
 // zip 中的 pclpw-backup.json 记录备份的路径；第 2 版起还记录每个文件的大小与 SHA-256，
 // 并用保存在启动器数据目录的密钥做 HMAC 签名，恢复时据此确认备份由本机的 Pixel World 创建且未被修改。
@@ -145,21 +146,21 @@ Future<BackupCheck> checkBackup(String zip, String dir, List<int> key) async {
       archive = ZipDecoder().decodeStream(input);
       manifest = _readManifest(archive);
     } catch (e) {
-      throw BackupException('备份文件已损坏：$e');
+      throw BackupException(tr.backupBackupFileCorrupted(e));
     }
-    if (manifest == null) throw BackupException('这个备份不是由 Pixel World 创建的，无法恢复');
+    if (manifest == null) throw BackupException(tr.backupBackupWasntCreatedPixel);
     final rawPaths = manifest['paths'];
-    if (rawPaths is! List || rawPaths.isEmpty) throw BackupException('备份清单无效');
+    if (rawPaths is! List || rawPaths.isEmpty) throw BackupException(tr.backupInvalidBackupManifest);
     final paths = <String>[];
     for (final e in rawPaths) {
-      if (e is! String) throw BackupException('备份清单无效');
+      if (e is! String) throw BackupException(tr.backupInvalidBackupManifest);
       try {
         paths.add(splitRelative(e).join('/'));
       } on UnsafePathException {
-        throw BackupException('备份清单中有不安全的路径：$e');
+        throw BackupException(tr.backupBackupManifestContainsUnsafe(e));
       }
     }
-    if (normalizePathSet(paths).length != paths.length) throw BackupException('备份清单中有重复或互相包含的路径');
+    if (normalizePathSet(paths).length != paths.length) throw BackupException(tr.backupBackupManifestContainsDuplicate);
 
     // 签名：有 mac 就必须验证通过
     Map<String, String>? digests;
@@ -168,15 +169,17 @@ Future<BackupCheck> checkBackup(String zip, String dir, List<int> key) async {
     if (mac != null) {
       final body = Map<String, dynamic>.of(manifest)..remove('mac');
       if (mac is! String || _mac(key, body) != mac) {
-        throw BackupException('备份签名不匹配：备份被修改过，或者不是在这台设备上创建的');
+        throw BackupException(tr.backupBackupSignatureMismatchBackup);
       }
       final files = manifest['files'];
-      if (files is! Map) throw BackupException('备份清单无效');
+      if (files is! Map) throw BackupException(tr.backupInvalidBackupManifest);
       digests = {};
       sizes = {};
       for (final e in files.entries) {
         final info = e.value;
-        if (info is! Map || info['sha256'] is! String || info['size'] is! int) throw BackupException('备份清单无效');
+        if (info is! Map || info['sha256'] is! String || info['size'] is! int) {
+          throw BackupException(tr.backupInvalidBackupManifest);
+        }
         digests['${e.key}'] = info['sha256'] as String;
         sizes['${e.key}'] = info['size'] as int;
       }
@@ -186,21 +189,21 @@ Future<BackupCheck> checkBackup(String zip, String dir, List<int> key) async {
     final seen = <String>{};
     for (final f in archive.files) {
       if (f.name == backupManifestName) continue;
-      if (f.isSymbolicLink) throw BackupException('备份中有符号链接，不能恢复：${f.name}');
+      if (f.isSymbolicLink) throw BackupException(tr.backupBackupContainsSymbolicLink(f.name));
       final String rel;
       try {
         rel = splitRelative(f.name).join('/');
       } on UnsafePathException {
-        throw BackupException('备份中有不安全的路径：${f.name}');
+        throw BackupException(tr.backupBackupContainsUnsafePath(f.name));
       }
-      if (!_under(paths, rel)) throw BackupException('备份中有清单以外的文件：${f.name}');
+      if (!_under(paths, rel)) throw BackupException(tr.backupBackupContainsFileNot(f.name));
       if (!f.isFile) continue;
-      if (!seen.add(rel.toLowerCase())) throw BackupException('备份中有重复的文件：${f.name}');
-      if (sizes != null && sizes[rel] != f.size) throw BackupException('备份内容与清单不符：${f.name}');
+      if (!seen.add(rel.toLowerCase())) throw BackupException(tr.backupBackupContainsDuplicateFile(f.name));
+      if (sizes != null && sizes[rel] != f.size) throw BackupException(tr.backupBackupContentsDontMatch(f.name));
       count++;
       bytes += f.size;
     }
-    if (sizes != null && sizes.length != count) throw BackupException('备份缺少清单中的文件');
+    if (sizes != null && sizes.length != count) throw BackupException(tr.backupBackupMissingFilesListed);
     return BackupCheck(paths: paths, signed: mac != null, files: count, bytes: bytes, digests: digests);
   } finally {
     await input.close();
@@ -210,7 +213,7 @@ Future<BackupCheck> checkBackup(String zip, String dir, List<int> key) async {
 /// 把检查过的备份解压到新的临时文件夹 [staging]，并核对 CRC 与（签名备份的）SHA-256
 Future<void> extractBackup(String zip, String staging, BackupCheck check) async {
   if (FileSystemEntity.typeSync(staging, followLinks: false) != FileSystemEntityType.notFound) {
-    throw BackupException('临时文件夹已存在：$staging');
+    throw BackupException(tr.commonTemporaryFolderAlreadyExists(staging));
   }
   await Directory(staging).create(recursive: true);
   final input = InputFileStream(zip);
@@ -218,9 +221,9 @@ Future<void> extractBackup(String zip, String staging, BackupCheck check) async 
     final archive = ZipDecoder().decodeStream(input, verify: true);
     for (final f in archive.files) {
       if (f.name == backupManifestName) continue;
-      if (f.isSymbolicLink) throw BackupException('备份中有符号链接：${f.name}');
+      if (f.isSymbolicLink) throw BackupException(tr.backupBackupContainsSymbolicLink2(f.name));
       final rel = splitRelative(f.name).join('/');
-      if (!_under(check.paths, rel)) throw BackupException('备份中有清单以外的文件：${f.name}');
+      if (!_under(check.paths, rel)) throw BackupException(tr.backupBackupContainsFileNot(f.name));
       if (!f.isFile) continue;
       final abs = resolveInside(staging, rel);
       await Directory(p.dirname(abs)).create(recursive: true);
@@ -231,7 +234,9 @@ Future<void> extractBackup(String zip, String staging, BackupCheck check) async 
         await out.close();
       }
       final want = check.digests?[rel];
-      if (want != null && await _sha256Of(File(abs)) != want) throw BackupException('文件内容与备份清单不符：$rel');
+      if (want != null && await _sha256Of(File(abs)) != want) {
+        throw BackupException(tr.backupFileContentsDontMatch(rel));
+      }
     }
   } finally {
     await input.close();

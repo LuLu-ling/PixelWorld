@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import '../app_scope.dart';
 import '../platform.dart';
 import '../shell.dart';
+import '../l10n/l10n.dart';
+import '../core/i18n/strings.dart';
 
 /// 新手教程：在真实界面上一步步高亮各个地方（周围压暗），旁边的卡片说明它是做什么的。
 /// 第一次打开启动器时自动出现一次；之后可以在「设置 → 关于与致谢」里再看一遍。
@@ -109,24 +111,19 @@ class _Step {
   final bool mobileOnly;
 }
 
-const _steps = [
-  _Step('欢迎使用 Pixel World', '花一分钟认识一下启动器的几个主要地方。随时可以点「跳过」，之后在「设置 → 关于与致谢」里能再看一遍。', page: MainPage.home),
-  _Step('先添加账户', '点这里添加微软正版账户；登录过一次正版后，也可以添加外置登录（例如 LittleSkin）和离线账户。', target: 'top.account'),
-  _Step(
-    '安装游戏',
-    '在「下载」里选游戏版本和加载器（Forge、Fabric 等）来安装。装好的一份叫「实例」，同一个版本可以装好几个，存档和模组互不影响。'
-        '模组、整合包、资源包和光影也在这里找。',
-    target: 'rail.download',
-  ),
-  _Step('切换实例', '首页显示当前实例。点「切换实例」可以在装好的实例之间切换，或者管理全部实例。', target: 'home.switch', page: MainPage.home),
-  _Step('开始游戏', '选好实例后点这里启动。第一次启动会自动准备好需要的 Java。', target: 'home.launch', page: MainPage.home),
-  _Step('实例设置', '每个实例的模组、存档、资源包、光影、内存和 Java 都在这里单独管理，也可以直接给这个实例添加模组。', target: 'home.settings', page: MainPage.home),
-  _Step('后台任务', '下载和安装都在后台进行，进度显示在这里，点开可以查看详情或者取消。', target: 'top.tasks'),
-  _Step('工具', '联机大厅、局域网互传、服务器查询、错误分析，还有皮肤、成就图片这些小工具。', target: 'rail.tools'),
-  _Step('文件', '手机上的文件管理器：直接管理游戏文件夹里的存档、模组和截图。', target: 'rail.files', mobileOnly: true),
-  _Step('AI 助手', '有问题可以问 AI，例如游戏为什么崩溃、该装哪个模组。先在设置里配置好模型就能用。', target: 'rail.ai'),
-  _Step('设置', '主题、背景图片和首页布局在「个性化」里；Java、内存和游戏文件夹也在这里调整。', target: 'rail.settings'),
-  _Step('准备好了', '先去「下载」装一个实例吧！这个教程可以在「设置 → 关于与致谢」里再次打开。'),
+List<_Step> get _steps => [
+  _Step(tr.commonWelcomePixelWorld, tr.tourTakeMinuteGetKnow, page: MainPage.home),
+  _Step(tr.tourAddAccountFirst, tr.tourClickHereAddMicrosoft, target: 'top.account'),
+  _Step(tr.tourInstallGame, tr.tourUnderDownloadChooseGame, target: 'rail.download'),
+  _Step(tr.tourSwitchInstance, tr.tourHomePageShowsCurrent, target: 'home.switch', page: MainPage.home),
+  _Step(tr.tourPlay, tr.tourPickInstanceClickHere, target: 'home.launch', page: MainPage.home),
+  _Step(tr.tourInstanceSettings, tr.tourEachInstancesModsWorlds, target: 'home.settings', page: MainPage.home),
+  _Step(tr.tourBackgroundTasks, tr.tourDownloadsInstallsRunBackground, target: 'top.tasks'),
+  _Step(tr.navTools, tr.tourMultiplayerLobbyLANTransfer, target: 'rail.tools'),
+  _Step(tr.navFiles, tr.tourFileManagerYourPhone, target: 'rail.files', mobileOnly: true),
+  _Step(tr.navAiAssistant, tr.tourAskAIWhenSomething, target: 'rail.ai'),
+  _Step(tr.navSettings, tr.tourThemeBackgroundImageHome, target: 'rail.settings'),
+  _Step(tr.commonAllSet, tr.tourHeadDownloadInstallInstance),
 ];
 
 OverlayEntry? _entry;
@@ -449,11 +446,14 @@ class _Card extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  if (!last) TextButton(onPressed: onSkip, child: const Text('跳过')),
+                  if (!last) TextButton(onPressed: onSkip, child: Text(context.l10n.commonSkip)),
                   const Spacer(),
-                  if (onPrev != null) TextButton(onPressed: onPrev, child: const Text('上一步')),
+                  if (onPrev != null) TextButton(onPressed: onPrev, child: Text(context.l10n.commonBack)),
                   const SizedBox(width: 4),
-                  FilledButton(onPressed: onNext, child: Text(last ? '开始使用' : '下一步')),
+                  FilledButton(
+                    onPressed: onNext,
+                    child: Text(last ? context.l10n.tourGetStarted : context.l10n.commonNext),
+                  ),
                 ],
               ),
             ],

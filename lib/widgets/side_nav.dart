@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/instance.dart';
+import '../l10n/l10n.dart';
 import 'app_background.dart';
 import 'loader_icon.dart';
 
@@ -281,7 +282,10 @@ class MigratingPlaceholder extends StatelessWidget {
           const SizedBox(height: 16),
           Text(title, style: theme.textTheme.titleLarge),
           const SizedBox(height: 8),
-          Text('这部分功能正在迁移中', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(
+            context.l10n.comingSoon,
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
         ],
       ),
     );

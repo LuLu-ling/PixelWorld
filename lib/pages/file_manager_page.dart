@@ -12,9 +12,11 @@ import '../core/paths.dart';
 import '../platform.dart';
 import '../widgets/format.dart';
 import '../widgets/side_nav.dart';
+import '../l10n/l10n.dart';
+import '../core/i18n/strings.dart';
 
 /// 选择文件夹：桌面端用系统对话框，手机上用内置的文件管理器
-Future<String?> pickFolder(BuildContext context, {String? start, String confirm = '选择'}) async {
+Future<String?> pickFolder(BuildContext context, {String? start, String? confirm}) async {
   if (isDesktop) return getDirectoryPath(initialDirectory: start, confirmButtonText: confirm);
   return Navigator.of(
     context,
@@ -33,8 +35,8 @@ Future<String?> pickFile(
   BuildContext context, {
   String? start,
   List<String>? extensions,
-  String label = '文件',
-  String confirm = '选择',
+  String? label,
+  String? confirm,
 }) async {
   if (isDesktop) {
     final f = await openFile(
@@ -64,12 +66,12 @@ Future<String?> pickSavePath(
   String name, {
   String? start,
   List<String>? extensions,
-  String label = '文件',
+  String? label,
 }) async {
   if (isDesktop) {
     final loc = await getSaveLocation(
       suggestedName: name,
-      confirmButtonText: '保存',
+      confirmButtonText: context.l10n.fileManagerSave,
       acceptedTypeGroups: [
         if (extensions != null && extensions.isNotEmpty) XTypeGroup(label: label, extensions: extensions),
       ],
@@ -112,10 +114,10 @@ class FileManagerPage extends StatefulWidget {
     required this.start,
     bool pick = false,
     FilePickMode? mode,
-    this.confirm = '选择',
+    this.confirm,
     this.extensions,
     this.saveName,
-    this.label = '文件',
+    this.label,
     this.embedded = false,
   }) : mode = mode ?? (pick ? FilePickMode.folder : FilePickMode.none);
 
@@ -124,18 +126,22 @@ class FileManagerPage extends StatefulWidget {
 
   final String start;
   final FilePickMode mode;
-  final String confirm;
+
+  /// 确认按钮的动词，默认「选择」
+  final String? confirm;
 
   /// 选择文件时只能选这些扩展名（不带点）；为空时不限制
   final List<String>? extensions;
 
   /// 选择保存位置时预填的文件名
   final String? saveName;
-  final String label;
+
+  /// 选择或保存的内容名称，默认「文件」
+  final String? label;
 
   bool get pick => mode != FilePickMode.none;
 
-  static Route<String> route(String start, {bool pick = false, String confirm = '选择'}) => MaterialPageRoute(
+  static Route<String> route(String start, {bool pick = false, String? confirm}) => MaterialPageRoute(
     builder: (_) => FileManagerPage(start: start, pick: pick, confirm: confirm),
   );
 
@@ -170,23 +176,23 @@ class _FileManagerPageState extends State<FileManagerPage> {
   Future<void> _confirmSave() async {
     final name = _saveName.text.trim();
     if (name.isEmpty || name.contains('/') || name.contains(r'\')) {
-      toast(context, '请填写有效的文件名');
+      toast(context, context.l10n.fileManagerEnterValidFileName);
       return;
     }
     final target = p.join(_dir, name);
     if (FileSystemEntity.isDirectorySync(target)) {
-      toast(context, '已经有同名的文件夹');
+      toast(context, context.l10n.fileManagerFolderSameNameAlready);
       return;
     }
     if (File(target).existsSync()) {
       final ok = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('替换已有的文件？'),
-          content: Text('这个文件夹里已经有「$name」，保存后会替换它。'),
+          title: Text(context.l10n.fileManagerReplaceExistingFile),
+          content: Text(context.l10n.fileManagerAlreadyExistsFolderSaving(name)),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('替换')),
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(context.l10n.commonCancel)),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(context.l10n.fileManagerReplace)),
           ],
         ),
       );
@@ -290,7 +296,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
     try {
       await job();
     } catch (e) {
-      if (mounted) toast(context, '$label失败：${errorText(e)}');
+      if (mounted) toast(context, context.l10n.fileManagerFailed(label, errorText(e)));
     }
     if (!mounted) return;
     setState(() => _busy = null);
@@ -308,12 +314,12 @@ class _FileManagerPageState extends State<FileManagerPage> {
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(labelText: '名称'),
+          decoration: InputDecoration(labelText: context.l10n.fileManagerName),
           onSubmitted: (v) => Navigator.pop(context, v),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, ctrl.text), child: const Text('确定')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(context, ctrl.text), child: Text(context.l10n.fileManagerOK)),
         ],
       ),
     );
@@ -323,32 +329,36 @@ class _FileManagerPageState extends State<FileManagerPage> {
     name = name?.trim();
     if (name == null || name.isEmpty) return null;
     if (name.contains('/') || name.contains('\\') || name == '.' || name == '..') {
-      toast(context, '名称不能包含 / 或 \\');
+      toast(context, context.l10n.fileManagerNamesCantContain);
       return null;
     }
     return name;
   }
 
   Future<void> _newFolder() async {
-    final raw = await _askName('新建文件夹');
+    final raw = await _askName(context.l10n.fileManagerNewFolder);
     if (!mounted) return;
     final name = _checkName(raw);
     if (name == null) return;
     final target = p.join(_dir, name);
-    if (FileSystemEntity.typeSync(target) != FileSystemEntityType.notFound) return toast(context, '已有同名的文件或文件夹');
+    if (FileSystemEntity.typeSync(target) != FileSystemEntityType.notFound) {
+      return toast(context, context.l10n.fileManagerFileFolderSameName);
+    }
     _highlight = target;
-    await _run('新建文件夹', () => Directory(target).create());
+    await _run(context.l10n.fileManagerNewFolder, () => Directory(target).create());
   }
 
   Future<void> _rename(FileSystemEntity e) async {
-    final raw = await _askName('重命名', initial: p.basename(e.path));
+    final raw = await _askName(context.l10n.fileManagerRename, initial: p.basename(e.path));
     if (!mounted) return;
     final name = _checkName(raw);
     if (name == null || name == p.basename(e.path)) return;
     final target = p.join(_dir, name);
-    if (FileSystemEntity.typeSync(target) != FileSystemEntityType.notFound) return toast(context, '已有同名的文件或文件夹');
+    if (FileSystemEntity.typeSync(target) != FileSystemEntityType.notFound) {
+      return toast(context, context.l10n.fileManagerFileFolderSameName);
+    }
     _highlight = target;
-    await _run('重命名', () => e.rename(target));
+    await _run(context.l10n.fileManagerRename, () => e.rename(target));
   }
 
   Future<void> _delete(FileSystemEntity e) async {
@@ -357,35 +367,40 @@ class _FileManagerPageState extends State<FileManagerPage> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('彻底删除'),
-          content: Text('「$name」会被彻底删除，不能恢复。'),
+          title: Text(context.l10n.fileManagerDeletePermanently),
+          content: Text(context.l10n.fileManagerWillPermanentlyDeletedCant(name)),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('彻底删除')),
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(context.l10n.commonCancel)),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(context.l10n.fileManagerDeletePermanently),
+            ),
           ],
         ),
       );
-      if (ok == true) await _run('删除', () => e.delete(recursive: true));
+      if (ok == true) await _run(tr.commonDelete, () => e.delete(recursive: true));
       return;
     }
-    await _run('删除', () => moveToTrash(e.path));
-    if (mounted) toast(context, '「$name」已移到回收站');
+    await _run(context.l10n.commonDelete, () => moveToTrash(e.path));
+    if (mounted) toast(context, context.l10n.fileManagerMovedRecycleBin(name));
   }
 
   Future<void> _paste() async {
     final clip = _clipboard;
     if (clip == null) return;
     for (final src in clip.paths) {
-      if (p.equals(src, _dir) || p.isWithin(src, _dir)) return toast(context, '不能把文件夹粘贴到它自己里面');
+      if (p.equals(src, _dir) || p.isWithin(src, _dir)) {
+        return toast(context, context.l10n.fileManagerCantPasteFolderInto);
+      }
     }
     final total = clip.paths.fold(0, (n, s) => n + countFiles(s));
     var done = 0;
     void tick(String _) {
       done++;
-      if (mounted && done % 20 == 0) setState(() => _busy = '正在粘贴（$done / $total）');
+      if (mounted && done % 20 == 0) setState(() => _busy = context.l10n.fileManagerPasting(done, total));
     }
 
-    await _run(clip.cut ? '移动' : '复制', () async {
+    await _run(clip.cut ? context.l10n.storageLocationMove : context.l10n.commonCopy, () async {
       for (final src in clip.paths) {
         final target = uniquePath(p.join(_dir, p.basename(src)));
         if (clip.cut && p.equals(p.dirname(src), _dir)) continue;
@@ -397,16 +412,16 @@ class _FileManagerPageState extends State<FileManagerPage> {
   }
 
   Future<void> _import() async {
-    final files = await openFiles(confirmButtonText: '导入');
+    final files = await openFiles(confirmButtonText: context.l10n.pclImportButton);
     if (files.isEmpty) return;
-    await _run('导入', () async {
+    await _run(tr.pclImportButton, () async {
       for (final f in files) {
         final target = uniquePath(p.join(_dir, f.name));
         await f.saveTo(target);
         _highlight = target;
       }
     });
-    if (mounted) toast(context, '已导入 ${files.length} 个文件');
+    if (mounted) toast(context, context.l10n.fileManagerImportedFiles(files.length));
   }
 
   Future<void> _requestAccess() async {
@@ -431,9 +446,9 @@ class _FileManagerPageState extends State<FileManagerPage> {
         final bytes = raf.readSync(512 * 1024);
         raf.closeSync();
         text = utf8.decode(bytes, allowMalformed: true);
-        if (f.lengthSync() > bytes.length) text += '\n\n…（文件较大，只显示前 512 KB）';
+        if (f.lengthSync() > bytes.length) text += context.l10n.fileManagerLargeFileOnlyFirst;
       } catch (e) {
-        text = '无法读取：${errorText(e)}';
+        text = context.l10n.fileManagerCantRead(errorText(e));
       }
       showDialog<void>(
         context: context,
@@ -446,11 +461,11 @@ class _FileManagerPageState extends State<FileManagerPage> {
               child: SelectableText(text, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
             ),
           ),
-          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('关闭'))],
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.windowClose))],
         ),
       );
     } else {
-      toast(context, '不能预览这种文件。可以复制、剪切、重命名或删除');
+      toast(context, context.l10n.fileManagerKindFileCantPreviewed);
     }
   }
 
@@ -460,18 +475,30 @@ class _FileManagerPageState extends State<FileManagerPage> {
     final scheme = theme.colorScheme;
     final state = AppScope.of(context);
     final shortcuts = [
-      (icon: Icons.sports_esports_outlined, label: '游戏文件夹', path: state.config.gameDir),
-      if (Platform.isAndroid) (icon: Icons.smartphone, label: '手机存储', path: AndroidStorage.root),
-      (icon: Icons.inventory_2_outlined, label: '应用数据', path: Paths.appData),
-      (icon: Icons.delete_outline, label: '回收站', path: mobileTrashFor(state.config.gameDir)),
+      (icon: Icons.sports_esports_outlined, label: context.l10n.oobeGameFolder, path: state.config.gameDir),
+      if (Platform.isAndroid) (icon: Icons.smartphone, label: context.l10n.oobePhoneStorage, path: AndroidStorage.root),
+      (icon: Icons.inventory_2_outlined, label: context.l10n.fileManagerAppData, path: Paths.appData),
+      (
+        icon: Icons.delete_outline,
+        label: context.l10n.fileManagerRecycleBin,
+        path: mobileTrashFor(state.config.gameDir),
+      ),
     ];
     final clip = _clipboard;
     final actions = [
-      IconButton(tooltip: '上一级', onPressed: _up, icon: const Icon(Icons.arrow_upward)),
-      IconButton(tooltip: '新建文件夹', onPressed: _newFolder, icon: const Icon(Icons.create_new_folder_outlined)),
+      IconButton(tooltip: context.l10n.fileManagerUp, onPressed: _up, icon: const Icon(Icons.arrow_upward)),
+      IconButton(
+        tooltip: context.l10n.fileManagerNewFolder,
+        onPressed: _newFolder,
+        icon: const Icon(Icons.create_new_folder_outlined),
+      ),
       if (!widget.pick)
-        IconButton(tooltip: '从手机导入文件', onPressed: _import, icon: const Icon(Icons.file_upload_outlined)),
-      IconButton(tooltip: '刷新', onPressed: _load, icon: const Icon(Icons.refresh)),
+        IconButton(
+          tooltip: context.l10n.fileManagerImportFilesFromPhone,
+          onPressed: _import,
+          icon: const Icon(Icons.file_upload_outlined),
+        ),
+      IconButton(tooltip: context.l10n.fileViewerRefresh, onPressed: _load, icon: const Icon(Icons.refresh)),
       const SizedBox(width: 8),
     ];
     final content = Column(
@@ -510,16 +537,22 @@ class _FileManagerPageState extends State<FileManagerPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      '已${clip.cut ? '剪切' : '复制'}「${p.basename(clip.paths.first)}」'
-                      '${clip.paths.length > 1 ? ' 等 ${clip.paths.length} 项' : ''}，打开目标文件夹后粘贴',
+                      context.l10n.fileManagerOpenDestinationFolderPaste(
+                        clip.cut ? context.l10n.fileManagerCut : context.l10n.commonCopy,
+                        p.basename(clip.paths.first),
+                        clip.paths.length > 1 ? context.l10n.fileManagerMore(clip.paths.length) : '',
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  TextButton(onPressed: () => setState(() => _clipboard = null), child: const Text('取消')),
+                  TextButton(
+                    onPressed: () => setState(() => _clipboard = null),
+                    child: Text(context.l10n.commonCancel),
+                  ),
                   FilledButton.tonalIcon(
                     onPressed: _busy == null ? _paste : null,
                     icon: const Icon(Icons.content_paste),
-                    label: const Text('粘贴到这里'),
+                    label: Text(context.l10n.fileManagerPasteHere),
                   ),
                 ],
               ),
@@ -534,11 +567,11 @@ class _FileManagerPageState extends State<FileManagerPage> {
               child: Row(
                 children: [
                   Expanded(child: Text(_dir, overflow: TextOverflow.ellipsis)),
-                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+                  TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel)),
                   const SizedBox(width: 8),
                   FilledButton(
                     onPressed: _error == null ? () => Navigator.pop(context, _dir) : null,
-                    child: Text('${widget.confirm}这个文件夹'),
+                    child: Text(context.l10n.fileManagerFolder(widget.confirm ?? context.l10n.commonChoose)),
                   ),
                 ],
               ),
@@ -554,12 +587,15 @@ class _FileManagerPageState extends State<FileManagerPage> {
                   Expanded(
                     child: Text(
                       widget.extensions == null || widget.extensions!.isEmpty
-                          ? '点一个文件来${widget.confirm}'
-                          : '点一个 ${widget.extensions!.map((e) => '.$e').join(' / ')} 文件来${widget.confirm}',
+                          ? context.l10n.fileManagerTapFile(widget.confirm ?? context.l10n.commonChoose)
+                          : context.l10n.fileManagerTapFile2(
+                              widget.extensions!.map((e) => '.$e').join(' / '),
+                              widget.confirm ?? context.l10n.commonChoose,
+                            ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+                  TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel)),
                 ],
               ),
             ),
@@ -574,13 +610,20 @@ class _FileManagerPageState extends State<FileManagerPage> {
                   Expanded(
                     child: TextField(
                       controller: _saveName,
-                      decoration: const InputDecoration(labelText: '文件名', isDense: true, border: OutlineInputBorder()),
+                      decoration: InputDecoration(
+                        labelText: context.l10n.fileManagerFileName,
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                      ),
                       onSubmitted: (_) => _confirmSave(),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-                  FilledButton(onPressed: _error == null ? _confirmSave : null, child: const Text('保存到这里')),
+                  TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel)),
+                  FilledButton(
+                    onPressed: _error == null ? _confirmSave : null,
+                    child: Text(context.l10n.fileManagerSaveHere),
+                  ),
                 ],
               ),
             ),
@@ -608,7 +651,9 @@ class _FileManagerPageState extends State<FileManagerPage> {
           children: [
             SideNav<String?>(
               groups: [
-                SideNavGroup('位置', [for (final s in shortcuts) SideNavItem<String?>(s.path, s.label, s.icon)]),
+                SideNavGroup(context.l10n.fileManagerLocation, [
+                  for (final s in shortcuts) SideNavItem<String?>(s.path, s.label, s.icon),
+                ]),
               ],
               value: current,
               onChanged: (v) {
@@ -654,10 +699,10 @@ class _FileManagerPageState extends State<FileManagerPage> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(switch (widget.mode) {
-            FilePickMode.folder => '选择文件夹',
-            FilePickMode.file => '选择${widget.label}',
-            FilePickMode.save => '保存${widget.label}',
-            FilePickMode.none => '文件管理',
+            FilePickMode.folder => context.l10n.fileManagerChooseFolder,
+            FilePickMode.file => context.l10n.fileManagerChoose(widget.label ?? context.l10n.navFiles),
+            FilePickMode.save => context.l10n.fileManagerSave2(widget.label ?? context.l10n.navFiles),
+            FilePickMode.none => context.l10n.storageLocationFileManager,
           }),
           actions: actions,
         ),
@@ -678,12 +723,14 @@ class _FileManagerPageState extends State<FileManagerPage> {
               Icon(_needAccess ? Icons.lock_outline : Icons.error_outline, size: 40, color: scheme.onSurfaceVariant),
               const SizedBox(height: 12),
               Text(
-                _needAccess ? '需要「所有文件访问权限」才能访问手机存储' : '无法打开这个文件夹：${errorText(_error!)}',
+                _needAccess
+                    ? context.l10n.fileManagerAccessingPhoneStorageRequires
+                    : context.l10n.fileManagerCantOpenFolder(errorText(_error!)),
                 textAlign: TextAlign.center,
               ),
               if (_needAccess) ...[
                 const SizedBox(height: 16),
-                FilledButton(onPressed: _requestAccess, child: const Text('去授予权限')),
+                FilledButton(onPressed: _requestAccess, child: Text(context.l10n.fileManagerGrantPermission)),
               ],
             ],
           ),
@@ -692,7 +739,10 @@ class _FileManagerPageState extends State<FileManagerPage> {
     }
     if (_entries.isEmpty) {
       return Center(
-        child: Text('空文件夹', style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant)),
+        child: Text(
+          context.l10n.fileManagerEmptyFolder,
+          style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
+        ),
       );
     }
     return ListView.builder(
@@ -741,7 +791,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
           trailing: widget.pick
               ? null
               : PopupMenuButton<String>(
-                  tooltip: '更多操作',
+                  tooltip: context.l10n.fileManagerMoreActions,
                   onSelected: (v) => switch (v) {
                     'copy' => setState(() => _clipboard = (paths: [e.path], cut: false)),
                     'cut' => setState(() => _clipboard = (paths: [e.path], cut: true)),
@@ -750,10 +800,13 @@ class _FileManagerPageState extends State<FileManagerPage> {
                     _ => null,
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'copy', child: Text('复制')),
-                    const PopupMenuItem(value: 'cut', child: Text('剪切')),
-                    const PopupMenuItem(value: 'rename', child: Text('重命名')),
-                    PopupMenuItem(value: 'delete', child: Text(_inTrash ? '彻底删除' : '删除')),
+                    PopupMenuItem(value: 'copy', child: Text(context.l10n.commonCopy)),
+                    PopupMenuItem(value: 'cut', child: Text(context.l10n.fileManagerCut)),
+                    PopupMenuItem(value: 'rename', child: Text(context.l10n.fileManagerRename)),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text(_inTrash ? context.l10n.fileManagerDeletePermanently : context.l10n.commonDelete),
+                    ),
                   ],
                 ),
         );

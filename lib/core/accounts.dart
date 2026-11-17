@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'paths.dart';
 import 'secure.dart';
 import 'safe_write.dart';
+import 'i18n/strings.dart';
 
 /// 账户类型：离线、微软、外置登录（Yggdrasil API，账户密码）、外置登录（Yggdrasil Connect，OAuth 授权）
 enum AccountType { offline, microsoft, yggdrasil, yggdrasilConnect }
@@ -56,9 +57,10 @@ class Account {
   final String? clientToken;
 
   String get typeLabel => switch (type) {
-    AccountType.offline => '离线账户',
-    AccountType.microsoft => '微软账户',
-    AccountType.yggdrasil || AccountType.yggdrasilConnect => '外置登录 · ${serverName ?? Uri.tryParse('$server')?.host}',
+    AccountType.offline => tr.oobeOfflineAccount,
+    AccountType.microsoft => tr.oobeMicrosoftAccount,
+    AccountType.yggdrasil ||
+    AccountType.yggdrasilConnect => tr.accountsExternal(serverName ?? Uri.tryParse('$server')?.host ?? ''),
   };
 
   Account copyWith({
@@ -188,7 +190,7 @@ class AccountStore {
 
   static final _namePattern = RegExp(r'^[A-Za-z0-9_]{3,16}$');
 
-  static String? validateOfflineName(String name) => _namePattern.hasMatch(name) ? null : '用户名需为 3-16 位字母、数字或下划线';
+  static String? validateOfflineName(String name) => _namePattern.hasMatch(name) ? null : tr.accountsUsernamesMust316;
 
   Future<Account> addOffline(String name) async {
     final error = validateOfflineName(name);

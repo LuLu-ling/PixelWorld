@@ -7,6 +7,7 @@ import '../app_info.dart';
 import '../app_state.dart';
 import '../core/accounts.dart';
 import '../core/precheck.dart';
+import '../l10n/l10n.dart';
 import 'accounts_dialog.dart';
 
 /// 正版购买劝导与赞助劝导的对话框
@@ -22,19 +23,21 @@ class DialogLaunchPrompts implements LaunchPrompts {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.verified_user_outlined),
-        title: const Text('需要先验证正版'),
-        content: const SizedBox(
-          width: 400,
-          child: Text(
-            'Minecraft 是付费游戏。按照 Mojang 的规定，需要先登录一次购买了 Minecraft 的微软账户，'
-            '才能用离线账户或外置登录开始游戏。\n\n'
-            '验证一次之后，离线账户和外置登录就可以一直使用了。',
-          ),
-        ),
+        title: Text(context.l10n.launchDialogsVerifyOwnershipFirst),
+        content: SizedBox(width: 400, child: Text(context.l10n.launchDialogsOwnershipRequiredBody)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, OwnershipChoice.cancel), child: const Text('返回')),
-          TextButton(onPressed: () => Navigator.pop(context, OwnershipChoice.store), child: const Text('去购买')),
-          FilledButton(onPressed: () => Navigator.pop(context, OwnershipChoice.login), child: const Text('登录微软账户')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, OwnershipChoice.cancel),
+            child: Text(context.l10n.tooltipBack),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, OwnershipChoice.store),
+            child: Text(context.l10n.launchDialogsBuyGame),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, OwnershipChoice.login),
+            child: Text(context.l10n.launchDialogsSignInMicrosoft),
+          ),
         ],
       ),
     );
@@ -54,11 +57,14 @@ class DialogLaunchPrompts implements LaunchPrompts {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.warning_amber_rounded),
-        title: const Text('Java 版本可能不兼容'),
-        content: SizedBox(width: 400, child: Text('$message\n\n可以在实例设置中把 Java 改为 Java 8 或自动选择。')),
+        title: Text(context.l10n.launchDialogsJavaVersionMayIncompatible),
+        content: SizedBox(width: 400, child: Text(context.l10n.launchDialogsYouCanChangeJava(message))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('返回')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('仍然启动')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(context.l10n.tooltipBack)),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.l10n.launchDialogsLaunchAnyway),
+          ),
         ],
       ),
     );
@@ -71,18 +77,14 @@ class DialogLaunchPrompts implements LaunchPrompts {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.favorite_outline),
-        title: Text('已经启动 $launchCount 次游戏啦'),
-        content: const SizedBox(
+        title: Text(context.l10n.launchDialogsOtherTimes(launchCount)),
+        content: SizedBox(
           width: 400,
-          child: Text(
-            '${AppInfo.name} 由 ${AppInfo.authorName} 维护。如果觉得好用，'
-            '能否考虑赞助一下作者？\n\n'
-            '本项目免费、没有广告，离不开大家的支持。',
-          ),
+          child: Text(context.l10n.launchDialogsMaintainedIfYouFind(AppInfo.name, AppInfo.authorName)),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('下次再说')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('赞助作者')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(context.l10n.launchDialogsMaybeLater)),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(context.l10n.aboutSponsor)),
         ],
       ),
     );
@@ -116,28 +118,28 @@ class _PasswordDialogState extends State<_PasswordDialog> {
   @override
   Widget build(BuildContext context) => AlertDialog(
     icon: const Icon(Icons.lock_outline),
-    title: Text('重新登录 ${widget.acc.serverName ?? ''}'),
+    title: Text(context.l10n.launchDialogsSignAgain(widget.acc.serverName ?? '')),
     content: SizedBox(
       width: 400,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('${widget.acc.name}（${widget.acc.login}）的登录已失效，请输入密码继续启动。'),
+          Text(context.l10n.launchDialogsSignHasExpiredEnter(widget.acc.name, widget.acc.login ?? '')),
           const SizedBox(height: 16),
           TextField(
             controller: _password,
             autofocus: true,
             obscureText: true,
-            decoration: const InputDecoration(labelText: '密码', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: context.l10n.commonPassword, border: const OutlineInputBorder()),
             onSubmitted: (_) => _submit(),
           ),
         ],
       ),
     ),
     actions: [
-      TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消启动')),
-      FilledButton(onPressed: _submit, child: const Text('登录')),
+      TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.launchDialogsCancelLaunch)),
+      FilledButton(onPressed: _submit, child: Text(context.l10n.commonSign)),
     ],
   );
 }

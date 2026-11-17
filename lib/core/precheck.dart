@@ -1,4 +1,5 @@
 import 'accounts.dart';
+import 'i18n/strings.dart';
 
 /// 启动前的正版验证与赞助提示。
 ///
@@ -16,7 +17,7 @@ const buyMinecraftUrl = 'https://www.minecraft.net/store/minecraft-java-bedrock-
 bool needsOwnershipCheck(Account acc, {required bool hintBuy}) => !hintBuy && acc.type != AccountType.microsoft;
 
 /// 离线账户和外置登录不可用时的说明
-const ownershipRequiredHint = '先登录一次购买了 Minecraft 的微软账户，才能使用离线账户和外置登录';
+String get ownershipRequiredHint => tr.precheckOwnershipRequired;
 
 /// 本次启动是否弹出赞助提示
 bool shouldAskSponsor(int launchCount) => sponsorCounts.contains(launchCount);

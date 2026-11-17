@@ -104,7 +104,11 @@ bool _hasContent(String dir) {
 /// 配置里的路径只改已经移走的那几项，任何时候都指向文件实际所在的位置。
 ///
 /// 返回这次启动应该使用的数据目录：一项都移不动（例如不在同一个盘）时继续用旧目录。
-Future<String> migrateWindowsLayout({required List<String> legacy, required String configDir, required String dataDir}) async {
+Future<String> migrateWindowsLayout({
+  required List<String> legacy,
+  required String configDir,
+  required String dataDir,
+}) async {
   final old = legacy.where((d) => !p.equals(d, dataDir) && !p.equals(d, configDir) && _hasContent(d)).firstOrNull;
   if (old == null) return dataDir;
   final config = File(p.join(configDir, 'config.json'));

@@ -38,7 +38,7 @@ abstract final class BackgroundPrefs {
 
   /// 契合度：填充 fill、适应 fit、拉伸 stretch、平铺 tile、居中 center、跨区 span（和 Windows 桌面壁纸一样）
   static const fitKey = 'bgFit';
-  static const fits = {'fill': '填充', 'fit': '适应', 'stretch': '拉伸', 'tile': '平铺', 'center': '居中', 'span': '跨区'};
+  static const fits = ['fill', 'fit', 'stretch', 'tile', 'center', 'span'];
 
   static const defaults = <String, dynamic>{
     imageKey: '',
@@ -102,7 +102,7 @@ class BackgroundController extends ChangeNotifier {
   String get fit {
     final v = _get<Object?>(BackgroundPrefs.fitKey);
     // 跨区只有电脑上有
-    return BackgroundPrefs.fits.containsKey(v) && (isDesktop || v != 'span') ? v as String : 'fill';
+    return BackgroundPrefs.fits.contains(v) && (isDesktop || v != 'span') ? v as String : 'fill';
   }
 
   /// 背景暗化的浓度；没有调过时用默认值（深色 35%、浅色 10%，和以前一样）

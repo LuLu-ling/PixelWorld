@@ -13,6 +13,7 @@ import 'loaders.dart';
 import 'paths.dart';
 import 'task.dart';
 import 'version.dart';
+import 'i18n/strings.dart';
 
 /// Forge 与 NeoForge：用官方安装器安装。
 /// 新版安装器支持 --installClient 命令行安装；1.12.2 以前的大部分安装器不支持，
@@ -213,13 +214,13 @@ Future<String> installForgeLike(
 
   final component = loaderComponent(kind, gameVersion, version);
   task.beginStep(downloadStep(component));
-  task.setStage('下载 $label 安装器');
+  task.setStage(tr.forgeDownloadInstaller(label));
   final installer = Paths.tempFile('${kind.name}-$version-installer.jar');
   await dl.downloadFile(DownloadItem(url: _installerUrl(kind, version), path: installer.path));
   try {
     final zip = ZipDecoder().decodeBytes(await installer.readAsBytes());
     final profileEntry = zip.findFile('install_profile.json');
-    if (profileEntry == null) throw Exception('$label 安装器已损坏：找不到 install_profile.json');
+    if (profileEntry == null) throw Exception(tr.forgeInstallerCorruptedInstallProfile(label));
     final profile = jsonDecode(utf8.decode(profileEntry.content)) as Map<String, dynamic>;
 
     task.beginStep(installStep(component));
@@ -269,7 +270,7 @@ Future<String> installForgeLike(
           } catch (e) {
             if (task.cancelled) rethrow;
             // 离线安装出问题时（例如安装器版本差异），改用原安装器联网安装一次
-            task.output('离线安装失败，改为联网安装：$e');
+            task.output(tr.forgeOfflineInstallFailedInstalling(e));
           }
           id = offlineId ?? await run(installer.path, offline: false);
         } finally {
@@ -370,7 +371,7 @@ Future<bool> _prepareInstallerFiles(
     final coord = _artifactCoord(_dataValue(profile, 'MOJMAPS', 'client'));
     final mappings = (vanilla.raw['downloads'] as Map?)?['client_mappings'] as Map?;
     if (coord == null || mappings == null || mappings['url'] == null) {
-      task.output('$label 安装器需要联网下载 Mojang 映射，无法完全离线安装');
+      task.output(tr.forgeInstallerNeedsDownloadMojang(label));
       return false;
     }
     add(
@@ -384,11 +385,11 @@ Future<bool> _prepareInstallerFiles(
   }
 
   if (items.isEmpty) return true;
-  task.setStage('下载 $label 安装器需要的文件');
+  task.setStage(tr.forgeDownloadFilesNeededInstaller(label));
   try {
     await dl.downloadAll(items.values.toList(), task.progress, cancelled: () => task.cancelled);
   } catch (e) {
-    task.output('部分文件没有下载成功，交给安装器重试：$e');
+    task.output(tr.forgeSomeFilesDidntDownload(e));
   }
   for (final item in items.values) {
     if (!await Downloader.isComplete(item)) return false;
@@ -471,7 +472,9 @@ Future<String> _runInstaller(
       ? VersionJson({'id': gameVersion, 'javaVersion': javaVersion})
       : vanilla;
 
-  task.setStage(offline ? '运行 $label 安装器（处理文件，可能需要几分钟）' : '运行 $label 安装器（下载依赖并处理文件，可能需要几分钟）');
+  task.setStage(
+    offline ? tr.forgeRunInstallerProcessingFiles(label) : tr.forgeRunInstallerDownloadingDependencies(label),
+  );
   final before = _versionIds(g);
   final r = await runJava(
     javaFor,
@@ -485,12 +488,12 @@ Future<String> _runInstaller(
   final installerLog = File(p.join(g.root, '${p.basename(installer)}.log'));
   if (installerLog.existsSync()) await installerLog.delete().catchError((_) => installerLog);
   String tail() => r.output.trim().split('\n').reversed.take(8).toList().reversed.join('\n');
-  if (r.code != 0) throw Exception('$label 安装器运行失败（退出代码 ${r.code}）\n${tail()}');
+  if (r.code != 0) throw Exception(tr.forgeInstallerFailedExitCode(label, r.code, tail()));
   // 安卓上拿不到 System.exit 的退出代码，安装器报告失败时按输出判断
   if (Platform.isAndroid &&
       RegExp(r'There was an error during installation|A problem installing was detected|Exception in thread "main"')
           .hasMatch(r.output)) {
-    throw Exception('$label 安装器运行失败\n${tail()}');
+    throw Exception(tr.forgeInstallerFailed(label, tail()));
   }
   // 优先用安装器自带的版本名（已安装过同一个版本时，安装器会覆盖它，不新增文件夹）。
   // 不能只看前后新增了哪些文件夹：排队时同时进行的其他安装也会新增版本，会认错版本
@@ -499,9 +502,9 @@ Future<String> _runInstaller(
   final candidates = added.length > 1 ? added.where((id) => id.contains(gameVersion)).toSet() : added;
   if (candidates.length == 1) return candidates.single;
   if (candidates.length > 1) {
-    throw Exception('$label 安装器之后出现了多个新版本（${candidates.join('、')}），无法确定是哪一个');
+    throw Exception(tr.forgeSeveralNewVersionsAppeared(label, candidates.join(tr.commonListSeparator)));
   }
-  throw Exception('$label 安装器没有生成新的版本');
+  throw Exception(tr.forgeInstallerDidntCreateNew(label));
 }
 
 /// 老版安装器：install_profile.json 中包含 versionInfo（版本 JSON）与 install（主 jar 位置）
@@ -513,7 +516,7 @@ Future<String> _installLegacy(
   TaskProgress task,
   String label,
 ) async {
-  task.setStage('安装 $label');
+  task.setStage(tr.forgeInstall(label));
   final info = Map<String, dynamic>.from(profile['versionInfo'] as Map);
   final install = profile['install'] as Map<String, dynamic>;
   final id = '${info['id']}';
@@ -521,7 +524,7 @@ Future<String> _installLegacy(
 
   // 主 jar 放进 libraries，对应 install.path 的 Maven 坐标
   final universal = zip.findFile('${install['filePath']}');
-  if (universal == null) throw Exception('$label 安装器已损坏：找不到 ${install['filePath']}');
+  if (universal == null) throw Exception(tr.forgeInstallerCorruptedMissing(label, install['filePath']));
   final target = File(p.join(g.libraries, mavenPath('${install['path']}')));
   await target.parent.create(recursive: true);
   await target.writeAsBytes(universal.content);

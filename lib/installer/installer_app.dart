@@ -6,6 +6,8 @@ import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 
 import '../app_info.dart';
+import '../core/i18n/strings.dart';
+import '../l10n/l10n.dart';
 import '../theme.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/window_buttons.dart';
@@ -14,8 +16,12 @@ import 'installer_core.dart';
 /// 安装 / 卸载界面
 Future<void> runInstaller(InstallerMode mode, List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+  // 安装器没有启动器的设置，跟随系统语言
+  useCoreStrings(lookupAppLocalizations(AppL10n.resolve(WidgetsBinding.instance.platformDispatcher.locales, const [])));
   final window = WindowManager.instance.getCurrent()!;
-  window.title = mode == InstallerMode.install ? '安装 ${AppInfo.name}' : '卸载 ${AppInfo.name}';
+  window.title = mode == InstallerMode.install
+      ? tr.installerAppInstall(AppInfo.name)
+      : tr.installerAppUninstall(AppInfo.name);
   window.titleBarStyle = TitleBarStyle.hidden;
   window.isWindowControlButtonsVisible = false;
   window.isResizable = false;
@@ -44,6 +50,9 @@ class InstallerApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
+      supportedLocales: AppL10n.supportedLocales,
+      localizationsDelegates: AppL10n.delegates,
+      localeListResolutionCallback: AppL10n.resolve,
       home: _InstallerPage(mode: mode, args: args),
     );
   }
@@ -77,7 +86,10 @@ class _InstallerPageState extends State<_InstallerPage> {
   bool get _upgrade => _isInstall && readManifest(_dir) != null;
 
   Future<void> _pickDir() async {
-    final picked = await getDirectoryPath(initialDirectory: p.dirname(_dir), confirmButtonText: '选择');
+    final picked = await getDirectoryPath(
+      initialDirectory: p.dirname(_dir),
+      confirmButtonText: context.l10n.commonChoose,
+    );
     if (picked == null) return;
     // 选了普通文件夹时放进同名子文件夹，文件不会散落在里面
     setState(
@@ -89,7 +101,7 @@ class _InstallerPageState extends State<_InstallerPage> {
   Future<void> _install() async {
     setState(() {
       _step = _Step.working;
-      _stage = '正在准备…';
+      _stage = context.l10n.lanTransferPreparing;
       _value = null;
     });
     try {
@@ -118,7 +130,7 @@ class _InstallerPageState extends State<_InstallerPage> {
   Future<void> _uninstall() async {
     setState(() {
       _step = _Step.working;
-      _stage = '正在卸载…';
+      _stage = context.l10n.installerAppUninstalling;
     });
     try {
       await startCleanup(_dir, removeData: _removeData);
@@ -196,10 +208,13 @@ class _InstallerPageState extends State<_InstallerPage> {
       _Step.form => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('${_upgrade ? '更新' : '安装'} ${AppInfo.name}', style: theme.textTheme.headlineSmall),
+          Text(
+            '${_upgrade ? context.l10n.installerAppUpdate : context.l10n.commonInstall} ${AppInfo.name}',
+            style: theme.textTheme.headlineSmall,
+          ),
           const SizedBox(height: 4),
           Text(
-            '版本 ${AppInfo.version} · 只为当前用户安装，不需要管理员权限',
+            context.l10n.installerAppVersionInstalledCurrentUser(AppInfo.version),
             style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 20),
@@ -208,61 +223,70 @@ class _InstallerPageState extends State<_InstallerPage> {
             margin: EdgeInsets.zero,
             child: ListTile(
               leading: const Icon(Icons.folder_outlined),
-              title: const Text('安装位置'),
+              title: Text(context.l10n.installerAppInstallLocation),
               subtitle: Text(_dir, overflow: TextOverflow.ellipsis),
-              trailing: TextButton(onPressed: _pickDir, child: const Text('更改')),
+              trailing: TextButton(onPressed: _pickDir, child: Text(context.l10n.storageLocationChange)),
             ),
           ),
           const SizedBox(height: 8),
           CheckboxListTile(
             value: _desktop,
             onChanged: (v) => setState(() => _desktop = v!),
-            title: const Text('创建桌面快捷方式'),
+            title: Text(context.l10n.shortcut),
           ),
           CheckboxListTile(
             value: _startMenu,
             onChanged: (v) => setState(() => _startMenu = v!),
-            title: const Text('添加到开始菜单'),
+            title: Text(context.l10n.installerAppAddStartMenu),
           ),
           const Spacer(),
           Text(
-            '${AppInfo.name} 是第三方 Minecraft 启动器，与 Mojang 或 Microsoft 无关。',
+            context.l10n.installerAppThirdPartyMinecraftLauncher(AppInfo.name),
             style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(onPressed: () => exit(1), child: const Text('取消')),
+              TextButton(onPressed: () => exit(1), child: Text(context.l10n.commonCancel)),
               const SizedBox(width: 8),
-              FilledButton(onPressed: _install, child: Text(_upgrade ? '更新' : '安装')),
+              FilledButton(
+                onPressed: _install,
+                child: Text(_upgrade ? context.l10n.installerAppUpdate : context.l10n.commonInstall),
+              ),
             ],
           ),
         ],
       ),
-      _Step.working => _progress(theme, _upgrade ? '正在更新' : '正在安装'),
+      _Step.working => _progress(
+        theme,
+        _upgrade ? context.l10n.installerAppUpdating : context.l10n.installerAppInstalling,
+      ),
       _Step.done => _result(
         theme,
         icon: Icons.check_circle,
         color: scheme.primary,
-        title: '安装完成',
-        body: '已安装到 $_dir',
+        title: context.l10n.installerAppInstallationComplete,
+        body: context.l10n.installerAppInstalled(_dir),
         actions: [
-          TextButton(onPressed: () => exit(0), child: const Text('完成')),
+          TextButton(onPressed: () => exit(0), child: Text(context.l10n.oobeDone)),
           const SizedBox(width: 8),
-          FilledButton(onPressed: _launch, child: Text('启动 ${AppInfo.name}')),
+          FilledButton(onPressed: _launch, child: Text(context.l10n.installerAppLaunch(AppInfo.name))),
         ],
       ),
       _Step.failed => _result(
         theme,
         icon: Icons.error,
         color: scheme.error,
-        title: '安装失败',
+        title: context.l10n.installerAppInstallationFailed,
         body: _error,
         actions: [
-          TextButton(onPressed: () => exit(1), child: const Text('关闭')),
+          TextButton(onPressed: () => exit(1), child: Text(context.l10n.windowClose)),
           const SizedBox(width: 8),
-          FilledButton(onPressed: () => setState(() => _step = _Step.form), child: const Text('重试')),
+          FilledButton(
+            onPressed: () => setState(() => _step = _Step.form),
+            child: Text(context.l10n.deviceLoginDialogRetry),
+          ),
         ],
       ),
     };
@@ -274,10 +298,10 @@ class _InstallerPageState extends State<_InstallerPage> {
       _Step.form || _Step.done => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('卸载 ${AppInfo.name}', style: theme.textTheme.headlineSmall),
+          Text(context.l10n.installerAppUninstall(AppInfo.name), style: theme.textTheme.headlineSmall),
           const SizedBox(height: 4),
           Text(
-            '只删除安装时写入的文件，放在程序文件夹里的其他文件不会动',
+            context.l10n.installerAppOnlyFilesWrittenDuring,
             style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 20),
@@ -286,7 +310,7 @@ class _InstallerPageState extends State<_InstallerPage> {
             margin: EdgeInsets.zero,
             child: ListTile(
               leading: const Icon(Icons.folder_outlined),
-              title: const Text('安装位置'),
+              title: Text(context.l10n.installerAppInstallLocation),
               subtitle: Text(_dir, overflow: TextOverflow.ellipsis),
             ),
           ),
@@ -294,9 +318,12 @@ class _InstallerPageState extends State<_InstallerPage> {
           CheckboxListTile(
             value: _removeData,
             onChanged: (v) => setState(() => _removeData = v!),
-            title: Text('同时删除启动器数据', style: TextStyle(color: _removeData ? scheme.error : null)),
+            title: Text(
+              context.l10n.installerAppAlsoDeleteLauncherData,
+              style: TextStyle(color: _removeData ? scheme.error : null),
+            ),
             subtitle: Text(
-              '设置、账户与默认游戏文件夹（${userDataDirs.join('、')}）。默认游戏文件夹中的存档也会被删除',
+              context.l10n.installerAppSettingsAccountsDefaultGame(userDataDirs.join(context.l10n.commonListSeparator)),
               style: TextStyle(color: _removeData ? scheme.error : null),
             ),
           ),
@@ -304,25 +331,25 @@ class _InstallerPageState extends State<_InstallerPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(onPressed: () => exit(1), child: const Text('取消')),
+              TextButton(onPressed: () => exit(1), child: Text(context.l10n.commonCancel)),
               const SizedBox(width: 8),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError),
                 onPressed: _uninstall,
-                child: const Text('卸载'),
+                child: Text(context.l10n.installerAppUninstall2),
               ),
             ],
           ),
         ],
       ),
-      _Step.working => _progress(theme, '正在卸载'),
+      _Step.working => _progress(theme, context.l10n.installerAppUninstalling2),
       _Step.failed => _result(
         theme,
         icon: Icons.error,
         color: scheme.error,
-        title: '卸载失败',
+        title: context.l10n.installerAppUninstallFailed,
         body: _error,
-        actions: [TextButton(onPressed: () => exit(1), child: const Text('关闭'))],
+        actions: [TextButton(onPressed: () => exit(1), child: Text(context.l10n.windowClose))],
       ),
     };
   }

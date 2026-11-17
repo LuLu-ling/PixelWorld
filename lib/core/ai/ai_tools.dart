@@ -24,6 +24,7 @@ import '../safe_path.dart';
 import '../version.dart';
 import 'web_tools.dart';
 import 'workspace_tools.dart';
+import '../i18n/strings.dart';
 
 /// 操作的类型：只读操作默认直接执行；其余都要用户允许
 enum ToolKind {
@@ -89,8 +90,8 @@ class AiToolbox {
     AiToolDef(
       spec: AiTool('list_versions', '列出当前游戏文件夹中已安装的所有版本，以及当前选择的版本。', _schema({})),
       kind: ToolKind.read,
-      label: '查看实例列表',
-      prepare: (_) async => ToolPlan('查看实例列表', _listVersions),
+      label: tr.aiToolsViewInstanceList,
+      prepare: (_) async => ToolPlan(tr.aiToolsViewInstanceList, _listVersions),
     ),
     AiToolDef(
       spec: AiTool(
@@ -99,19 +100,19 @@ class AiToolbox {
         _schema({'version': _versionParam}, ['version']),
       ),
       kind: ToolKind.read,
-      label: '查看实例信息',
+      label: tr.aiToolsViewInstanceInfo,
       prepare: (a) async {
         final v = _version(a);
-        return ToolPlan('查看 ${v.id} 的信息', () => _versionInfo(v));
+        return ToolPlan(tr.aiToolsViewInfo(v.id), () => _versionInfo(v));
       },
     ),
     AiToolDef(
       spec: AiTool('list_mods', '列出一个版本的模组文件（mods 文件夹），包括是否启用。', _schema({'version': _versionParam}, ['version'])),
       kind: ToolKind.read,
-      label: '查看模组列表',
+      label: tr.aiToolsViewModList,
       prepare: (a) async {
         final v = _version(a);
-        return ToolPlan('查看 ${v.id} 的模组', () => _listMods(v));
+        return ToolPlan(tr.aiToolsViewMods(v.id), () => _listMods(v));
       },
     ),
     AiToolDef(
@@ -127,14 +128,14 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.read,
-      label: '查看文件',
+      label: tr.aiToolsViewFiles,
       prepare: (a) async {
         final v = _version(a);
         final dir = await _gameDir(v);
         final rel = '${a['path'] ?? ''}'.trim();
         final abs = rel.isEmpty ? dir : _inside(dir, rel);
         // 文件夹不存在是正常的查看结果（例如还没有装光影），不算失败
-        return ToolPlan('查看 ${v.id}/${rel.isEmpty ? '' : rel}', () async {
+        return ToolPlan(tr.aiToolsView(v.id, rel.isEmpty ? '' : rel), () async {
           _recheck(dir, abs);
           return Directory(abs).existsSync() ? _listDir(dir, abs) : '文件夹不存在：$rel';
         });
@@ -156,12 +157,12 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.read,
-      label: '读取日志',
+      label: tr.aiToolsReadLog,
       prepare: (a) async {
         final v = _version(a);
         final kind = '${a['kind']}';
         return ToolPlan(
-          '读取 ${v.id} 的${const {'crash': '崩溃报告', 'debug': '调试日志'}[kind] ?? '游戏日志'}',
+          tr.aiToolsRead(v.id, {'crash': tr.aiToolsCrashReport, 'debug': tr.aiToolsDebugLog}[kind] ?? tr.subLog),
           () => _readLog(v, kind),
         );
       },
@@ -179,12 +180,12 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.read,
-      label: '搜索模组',
+      label: tr.aiToolsSearchMods,
       prepare: (a) async {
         final v = _version(a);
         final q = '${a['query'] ?? ''}'.trim();
         if (q.isEmpty) throw ToolError('请提供搜索关键词');
-        return ToolPlan('在 Modrinth 搜索「$q」', () => _search(v, q));
+        return ToolPlan(tr.aiToolsSearchModrinth(q), () => _search(v, q));
       },
     ),
     AiToolDef(
@@ -201,9 +202,11 @@ class AiToolbox {
         }),
       ),
       kind: ToolKind.read,
-      label: '查看可安装的版本',
-      prepare: (a) async =>
-          ToolPlan('查看可安装的 Minecraft 版本', () => _gameVersions('${a['type'] ?? 'release'}', '${a['query'] ?? ''}')),
+      label: tr.aiToolsViewInstallableVersions,
+      prepare: (a) async => ToolPlan(
+        tr.aiToolsViewInstallableMinecraftVersions,
+        () => _gameVersions('${a['type'] ?? 'release'}', '${a['query'] ?? ''}'),
+      ),
     ),
     AiToolDef(
       spec: AiTool(
@@ -222,12 +225,12 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.read,
-      label: '查看加载器版本',
+      label: tr.aiToolsViewLoaderVersions,
       prepare: (a) async {
         final kind = _loaderKind(a['loader']);
         final game = '${a['game_version'] ?? ''}'.trim();
         if (kind == null) throw ToolError('不支持的加载器：${a['loader']}');
-        return ToolPlan('查看 $game 的 ${kind.label} 版本', () => _loaderVersions(kind, game));
+        return ToolPlan(tr.aiToolsViewVersions(game, kind.label), () => _loaderVersions(kind, game));
       },
     ),
     AiToolDef(
@@ -252,16 +255,16 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.write,
-      label: '安装新实例',
+      label: tr.aiToolsInstallNewInstance,
       prepare: _prepareInstall,
     ),
     AiToolDef(
       spec: AiTool('select_version', '把启动页当前选择的版本切换为指定的已安装版本。', _schema({'version': _versionParam}, ['version'])),
       kind: ToolKind.write,
-      label: '切换实例',
+      label: tr.tourSwitchInstance,
       prepare: (a) async {
         final v = _version(a);
-        return ToolPlan('把当前实例切换为 ${v.id}', () async {
+        return ToolPlan(tr.aiToolsSwitchCurrentInstance(v.id), () async {
           await state.selectVersion(v.id);
           return '已切换为 ${v.id}';
         }, details: ['${v.id}（${describeVersion(v)}）']);
@@ -296,7 +299,7 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.read,
-      label: '搜索资源',
+      label: tr.aiToolsSearchResources,
       prepare: (a) async {
         final type = _resourceType(a['type']);
         final f = _filter(a, type);
@@ -304,7 +307,7 @@ class AiToolbox {
         final sort = '${a['sort'] ?? 'relevance'}';
         final limit = ((a['limit'] as num?)?.toInt() ?? 12).clamp(1, 20);
         return ToolPlan(
-          '在 Modrinth 搜索${f == null ? '' : '${f.label} 的'}${type.label}${q.isEmpty ? '' : '「$q」'}',
+          tr.aiToolsSearchModrinth2(f == null ? '' : tr.aiToolsText(f.label), type.label, q.isEmpty ? '' : '「$q」'),
           () => _searchResources(type, q, f, sort, limit),
         );
       },
@@ -331,7 +334,7 @@ class AiToolbox {
         }),
       ),
       kind: ToolKind.read,
-      label: '查看项目详情',
+      label: tr.aiToolsViewProjectDetails,
       prepare: (a) async {
         final ids = <String>{
           for (final x in (a['projects'] as List? ?? const [])) '$x'.trim(),
@@ -340,8 +343,10 @@ class AiToolbox {
         if (ids.isEmpty) throw ToolError('请提供项目 ID（project 或 projects）');
         if (ids.length > 10) throw ToolError('一次最多查看 10 个项目');
         final f = _filter(a, ResourceType.mod);
-        if (ids.length == 1) return ToolPlan('查看 Modrinth 项目 ${ids.first}', () => _projectInfo(ids.first, f));
-        return ToolPlan('比较 ${ids.length} 个 Modrinth 项目', () async {
+        if (ids.length == 1) {
+          return ToolPlan(tr.aiToolsViewModrinthProject(ids.first), () => _projectInfo(ids.first, f));
+        }
+        return ToolPlan(tr.aiToolsCompareModrinthProjects(ids.length), () async {
           final rows = await Future.wait([
             for (final id in ids) _projectInfo(id, f, brief: true).catchError((Object e) => '- $id：查询失败（$e）'),
           ]);
@@ -369,7 +374,7 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.write,
-      label: '安装资源',
+      label: tr.aiToolsInstallResource,
       prepare: (a) async {
         final v = _version(a);
         final type = _resourceType(a['type']);
@@ -387,7 +392,7 @@ class AiToolbox {
         );
         final note = type == ResourceType.shader ? _shaderSupport(v, dir) : null;
         return ToolPlan(
-          '安装${type.label} ${rv.name}',
+          tr.aiToolsInstall(type.label, rv.name),
           () async {
             final r = await state.installResource(rv, type, v, world: type == ResourceType.datapack ? world : null);
             return [
@@ -397,9 +402,13 @@ class AiToolbox {
             ].join('；');
           },
           details: [
-            '实例：${v.id}',
-            '文件：${rv.fileName}（${_size(rv.fileSize)}），放进 ${type == ResourceType.datapack ? 'saves/$world/datapacks' : type.folder}',
-            '来源：Modrinth',
+            tr.aiToolsInstance(v.id),
+            tr.aiToolsFileInto(
+              rv.fileName,
+              _size(rv.fileSize),
+              type == ResourceType.datapack ? 'saves/$world/datapacks' : type.folder,
+            ),
+            tr.aiToolsSourceModrinth,
             ?note,
           ],
         );
@@ -408,14 +417,14 @@ class AiToolbox {
     AiToolDef(
       spec: AiTool('list_javas', '列出启动器找到的 Java，以及全局设置使用的 Java。', _schema({})),
       kind: ToolKind.read,
-      label: '查看 Java',
-      prepare: (_) async => ToolPlan('查看已安装的 Java', _listJavas),
+      label: tr.aiToolsViewJava,
+      prepare: (_) async => ToolPlan(tr.aiToolsViewInstalledJava, _listJavas),
     ),
     AiToolDef(
       spec: AiTool('system_info', '查看系统信息：操作系统、内存、处理器与显卡（含驱动版本）。', _schema({})),
       kind: ToolKind.read,
-      label: '查看系统信息',
-      prepare: (_) async => ToolPlan('查看系统信息', _systemInfo),
+      label: tr.aiToolsViewSystemInfo,
+      prepare: (_) async => ToolPlan(tr.aiToolsViewSystemInfo, _systemInfo),
     ),
     AiToolDef(
       spec: AiTool(
@@ -430,7 +439,7 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.write,
-      label: '设置实例的 Java',
+      label: tr.aiToolsSetInstanceJava,
       prepare: (a) async {
         final v = _version(a);
         final arg = '${a['java'] ?? ''}'.trim();
@@ -438,10 +447,10 @@ class AiToolbox {
         String label;
         if (arg == 'global') {
           pref = const JavaGlobal();
-          label = '跟随全局设置';
+          label = tr.instanceUseGlobalSetting;
         } else if (arg == 'auto') {
           pref = const JavaAuto();
-          label = '自动选择';
+          label = tr.downloadSourceAuto;
         } else {
           // 只能选择启动器找到的 Java，不能指定任意程序
           final j = (await state.javas()).where((j) => p.equals(j.path, arg)).firstOrNull;
@@ -450,10 +459,10 @@ class AiToolbox {
           label = 'Java ${j.major}（${state.redactor().apply(j.path)}）';
         }
         final old = _javaLabel(readInstanceSettings(state.paths.versionDir(v.id)).java);
-        return ToolPlan('把 ${v.id} 的 Java 改为$label', () async {
+        return ToolPlan(tr.aiToolsChangeJava(v.id, label), () async {
           await writeInstanceJava(state.paths.versionDir(v.id), pref);
           return '已把 ${v.id} 的 Java 设为$label';
-        }, details: ['实例：${v.id}', '原来：$old', '改为：$label']);
+        }, details: [tr.aiToolsInstance(v.id), tr.aiToolsBefore(old), tr.aiToolsAfter(label)]);
       },
     ),
     AiToolDef(
@@ -473,7 +482,7 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.write,
-      label: '设置实例的内存',
+      label: tr.aiToolsSetInstanceMemory,
       prepare: (a) async {
         final v = _version(a);
         final mode = '${a['mode'] ?? ''}';
@@ -494,10 +503,10 @@ class AiToolbox {
         final label = switch (mode) {
           'custom' => '自定义 ${ramFromTick(tick).toStringAsFixed(1)} GB',
           'auto' => '自动分配',
-          _ => '跟随全局设置',
+          _ => tr.instanceUseGlobalSetting,
         };
         return ToolPlan(
-          '把 ${v.id} 的内存改为$label',
+          tr.aiToolsChangeMemory(v.id, label),
           () async {
             await writeInstanceRaw(state.paths.versionDir(v.id), {
               'VersionRamType': const {'auto': 0, 'custom': 1, 'global': 2}[mode]!,
@@ -506,10 +515,10 @@ class AiToolbox {
             return '已把 ${v.id} 的内存设为$label';
           },
           details: [
-            '实例：${v.id}',
-            '原来：${_memoryLabel(s)}',
-            '改为：$label',
-            '系统内存：共 ${mem.total.toStringAsFixed(1)} GB，当前空闲 ${mem.free.toStringAsFixed(1)} GB',
+            tr.aiToolsInstance(v.id),
+            tr.aiToolsBefore2(_memoryLabel(s)),
+            tr.aiToolsAfter(label),
+            tr.aiToolsSystemMemoryGBTotal(mem.total.toStringAsFixed(1), mem.free.toStringAsFixed(1)),
           ],
         );
       },
@@ -527,11 +536,11 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.read,
-      label: '读取配置文件',
+      label: tr.aiToolsReadConfigFile,
       prepare: (a) async {
         final v = _version(a);
         final (abs, rel) = await _configFile(v, a['path']);
-        return ToolPlan('读取 $rel', () async {
+        return ToolPlan(tr.commonRead(rel), () async {
           _recheck(await _gameDir(v), abs);
           final text = await File(abs).readAsString();
           return state.redactor().apply(
@@ -565,7 +574,7 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.danger,
-      label: '修改配置文件',
+      label: tr.aiToolsEditConfigFile,
       prepare: (a) async {
         final v = _version(a);
         final (abs, rel) = await _configFile(v, a['path']);
@@ -584,7 +593,7 @@ class AiToolbox {
         final result = text;
         String clip(String s) => s.length > 200 ? '${s.substring(0, 200)}…' : s;
         return ToolPlan(
-          '修改 $rel（${edits.length} 处）',
+          tr.aiToolsEditChanges(rel, edits.length),
           () async {
             final dir = await _gameDir(v);
             _recheck(dir, abs);
@@ -593,12 +602,12 @@ class AiToolbox {
             return '已修改 $rel，原文件已备份到 ${p.basename(zip)}';
           },
           details: [
-            '实例：${v.id}',
+            tr.aiToolsInstance(v.id),
             for (final e in edits) ...[
               for (final l in clip(e.old).split('\n')) '- $l',
               for (final l in clip(e.now).split('\n')) '+ $l',
             ],
-            '修改前会备份原文件',
+            tr.aiToolsOriginalFileBackedUp,
           ],
         );
       },
@@ -617,18 +626,18 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.write,
-      label: '安装模组',
+      label: tr.aiToolsInstallMod,
       prepare: (a) async {
         final v = _version(a);
         final mv = await _resolveMod(v, a);
         return ToolPlan(
-          '安装模组 ${mv.name}',
+          tr.aiToolsInstallMod2(mv.name),
           () => _install(v, mv),
           details: [
-            '实例：${v.id}',
-            '文件：${mv.fileName}（${_size(mv.fileSize)}）',
-            '来源：Modrinth',
-            if (mv.requires.isNotEmpty) '会同时安装必需的前置模组',
+            tr.aiToolsInstance(v.id),
+            tr.aiToolsFile(mv.fileName, _size(mv.fileSize)),
+            tr.aiToolsSourceModrinth,
+            if (mv.requires.isNotEmpty) tr.aiToolsRequiredDependenciesInstalledToo,
           ],
         );
       },
@@ -651,19 +660,19 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.write,
-      label: '启用或禁用模组',
+      label: tr.aiToolsEnableDisableMods,
       prepare: (a) async {
         final v = _version(a);
         final enabled = a['enabled'] == true;
         final files = await _modFiles(v, a['files']);
-        return ToolPlan('${enabled ? '启用' : '禁用'} ${files.length} 个模组', () async {
+        return ToolPlan(tr.aiToolsMods(enabled ? tr.aiToolsEnable : tr.aiToolsDisable, files.length), () async {
           final dir = await _gameDir(v);
           for (final f in files) {
             _recheck(dir, f.path);
             await setModEnabled(f, enabled);
           }
-          return '已${enabled ? '启用' : '禁用'}：${files.map((f) => f.name).join('、')}';
-        }, details: ['实例：${v.id}', for (final f in files) f.name]);
+          return '已${enabled ? tr.aiToolsEnable : tr.aiToolsDisable}：${files.map((f) => f.name).join('、')}';
+        }, details: [tr.aiToolsInstance(v.id), for (final f in files) f.name]);
       },
     ),
     AiToolDef(
@@ -684,25 +693,25 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.write,
-      label: '备份',
+      label: tr.aiToolsBackUp,
       prepare: (a) async {
         final v = _version(a);
         final dir = await _gameDir(v);
         final paths = _existing(dir, a['paths']);
         final size = paths.fold<int>(0, (s, e) => s + _sizeOf(p.join(dir, e)));
-        return ToolPlan('备份 ${paths.length} 项', () async {
+        return ToolPlan(tr.aiToolsBackUpItems(paths.length), () async {
           final zip = await _backup(v, dir, paths, '${a['label'] ?? ''}');
           return '已备份到 ${p.basename(zip)}';
-        }, details: ['实例：${v.id}', ...paths, '大小约 ${_size(size)}，保存到游戏文件夹的 backups 中']);
+        }, details: [tr.aiToolsInstance(v.id), ...paths, tr.aiToolsAboutSavedBackupsGame(_size(size))]);
       },
     ),
     AiToolDef(
       spec: AiTool('list_backups', '列出一个版本的备份及其包含的内容。', _schema({'version': _versionParam}, ['version'])),
       kind: ToolKind.read,
-      label: '查看备份',
+      label: tr.aiToolsViewBackups,
       prepare: (a) async {
         final v = _version(a);
-        return ToolPlan('查看 ${v.id} 的备份', () => _listBackups(v));
+        return ToolPlan(tr.aiToolsViewBackups2(v.id), () => _listBackups(v));
       },
     ),
     AiToolDef(
@@ -722,17 +731,17 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.danger,
-      label: '删除文件',
+      label: tr.commonDeleteFiles,
       prepare: (a) async {
         final v = _version(a);
         final dir = await _gameDir(v);
         final paths = _existing(dir, a['paths']);
-        return ToolPlan('删除 ${paths.length} 项（移到回收站）', () async {
+        return ToolPlan(tr.aiToolsDeleteItemsMoveRecycle(paths.length), () async {
           for (final rel in paths) {
             await moveToTrash(_inside(dir, rel));
           }
           return '已移到回收站：${paths.join('、')}';
-        }, details: ['实例：${v.id}', for (final rel in paths) '$rel（${_size(_sizeOf(p.join(dir, rel)))}）']);
+        }, details: [tr.aiToolsInstance(v.id), for (final rel in paths) '$rel（${_size(_sizeOf(p.join(dir, rel)))}）']);
       },
     ),
     AiToolDef(
@@ -750,21 +759,30 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.danger,
-      label: '替换模组',
+      label: tr.aiToolsReplaceMod,
       prepare: (a) async {
         final v = _version(a);
         final old = (await _modFiles(v, [a['file']])).single;
         final mv = await _resolveMod(v, a);
         if (mv.fileName == old.name.replaceFirst(RegExp(r'\.disabled$'), '')) throw ToolError('新旧文件相同，不需要替换');
-        return ToolPlan('替换模组 ${old.name}', () async {
-          final dir = await _gameDir(v);
-          _recheck(dir, old.path);
-          final rel = p.relative(old.path, from: dir).replaceAll('\\', '/');
-          final zip = await _backup(v, dir, [rel], 'replace');
-          await moveToTrash(old.path);
-          final r = await _install(v, mv);
-          return '旧文件已备份到 ${p.basename(zip)} 并移到回收站。$r';
-        }, details: ['实例：${v.id}', '旧文件：${old.name}', '新文件：${mv.fileName}（${mv.name}，来自 Modrinth）', '旧文件会先备份，再移到回收站']);
+        return ToolPlan(
+          tr.aiToolsReplaceMod2(old.name),
+          () async {
+            final dir = await _gameDir(v);
+            _recheck(dir, old.path);
+            final rel = p.relative(old.path, from: dir).replaceAll('\\', '/');
+            final zip = await _backup(v, dir, [rel], 'replace');
+            await moveToTrash(old.path);
+            final r = await _install(v, mv);
+            return '旧文件已备份到 ${p.basename(zip)} 并移到回收站。$r';
+          },
+          details: [
+            tr.aiToolsInstance(v.id),
+            tr.aiToolsOldFile(old.name),
+            tr.aiToolsNewFileFromModrinth(mv.fileName, mv.name),
+            tr.aiToolsOldFileBackedUp,
+          ],
+        );
       },
     ),
     AiToolDef(
@@ -780,7 +798,7 @@ class AiToolbox {
         ),
       ),
       kind: ToolKind.danger,
-      label: '从备份恢复',
+      label: tr.aiToolsRestoreFromBackup,
       prepare: (a) async {
         final v = _version(a);
         final name = p.basename('${a['backup'] ?? ''}');
@@ -800,13 +818,13 @@ class AiToolbox {
           _inside(dir, rel);
         }
         return ToolPlan(
-          '从备份 $name 恢复',
+          tr.aiToolsRestoreFromBackup2(name),
           () => _restore(v, dir, zip, check),
           details: [
-            '实例：${v.id}',
-            '将恢复：${check.paths.join('、')}（${check.files} 个文件，${_size(check.bytes)}）',
-            if (!check.signed) '注意：这是旧版 Pixel World 创建的备份，没有签名，无法确认内容未被修改过',
-            '先解压到临时文件夹并校验，成功后才把当前的对应内容备份并移到回收站',
+            tr.aiToolsInstance(v.id),
+            tr.aiToolsWillRestoreFiles(check.paths.join('、'), check.files, _size(check.bytes)),
+            if (!check.signed) tr.aiToolsNoteBackupWasCreated,
+            tr.aiToolsItsExtractedTemporaryFolder,
           ],
         );
       },
@@ -854,7 +872,7 @@ class AiToolbox {
     }).toList();
     return [
       '最新正式版：${r.latestRelease}，最新快照：${r.latestSnapshot}',
-      if (list.isEmpty) '没有符合条件的版本',
+      if (list.isEmpty) tr.downloadNoMatchingVersions,
       for (final v in list.take(60)) '- ${v.id}（${v.type}${v.fool ? '，愚人节版本' : ''}，${v.releaseTime.split('T').first}）',
       if (list.length > 60) '……共 ${list.length} 个，只列出最新的 60 个，可以用 query 筛选',
     ].join('\n');
@@ -906,7 +924,9 @@ class AiToolbox {
     String? optifine;
     if (ofArg.isNotEmpty) {
       if (kind == LoaderKind.optifine) throw ToolError('loader 已经是 optifine，不需要再指定 optifine');
-      if (!canAddOptiFine(loaderOfKind(kind))) throw ToolError('${kind?.label ?? '原版'} 不能与 OptiFine 一起安装');
+      if (!canAddOptiFine(loaderOfKind(kind))) {
+        throw ToolError('${kind?.label ?? tr.downloadVanilla} 不能与 OptiFine 一起安装');
+      }
       final list = await loaderVersions(state.downloader, LoaderKind.optifine, game);
       final of = list.where((v) => v.version == ofArg || v.label == ofArg).firstOrNull;
       if (of == null) throw ToolError('OptiFine 没有适用于 $game 的版本 $ofArg');
@@ -927,7 +947,7 @@ class AiToolbox {
     }
 
     return ToolPlan(
-      '安装 $shown',
+      tr.aiToolsInstall2(shown),
       () async {
         final id = await state.installVersion(
           game,
@@ -939,12 +959,14 @@ class AiToolbox {
         return '已安装为 $id，并已设为当前选择的实例';
       },
       details: [
-        'Minecraft $game（${rv.type == 'release' ? '正式版' : rv.type}）',
+        'Minecraft $game（${rv.type == 'release' ? tr.updateChannelStable : rv.type}）',
         if (kind != null) loaderComponent(kind, game, loaderVersion),
         if (optifine != null)
           '${loaderComponent(LoaderKind.optifine, game, optifine)}（${optiFineNote(loaderOfKind(kind), null)}）',
-        '实例名称：$shown',
-        '从${state.downloader.useMirror ? ' BMCLAPI 镜像' : '官方源'}下载，可能需要几分钟；进度可以在任务页查看',
+        tr.aiToolsInstanceName(shown),
+        tr.aiToolsDownloadsFromMayTake(
+          state.downloader.useMirror ? tr.networkCheckPanelBMCLAPIMirror : tr.downloadSourceOfficial,
+        ),
       ],
     );
   }
@@ -1049,21 +1071,21 @@ class AiToolbox {
     if (v.optifine) return null;
     final mods = listInstanceFiles(dir, InstanceFolder.mods).where((f) => !f.disabled).map((f) => f.name.toLowerCase());
     if (mods.any((n) => n.startsWith('iris') || n.contains('optifine') || n.startsWith('oculus'))) return null;
-    return '注意：${v.id} 中没有找到 Iris 或 OptiFine，光影包需要它们才能使用';
+    return tr.aiToolsNoteHasNoIris(v.id);
   }
 
   // ---------- Java、内存与系统 ----------
 
   String _javaLabel(JavaPref j) => switch (j) {
-    JavaGlobal() => '跟随全局设置',
-    JavaAuto() => '自动选择',
+    JavaGlobal() => tr.instanceUseGlobalSetting,
+    JavaAuto() => tr.downloadSourceAuto,
     JavaExist(:final path) || JavaRelative(:final path) => state.redactor().apply(path),
   };
 
   String _memoryLabel(InstanceSettings s) => switch (s.memoryMode) {
     'custom' => '自定义 ${ramFromTick(s.memoryTick).toStringAsFixed(1)} GB',
     'auto' => '自动分配',
-    _ => '跟随全局设置',
+    _ => tr.instanceUseGlobalSetting,
   };
 
   Future<String> _listJavas() async {
@@ -1071,7 +1093,7 @@ class AiToolbox {
     final r = state.redactor();
     final global = state.config.javaPath;
     return [
-      '全局设置：${global.isEmpty ? '自动选择' : r.apply(global)}',
+      '全局设置：${global.isEmpty ? tr.downloadSourceAuto : r.apply(global)}',
       if (list.isEmpty) '没有找到 Java（启动时会按需自动下载）',
       for (final j in list)
         '- Java ${j.major}（${j.version}，${j.is64 ? 64 : 32} 位${j.managed ? '，启动器下载' : ''}）：${r.apply(j.path)}',
@@ -1089,9 +1111,9 @@ class AiToolbox {
     final mem = systemMemory();
     final env = Platform.environment;
     final lines = [
-      '系统：${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+      tr.crashSystem(Platform.operatingSystem, Platform.operatingSystemVersion),
       '内存：共 ${mem.total.toStringAsFixed(1)} GB，当前空闲 ${mem.free.toStringAsFixed(1)} GB',
-      '处理器：${env['PROCESSOR_IDENTIFIER'] ?? '未知'}，${Platform.numberOfProcessors} 个逻辑核心',
+      '处理器：${env['PROCESSOR_IDENTIFIER'] ?? tr.loaderNamesUnknown}，${Platform.numberOfProcessors} 个逻辑核心',
     ];
     if (Platform.isWindows) {
       // 固定的查询命令，只读取显卡名称与驱动版本
@@ -1105,7 +1127,7 @@ class AiToolbox {
           final parts = l.split('|');
           final date = parts.length > 2 && parts[2].length >= 8 ? parts[2].substring(0, 8) : '';
           lines.add(
-            '显卡：${parts[0].trim()}，驱动 ${parts.length > 1 ? parts[1].trim() : '未知'}${date.isEmpty ? '' : '（$date）'}',
+            '显卡：${parts[0].trim()}，驱动 ${parts.length > 1 ? parts[1].trim() : tr.loaderNamesUnknown}${date.isEmpty ? '' : '（$date）'}',
           );
         }
       } catch (_) {
@@ -1269,8 +1291,8 @@ class AiToolbox {
     };
     final tooNew = resolved == null || chosen == null ? null : javaTooNewWarning(resolved, chosen.major);
     final java = switch (s.java) {
-      JavaGlobal() => '跟随全局设置',
-      JavaAuto() => '自动选择',
+      JavaGlobal() => tr.instanceUseGlobalSetting,
+      JavaAuto() => tr.downloadSourceAuto,
       JavaExist(:final path) || JavaRelative(:final path) => path,
     };
     return [
@@ -1279,9 +1301,9 @@ class AiToolbox {
       'Java：${state.redactor().apply(java)}（这个实例需要 Java $required 或更高）',
       if (tooNew != null) '注意：$tooNew',
       '内存：${switch (s.memoryMode) {
-        'custom' => '自定义',
-        'auto' => '自动',
-        _ => '跟随全局设置',
+        'custom' => tr.commonCustom,
+        'auto' => tr.commonAuto,
+        _ => tr.instanceUseGlobalSetting,
       }}',
       if (v.modable)
         '模组：${mods.where((m) => !m.disabled).length} 个启用，${mods.where((m) => m.disabled).length} 个禁用'
@@ -1331,7 +1353,7 @@ class AiToolbox {
     } else {
       f = File(p.join(dir, 'logs', kind == 'debug' ? 'debug.log' : 'latest.log'));
     }
-    if (f == null || !f.existsSync()) throw ToolError('没有找到${kind == 'crash' ? '崩溃报告' : '日志'}');
+    if (f == null || !f.existsSync()) throw ToolError('没有找到${kind == 'crash' ? tr.aiToolsCrashReport : tr.toolsLog}');
     _inside(dir, p.relative(f.path, from: dir));
     final bytes = await f.readAsBytes();
     final text = utf8.decode(

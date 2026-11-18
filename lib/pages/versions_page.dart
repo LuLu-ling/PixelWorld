@@ -19,8 +19,11 @@ import 'home_page.dart' show instanceModCount;
 import 'instance_page.dart' show instanceSectionRequest;
 import '../l10n/l10n.dart';
 
+/// 打开实例列表时聚焦搜索框（顶栏的搜索按钮）；已在实例列表时也会重新聚焦
+final versionsSearchRequest = ValueNotifier<bool>(false);
+
 /// 版本选择：左侧游戏文件夹，右侧该文件夹中的版本（PCL 的布局）
-class VersionsPage extends StatelessWidget {
+class VersionsPage extends StatefulWidget {
   const VersionsPage({super.key});
 
   /// 与 PCL-CE 的 McFolderListLoadSub 一致的自动发现规则，加上用户添加的文件夹
@@ -58,6 +61,40 @@ class VersionsPage extends StatelessWidget {
     return out;
   }
 
+  @override
+  State<VersionsPage> createState() => _VersionsPageState();
+}
+
+class _VersionsPageState extends State<VersionsPage> {
+  final _search = FocusNode();
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    versionsSearchRequest.addListener(_onSearchRequest);
+    _onSearchRequest();
+  }
+
+  @override
+  void dispose() {
+    versionsSearchRequest.removeListener(_onSearchRequest);
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _onSearchRequest() {
+    if (!versionsSearchRequest.value) return;
+    versionsSearchRequest.value = false;
+    _search.requestFocus();
+  }
+
+  /// 按名称、加载器和游戏版本搜索，空格分隔的每个词都要匹配
+  bool _matches(InstanceInfo v) {
+    final text = '${v.id} ${describeVersion(v)}'.toLowerCase();
+    return _query.toLowerCase().split(' ').every(text.contains);
+  }
+
   Future<void> _addFolder(BuildContext context) async {
     final state = AppScope.read(context);
     final dir = await pickFolder(context, confirm: context.l10n.oobeAdd);
@@ -83,7 +120,8 @@ class VersionsPage extends StatelessWidget {
     final state = AppScope.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final list = folders(state.config, context.l10n);
+    final list = VersionsPage.folders(state.config, context.l10n);
+    final shown = state.versions.where(_matches).toList();
     final current = p.normalize(state.config.gameDir);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -145,75 +183,104 @@ class VersionsPage extends StatelessWidget {
                       style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   )
-                : ListView(
-                    padding: const EdgeInsets.all(20),
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              context.l10n.versionsOtherInstances(state.versions.length),
-                              style: theme.textTheme.titleSmall,
-                            ),
-                          ),
-                          FilledButton.tonalIcon(
-                            onPressed: () {
-                              downloadTabRequest.value = 'versions';
-                              ShellNav.of(context).goMain(MainPage.download);
-                            },
-                            icon: const Icon(Icons.add, size: 18),
-                            label: Text(context.l10n.versionsNewInstance),
-                          ),
-                          const SizedBox(width: 4),
-                          IconButton(
-                            tooltip: context.l10n.fileViewerRefresh,
-                            onPressed: state.refreshVersions,
-                            icon: const Icon(Icons.refresh),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      for (final v in state.versions)
-                        Card.filled(
-                          color: v.id == state.config.selectedVersion
-                              ? scheme.secondaryContainer
-                              : scheme.surfaceContainerLow,
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            leading: versionIcon(v, color: scheme.primary),
-                            title: Text(v.id),
-                            // 同一个游戏版本可以装多个实例，带上模组数方便区分
-                            subtitle: FutureBuilder<int?>(
-                              future: v.loader == Loader.vanilla ? Future.value(null) : instanceModCount(state, v),
-                              builder: (context, snap) => Text(
-                                [
-                                  describeVersion(v),
-                                  if (snap.data != null) context.l10n.commonModCount(snap.data ?? 0),
-                                ].join(' · '),
-                              ),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
+                      // 标题和搜索框固定在上面，只滚动下面的实例
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                        child: Column(
+                          children: [
+                            Row(
                               children: [
-                                if (v.id == state.config.selectedVersion) const Icon(Icons.check),
-                                IconButton(
-                                  tooltip: context.l10n.tourInstanceSettings,
-                                  icon: const Icon(Icons.settings_outlined),
+                                Expanded(
+                                  child: Text(
+                                    context.l10n.versionsOtherInstances(state.versions.length),
+                                    style: theme.textTheme.titleSmall,
+                                  ),
+                                ),
+                                FilledButton.tonalIcon(
                                   onPressed: () {
-                                    state.instanceId = v.id;
-                                    instanceSectionRequest.value = 'setup';
-                                    ShellNav.of(context).open(SubPage.instance);
+                                    downloadTabRequest.value = 'versions';
+                                    ShellNav.of(context).goMain(MainPage.download);
                                   },
+                                  icon: const Icon(Icons.add, size: 18),
+                                  label: Text(context.l10n.versionsNewInstance),
+                                ),
+                                const SizedBox(width: 4),
+                                IconButton(
+                                  tooltip: context.l10n.fileViewerRefresh,
+                                  onPressed: state.refreshVersions,
+                                  icon: const Icon(Icons.refresh),
                                 ),
                               ],
                             ),
-                            onTap: () async {
-                              await state.selectVersion(v.id);
-                              if (context.mounted) ShellNav.of(context).back();
-                            },
-                          ),
+                            const SizedBox(height: 8),
+                            SearchField(
+                              hint: context.l10n.versionsSearchInstances,
+                              focusNode: _search,
+                              onChanged: (v) => setState(() => _query = v),
+                            ),
+                          ],
                         ),
+                      ),
+                      Expanded(
+                        child: shown.isEmpty
+                            ? Center(
+                                child: Text(
+                                  context.l10n.versionsNoMatchingInstances,
+                                  style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                                ),
+                              )
+                            : ListView(
+                                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                                children: [
+                                  for (final v in shown)
+                                    Card.filled(
+                                      color: v.id == state.config.selectedVersion
+                                          ? scheme.secondaryContainer
+                                          : scheme.surfaceContainerLow,
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      child: ListTile(
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                        leading: versionIcon(v, color: scheme.primary),
+                                        title: Text(v.id),
+                                        // 同一个游戏版本可以装多个实例，带上模组数方便区分
+                                        subtitle: FutureBuilder<int?>(
+                                          future: v.loader == Loader.vanilla
+                                              ? Future.value(null)
+                                              : instanceModCount(state, v),
+                                          builder: (context, snap) => Text(
+                                            [
+                                              describeVersion(v),
+                                              if (snap.data != null) context.l10n.commonModCount(snap.data ?? 0),
+                                            ].join(' · '),
+                                          ),
+                                        ),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (v.id == state.config.selectedVersion) const Icon(Icons.check),
+                                            IconButton(
+                                              tooltip: context.l10n.tourInstanceSettings,
+                                              icon: const Icon(Icons.settings_outlined),
+                                              onPressed: () {
+                                                state.instanceId = v.id;
+                                                instanceSectionRequest.value = 'setup';
+                                                ShellNav.of(context).open(SubPage.instance);
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                        onTap: () async {
+                                          await state.selectVersion(v.id);
+                                          if (context.mounted) ShellNav.of(context).back();
+                                        },
+                                      ),
+                                    ),
+                                ],
+                              ),
+                      ),
                     ],
                   ),
           ),

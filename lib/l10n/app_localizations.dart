@@ -3481,6 +3481,18 @@ abstract class AppLocalizations {
   /// **'新建实例'**
   String get versionsNewInstance;
 
+  /// No description provided for @versionsSearchInstances.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索实例'**
+  String get versionsSearchInstances;
+
+  /// No description provided for @versionsNoMatchingInstances.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有匹配的实例'**
+  String get versionsNoMatchingInstances;
+
   /// No description provided for @tasksProgress.
   ///
   /// In zh, this message translates to:

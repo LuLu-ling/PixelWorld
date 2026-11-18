@@ -1959,6 +1959,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get versionsNewInstance => 'New instance';
 
   @override
+  String get versionsSearchInstances => 'Search instances';
+
+  @override
+  String get versionsNoMatchingInstances => 'No matching instances';
+
+  @override
   String tasksProgress(Object count) {
     return '$count in progress';
   }

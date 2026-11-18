@@ -1858,6 +1858,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get versionsNewInstance => '新建实例';
 
   @override
+  String get versionsSearchInstances => '搜索实例';
+
+  @override
+  String get versionsNoMatchingInstances => '没有匹配的实例';
+
+  @override
   String tasksProgress(Object count) {
     return '$count 个进行中';
   }
@@ -7931,6 +7937,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get versionsNewInstance => '新建實例';
+
+  @override
+  String get versionsSearchInstances => '搜尋實例';
+
+  @override
+  String get versionsNoMatchingInstances => '沒有符合條件的實例';
 
   @override
   String tasksProgress(Object count) {

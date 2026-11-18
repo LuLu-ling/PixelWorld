@@ -638,6 +638,8 @@
   "versionsOtherInstances": "{count} 个实例",
   "@versionsOtherInstances": {"placeholders": {"count": {"type": "num"}}},
   "versionsNewInstance": "新建实例",
+  "versionsSearchInstances": "搜索实例",
+  "versionsNoMatchingInstances": "没有匹配的实例",
   "tasksProgress": "{count} 个进行中",
   "@tasksProgress": {"placeholders": {"count": {}}},
   "tasksClearFinishedTasks": "清除已结束的任务",

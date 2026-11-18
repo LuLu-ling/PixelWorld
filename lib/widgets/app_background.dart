@@ -605,6 +605,32 @@ class GlassField extends StatelessWidget {
   }
 }
 
+/// 带放大镜图标的搜索框（下载页的版本列表、实例列表）
+class SearchField extends StatelessWidget {
+  const SearchField({super.key, required this.hint, required this.onChanged, this.focusNode});
+
+  final String hint;
+  final ValueChanged<String> onChanged;
+  final FocusNode? focusNode;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 40,
+    child: GlassField(
+      decoration: InputDecoration(
+        prefixIcon: const Icon(Icons.search, size: 20),
+        hintText: hint,
+        isDense: true,
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+      ),
+      child: (decoration) => TextField(focusNode: focusNode, decoration: decoration, onChanged: onChanged),
+    ),
+  );
+}
+
 /// 标记「在毛玻璃面板里面」，里面的 [GlassPanel] 不再重复画背景
 class _InGlass extends InheritedWidget {
   const _InGlass({required super.child});

@@ -564,6 +564,8 @@
   "versionsNoInstancesFolderYet": "這個資料夾中還沒有實例",
   "versionsOtherInstances": "{count} 個實例",
   "versionsNewInstance": "新建實例",
+  "versionsSearchInstances": "搜尋實例",
+  "versionsNoMatchingInstances": "沒有符合條件的實例",
   "tasksProgress": "{count} 個進行中",
   "tasksClearFinishedTasks": "清除已結束的任務",
   "tasksNoTasksYetInstalling": "還沒有任務。安裝實例、下載資源或啟動遊戲時會顯示在這裡",

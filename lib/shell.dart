@@ -496,8 +496,11 @@ class _TopBarState extends State<_TopBar> {
             ),
             const SizedBox(width: 4),
             IconButton(
-              tooltip: l.tooltipInstances,
-              onPressed: () => ShellNav.of(context).open(SubPage.versions),
+              tooltip: l.versionsSearchInstances,
+              onPressed: () {
+                versionsSearchRequest.value = true;
+                ShellNav.of(context).open(SubPage.versions);
+              },
               icon: const Icon(Icons.search, size: 21),
             ),
             if (!tight)

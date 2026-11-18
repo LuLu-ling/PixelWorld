@@ -564,6 +564,8 @@
   "versionsNoInstancesFolderYet": "No instances in this folder yet",
   "versionsOtherInstances": "{count, plural, =1{1 instance} other{{count} instances}}",
   "versionsNewInstance": "New instance",
+  "versionsSearchInstances": "Search instances",
+  "versionsNoMatchingInstances": "No matching instances",
   "tasksProgress": "{count} in progress",
   "tasksClearFinishedTasks": "Clear finished tasks",
   "tasksNoTasksYetInstalling": "No tasks yet. Installing instances, downloading resources and launching the game show up here",

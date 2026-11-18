@@ -186,22 +186,7 @@ class _VersionsViewState extends State<_VersionsView> {
           left: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(
-                height: 40,
-                child: GlassField(
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    hintText: context.l10n.downloadSearchVersions,
-                    isDense: true,
-                    filled: true,
-                    fillColor: scheme.surfaceContainerLow,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                  ),
-                  child: (decoration) =>
-                      TextField(decoration: decoration, onChanged: (v) => setState(() => _query = v)),
-                ),
-              ),
+              SearchField(hint: context.l10n.downloadSearchVersions, onChanged: (v) => setState(() => _query = v)),
               const SizedBox(height: 6),
               Expanded(
                 child: GlassPanel(

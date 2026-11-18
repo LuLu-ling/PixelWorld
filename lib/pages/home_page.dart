@@ -359,6 +359,7 @@ class _HeroCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     PopupMenuButton<String>(
                       tooltip: context.l10n.homeMore,
+                      borderRadius: BorderRadius.circular(10),
                       onSelected: (value) {
                         if (value == 'versions') onVersions();
                         if (value == 'log') onLog();
@@ -1883,6 +1884,7 @@ class _DesktopHero extends StatelessWidget {
                 const SizedBox(width: 8),
                 PopupMenuButton<String>(
                   tooltip: context.l10n.homeMore,
+                  borderRadius: BorderRadius.circular(10),
                   onSelected: (value) {
                     if (value == 'versions') onVersions();
                     if (value == 'log') onLog();

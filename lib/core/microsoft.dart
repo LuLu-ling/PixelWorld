@@ -104,7 +104,7 @@ class MicrosoftAuth implements AccountAuth {
   final String clientId;
 
   @override
-  Future<AuthSession> prepare(Account acc, AuthPrompts prompts) async =>
+  Future<AuthSession> prepare(Account acc) async =>
       (account: await refreshIfNeeded(acc, clientId), jvmArgs: const <String>[]);
 }
 

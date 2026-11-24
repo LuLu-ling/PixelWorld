@@ -223,35 +223,22 @@ Future<String> _secretDecrypt(String value, Uint8List key) async {
 
 String? _text(Object? v) => v == null || '$v'.isEmpty ? null : '$v';
 
-/// PCL-CE 的档案转换为账户，信息不完整时返回 null。外置登录的 server 是 API 根地址加 /authserver；
-/// 密码不导入，令牌失效时启动前会请用户重新输入。Yggdrasil Connect 没有记录 client_id，
-/// 续期时使用本启动器的，不能续期就需要重新登录
+/// PCL-CE 里外置登录（authlib-injector / Yggdrasil Connect）档案的类型：本启动器不支持，导入时跳过
+bool pclExternalProfile(Map<String, dynamic> pr) => const {'Authlib', 'YggdrasilConnect'}.contains(pr['profileType']);
+
+/// PCL-CE 的档案（微软、离线）转换为账户，信息不完整或是外置登录时返回 null
 Account? pclAccount(Map<String, dynamic> pr) {
-  final type = _enum(
-    pr['profileType'],
-    ['Microsoft', 'Offline', 'Authlib', 'YggdrasilConnect'],
-    [AccountType.microsoft, AccountType.offline, AccountType.yggdrasil, AccountType.yggdrasilConnect],
-  );
+  final type = _enum(pr['profileType'], ['Microsoft', 'Offline'], [AccountType.microsoft, AccountType.offline]);
   final name = _text(pr['username']);
-  final uuid = '${pr['uuid'] ?? ''}'.replaceAll('-', '');
-  final server = _text(pr['server'])
-      ?.replaceFirst(RegExp(r'/+$'), '')
-      .replaceFirst(RegExp(r'/authserver$', caseSensitive: false), '');
-  final thirdParty = type == AccountType.yggdrasil || type == AccountType.yggdrasilConnect;
-  if (type == null || name == null || (thirdParty && (server == null || uuid.isEmpty))) return null;
+  if (type == null || name == null) return null;
   return Account(
     id: newId(),
     type: type,
     name: name,
-    uuid: uuid,
+    uuid: '${pr['uuid'] ?? ''}'.replaceAll('-', ''),
     accessToken: _text(pr['accessToken']) ?? newId(),
-    refreshToken: type == AccountType.yggdrasilConnect ? _text(pr['refreshToken']) : null,
     expiresAt: DateTime.tryParse('${pr['expiresAt'] ?? ''}')?.millisecondsSinceEpoch,
     importedLegacy: type == AccountType.microsoft,
-    server: thirdParty ? server : null,
-    serverName: thirdParty ? _text(pr['serverName']) : null,
-    login: type == AccountType.yggdrasil ? _text(pr['name']) : null,
-    clientToken: type == AccountType.yggdrasil ? _text(pr['clientToken']) : null,
   );
 }
 
@@ -374,7 +361,13 @@ Future<PclImportResult> importFromPcl(
           final converted = pclAccount(profiles[i]);
           if (converted == null) {
             final name = _text(profiles[i]['username']);
-            if (name != null) result.skippedAccounts.add(tr.importIncompleteAccountInfoSign(name));
+            if (name != null) {
+              result.skippedAccounts.add(
+                pclExternalProfile(profiles[i])
+                    ? tr.importExternalNotSupported(name)
+                    : tr.importIncompleteAccountInfoSign(name),
+              );
+            }
             continue;
           }
           final acc = await store.importAccount(converted);

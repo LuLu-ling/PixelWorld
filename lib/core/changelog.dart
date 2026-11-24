@@ -7,7 +7,7 @@ String changelogAsset(String version) => 'release-notes/v$version.md';
 
 /// Nightly 构建没有自己的发布说明，复用下一个版本的更新日志；
 /// 发版时把这里跟着改成再下一个版本（同时先写好对应的 release-notes）
-const nightlyChangelogVersion = '0.3.4';
+const nightlyChangelogVersion = '0.3.5';
 
 /// 这个构建应显示的更新日志版本：nightly 用下一个版本的说明，其余用自身版本
 String changelogVersionFor(String version, String channel) => channel == 'nightly' ? nightlyChangelogVersion : version;

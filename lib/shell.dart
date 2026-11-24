@@ -109,6 +109,23 @@ class _ShellState extends State<Shell> {
     fileManagerRequest.addListener(_onFileRequest);
   }
 
+  /// 升级后旧的外置登录账户已被移除（读取账户时丢弃并保存），提示一次
+  Future<void> _noticeRemovedExternal(BuildContext ctx) async {
+    final store = AppScope.read(ctx).accounts;
+    final removed = store.removedExternal;
+    if (removed <= 0) return;
+    store.removedExternal = 0;
+    await showDialog<void>(
+      context: ctx,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.info_outline),
+        title: Text(context.l10n.accountsExternalRemovedTitle),
+        content: SizedBox(width: 400, child: Text(context.l10n.accountsExternalRemovedBody(removed))),
+        actions: [FilledButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.oobeDone))],
+      ),
+    );
+  }
+
   void _onFileRequest() {
     if (fileManagerRequest.value != null && mounted) _goMain(MainPage.files);
   }
@@ -134,6 +151,8 @@ class _ShellState extends State<Shell> {
           await ensureAgreement(ctx);
           if (!ctx.mounted) return;
           await askStorageOnFirstRun(ctx);
+          if (!ctx.mounted) return;
+          await _noticeRemovedExternal(ctx);
         }
         // 等启动画面（或首次设置）淡出后开始新手教程
         await Future<void>.delayed(Duration(milliseconds: oobe == null ? 1200 : 400));
@@ -665,7 +684,6 @@ class _AccountChip extends StatelessWidget {
       null => '',
       AccountType.microsoft => ' · ${l.accountMicrosoft}',
       AccountType.offline => ' · ${l.accountOffline}',
-      _ => ' · ${account!.serverName ?? l.accountExternal}',
     };
     final chip = _BarChip(
       onTap: () => showAccountsDialog(context),

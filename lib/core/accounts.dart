@@ -12,8 +12,12 @@ import 'secure.dart';
 import 'safe_write.dart';
 import 'i18n/strings.dart';
 
-/// 账户类型：离线、微软、外置登录（Yggdrasil API，账户密码）、外置登录（Yggdrasil Connect，OAuth 授权）
-enum AccountType { offline, microsoft, yggdrasil, yggdrasilConnect }
+/// 账户类型：离线、微软。
+/// 外置登录（authlib-injector / Yggdrasil）已移除：Mojang 的 AppID 审核标准不允许使用第三方验证服务
+enum AccountType { offline, microsoft }
+
+/// 旧版本保存的外置登录账户类型，读取时丢弃
+const _removedTypes = {'yggdrasil', 'yggdrasilConnect'};
 
 class Account {
   Account({
@@ -25,10 +29,6 @@ class Account {
     this.refreshToken,
     this.expiresAt,
     this.importedLegacy = false,
-    this.server,
-    this.serverName,
-    this.login,
-    this.clientToken,
   });
 
   final String id;
@@ -44,33 +44,12 @@ class Account {
   /// 从 PCL-CE 导入的微软账户：刷新令牌属于 PCL-CE 的应用，过期后需要重新登录
   final bool importedLegacy;
 
-  /// 外置登录：authlib-injector API 根地址（不以 / 结尾）
-  final String? server;
-
-  /// 外置登录：验证服务器名称（元数据中的 serverName）
-  final String? serverName;
-
-  /// Yggdrasil API：登录用的账户（邮箱或用户名），令牌失效后重新输入密码时使用
-  final String? login;
-
-  /// Yggdrasil API 的 clientToken；Yggdrasil Connect 为 OAuth client_id（刷新令牌时必须与登录时相同）
-  final String? clientToken;
-
   String get typeLabel => switch (type) {
     AccountType.offline => tr.oobeOfflineAccount,
     AccountType.microsoft => tr.oobeMicrosoftAccount,
-    AccountType.yggdrasil ||
-    AccountType.yggdrasilConnect => tr.accountsExternal(serverName ?? Uri.tryParse('$server')?.host ?? ''),
   };
 
-  Account copyWith({
-    String? id,
-    String? name,
-    String? accessToken,
-    String? refreshToken,
-    int? expiresAt,
-    String? clientToken,
-  }) => Account(
+  Account copyWith({String? id, String? name, String? accessToken, String? refreshToken, int? expiresAt}) => Account(
     id: id ?? this.id,
     type: type,
     name: name ?? this.name,
@@ -79,10 +58,6 @@ class Account {
     refreshToken: refreshToken ?? this.refreshToken,
     expiresAt: expiresAt ?? this.expiresAt,
     importedLegacy: importedLegacy,
-    server: server,
-    serverName: serverName,
-    login: login,
-    clientToken: clientToken ?? this.clientToken,
   );
 
   Map<String, dynamic> toJson() => {
@@ -94,10 +69,6 @@ class Account {
     'refreshToken': ?refreshToken,
     'expiresAt': ?expiresAt,
     if (importedLegacy) 'importedFrom': 'pcl',
-    'server': ?server,
-    'serverName': ?serverName,
-    'login': ?login,
-    'clientToken': ?clientToken,
   };
 
   static Account fromJson(Map<String, dynamic> j) => Account(
@@ -109,10 +80,6 @@ class Account {
     refreshToken: j['refreshToken'] as String?,
     expiresAt: (j['expiresAt'] as num?)?.toInt(),
     importedLegacy: j['importedFrom'] == 'pcl',
-    server: j['server'] as String?,
-    serverName: j['serverName'] as String?,
-    login: j['login'] as String?,
-    clientToken: j['clientToken'] as String?,
   );
 }
 
@@ -133,25 +100,33 @@ String offlineUuid(String name) {
 
 /// 账户列表，加密保存在应用数据目录的 accounts.dat（见 [SecureData]）
 class AccountStore {
-  AccountStore._(this.accounts);
+  AccountStore._(this.accounts, {this.removedExternal = 0});
 
   final List<Account> accounts;
+
+  /// 读取时丢弃的旧外置登录账户数量（界面提示一次）
+  int removedExternal;
 
   static File get _file => File(p.join(Paths.configDir, 'accounts.dat'));
 
   /// 早期版本明文保存的账户文件，读取后迁移到 accounts.dat
   static File get _legacyFile => File(p.join(Paths.configDir, 'accounts.json'));
 
-  static List<Account> _parse(String text) =>
-      (jsonDecode(text) as List).whereType<Map<String, dynamic>>().map(Account.fromJson).toList();
+  static AccountStore _parse(String text) {
+    final all = (jsonDecode(text) as List).whereType<Map<String, dynamic>>().toList();
+    final kept = all.where((j) => !_removedTypes.contains(j['type'])).toList();
+    final store = AccountStore._(kept.map(Account.fromJson).toList(), removedExternal: all.length - kept.length);
+    if (store.removedExternal > 0) unawaited(store._save().catchError((_) {}));
+    return store;
+  }
 
   static AccountStore load() {
     try {
       if (_file.existsSync()) {
-        return AccountStore._(_parse(utf8.decode(SecureData.unprotect(_file.readAsBytesSync()))));
+        return _parse(utf8.decode(SecureData.unprotect(_file.readAsBytesSync())));
       }
       if (_legacyFile.existsSync()) {
-        final store = AccountStore._(_parse(_legacyFile.readAsStringSync()));
+        final store = _parse(_legacyFile.readAsStringSync());
         store._save().then((_) => _legacyFile.delete()).catchError((_) => _legacyFile);
         return store;
       }
@@ -167,9 +142,8 @@ class AccountStore {
     unawaited(Paths.backupConfigFile(_file));
   }
 
-  /// 添加或更新账户（同类型、同验证服务器、同 UUID 视为同一账户）
-  Future<Account> upsert(Account acc) =>
-      _put(acc, (a) => a.type == acc.type && a.server == acc.server && a.uuid == acc.uuid);
+  /// 添加或更新账户（同类型、同 UUID 视为同一账户）
+  Future<Account> upsert(Account acc) => _put(acc, (a) => a.type == acc.type && a.uuid == acc.uuid);
 
   /// 导入（PCL-CE）：离线账户按名称匹配，避免 UUID 生成方式不同导致重复；其他账户同 [upsert]
   Future<Account> importAccount(Account acc) => acc.type == AccountType.offline

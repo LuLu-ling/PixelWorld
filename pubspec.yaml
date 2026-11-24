@@ -3,7 +3,7 @@ description: "Pixel World"
 publish_to: 'none'
 
 # 版本名 + 构建号：构建号是安卓的 versionCode，每次发布都要增加
-version: 0.3.3+26
+version: 0.3.4+27
 
 environment:
   sdk: ^3.13.7

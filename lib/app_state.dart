@@ -801,7 +801,8 @@ class AppState extends ChangeNotifier {
     if (tipped.contains(id)) return false;
     final inst = instance(id);
     if (inst == null || !const {Loader.fabric, Loader.forge, Loader.neoforge}.contains(inst.loader)) return false;
-    return !hasTouchController(await gameDirOf(inst));
+    // 装过又禁用了的是想用自带按键，也不推荐
+    return !hasTouchController(await gameDirOf(inst), includeDisabled: true);
   }
 
   /// 退出后的推荐：用自带虚拟按键玩了至少 3 分钟、正常退出

@@ -21,6 +21,7 @@ import 'network_check_panel.dart';
 import 'storage_location.dart';
 import 'theme_color_dialog.dart';
 import 'window_buttons.dart';
+import 'yggdrasil_login_dialog.dart';
 import '../core/i18n/strings.dart';
 
 /// 首次设置走完后要做的事
@@ -659,7 +660,7 @@ class _OobePageState extends State<OobePage> {
     final scheme = theme.colorScheme;
     final clientId = state.config.effectiveMsClientId.trim();
     final list = state.accounts.accounts;
-    // 验证过正版后才能添加离线账户（见 precheck.dart）
+    // 验证过正版后才能添加离线账户和外置登录（见 precheck.dart）
     final verified = state.config.hintBuy;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -687,6 +688,17 @@ class _OobePageState extends State<OobePage> {
                           title: context.l10n.commonSignMicrosoft,
                           create: (onCode) => MicrosoftLogin(clientId, onCode),
                         ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _AccountCard(
+                  icon: Icons.key_outlined,
+                  title: context.l10n.oobeExternalSign,
+                  subtitle: verified
+                      ? context.l10n.oobeLittleSkinOtherSkinSites
+                      : context.l10n.oobeAvailableAfterVerification,
+                  onTap: verified ? () => showYggdrasilLogin(context) : null,
                 ),
               ),
               const SizedBox(width: 10),

@@ -126,6 +126,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountOffline => '离线';
 
   @override
+  String get accountExternal => '外置';
+
+  @override
   String get windowMinimize => '最小化';
 
   @override
@@ -1016,6 +1019,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonSignMicrosoft => '微软登录';
 
   @override
+  String get oobeExternalSign => '外置登录';
+
+  @override
+  String get oobeLittleSkinOtherSkinSites => 'LittleSkin 等皮肤站';
+
+  @override
   String get oobeOfflineAccount => '离线账户';
 
   @override
@@ -1095,7 +1104,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tourAddAccountFirst => '先添加账户';
 
   @override
-  String get tourClickHereAddMicrosoft => '点这里添加微软正版账户；登录过一次正版后，也可以添加离线账户。';
+  String get tourClickHereAddMicrosoft => '点这里添加微软正版账户；登录过一次正版后，也可以添加外置登录（例如 LittleSkin）和离线账户。';
 
   @override
   String get tourInstallGame => '安装游戏';
@@ -1299,6 +1308,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get launchDialogsMaybeLater => '下次再说';
 
   @override
+  String launchDialogsSignAgain(Object serverName) {
+    return '重新登录 $serverName';
+  }
+
+  @override
+  String launchDialogsSignHasExpiredEnter(Object name, Object login) {
+    return '$name（$login）的登录已失效，请输入密码继续启动。';
+  }
+
+  @override
+  String get commonPassword => '密码';
+
+  @override
+  String get launchDialogsCancelLaunch => '取消启动';
+
+  @override
+  String get commonSign => '登录';
+
+  @override
   String updateDialogYoureLatestVersion(Object label) {
     return '已是最新版本（$label）';
   }
@@ -1420,6 +1448,43 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonChoose => '选择';
 
   @override
+  String get yggdrasilLoginDialogAuthenticationServerAddress => '验证服务器地址';
+
+  @override
+  String get yggdrasilLoginDialogEnterAddressPickOne => '输入地址，或从列表中选择';
+
+  @override
+  String get yggdrasilLoginDialogChooseProfile => '选择角色';
+
+  @override
+  String yggdrasilLoginDialogAuthenticationServer(Object server) {
+    return '验证服务器：$server';
+  }
+
+  @override
+  String get yggdrasilLoginDialogAddressIsntEncryptedYour => '这个地址没有加密，密码会以明文传输';
+
+  @override
+  String get yggdrasilLoginDialogEmailUsername => '邮箱或用户名';
+
+  @override
+  String get yggdrasilLoginDialogPasswordSign => '账户密码登录';
+
+  @override
+  String get yggdrasilLoginDialogOAuthAuthorization => 'OAuth 授权';
+
+  @override
+  String get yggdrasilLoginDialogAccountPassword => '账户密码';
+
+  @override
+  String yggdrasilLoginDialogClickingStartOpensAuthorization(Object site) {
+    return '点击开始后会在浏览器中打开 $site 的授权页面，确认授权并选择角色即可，启动器不会接触你的密码。';
+  }
+
+  @override
+  String get yggdrasilLoginDialogStartOAuthSign => '开始 OAuth 登录';
+
+  @override
   String get accountsDialogNoAccountsYet => '还没有账户';
 
   @override
@@ -1433,6 +1498,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accountsDialogMicrosoftSignNeedsAzure => '微软登录需要先在「设置 - 其他」中填写 Azure 应用 Client ID。';
+
+  @override
+  String get accountsDialogThirdPartyAccounts => '第三方账户';
 
   @override
   String get maintenanceActionsNothingCleanUp => '没有需要清理的文件';
@@ -5199,6 +5267,40 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String yggdrasilConnectDoesntSupportYggdrasilConnect(Object name) {
+    return '$name 不支持 Yggdrasil Connect';
+  }
+
+  @override
+  String yggdrasilConnectHasInvalidYggdrasilConnect(Object name) {
+    return '$name 的 Yggdrasil Connect 配置无效';
+  }
+
+  @override
+  String yggdrasilConnectLauncherHasntRegisteredApp(Object name) {
+    return '启动器尚未在 $name 注册应用，暂时无法使用 OAuth 登录';
+  }
+
+  @override
+  String get yggdrasilConnectMalformedIDToken => 'ID 令牌格式错误';
+
+  @override
+  String get yggdrasilConnectInvalidIDTokenIssuer => 'ID 令牌无效（签发者、受众或有效期不符）';
+
+  @override
+  String yggdrasilConnectDoesntSupportDeviceCode(Object name) {
+    return '$name 不支持设备代码登录';
+  }
+
+  @override
+  String get yggdrasilConnectNoProfileWasChosen => '授权时没有选择角色';
+
+  @override
+  String yggdrasilConnectAuthorizationAccountHasExpired(Object typeLabel, Object name) {
+    return '$typeLabel 账户 $name 的授权已过期，请在账户中重新登录';
+  }
+
+  @override
   String oauthCantStartSign(Object status) {
     return '无法开始登录：$status';
   }
@@ -5220,7 +5322,36 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String accountsExternal(Object host) {
+    return '外置登录 · $host';
+  }
+
+  @override
   String get accountsUsernamesMust316 => '用户名需为 3-16 位字母、数字或下划线';
+
+  @override
+  String get yggdrasilAccountHasNoProfile => '该账户还没有角色，请先到皮肤站创建角色';
+
+  @override
+  String get yggdrasilAuthenticationServerDidntReturn => '验证服务器没有返回所选角色';
+
+  @override
+  String yggdrasilProfileNoLongerBelongs(Object name) {
+    return '角色 $name 已不在该账户下，请重新添加账户';
+  }
+
+  @override
+  String get yggdrasilApiEnterAuthenticationServerAddress => '请输入验证服务器地址';
+
+  @override
+  String yggdrasilApiIsntValidAuthenticationServer(Object url) {
+    return '$url 不是有效的验证服务器';
+  }
+
+  @override
+  String yggdrasilApiAuthenticationServerReturnedHTTP(Object status) {
+    return '验证服务器返回 HTTP $status';
+  }
 
   @override
   String newsMinecraftWikiRequestFailed(Object statusCode) {
@@ -5232,6 +5363,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get secureDecryptionFailed => '解密失败';
+
+  @override
+  String get authlibInjectorVerificationFailedSHA256 => '校验失败（SHA-256 不匹配）';
+
+  @override
+  String authlibInjectorCouldntDownloadAuthlibInjector(Object e) {
+    return '无法下载 authlib-injector：$e';
+  }
 
   @override
   String get authSignCanceled => '已取消登录';
@@ -5921,14 +6060,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadLoadFailedRetry => '连不上 · 重试';
 
   @override
-  String get precheckOwnershipRequired => '先登录一次购买了 Minecraft 的微软账户，才能使用离线账户。';
+  String get precheckOwnershipRequired => '先登录一次购买了 Minecraft 的微软账户，才能使用离线账户和外置登录。';
 
   @override
   String get launchDialogsVerifyOwnershipFirst => '需要先验证正版';
 
   @override
   String get launchDialogsOwnershipRequiredBody =>
-      'Minecraft 是付费游戏。按照 Mojang 的规定，需要先登录一次购买了 Minecraft 的微软账户，才能用离线账户开始游戏。\n\n验证一次之后，离线账户就可以一直使用了。';
+      'Minecraft 是付费游戏。按照 Mojang 的规定，需要先登录一次购买了 Minecraft 的微软账户，才能用离线账户或外置登录开始游戏。\n\n验证一次之后，离线账户和外置登录就可以一直使用了。';
 
   @override
   String get launchDialogsBuyGame => '去购买';
@@ -5937,26 +6076,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get launchDialogsSignInMicrosoft => '登录微软账户';
 
   @override
-  String get oobeAccountHintVerified => '玩正版用微软账户，也可以用离线账户。';
+  String get oobeAccountHintVerified => '玩正版用微软账户，也可以用离线账户或外置登录。';
 
   @override
-  String get oobeAccountHintUnverified => '先登录购买了 Minecraft 的微软账户，之后也能用离线账户。';
+  String get oobeAccountHintUnverified => '先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。';
 
   @override
   String get oobeAvailableAfterVerification => '验证正版后可用';
-
-  @override
-  String importExternalNotSupported(Object name) {
-    return '$name（外置登录已不再支持）';
-  }
-
-  @override
-  String get accountsExternalRemovedTitle => '外置登录已移除';
-
-  @override
-  String accountsExternalRemovedBody(int count) {
-    return '为符合 Mojang 对启动器的要求，Pixel World 不再支持外置登录（authlib-injector / LittleSkin 等皮肤站），已移除 $count 个外置登录账户。请使用微软正版账户登录；验证过正版后也可以使用离线账户。';
-  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -6078,6 +6204,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get accountOffline => '離線';
+
+  @override
+  String get accountExternal => '外置';
 
   @override
   String get windowMinimize => '最小化';
@@ -6971,6 +7100,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get commonSignMicrosoft => '微軟登入';
 
   @override
+  String get oobeExternalSign => '外置登入';
+
+  @override
+  String get oobeLittleSkinOtherSkinSites => 'LittleSkin 等皮膚站';
+
+  @override
   String get oobeOfflineAccount => '離線帳戶';
 
   @override
@@ -7050,7 +7185,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get tourAddAccountFirst => '先新增帳戶';
 
   @override
-  String get tourClickHereAddMicrosoft => '點這裡新增微軟正版帳戶；登入過一次正版後，也可以新增離線帳戶。';
+  String get tourClickHereAddMicrosoft => '點這裡新增微軟正版帳戶；登入過一次正版後，也可以新增外置登入（例如 LittleSkin）和離線帳戶。';
 
   @override
   String get tourInstallGame => '安裝遊戲';
@@ -7254,6 +7389,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get launchDialogsMaybeLater => '下次再說';
 
   @override
+  String launchDialogsSignAgain(Object serverName) {
+    return '重新登入 $serverName';
+  }
+
+  @override
+  String launchDialogsSignHasExpiredEnter(Object name, Object login) {
+    return '$name（$login）的登入已失效，請輸入密碼繼續啟動。';
+  }
+
+  @override
+  String get commonPassword => '密碼';
+
+  @override
+  String get launchDialogsCancelLaunch => '取消啟動';
+
+  @override
+  String get commonSign => '登入';
+
+  @override
   String updateDialogYoureLatestVersion(Object label) {
     return '已是最新版本（$label）';
   }
@@ -7375,6 +7529,43 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get commonChoose => '選擇';
 
   @override
+  String get yggdrasilLoginDialogAuthenticationServerAddress => '驗證伺服器位址';
+
+  @override
+  String get yggdrasilLoginDialogEnterAddressPickOne => '輸入位址，或從列表中選擇';
+
+  @override
+  String get yggdrasilLoginDialogChooseProfile => '選擇角色';
+
+  @override
+  String yggdrasilLoginDialogAuthenticationServer(Object server) {
+    return '驗證伺服器：$server';
+  }
+
+  @override
+  String get yggdrasilLoginDialogAddressIsntEncryptedYour => '這個位址沒有加密，密碼會以明文傳輸';
+
+  @override
+  String get yggdrasilLoginDialogEmailUsername => '郵箱或使用者名';
+
+  @override
+  String get yggdrasilLoginDialogPasswordSign => '帳戶密碼登入';
+
+  @override
+  String get yggdrasilLoginDialogOAuthAuthorization => 'OAuth 授權';
+
+  @override
+  String get yggdrasilLoginDialogAccountPassword => '帳戶密碼';
+
+  @override
+  String yggdrasilLoginDialogClickingStartOpensAuthorization(Object site) {
+    return '點擊開始後會在瀏覽器中開啟 $site 的授權頁面，確認授權並選擇角色即可，啟動器不會接觸你的密碼。';
+  }
+
+  @override
+  String get yggdrasilLoginDialogStartOAuthSign => '開始 OAuth 登入';
+
+  @override
   String get accountsDialogNoAccountsYet => '還沒有帳戶';
 
   @override
@@ -7388,6 +7579,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get accountsDialogMicrosoftSignNeedsAzure => '微軟登入需要先在「設定 - 其他」中填寫 Azure 應用 Client ID。';
+
+  @override
+  String get accountsDialogThirdPartyAccounts => '第三方帳戶';
 
   @override
   String get maintenanceActionsNothingCleanUp => '沒有需要清理的檔案';
@@ -11154,6 +11348,40 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String yggdrasilConnectDoesntSupportYggdrasilConnect(Object name) {
+    return '$name 不支援 Yggdrasil Connect';
+  }
+
+  @override
+  String yggdrasilConnectHasInvalidYggdrasilConnect(Object name) {
+    return '$name 的 Yggdrasil Connect 設定無效';
+  }
+
+  @override
+  String yggdrasilConnectLauncherHasntRegisteredApp(Object name) {
+    return '啟動器尚未在 $name 註冊應用，暫時無法使用 OAuth 登入';
+  }
+
+  @override
+  String get yggdrasilConnectMalformedIDToken => 'ID 令牌格式錯誤';
+
+  @override
+  String get yggdrasilConnectInvalidIDTokenIssuer => 'ID 令牌無效（簽發者、受眾或有效期不符）';
+
+  @override
+  String yggdrasilConnectDoesntSupportDeviceCode(Object name) {
+    return '$name 不支援裝置程式碼登入';
+  }
+
+  @override
+  String get yggdrasilConnectNoProfileWasChosen => '授權時沒有選擇角色';
+
+  @override
+  String yggdrasilConnectAuthorizationAccountHasExpired(Object typeLabel, Object name) {
+    return '$typeLabel 帳戶 $name 的授權已過期，請在帳戶中重新登入';
+  }
+
+  @override
   String oauthCantStartSign(Object status) {
     return '無法開始登入：$status';
   }
@@ -11175,7 +11403,36 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String accountsExternal(Object host) {
+    return '外置登入 · $host';
+  }
+
+  @override
   String get accountsUsernamesMust316 => '使用者名需為 3-16 位字母、數字或下划線';
+
+  @override
+  String get yggdrasilAccountHasNoProfile => '該帳戶還沒有角色，請先到皮膚站建立角色';
+
+  @override
+  String get yggdrasilAuthenticationServerDidntReturn => '驗證伺服器沒有返回所選角色';
+
+  @override
+  String yggdrasilProfileNoLongerBelongs(Object name) {
+    return '角色 $name 已不在該帳戶下，請重新新增帳戶';
+  }
+
+  @override
+  String get yggdrasilApiEnterAuthenticationServerAddress => '請輸入驗證伺服器位址';
+
+  @override
+  String yggdrasilApiIsntValidAuthenticationServer(Object url) {
+    return '$url 不是有效的驗證伺服器';
+  }
+
+  @override
+  String yggdrasilApiAuthenticationServerReturnedHTTP(Object status) {
+    return '驗證伺服器返回 HTTP $status';
+  }
 
   @override
   String newsMinecraftWikiRequestFailed(Object statusCode) {
@@ -11187,6 +11444,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get secureDecryptionFailed => '解密失敗';
+
+  @override
+  String get authlibInjectorVerificationFailedSHA256 => '校驗失敗（SHA-256 不匹配）';
+
+  @override
+  String authlibInjectorCouldntDownloadAuthlibInjector(Object e) {
+    return '無法下載 authlib-injector：$e';
+  }
 
   @override
   String get authSignCanceled => '已取消登入';
@@ -11876,14 +12141,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get downloadLoadFailedRetry => '連不上 · 重試';
 
   @override
-  String get precheckOwnershipRequired => '先登入一次購買了 Minecraft 的微軟帳戶，才能使用離線帳戶。';
+  String get precheckOwnershipRequired => '先登入一次購買了 Minecraft 的微軟帳戶，才能使用離線帳戶和外置登入。';
 
   @override
   String get launchDialogsVerifyOwnershipFirst => '需要先驗證正版';
 
   @override
   String get launchDialogsOwnershipRequiredBody =>
-      'Minecraft 是付費遊戲。按照 Mojang 的規定，需要先登入一次購買了 Minecraft 的微軟帳戶，才能用離線帳戶開始遊戲。\n\n驗證一次之後，離線帳戶就可以一直使用了。';
+      'Minecraft 是付費遊戲。按照 Mojang 的規定，需要先登入一次購買了 Minecraft 的微軟帳戶，才能用離線帳戶或外置登入開始遊戲。\n\n驗證一次之後，離線帳戶和外置登入就可以一直使用了。';
 
   @override
   String get launchDialogsBuyGame => '去購買';
@@ -11892,24 +12157,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get launchDialogsSignInMicrosoft => '登入微軟帳戶';
 
   @override
-  String get oobeAccountHintVerified => '玩正版用微軟帳戶，也可以用離線帳戶。';
+  String get oobeAccountHintVerified => '玩正版用微軟帳戶，也可以用離線帳戶或外置登入。';
 
   @override
-  String get oobeAccountHintUnverified => '先登入購買了 Minecraft 的微軟帳戶，之後也能用離線帳戶。';
+  String get oobeAccountHintUnverified => '先登入購買了 Minecraft 的微軟帳戶，之後也能用離線帳戶和外置登入。';
 
   @override
   String get oobeAvailableAfterVerification => '驗證正版後可用';
-
-  @override
-  String importExternalNotSupported(Object name) {
-    return '$name（外置登入已不再支援）';
-  }
-
-  @override
-  String get accountsExternalRemovedTitle => '外置登入已移除';
-
-  @override
-  String accountsExternalRemovedBody(int count) {
-    return '為符合 Mojang 對啟動器的要求，Pixel World 不再支援外置登入（authlib-injector / LittleSkin 等皮膚站），已移除 $count 個外置登入帳戶。請使用微軟正版帳戶登入；驗證過正版後也可以使用離線帳戶。';
-  }
 }

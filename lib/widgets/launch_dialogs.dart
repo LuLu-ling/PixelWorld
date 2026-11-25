@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../app_info.dart';
 import '../app_state.dart';
+import '../core/accounts.dart';
 import '../core/precheck.dart';
 import '../l10n/l10n.dart';
 import 'accounts_dialog.dart';
@@ -47,6 +48,10 @@ class DialogLaunchPrompts implements LaunchPrompts {
   }
 
   @override
+  Future<String?> askPassword(Account acc) =>
+      showDialog<String>(context: context, barrierDismissible: false, builder: (_) => _PasswordDialog(acc));
+
+  @override
   Future<bool> confirmJava(String message) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -85,4 +90,56 @@ class DialogLaunchPrompts implements LaunchPrompts {
     );
     if (ok == true) await launchUrl(Uri.parse(AppInfo.sponsorUrl));
   }
+}
+
+/// 外置登录的令牌无法续期时重新输入密码；返回密码，取消时返回 null
+class _PasswordDialog extends StatefulWidget {
+  const _PasswordDialog(this.acc);
+
+  final Account acc;
+
+  @override
+  State<_PasswordDialog> createState() => _PasswordDialogState();
+}
+
+class _PasswordDialogState extends State<_PasswordDialog> {
+  final _password = TextEditingController();
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_password.text.isNotEmpty) Navigator.pop(context, _password.text);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    icon: const Icon(Icons.lock_outline),
+    title: Text(context.l10n.launchDialogsSignAgain(widget.acc.serverName ?? '')),
+    content: SizedBox(
+      width: 400,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(context.l10n.launchDialogsSignHasExpiredEnter(widget.acc.name, widget.acc.login ?? '')),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _password,
+            autofocus: true,
+            obscureText: true,
+            decoration: InputDecoration(labelText: context.l10n.commonPassword, border: const OutlineInputBorder()),
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.launchDialogsCancelLaunch)),
+      FilledButton(onPressed: _submit, child: Text(context.l10n.commonSign)),
+    ],
+  );
 }

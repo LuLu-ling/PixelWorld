@@ -4,9 +4,10 @@ import '../app_scope.dart';
 import '../core/accounts.dart';
 import '../core/microsoft.dart';
 import 'device_login_dialog.dart';
+import 'yggdrasil_login_dialog.dart';
 import '../l10n/l10n.dart';
 
-/// 账户管理：切换、添加离线 / 微软账户、移除
+/// 账户管理：切换、添加离线 / 微软 / 外置登录账户、移除
 Future<void> showAccountsDialog(BuildContext context) =>
     showDialog<void>(context: context, builder: (_) => const _AccountsDialog());
 
@@ -41,7 +42,7 @@ class _AccountsDialogState extends State<_AccountsDialog> {
     final state = AppScope.of(context);
     final scheme = Theme.of(context).colorScheme;
     final selected = state.selectedAccount?.id;
-    // 验证过正版后才能添加离线账户（见 precheck.dart）
+    // 验证过正版后才能添加离线账户和外置登录（见 precheck.dart）
     final verified = state.config.hintBuy;
     return AlertDialog(
       title: Text(context.l10n.oobeAccount),
@@ -130,6 +131,17 @@ class _AccountsDialogState extends State<_AccountsDialog> {
                   child: FilledButton.tonal(onPressed: verified ? _add : null, child: Text(context.l10n.oobeAdd)),
                 ),
               ],
+            ),
+            const SizedBox(height: 20),
+            Text(context.l10n.accountsDialogThirdPartyAccounts, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.tonalIcon(
+                onPressed: verified ? () => showYggdrasilLogin(context) : null,
+                icon: const Icon(Icons.dns_outlined),
+                label: Text(context.l10n.oobeExternalSign),
+              ),
             ),
           ],
         ),

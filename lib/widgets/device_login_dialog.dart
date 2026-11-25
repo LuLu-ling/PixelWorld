@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../app_scope.dart';
 import '../core/accounts.dart';
 import '../core/auth/auth.dart';
+import '../core/auth/oauth.dart';
+import '../core/microsoft.dart';
 import '../l10n/l10n.dart';
 
 /// 设备代码登录对话框（微软）。[create] 用展示代码的回调创建登录命令
@@ -26,6 +28,20 @@ Future<void> showDeviceLogin(
       ),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.commonCancel))],
     ),
+  );
+}
+
+/// 启动器上次退出前还有没完成的微软登录（安卓上去浏览器授权时启动器可能被系统杀掉）：
+/// 重新打开登录对话框，接着等同一个代码，用户已经授权过的话马上就能登录
+Future<void> resumePendingMicrosoftLogin(BuildContext context) async {
+  final clientId = AppScope.read(context).config.effectiveMsClientId;
+  if (clientId.trim().isEmpty) return;
+  final pending = await PendingMicrosoftLogin.load(clientId);
+  if (pending == null || !context.mounted) return;
+  await showDeviceLogin(
+    context,
+    title: context.l10n.commonSignMicrosoft,
+    create: (onCode) => MicrosoftLogin(clientId, onCode, resume: pending),
   );
 }
 
@@ -62,7 +78,7 @@ class DeviceLoginPanel extends StatefulWidget {
   State<DeviceLoginPanel> createState() => _DeviceLoginPanelState();
 }
 
-class _DeviceLoginPanelState extends State<DeviceLoginPanel> {
+class _DeviceLoginPanelState extends State<DeviceLoginPanel> with WidgetsBindingObserver {
   LoginCommand? _login;
   DeviceCode? _code;
   String? _error;
@@ -70,7 +86,14 @@ class _DeviceLoginPanelState extends State<DeviceLoginPanel> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.autoStart) _start();
+  }
+
+  /// 从浏览器切回启动器时马上查一次，不用等下一个轮询间隔
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) OAuthClient.wakeUp();
   }
 
   void _start() {
@@ -90,11 +113,13 @@ class _DeviceLoginPanelState extends State<DeviceLoginPanel> {
   void _onCode(DeviceCode c) {
     if (mounted) setState(() => _code = c);
     Clipboard.setData(ClipboardData(text: c.userCode));
-    launchUrl(Uri.parse(c.completeUri ?? c.verificationUri));
+    // 接着上次的登录时用户多半已经授权过了，不再自动打开浏览器；需要时点下面的链接
+    if (!c.resumed) launchUrl(Uri.parse(c.completeUri ?? c.verificationUri));
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _login?.cancel();
     super.dispose();
   }
@@ -137,7 +162,9 @@ class _DeviceLoginPanelState extends State<DeviceLoginPanel> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          code.completeUri != null
+          code.resumed
+              ? context.l10n.deviceLoginDialogResumed
+              : code.completeUri != null
               ? context.l10n.deviceLoginDialogAuthorizationPageHasOpened
               : context.l10n.deviceLoginDialogSignPageHasOpened,
         ),

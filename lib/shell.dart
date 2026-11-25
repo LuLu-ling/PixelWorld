@@ -15,6 +15,7 @@ import 'widgets/accounts_dialog.dart';
 import 'widgets/agreement_dialog.dart';
 import 'widgets/app_background.dart';
 import 'widgets/app_logo.dart';
+import 'widgets/device_login_dialog.dart' show resumePendingMicrosoftLogin;
 import 'widgets/device_status.dart';
 import 'widgets/oobe.dart';
 import 'widgets/shell_layout.dart';
@@ -126,6 +127,9 @@ class _ShellState extends State<Shell> {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final ctx = _navKey.currentContext;
         if (ctx == null || !ctx.mounted) return;
+        // 上次去浏览器登录微软账户时启动器被系统杀掉了：接着完成那次登录
+        await resumePendingMicrosoftLogin(ctx);
+        if (!ctx.mounted) return;
         // 全新安装：全屏的首次设置（协议、外观、游戏文件夹、网络、账户）
         final oobe = await showOobeIfNeeded(ctx);
         if (!ctx.mounted) return;

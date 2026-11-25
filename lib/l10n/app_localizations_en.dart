@@ -1682,6 +1682,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The sign-in page has opened in your browser. Enter the code below (already copied to the clipboard):';
 
   @override
+  String get deviceLoginDialogResumed =>
+      'Picking up your last sign-in: finish authorizing with the code below in your browser, then come back and you will be signed in automatically. If you closed the page, open it again with the link below:';
+
+  @override
   String get deviceLoginDialogWaitingSign => 'Waiting for sign-in';
 
   @override
@@ -6365,6 +6369,10 @@ class AppLocalizationsEnGb extends AppLocalizationsEn {
   @override
   String get deviceLoginDialogAuthorizationPageHasOpened =>
       'The authorisation page has opened in your browser. Check that the code on the page matches the one below, then approve:';
+
+  @override
+  String get deviceLoginDialogResumed =>
+      'Picking up your last sign-in: finish authorising with the code below in your browser, then come back and you will be signed in automatically. If you closed the page, open it again with the link below:';
 
   @override
   String get themeColorDialogCustomThemeColor => 'Custom theme colour';

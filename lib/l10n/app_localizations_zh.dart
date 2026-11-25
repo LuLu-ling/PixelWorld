@@ -1596,6 +1596,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deviceLoginDialogSignPageHasOpened => '已在浏览器中打开登录页面，请输入下面的代码（已复制到剪贴板）：';
 
   @override
+  String get deviceLoginDialogResumed => '接着完成上次的登录：在浏览器里用下面的代码完成授权后回到启动器，会自动登录。授权页面关掉了可以点下面的链接重新打开：';
+
+  @override
   String get deviceLoginDialogWaitingSign => '等待登录完成';
 
   @override
@@ -7678,6 +7681,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get deviceLoginDialogSignPageHasOpened => '已在瀏覽器中開啟登入頁面，請輸入下面的程式碼（已複製到剪貼簿）：';
+
+  @override
+  String get deviceLoginDialogResumed => '接著完成上次的登入：在瀏覽器裡用下面的代碼完成授權後回到啟動器，會自動登入。授權頁面關掉了可以點下面的連結重新打開：';
 
   @override
   String get deviceLoginDialogWaitingSign => '等待登入完成';

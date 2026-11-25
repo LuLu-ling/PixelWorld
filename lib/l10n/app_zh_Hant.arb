@@ -488,6 +488,7 @@
   "deviceLoginDialogRetry": "重試",
   "deviceLoginDialogAuthorizationPageHasOpened": "已在瀏覽器中開啟授權頁面，請確認頁面上的程式碼與下面一致後完成授權：",
   "deviceLoginDialogSignPageHasOpened": "已在瀏覽器中開啟登入頁面，請輸入下面的程式碼（已複製到剪貼簿）：",
+  "deviceLoginDialogResumed": "接著完成上次的登入：在瀏覽器裡用下面的代碼完成授權後回到啟動器，會自動登入。授權頁面關掉了可以點下面的連結重新打開：",
   "deviceLoginDialogWaitingSign": "等待登入完成",
   "formatOtherYearsAgo": "{inDays} 年前",
   "formatOtherMonthsAgo": "{inDays} 個月前",

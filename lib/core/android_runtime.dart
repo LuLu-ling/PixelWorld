@@ -341,14 +341,17 @@ Future<AndroidGpu> androidGpu() async =>
 /// 把设置中的渲染器（可能是 auto）换成实际使用的渲染器，并给出理由
 ///
 /// [sdl]：这个版本用 SDL3 创建窗口（26.x）。Krypton Wrapper 在 26.3 快照起会崩溃，这类版本用 MobileGlues
-/// 版本的 mods 文件夹里是否有启用的 TouchController 模组（基岩版风格的触控）
-bool hasTouchController(String gameDir) {
+/// 版本的 mods 文件夹里是否有启用的 TouchController 模组（基岩版风格的触控）；
+/// [includeDisabled] 时禁用了的（.jar.disabled）也算，用于判断要不要推荐
+bool hasTouchController(String gameDir, {bool includeDisabled = false}) {
   try {
     final dir = Directory(p.join(gameDir, 'mods'));
     if (!dir.existsSync()) return false;
     return dir.listSync().any((e) {
       final name = p.basename(e.path).toLowerCase();
-      return e is File && name.contains('touchcontroller') && name.endsWith('.jar');
+      return e is File &&
+          name.contains('touchcontroller') &&
+          (name.endsWith('.jar') || includeDisabled && name.endsWith('.jar.disabled'));
     });
   } catch (_) {
     return false;

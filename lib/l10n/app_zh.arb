@@ -2175,5 +2175,12 @@
   "oobeAccountHintVerified": "玩正版用微软账户，也可以用离线账户或外置登录。",
   "oobeAccountHintUnverified": "为了正版验证，请先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。",
   "oobeAvailableAfterVerification": "验证正版后可用",
-  "accountsOwnershipNotice": "说明：为了正版验证，离线账户和外置登录需要先登录一次拥有 Minecraft 的微软账户，确认你购买了游戏后才能添加和使用。"
+  "accountsOwnershipNotice": "说明：为了正版验证，离线账户和外置登录需要先登录一次拥有 Minecraft 的微软账户，确认你购买了游戏后才能添加和使用。",
+  "touchTipTitle": "试试 TouchController",
+  "touchTipBody": "TouchController 是第三方模组，给 Java 版带来基岩版风格的触屏操作，按键布局可以自己调整。它还在早期开发阶段，可能会遇到问题。\n\n装进「{instance}」后，下次启动时启动器会把游戏内的触摸交给它，并隐藏自带的虚拟按键；想换回来，在模组里禁用它就行。",
+  "@touchTipBody": {"placeholders": {"instance": {}}},
+  "touchTipInstall": "安装",
+  "touchTipNever": "不再推荐",
+  "touchTipInstalled": "已为 {instance} 安装 TouchController，下次启动生效",
+  "@touchTipInstalled": {"placeholders": {"instance": {}}}
 }

@@ -21,6 +21,7 @@
   "yggdrasilLoginDialogOAuthAuthorization": "OAuth authorisation",
   "yggdrasilLoginDialogClickingStartOpensAuthorization": "Clicking Start opens the {site} authorisation page in your browser; approve it and choose a profile. The launcher never sees your password.",
   "deviceLoginDialogAuthorizationPageHasOpened": "The authorisation page has opened in your browser. Check that the code on the page matches the one below, then approve:",
+  "touchTipBody": "TouchController is a third-party mod that brings Bedrock-style touch controls to Java Edition, with a layout you can customise. It is still early in development, so expect some rough edges.\n\nOnce it is in \"{instance}\", the launcher hands in-game touch over to it from the next launch and hides its own on-screen buttons. To switch back, disable it in the mod list.",
   "themeColorDialogCustomThemeColor": "Custom theme colour",
   "tasksCanceled": "Cancelled",
   "diagnoseNoKnownProblemMatched": "No known problem matched; you can check the log or analyse it with AI.",

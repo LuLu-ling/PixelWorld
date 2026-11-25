@@ -165,6 +165,11 @@ class AppState extends ChangeNotifier {
   /// 游戏崩溃（非正常退出）时发出收集到的崩溃信息
   Stream<CrashReport> get crashes => _crashes.stream;
 
+  final _touchControllerTips = StreamController<String>.broadcast();
+
+  /// 安卓：在没装 TouchController 的模组实例里玩了一会儿、正常退出后，推荐装它（值为实例 id）
+  Stream<String> get touchControllerTips => _touchControllerTips.stream;
+
   /// 错误分析页正在查看的内容
   CrashReport? diagnosis;
 
@@ -769,7 +774,20 @@ class AppState extends ChangeNotifier {
       _launcherLog(tr.appStateCouldntCollectCrashInformation(e));
     } finally {
       _afterExited(config.afterLaunch, crashed: crashed);
+      if (!crashed) _maybeTipTouchController(run);
     }
+  }
+
+  /// 推荐 TouchController 的时机：安卓上用自带虚拟按键玩了至少 3 分钟、正常退出，
+  /// 实例是它支持的加载器（Fabric、Forge、NeoForge）且还没装；每个实例只推荐一次
+  void _maybeTipTouchController(GameRun run) {
+    if (!Platform.isAndroid || !config.touchControllerTip) return;
+    if (config.touchControllerTipped.contains(run.versionId)) return;
+    if (DateTime.now().difference(run.startedAt) < const Duration(minutes: 3)) return;
+    final inst = instance(run.versionId);
+    if (inst == null || !const {Loader.fabric, Loader.forge, Loader.neoforge}.contains(inst.loader)) return;
+    if (hasTouchController(run.gameDir)) return;
+    _touchControllerTips.add(run.versionId);
   }
 
   // ---------- 启动器可见性，与 PCL-CE 的 LauncherVisibility 一致 ----------

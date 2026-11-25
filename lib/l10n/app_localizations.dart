@@ -10346,6 +10346,36 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'说明：为了正版验证，离线账户和外置登录需要先登录一次拥有 Minecraft 的微软账户，确认你购买了游戏后才能添加和使用。'**
   String get accountsOwnershipNotice;
+
+  /// No description provided for @touchTipTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'试试 TouchController'**
+  String get touchTipTitle;
+
+  /// No description provided for @touchTipBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'TouchController 是第三方模组，给 Java 版带来基岩版风格的触屏操作，按键布局可以自己调整。它还在早期开发阶段，可能会遇到问题。\n\n装进「{instance}」后，下次启动时启动器会把游戏内的触摸交给它，并隐藏自带的虚拟按键；想换回来，在模组里禁用它就行。'**
+  String touchTipBody(Object instance);
+
+  /// No description provided for @touchTipInstall.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装'**
+  String get touchTipInstall;
+
+  /// No description provided for @touchTipNever.
+  ///
+  /// In zh, this message translates to:
+  /// **'不再推荐'**
+  String get touchTipNever;
+
+  /// No description provided for @touchTipInstalled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已为 {instance} 安装 TouchController，下次启动生效'**
+  String touchTipInstalled(Object instance);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

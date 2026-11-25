@@ -39,7 +39,7 @@ import 'widgets/mac_traffic_lights.dart';
 export 'widgets/shell_layout.dart' show AlignedSplit;
 
 /// files 只在手机上出现（内置文件管理器）；电脑上打开文件夹用系统的资源管理器
-enum MainPage { home, download, settings, tools, ai, files }
+enum MainPage { home, download, settings, tools, ai, files, accounts }
 
 /// 从主页面进入的子页面：顶栏显示返回按钮和标题
 enum SubPage { versions, log, instance, tasks, diagnose }
@@ -59,6 +59,7 @@ String _mainTitle(AppLocalizations l, MainPage p) => switch (p) {
   MainPage.tools => l.navTools,
   MainPage.ai => l.navAiAssistant,
   MainPage.files => l.navFiles,
+  MainPage.accounts => l.oobeAccount,
 };
 
 /// 页面切换，供各页面打开子页面或返回
@@ -198,6 +199,7 @@ class _ShellState extends State<Shell> {
           const ToolsPage(),
           const AiPage(),
           if (isDesktop) const SizedBox.shrink() else const EmbeddedFileManager(),
+          const AccountsPage(),
         ],
       ),
     };
@@ -296,13 +298,23 @@ class _Rail extends StatelessWidget {
             children: [
               const AppLogo(size: 36),
               const SizedBox(height: 10),
-              item(MainPage.home, Icons.rocket_launch_outlined, Icons.rocket_launch),
-              item(MainPage.download, Icons.download_outlined, Icons.download),
-              item(MainPage.tools, Icons.construction_outlined, Icons.construction),
-              // 手机上的内置文件管理器（电脑上打开文件夹用系统的资源管理器）
-              if (!isDesktop) item(MainPage.files, Icons.folder_outlined, Icons.folder),
-              item(MainPage.settings, Icons.settings_outlined, Icons.settings),
-              item(MainPage.ai, Icons.chat_bubble_outline, Icons.chat_bubble, 'AI'),
+              // 手机横屏高度不够时可以上下滚动
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      item(MainPage.home, Icons.rocket_launch_outlined, Icons.rocket_launch),
+                      item(MainPage.download, Icons.download_outlined, Icons.download),
+                      item(MainPage.tools, Icons.construction_outlined, Icons.construction),
+                      // 手机上的内置文件管理器（电脑上打开文件夹用系统的资源管理器）
+                      if (!isDesktop) item(MainPage.files, Icons.folder_outlined, Icons.folder),
+                      item(MainPage.accounts, Icons.person_outline, Icons.person),
+                      item(MainPage.settings, Icons.settings_outlined, Icons.settings),
+                      item(MainPage.ai, Icons.chat_bubble_outline, Icons.chat_bubble, 'AI'),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),

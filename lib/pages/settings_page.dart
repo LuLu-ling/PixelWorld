@@ -17,14 +17,13 @@ import '../widgets/settings_group.dart';
 import '../widgets/side_nav.dart';
 import '../widgets/ai_settings.dart';
 import '../widgets/ai_workspace_settings.dart';
-import '../widgets/accounts_dialog.dart' show AccountsPanel;
 import '../widgets/storage_location.dart';
 import 'docs_page.dart';
 import 'settings_sections.dart';
 
-enum _Section { accounts, launch, java, manage, appearance, misc, ai, aiTools, aiWorkspace, about, docs }
+enum _Section { launch, java, manage, appearance, misc, ai, aiTools, aiWorkspace, about, docs }
 
-/// 从别的页面跳到设置的某个小节（值为小节名，例如 accounts、ai、aiTools、aiWorkspace），见 ShellNav.openSettings
+/// 从别的页面跳到设置的某个小节（值为小节名，例如 ai、aiTools、aiWorkspace），见 ShellNav.openSettings
 final settingsSectionRequest = ValueNotifier<String?>(null);
 
 class SettingsPage extends StatefulWidget {
@@ -73,7 +72,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
   static List<SideNavGroup<_Section>> _groups(AppLocalizations l) => [
     SideNavGroup(l.settingsGroupGame, [
-      SideNavItem(_Section.accounts, l.oobeAccount, Icons.person_outline),
       SideNavItem(_Section.launch, l.settingsLaunch, Icons.rocket_launch_outlined),
       const SideNavItem(_Section.java, 'Java', Icons.coffee_outlined),
       SideNavItem(_Section.manage, l.settingsManage, Icons.folder_outlined),
@@ -103,15 +101,6 @@ class _SettingsPageState extends State<SettingsPage> {
         Expanded(
           child: ContentPanel(
             child: switch (_section) {
-              _Section.accounts => ListView(
-                padding: const EdgeInsets.fromLTRB(6, 2, 16, 16),
-                children: [
-                  SettingsGroup(
-                    title: l.oobeAccount,
-                    children: const [Padding(padding: EdgeInsets.fromLTRB(20, 16, 20, 20), child: AccountsPanel())],
-                  ),
-                ],
-              ),
               _Section.launch => const LaunchSection(),
               _Section.java => const JavaSection(),
               _Section.misc => const MiscSection(),

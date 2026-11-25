@@ -8,6 +8,9 @@ import 'package:window_manager/window_manager.dart';
 import 'app_info.dart';
 import 'core/accounts.dart';
 import 'core/auth/auth.dart';
+import 'core/auth/authlib_injector.dart';
+import 'core/auth/yggdrasil.dart';
+import 'core/auth/yggdrasil_connect.dart';
 import 'core/ai/ai_chat.dart';
 import 'core/ai/ai_context.dart';
 import 'core/ai/ai_tools.dart';
@@ -44,8 +47,8 @@ import 'core/i18n/strings.dart';
 
 enum GameState { idle, preparing, running }
 
-/// 启动过程中需要界面参与的决定（正版验证、赞助劝导、Java 兼容）
-abstract interface class LaunchPrompts {
+/// 启动过程中需要界面参与的决定（正版验证、赞助劝导、外置登录重新输入密码）
+abstract interface class LaunchPrompts implements AuthPrompts {
   Future<OwnershipChoice> askOwnership();
   Future<void> askSponsor(int launchCount);
 
@@ -259,6 +262,8 @@ class AppState extends ChangeNotifier {
   AccountAuth _authFor(Account acc) => switch (acc.type) {
     AccountType.offline => const OfflineAuth(),
     AccountType.microsoft => MicrosoftAuth(config.effectiveMsClientId),
+    AccountType.yggdrasil => YggdrasilAuth(AuthlibInjector(downloader)),
+    AccountType.yggdrasilConnect => ConnectAuth(AuthlibInjector(downloader)),
   };
 
   bool isFavorite(String id) => favorites.any((f) => f.id == id);
@@ -466,7 +471,7 @@ class AppState extends ChangeNotifier {
     if (acc == null) throw Exception(tr.appStateAddAccountFirst);
 
     // ---- 正版验证与赞助劝导 ----
-    // 没有验证过正版时不能用离线账户启动（对话框里可以去登录或购买）
+    // 没有验证过正版时不能用离线或外置登录账户启动（对话框里可以去登录或购买）
     if (needsOwnershipCheck(acc, hintBuy: config.hintBuy)) {
       await prompts.askOwnership();
       return false;
@@ -490,7 +495,7 @@ class AppState extends ChangeNotifier {
       if (acc.type != AccountType.offline) t.setStage(tr.appStateVerifyAccount);
       final AuthSession auth;
       try {
-        auth = await _authFor(acc).prepare(acc);
+        auth = await _authFor(acc).prepare(acc, prompts);
       } on LoginCancelled {
         tasks.remove(t);
         gameState = GameState.idle;

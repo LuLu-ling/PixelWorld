@@ -5,7 +5,7 @@
 > - **Install and launch** vanilla versions and mod loaders (Forge, NeoForge, Fabric, Quilt, OptiFine and more), with per-version Java, memory and isolation settings.
 > - **Mods and resources** from Modrinth, with automatic dependency installation.
 > - **Fast downloads** from the official servers or the BMCLAPI mirror, with automatic fallback and SHA-1 verification.
-> - **Accounts**: Microsoft account sign-in only, through Microsoft's official OAuth device code flow (see [Authentication](#authentication)). Offline accounts are available only after ownership has been verified. No third-party authentication services (Yggdrasil / authlib-injector) are supported.
+> - **Accounts**: Microsoft account sign-in through Microsoft's official OAuth device code flow (see [Authentication](#authentication)). Offline and third-party (Yggdrasil / authlib-injector) accounts are available only after game ownership has been verified with a Microsoft account.
 > - **No data collection**: no telemetry, no crash-report uploads, no author-run account server. See the [privacy policy](https://pixelworld.zhuzhi.site/docs/privacy.html).
 > - **Android**: built-in game runtime with selectable renderers and touch controls.
 >
@@ -16,8 +16,8 @@
 > 1. The player signs in on Microsoft's own sign-in page using the OAuth 2.0 device code flow (scope `XboxLive.signin`). The launcher never sees the player's password.
 > 2. The launcher exchanges the Microsoft token for Xbox Live and XSTS tokens, then signs in to Minecraft Services (`login_with_xbox`).
 > 3. It reads the player's Minecraft profile (`/minecraft/profile`). An account without a Java Edition profile (one that does not own the game) is rejected and cannot start the game.
-> 4. Offline accounts (for single-player use) can only be added and used after a Microsoft account that owns the game has signed in on this device.
-> 5. Tokens are stored only on the player's device (encrypted with DPAPI on Windows). There is no author-run account server, and no third-party authentication service, authlib-injector, or borrowed application ID is used.
+> 4. Offline accounts and third-party (Yggdrasil / authlib-injector) accounts can only be added and used after a Microsoft account that owns the game has signed in on this device. The launcher tells the player that this is required to verify game ownership.
+> 5. Tokens are stored only on the player's device (encrypted with DPAPI on Windows). There is no author-run account server, and no borrowed application ID is used.
 >
 > Minecraft is a trademark of Mojang Studios. Pixel World is not an official Minecraft product and is not approved by or associated with Mojang or Microsoft.
 
@@ -45,7 +45,7 @@ Pixel World 是一个跨平台的 Minecraft 启动器，本项目为轻度使用
 - **模组加载器**：Forge、NeoForge、Fabric、Quilt、Legacy Fabric、LiteLoader、Cleanroom、OptiFine（独立安装，或作为模组与加载器一起安装）、LabyMod。安卓上暂时不能安装需要运行安装器的 Forge、NeoForge、Cleanroom 与 OptiFine，见「下一步」。
 - **资源**：从 Modrinth 搜索并安装模组、光影包、资源包、数据包，自动安装必需的前置模组；模组启用与禁用；存档、截图等文件管理。
 - **下载**：官方源与 BMCLAPI 镜像，失败自动回退；多线程下载；SHA-1 校验；结尾的慢连接自动换节点。
-- **账户**：微软正版登录；验证过正版后也可以使用离线账户。不支持外置登录（authlib-injector）。账户在 Windows 上用 DPAPI 加密保存。
+- **账户**：微软正版登录；为了正版验证，需要先登录一次拥有 Minecraft 的微软账户，之后才能使用离线账户和外置登录（authlib-injector）。账户在 Windows 上用 DPAPI 加密保存。
 - **Java**：自动查找本机 Java，缺少时按版本需要自动下载。
 - **启动与排错**：启动游戏、游戏日志、崩溃分析；可选的 AI 排障助手（自填接口），可以查看日志、搜索并安装模组、修改配置文件、备份与恢复，每次修改都需要你确认。
 - **从 PCL-CE 迁移**：导入全局设置、游戏文件夹与账户；直接使用 PCL-CE 的版本文件夹与版本设置。

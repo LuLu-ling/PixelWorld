@@ -132,6 +132,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountOffline => 'Offline';
 
   @override
+  String get accountExternal => 'External';
+
+  @override
   String get windowMinimize => 'Minimize';
 
   @override
@@ -1055,6 +1058,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonSignMicrosoft => 'Sign in with Microsoft';
 
   @override
+  String get oobeExternalSign => 'External sign-in';
+
+  @override
+  String get oobeLittleSkinOtherSkinSites => 'LittleSkin and other skin sites';
+
+  @override
   String get oobeOfflineAccount => 'Offline account';
 
   @override
@@ -1136,7 +1145,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tourClickHereAddMicrosoft =>
-      'Click here to add a Microsoft account; after signing in with it once, you can also add offline accounts.';
+      'Click here to add a Microsoft account; after signing in with it once, you can also add external accounts (e.g. LittleSkin) and offline accounts.';
 
   @override
   String get tourInstallGame => 'Install the game';
@@ -1366,6 +1375,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get launchDialogsMaybeLater => 'Maybe later';
 
   @override
+  String launchDialogsSignAgain(Object serverName) {
+    return 'Sign in to $serverName again';
+  }
+
+  @override
+  String launchDialogsSignHasExpiredEnter(Object name, Object login) {
+    return 'The sign-in for $name ($login) has expired. Enter your password to continue launching.';
+  }
+
+  @override
+  String get commonPassword => 'Password';
+
+  @override
+  String get launchDialogsCancelLaunch => 'Cancel launch';
+
+  @override
+  String get commonSign => 'Sign in';
+
+  @override
   String updateDialogYoureLatestVersion(Object label) {
     return 'You\'re on the latest version ($label)';
   }
@@ -1495,6 +1523,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonChoose => 'Choose';
 
   @override
+  String get yggdrasilLoginDialogAuthenticationServerAddress => 'Authentication server address';
+
+  @override
+  String get yggdrasilLoginDialogEnterAddressPickOne => 'Enter an address or pick one from the list';
+
+  @override
+  String get yggdrasilLoginDialogChooseProfile => 'Choose a profile';
+
+  @override
+  String yggdrasilLoginDialogAuthenticationServer(Object server) {
+    return 'Authentication server: $server';
+  }
+
+  @override
+  String get yggdrasilLoginDialogAddressIsntEncryptedYour =>
+      'This address isn\'t encrypted; your password will be sent in plain text';
+
+  @override
+  String get yggdrasilLoginDialogEmailUsername => 'Email or username';
+
+  @override
+  String get yggdrasilLoginDialogPasswordSign => 'Password sign-in';
+
+  @override
+  String get yggdrasilLoginDialogOAuthAuthorization => 'OAuth authorization';
+
+  @override
+  String get yggdrasilLoginDialogAccountPassword => 'Account password';
+
+  @override
+  String yggdrasilLoginDialogClickingStartOpensAuthorization(Object site) {
+    return 'Clicking Start opens the $site authorization page in your browser; approve it and choose a profile. The launcher never sees your password.';
+  }
+
+  @override
+  String get yggdrasilLoginDialogStartOAuthSign => 'Start OAuth sign-in';
+
+  @override
   String get accountsDialogNoAccountsYet => 'No accounts yet';
 
   @override
@@ -1509,6 +1575,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get accountsDialogMicrosoftSignNeedsAzure =>
       'Microsoft sign-in needs an Azure app client ID in Settings → Other first.';
+
+  @override
+  String get accountsDialogThirdPartyAccounts => 'Third-party accounts';
 
   @override
   String get maintenanceActionsNothingCleanUp => 'Nothing to clean up';
@@ -5389,6 +5458,40 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String yggdrasilConnectDoesntSupportYggdrasilConnect(Object name) {
+    return '$name doesn\'t support Yggdrasil Connect';
+  }
+
+  @override
+  String yggdrasilConnectHasInvalidYggdrasilConnect(Object name) {
+    return '$name has an invalid Yggdrasil Connect configuration';
+  }
+
+  @override
+  String yggdrasilConnectLauncherHasntRegisteredApp(Object name) {
+    return 'The launcher hasn\'t registered an app with $name yet, so OAuth sign-in isn\'t available';
+  }
+
+  @override
+  String get yggdrasilConnectMalformedIDToken => 'Malformed ID token';
+
+  @override
+  String get yggdrasilConnectInvalidIDTokenIssuer => 'Invalid ID token (issuer, audience or validity doesn\'t match)';
+
+  @override
+  String yggdrasilConnectDoesntSupportDeviceCode(Object name) {
+    return '$name doesn\'t support device code sign-in';
+  }
+
+  @override
+  String get yggdrasilConnectNoProfileWasChosen => 'No profile was chosen during authorization';
+
+  @override
+  String yggdrasilConnectAuthorizationAccountHasExpired(Object typeLabel, Object name) {
+    return 'The authorization for $typeLabel account $name has expired; sign in again under Accounts';
+  }
+
+  @override
   String oauthCantStartSign(Object status) {
     return 'Can\'t start sign-in: $status';
   }
@@ -5410,7 +5513,36 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String accountsExternal(Object host) {
+    return 'External · $host';
+  }
+
+  @override
   String get accountsUsernamesMust316 => 'Usernames must be 3–16 letters, digits or underscores';
+
+  @override
+  String get yggdrasilAccountHasNoProfile => 'This account has no profile yet; create one on the skin site first';
+
+  @override
+  String get yggdrasilAuthenticationServerDidntReturn => 'The authentication server didn\'t return the chosen profile';
+
+  @override
+  String yggdrasilProfileNoLongerBelongs(Object name) {
+    return 'Profile $name no longer belongs to this account; please add the account again';
+  }
+
+  @override
+  String get yggdrasilApiEnterAuthenticationServerAddress => 'Enter the authentication server address';
+
+  @override
+  String yggdrasilApiIsntValidAuthenticationServer(Object url) {
+    return '$url isn\'t a valid authentication server';
+  }
+
+  @override
+  String yggdrasilApiAuthenticationServerReturnedHTTP(Object status) {
+    return 'The authentication server returned HTTP $status';
+  }
 
   @override
   String newsMinecraftWikiRequestFailed(Object statusCode) {
@@ -5422,6 +5554,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get secureDecryptionFailed => 'Decryption failed';
+
+  @override
+  String get authlibInjectorVerificationFailedSHA256 => 'Verification failed (SHA-256 mismatch)';
+
+  @override
+  String authlibInjectorCouldntDownloadAuthlibInjector(Object e) {
+    return 'Couldn\'t download authlib-injector: $e';
+  }
 
   @override
   String get authSignCanceled => 'Sign-in canceled';
@@ -6124,14 +6264,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get precheckOwnershipRequired =>
-      'Sign in once with a Microsoft account that owns Minecraft to use offline accounts.';
+      'To verify game ownership, sign in once with a Microsoft account that owns Minecraft before using offline and external accounts.';
 
   @override
   String get launchDialogsVerifyOwnershipFirst => 'Verify game ownership first';
 
   @override
   String get launchDialogsOwnershipRequiredBody =>
-      'Minecraft is a paid game. Mojang requires you to sign in once with a Microsoft account that owns Minecraft before playing with an offline account.\n\nAfter verifying once, offline accounts stay available.';
+      'Minecraft is a paid game. Mojang requires you to sign in once with a Microsoft account that owns Minecraft before playing with offline or external accounts.\n\nAfter verifying once, offline and external accounts stay available.';
 
   @override
   String get launchDialogsBuyGame => 'Buy the game';
@@ -6140,27 +6280,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get launchDialogsSignInMicrosoft => 'Sign in with Microsoft';
 
   @override
-  String get oobeAccountHintVerified => 'Use a Microsoft account to play the full game, or an offline account.';
+  String get oobeAccountHintVerified =>
+      'Use a Microsoft account to play the full game, or an offline or external account.';
 
   @override
   String get oobeAccountHintUnverified =>
-      'Sign in first with a Microsoft account that owns Minecraft; after that, offline accounts work too.';
+      'To verify game ownership, sign in first with a Microsoft account that owns Minecraft; after that, offline and external accounts work too.';
 
   @override
   String get oobeAvailableAfterVerification => 'Available after verifying ownership';
 
   @override
-  String importExternalNotSupported(Object name) {
-    return '$name (external accounts are no longer supported)';
-  }
-
-  @override
-  String get accountsExternalRemovedTitle => 'External accounts removed';
-
-  @override
-  String accountsExternalRemovedBody(int count) {
-    return 'To meet Mojang\'s requirements for launchers, Pixel World no longer supports external accounts (authlib-injector, LittleSkin and other skin sites). $count external account(s) were removed. Please sign in with a Microsoft account; offline accounts are available after verifying ownership.';
-  }
+  String get accountsOwnershipNotice =>
+      'Note: to verify game ownership, offline and external accounts can only be added and used after you sign in once with a Microsoft account that owns Minecraft.';
 }
 
 /// The translations for English, as used in the United Kingdom (`en_GB`).
@@ -6221,6 +6353,14 @@ class AppLocalizationsEnGb extends AppLocalizationsEn {
   @override
   String get tourThemeBackgroundImageHome =>
       'Theme, background image and home layout are under “Personalisation”; Java, memory and game folders are adjusted here too.';
+
+  @override
+  String get yggdrasilLoginDialogOAuthAuthorization => 'OAuth authorisation';
+
+  @override
+  String yggdrasilLoginDialogClickingStartOpensAuthorization(Object site) {
+    return 'Clicking Start opens the $site authorisation page in your browser; approve it and choose a profile. The launcher never sees your password.';
+  }
 
   @override
   String get deviceLoginDialogAuthorizationPageHasOpened =>
@@ -6318,6 +6458,14 @@ class AppLocalizationsEnGb extends AppLocalizationsEn {
   String get importLauncherBehaviorAfterLaunch => 'Launcher behaviour after launch';
 
   @override
+  String get yggdrasilConnectNoProfileWasChosen => 'No profile was chosen during authorisation';
+
+  @override
+  String yggdrasilConnectAuthorizationAccountHasExpired(Object typeLabel, Object name) {
+    return 'The authorisation for $typeLabel account $name has expired; sign in again under Accounts';
+  }
+
+  @override
   String get oauthAuthorizationDenied => 'Authorisation denied';
 
   @override
@@ -6325,4 +6473,8 @@ class AppLocalizationsEnGb extends AppLocalizationsEn {
 
   @override
   String get aiReplyLanguage => 'English (UK spelling)';
+
+  @override
+  String get accountsOwnershipNotice =>
+      'Note: to verify game ownership, offline and external accounts can only be added and used after you sign in once with a Microsoft account that owns Minecraft.';
 }

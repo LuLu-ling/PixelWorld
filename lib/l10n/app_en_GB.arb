@@ -18,6 +18,8 @@
   "afterLaunchMinimize": "Minimise, restore when the game exits",
   "oobeSelectedPanelsBecomeFrosted": "Selected · panels become frosted glass and the theme colour follows the image",
   "tourThemeBackgroundImageHome": "Theme, background image and home layout are under “Personalisation”; Java, memory and game folders are adjusted here too.",
+  "yggdrasilLoginDialogOAuthAuthorization": "OAuth authorisation",
+  "yggdrasilLoginDialogClickingStartOpensAuthorization": "Clicking Start opens the {site} authorisation page in your browser; approve it and choose a profile. The launcher never sees your password.",
   "deviceLoginDialogAuthorizationPageHasOpened": "The authorisation page has opened in your browser. Check that the code on the page matches the one below, then approve:",
   "themeColorDialogCustomThemeColor": "Custom theme colour",
   "tasksCanceled": "Cancelled",
@@ -47,7 +49,10 @@
   "importUnrecognizedCNGProtectedData": "Unrecognised CNG protected data",
   "importUnrecognizedUserKeyBinFormat": "Unrecognised UserKey.bin format",
   "importLauncherBehaviorAfterLaunch": "Launcher behaviour after launch",
+  "yggdrasilConnectNoProfileWasChosen": "No profile was chosen during authorisation",
+  "yggdrasilConnectAuthorizationAccountHasExpired": "The authorisation for {typeLabel} account {name} has expired; sign in again under Accounts",
   "oauthAuthorizationDenied": "Authorisation denied",
   "authSignCanceled": "Sign-in cancelled",
-  "aiReplyLanguage": "English (UK spelling)"
+  "aiReplyLanguage": "English (UK spelling)",
+  "accountsOwnershipNotice": "Note: to verify game ownership, offline and external accounts can only be added and used after you sign in once with a Microsoft account that owns Minecraft."
 }

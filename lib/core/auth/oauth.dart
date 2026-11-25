@@ -17,7 +17,7 @@ class OAuthToken {
   final int expiresAt;
 }
 
-/// OAuth 2.0 公共客户端：设备代码流（RFC 8628）与刷新令牌。用于微软登录
+/// OAuth 2.0 公共客户端：设备代码流（RFC 8628）与刷新令牌。微软登录与 Yggdrasil Connect 共用
 class OAuthClient {
   const OAuthClient({required this.clientId, required this.tokenEndpoint, this.deviceEndpoint});
 

@@ -313,6 +313,12 @@ abstract class AppLocalizations {
   /// **'离线'**
   String get accountOffline;
 
+  /// No description provided for @accountExternal.
+  ///
+  /// In zh, this message translates to:
+  /// **'外置'**
+  String get accountExternal;
+
   /// No description provided for @windowMinimize.
   ///
   /// In zh, this message translates to:
@@ -1999,6 +2005,18 @@ abstract class AppLocalizations {
   /// **'微软登录'**
   String get commonSignMicrosoft;
 
+  /// No description provided for @oobeExternalSign.
+  ///
+  /// In zh, this message translates to:
+  /// **'外置登录'**
+  String get oobeExternalSign;
+
+  /// No description provided for @oobeLittleSkinOtherSkinSites.
+  ///
+  /// In zh, this message translates to:
+  /// **'LittleSkin 等皮肤站'**
+  String get oobeLittleSkinOtherSkinSites;
+
   /// No description provided for @oobeOfflineAccount.
   ///
   /// In zh, this message translates to:
@@ -2152,7 +2170,7 @@ abstract class AppLocalizations {
   /// No description provided for @tourClickHereAddMicrosoft.
   ///
   /// In zh, this message translates to:
-  /// **'点这里添加微软正版账户；登录过一次正版后，也可以添加离线账户。'**
+  /// **'点这里添加微软正版账户；登录过一次正版后，也可以添加外置登录（例如 LittleSkin）和离线账户。'**
   String get tourClickHereAddMicrosoft;
 
   /// No description provided for @tourInstallGame.
@@ -2515,6 +2533,36 @@ abstract class AppLocalizations {
   /// **'下次再说'**
   String get launchDialogsMaybeLater;
 
+  /// No description provided for @launchDialogsSignAgain.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新登录 {serverName}'**
+  String launchDialogsSignAgain(Object serverName);
+
+  /// No description provided for @launchDialogsSignHasExpiredEnter.
+  ///
+  /// In zh, this message translates to:
+  /// **'{name}（{login}）的登录已失效，请输入密码继续启动。'**
+  String launchDialogsSignHasExpiredEnter(Object name, Object login);
+
+  /// No description provided for @commonPassword.
+  ///
+  /// In zh, this message translates to:
+  /// **'密码'**
+  String get commonPassword;
+
+  /// No description provided for @launchDialogsCancelLaunch.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消启动'**
+  String get launchDialogsCancelLaunch;
+
+  /// No description provided for @commonSign.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录'**
+  String get commonSign;
+
   /// No description provided for @updateDialogYoureLatestVersion.
   ///
   /// In zh, this message translates to:
@@ -2713,6 +2761,72 @@ abstract class AppLocalizations {
   /// **'选择'**
   String get commonChoose;
 
+  /// No description provided for @yggdrasilLoginDialogAuthenticationServerAddress.
+  ///
+  /// In zh, this message translates to:
+  /// **'验证服务器地址'**
+  String get yggdrasilLoginDialogAuthenticationServerAddress;
+
+  /// No description provided for @yggdrasilLoginDialogEnterAddressPickOne.
+  ///
+  /// In zh, this message translates to:
+  /// **'输入地址，或从列表中选择'**
+  String get yggdrasilLoginDialogEnterAddressPickOne;
+
+  /// No description provided for @yggdrasilLoginDialogChooseProfile.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择角色'**
+  String get yggdrasilLoginDialogChooseProfile;
+
+  /// No description provided for @yggdrasilLoginDialogAuthenticationServer.
+  ///
+  /// In zh, this message translates to:
+  /// **'验证服务器：{server}'**
+  String yggdrasilLoginDialogAuthenticationServer(Object server);
+
+  /// No description provided for @yggdrasilLoginDialogAddressIsntEncryptedYour.
+  ///
+  /// In zh, this message translates to:
+  /// **'这个地址没有加密，密码会以明文传输'**
+  String get yggdrasilLoginDialogAddressIsntEncryptedYour;
+
+  /// No description provided for @yggdrasilLoginDialogEmailUsername.
+  ///
+  /// In zh, this message translates to:
+  /// **'邮箱或用户名'**
+  String get yggdrasilLoginDialogEmailUsername;
+
+  /// No description provided for @yggdrasilLoginDialogPasswordSign.
+  ///
+  /// In zh, this message translates to:
+  /// **'账户密码登录'**
+  String get yggdrasilLoginDialogPasswordSign;
+
+  /// No description provided for @yggdrasilLoginDialogOAuthAuthorization.
+  ///
+  /// In zh, this message translates to:
+  /// **'OAuth 授权'**
+  String get yggdrasilLoginDialogOAuthAuthorization;
+
+  /// No description provided for @yggdrasilLoginDialogAccountPassword.
+  ///
+  /// In zh, this message translates to:
+  /// **'账户密码'**
+  String get yggdrasilLoginDialogAccountPassword;
+
+  /// No description provided for @yggdrasilLoginDialogClickingStartOpensAuthorization.
+  ///
+  /// In zh, this message translates to:
+  /// **'点击开始后会在浏览器中打开 {site} 的授权页面，确认授权并选择角色即可，启动器不会接触你的密码。'**
+  String yggdrasilLoginDialogClickingStartOpensAuthorization(Object site);
+
+  /// No description provided for @yggdrasilLoginDialogStartOAuthSign.
+  ///
+  /// In zh, this message translates to:
+  /// **'开始 OAuth 登录'**
+  String get yggdrasilLoginDialogStartOAuthSign;
+
   /// No description provided for @accountsDialogNoAccountsYet.
   ///
   /// In zh, this message translates to:
@@ -2742,6 +2856,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'微软登录需要先在「设置 - 其他」中填写 Azure 应用 Client ID。'**
   String get accountsDialogMicrosoftSignNeedsAzure;
+
+  /// No description provided for @accountsDialogThirdPartyAccounts.
+  ///
+  /// In zh, this message translates to:
+  /// **'第三方账户'**
+  String get accountsDialogThirdPartyAccounts;
 
   /// No description provided for @maintenanceActionsNothingCleanUp.
   ///
@@ -8931,6 +9051,54 @@ abstract class AppLocalizations {
   /// **'正在执行：{label}'**
   String hudBridgeRunning(Object label);
 
+  /// No description provided for @yggdrasilConnectDoesntSupportYggdrasilConnect.
+  ///
+  /// In zh, this message translates to:
+  /// **'{name} 不支持 Yggdrasil Connect'**
+  String yggdrasilConnectDoesntSupportYggdrasilConnect(Object name);
+
+  /// No description provided for @yggdrasilConnectHasInvalidYggdrasilConnect.
+  ///
+  /// In zh, this message translates to:
+  /// **'{name} 的 Yggdrasil Connect 配置无效'**
+  String yggdrasilConnectHasInvalidYggdrasilConnect(Object name);
+
+  /// No description provided for @yggdrasilConnectLauncherHasntRegisteredApp.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动器尚未在 {name} 注册应用，暂时无法使用 OAuth 登录'**
+  String yggdrasilConnectLauncherHasntRegisteredApp(Object name);
+
+  /// No description provided for @yggdrasilConnectMalformedIDToken.
+  ///
+  /// In zh, this message translates to:
+  /// **'ID 令牌格式错误'**
+  String get yggdrasilConnectMalformedIDToken;
+
+  /// No description provided for @yggdrasilConnectInvalidIDTokenIssuer.
+  ///
+  /// In zh, this message translates to:
+  /// **'ID 令牌无效（签发者、受众或有效期不符）'**
+  String get yggdrasilConnectInvalidIDTokenIssuer;
+
+  /// No description provided for @yggdrasilConnectDoesntSupportDeviceCode.
+  ///
+  /// In zh, this message translates to:
+  /// **'{name} 不支持设备代码登录'**
+  String yggdrasilConnectDoesntSupportDeviceCode(Object name);
+
+  /// No description provided for @yggdrasilConnectNoProfileWasChosen.
+  ///
+  /// In zh, this message translates to:
+  /// **'授权时没有选择角色'**
+  String get yggdrasilConnectNoProfileWasChosen;
+
+  /// No description provided for @yggdrasilConnectAuthorizationAccountHasExpired.
+  ///
+  /// In zh, this message translates to:
+  /// **'{typeLabel} 账户 {name} 的授权已过期，请在账户中重新登录'**
+  String yggdrasilConnectAuthorizationAccountHasExpired(Object typeLabel, Object name);
+
   /// No description provided for @oauthCantStartSign.
   ///
   /// In zh, this message translates to:
@@ -8961,11 +9129,53 @@ abstract class AppLocalizations {
   /// **'验证服务器暂时不可用（{status}），请稍后再试'**
   String oauthAuthenticationServerTemporarilyUnavailable(Object status);
 
+  /// No description provided for @accountsExternal.
+  ///
+  /// In zh, this message translates to:
+  /// **'外置登录 · {host}'**
+  String accountsExternal(Object host);
+
   /// No description provided for @accountsUsernamesMust316.
   ///
   /// In zh, this message translates to:
   /// **'用户名需为 3-16 位字母、数字或下划线'**
   String get accountsUsernamesMust316;
+
+  /// No description provided for @yggdrasilAccountHasNoProfile.
+  ///
+  /// In zh, this message translates to:
+  /// **'该账户还没有角色，请先到皮肤站创建角色'**
+  String get yggdrasilAccountHasNoProfile;
+
+  /// No description provided for @yggdrasilAuthenticationServerDidntReturn.
+  ///
+  /// In zh, this message translates to:
+  /// **'验证服务器没有返回所选角色'**
+  String get yggdrasilAuthenticationServerDidntReturn;
+
+  /// No description provided for @yggdrasilProfileNoLongerBelongs.
+  ///
+  /// In zh, this message translates to:
+  /// **'角色 {name} 已不在该账户下，请重新添加账户'**
+  String yggdrasilProfileNoLongerBelongs(Object name);
+
+  /// No description provided for @yggdrasilApiEnterAuthenticationServerAddress.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入验证服务器地址'**
+  String get yggdrasilApiEnterAuthenticationServerAddress;
+
+  /// No description provided for @yggdrasilApiIsntValidAuthenticationServer.
+  ///
+  /// In zh, this message translates to:
+  /// **'{url} 不是有效的验证服务器'**
+  String yggdrasilApiIsntValidAuthenticationServer(Object url);
+
+  /// No description provided for @yggdrasilApiAuthenticationServerReturnedHTTP.
+  ///
+  /// In zh, this message translates to:
+  /// **'验证服务器返回 HTTP {status}'**
+  String yggdrasilApiAuthenticationServerReturnedHTTP(Object status);
 
   /// No description provided for @newsMinecraftWikiRequestFailed.
   ///
@@ -8984,6 +9194,18 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'解密失败'**
   String get secureDecryptionFailed;
+
+  /// No description provided for @authlibInjectorVerificationFailedSHA256.
+  ///
+  /// In zh, this message translates to:
+  /// **'校验失败（SHA-256 不匹配）'**
+  String get authlibInjectorVerificationFailedSHA256;
+
+  /// No description provided for @authlibInjectorCouldntDownloadAuthlibInjector.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法下载 authlib-injector：{e}'**
+  String authlibInjectorCouldntDownloadAuthlibInjector(Object e);
 
   /// No description provided for @authSignCanceled.
   ///
@@ -10074,7 +10296,7 @@ abstract class AppLocalizations {
   /// No description provided for @precheckOwnershipRequired.
   ///
   /// In zh, this message translates to:
-  /// **'先登录一次购买了 Minecraft 的微软账户，才能使用离线账户。'**
+  /// **'为了正版验证，需要先登录一次购买了 Minecraft 的微软账户，才能使用离线账户和外置登录。'**
   String get precheckOwnershipRequired;
 
   /// No description provided for @launchDialogsVerifyOwnershipFirst.
@@ -10086,7 +10308,7 @@ abstract class AppLocalizations {
   /// No description provided for @launchDialogsOwnershipRequiredBody.
   ///
   /// In zh, this message translates to:
-  /// **'Minecraft 是付费游戏。按照 Mojang 的规定，需要先登录一次购买了 Minecraft 的微软账户，才能用离线账户开始游戏。\n\n验证一次之后，离线账户就可以一直使用了。'**
+  /// **'Minecraft 是付费游戏。按照 Mojang 的规定，需要先登录一次购买了 Minecraft 的微软账户，才能用离线账户或外置登录开始游戏。\n\n验证一次之后，离线账户和外置登录就可以一直使用了。'**
   String get launchDialogsOwnershipRequiredBody;
 
   /// No description provided for @launchDialogsBuyGame.
@@ -10104,13 +10326,13 @@ abstract class AppLocalizations {
   /// No description provided for @oobeAccountHintVerified.
   ///
   /// In zh, this message translates to:
-  /// **'玩正版用微软账户，也可以用离线账户。'**
+  /// **'玩正版用微软账户，也可以用离线账户或外置登录。'**
   String get oobeAccountHintVerified;
 
   /// No description provided for @oobeAccountHintUnverified.
   ///
   /// In zh, this message translates to:
-  /// **'先登录购买了 Minecraft 的微软账户，之后也能用离线账户。'**
+  /// **'为了正版验证，请先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。'**
   String get oobeAccountHintUnverified;
 
   /// No description provided for @oobeAvailableAfterVerification.
@@ -10119,23 +10341,11 @@ abstract class AppLocalizations {
   /// **'验证正版后可用'**
   String get oobeAvailableAfterVerification;
 
-  /// No description provided for @importExternalNotSupported.
+  /// No description provided for @accountsOwnershipNotice.
   ///
   /// In zh, this message translates to:
-  /// **'{name}（外置登录已不再支持）'**
-  String importExternalNotSupported(Object name);
-
-  /// No description provided for @accountsExternalRemovedTitle.
-  ///
-  /// In zh, this message translates to:
-  /// **'外置登录已移除'**
-  String get accountsExternalRemovedTitle;
-
-  /// No description provided for @accountsExternalRemovedBody.
-  ///
-  /// In zh, this message translates to:
-  /// **'为符合 Mojang 对启动器的要求，Pixel World 不再支持外置登录（authlib-injector / LittleSkin 等皮肤站），已移除 {count} 个外置登录账户。请使用微软正版账户登录；验证过正版后也可以使用离线账户。'**
-  String accountsExternalRemovedBody(int count);
+  /// **'说明：为了正版验证，离线账户和外置登录需要先登录一次拥有 Minecraft 的微软账户，确认你购买了游戏后才能添加和使用。'**
+  String get accountsOwnershipNotice;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

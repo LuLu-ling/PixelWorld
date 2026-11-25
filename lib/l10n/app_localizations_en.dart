@@ -6297,6 +6297,36 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get accountsOwnershipNotice =>
       'Note: to verify game ownership, offline and external accounts can only be added and used after you sign in once with a Microsoft account that owns Minecraft.';
+
+  @override
+  String get touchTipTitle => 'Try TouchController';
+
+  @override
+  String touchTipBody(Object instance) {
+    return 'TouchController is a third-party mod that brings Bedrock-style touch controls to Java Edition, with a layout you can customize. It is still early in development, so expect some rough edges.\n\nOnce it is in \"$instance\", the launcher hands in-game touch over to it from the next launch and hides its own on-screen buttons. To switch back, disable it in the mod list.';
+  }
+
+  @override
+  String get touchTipInstall => 'Install';
+
+  @override
+  String get touchTipNever => 'Don\'t suggest again';
+
+  @override
+  String touchTipInstalled(Object instance) {
+    return 'Installed TouchController in $instance; it takes effect next launch';
+  }
+
+  @override
+  String touchTipBodyLaunch(Object instance) {
+    return 'TouchController is a third-party mod that brings Bedrock-style touch controls to Java Edition, with a layout you can customize. It is still early in development, so expect some rough edges.\n\nOnce it is in \"$instance\", it takes over in-game touch from this launch and the launcher hides its own on-screen buttons. To switch back, disable it in the mod list.';
+  }
+
+  @override
+  String get touchTipLaunchAnyway => 'Launch without it';
+
+  @override
+  String get touchTipInstallAndLaunch => 'Install and launch';
 }
 
 /// The translations for English, as used in the United Kingdom (`en_GB`).
@@ -6485,4 +6515,14 @@ class AppLocalizationsEnGb extends AppLocalizationsEn {
   @override
   String get accountsOwnershipNotice =>
       'Note: to verify game ownership, offline and external accounts can only be added and used after you sign in once with a Microsoft account that owns Minecraft.';
+
+  @override
+  String touchTipBody(Object instance) {
+    return 'TouchController is a third-party mod that brings Bedrock-style touch controls to Java Edition, with a layout you can customise. It is still early in development, so expect some rough edges.\n\nOnce it is in \"$instance\", the launcher hands in-game touch over to it from the next launch and hides its own on-screen buttons. To switch back, disable it in the mod list.';
+  }
+
+  @override
+  String touchTipBodyLaunch(Object instance) {
+    return 'TouchController is a third-party mod that brings Bedrock-style touch controls to Java Edition, with a layout you can customise. It is still early in development, so expect some rough edges.\n\nOnce it is in \"$instance\", it takes over in-game touch from this launch and the launcher hides its own on-screen buttons. To switch back, disable it in the mod list.';
+  }
 }

@@ -6089,6 +6089,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accountsOwnershipNotice => '说明：为了正版验证，离线账户和外置登录需要先登录一次拥有 Minecraft 的微软账户，确认你购买了游戏后才能添加和使用。';
+
+  @override
+  String get touchTipTitle => '试试 TouchController';
+
+  @override
+  String touchTipBody(Object instance) {
+    return 'TouchController 是第三方模组，给 Java 版带来基岩版风格的触屏操作，按键布局可以自己调整。它还在早期开发阶段，可能会遇到问题。\n\n装进「$instance」后，下次启动时启动器会把游戏内的触摸交给它，并隐藏自带的虚拟按键；想换回来，在模组里禁用它就行。';
+  }
+
+  @override
+  String get touchTipInstall => '安装';
+
+  @override
+  String get touchTipNever => '不再推荐';
+
+  @override
+  String touchTipInstalled(Object instance) {
+    return '已为 $instance 安装 TouchController，下次启动生效';
+  }
+
+  @override
+  String touchTipBodyLaunch(Object instance) {
+    return 'TouchController 是第三方模组，给 Java 版带来基岩版风格的触屏操作，按键布局可以自己调整。它还在早期开发阶段，可能会遇到问题。\n\n装进「$instance」后，这次启动就由它接管游戏内的触摸，并隐藏自带的虚拟按键；想换回来，在模组里禁用它就行。';
+  }
+
+  @override
+  String get touchTipLaunchAnyway => '直接启动';
+
+  @override
+  String get touchTipInstallAndLaunch => '安装并启动';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -12176,4 +12206,34 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get accountsOwnershipNotice => '說明：為了正版驗證，離線帳戶和外置登入需要先登入一次擁有 Minecraft 的微軟帳戶，確認你購買了遊戲後才能新增和使用。';
+
+  @override
+  String get touchTipTitle => '試試 TouchController';
+
+  @override
+  String touchTipBody(Object instance) {
+    return 'TouchController 是第三方模組，為 Java 版帶來基岩版風格的觸控操作，按鍵佈局可以自己調整。它還在早期開發階段，可能會遇到問題。\n\n裝進「$instance」後，下次啟動時啟動器會把遊戲內的觸控交給它，並隱藏內建的虛擬按鍵；想換回來，在模組裡停用它就行。';
+  }
+
+  @override
+  String get touchTipInstall => '安裝';
+
+  @override
+  String get touchTipNever => '不再推薦';
+
+  @override
+  String touchTipInstalled(Object instance) {
+    return '已為 $instance 安裝 TouchController，下次啟動生效';
+  }
+
+  @override
+  String touchTipBodyLaunch(Object instance) {
+    return 'TouchController 是第三方模組，為 Java 版帶來基岩版風格的觸控操作，按鍵佈局可以自己調整。它還在早期開發階段，可能會遇到問題。\n\n裝進「$instance」後，這次啟動就由它接管遊戲內的觸控，並隱藏內建的虛擬按鍵；想換回來，在模組裡停用它就行。';
+  }
+
+  @override
+  String get touchTipLaunchAnyway => '直接啟動';
+
+  @override
+  String get touchTipInstallAndLaunch => '安裝並啟動';
 }

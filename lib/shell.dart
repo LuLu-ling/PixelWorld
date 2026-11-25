@@ -20,6 +20,7 @@ import 'widgets/device_status.dart';
 import 'widgets/oobe.dart';
 import 'widgets/shell_layout.dart';
 import 'widgets/storage_location.dart';
+import 'widgets/touch_controller_tip.dart';
 import 'widgets/tour.dart';
 import 'widgets/update_dialog.dart';
 import 'widgets/window_buttons.dart';
@@ -98,6 +99,7 @@ class _ShellState extends State<Shell> {
   MainPage _page = MainPage.home;
   SubPage? _sub;
   StreamSubscription<CrashReport>? _crashes;
+  StreamSubscription<String>? _touchTips;
   final _navKey = GlobalKey();
   final _rootKey = GlobalKey();
   final _splitX = ValueNotifier<double?>(null);
@@ -118,6 +120,10 @@ class _ShellState extends State<Shell> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     // 游戏崩溃时弹出提示
+    _touchTips ??= AppScope.read(context).touchControllerTips.listen((id) {
+      final ctx = _navKey.currentContext;
+      if (ctx != null && ctx.mounted) showTouchControllerTip(ctx, id);
+    });
     _crashes ??= AppScope.read(context).crashes.listen((report) {
       final ctx = _navKey.currentContext;
       if (ctx != null && ctx.mounted) showCrashDialog(ctx, report);
@@ -174,6 +180,7 @@ class _ShellState extends State<Shell> {
   void dispose() {
     fileManagerRequest.removeListener(_onFileRequest);
     _crashes?.cancel();
+    _touchTips?.cancel();
     _splitX.dispose();
     super.dispose();
   }

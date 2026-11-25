@@ -9,6 +9,7 @@ import '../core/accounts.dart';
 import '../core/precheck.dart';
 import '../l10n/l10n.dart';
 import 'accounts_dialog.dart';
+import 'touch_controller_tip.dart';
 
 /// 正版购买劝导与赞助劝导的对话框
 class DialogLaunchPrompts implements LaunchPrompts {
@@ -70,6 +71,9 @@ class DialogLaunchPrompts implements LaunchPrompts {
     );
     return ok == true;
   }
+
+  @override
+  Future<void> suggestTouchController(String instanceId) => suggestTouchControllerBeforeLaunch(context, instanceId);
 
   @override
   Future<void> askSponsor(int launchCount) async {

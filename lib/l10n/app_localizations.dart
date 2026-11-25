@@ -3025,6 +3025,12 @@ abstract class AppLocalizations {
   /// **'已在浏览器中打开登录页面，请输入下面的代码（已复制到剪贴板）：'**
   String get deviceLoginDialogSignPageHasOpened;
 
+  /// No description provided for @deviceLoginDialogResumed.
+  ///
+  /// In zh, this message translates to:
+  /// **'接着完成上次的登录：在浏览器里用下面的代码完成授权后回到启动器，会自动登录。授权页面关掉了可以点下面的链接重新打开：'**
+  String get deviceLoginDialogResumed;
+
   /// No description provided for @deviceLoginDialogWaitingSign.
   ///
   /// In zh, this message translates to:

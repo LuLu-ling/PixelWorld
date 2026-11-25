@@ -488,6 +488,7 @@
   "deviceLoginDialogRetry": "Retry",
   "deviceLoginDialogAuthorizationPageHasOpened": "The authorization page has opened in your browser. Check that the code on the page matches the one below, then approve:",
   "deviceLoginDialogSignPageHasOpened": "The sign-in page has opened in your browser. Enter the code below (already copied to the clipboard):",
+  "deviceLoginDialogResumed": "Picking up your last sign-in: finish authorizing with the code below in your browser, then come back and you will be signed in automatically. If you closed the page, open it again with the link below:",
   "deviceLoginDialogWaitingSign": "Waiting for sign-in",
   "formatOtherYearsAgo": "{inDays, plural, =1{1 year ago} other{{inDays} years ago}}",
   "formatOtherMonthsAgo": "{inDays, plural, =1{1 month ago} other{{inDays} months ago}}",

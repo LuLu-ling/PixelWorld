@@ -35,13 +35,16 @@ class OfflineAuth implements AccountAuth {
 
 /// 设备代码流中展示给用户的代码与授权页面
 class DeviceCode {
-  DeviceCode({required this.userCode, required this.verificationUri, this.completeUri});
+  DeviceCode({required this.userCode, required this.verificationUri, this.completeUri, this.resumed = false});
 
   final String userCode;
   final String verificationUri;
 
   /// 已带上用户代码的授权页面（服务器提供时），打开后不需要手动输入代码
   final String? completeUri;
+
+  /// 接着等启动器上次退出前的代码：用户多半已经打开过授权页面，不再自动打开浏览器
+  final bool resumed;
 }
 
 /// Yggdrasil 角色（不含属性）

@@ -1,8 +1,15 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
+
 import 'accounts.dart';
 import 'auth/auth.dart';
 import 'auth/http_json.dart';
 import 'auth/oauth.dart';
 import 'i18n/strings.dart';
+import 'paths.dart';
+import 'safe_write.dart';
 
 const _msAuth = 'https://login.microsoftonline.com/consumers/oauth2/v2.0';
 const _scope = 'XboxLive.signin offline_access';
@@ -79,11 +86,17 @@ Future<Account> _minecraftFromMs(String msAccess, String msRefresh) async {
 }
 
 /// 微软账户的设备代码登录。用户在浏览器中输入代码，这里轮询直到完成。
+///
+/// 取得的代码会保存下来（[PendingMicrosoftLogin]）：安卓上用户去浏览器授权时启动器可能被系统杀掉，
+/// 重新打开后用 [resume] 接着等同一个代码，不用重新登录
 class MicrosoftLogin implements LoginCommand {
-  MicrosoftLogin(this.clientId, this.onCode);
+  MicrosoftLogin(this.clientId, this.onCode, {this.resume});
 
   final String clientId;
   final void Function(DeviceCode) onCode;
+
+  /// 启动器上次退出前还没完成的登录
+  final PendingDeviceCode? resume;
   bool _cancelled = false;
 
   @override
@@ -92,8 +105,59 @@ class MicrosoftLogin implements LoginCommand {
   @override
   Future<Account> execute() async {
     if (clientId.trim().isEmpty) throw Exception(tr.microsoftSetAzureAppClient);
-    final t = await _oauth(clientId).deviceLogin(_scope, onCode, cancelled: () => _cancelled);
-    return _minecraftFromMs(t.accessToken, '${t.refreshToken}');
+    Future<void>? saving;
+    try {
+      final t = await _oauth(clientId).deviceLogin(
+        _scope,
+        onCode,
+        cancelled: () => _cancelled,
+        resume: resume,
+        onPending: (c) => saving = PendingMicrosoftLogin.save(clientId, c),
+      );
+      return await _minecraftFromMs(t.accessToken, '${t.refreshToken}');
+    } finally {
+      // 成功、失败或取消后这个代码都用不上了
+      await saving;
+      await PendingMicrosoftLogin.clear();
+    }
+  }
+}
+
+/// 进行中的微软登录，保存在配置目录。代码大约 15 分钟后过期
+abstract final class PendingMicrosoftLogin {
+  static File get _file => File(p.join(Paths.configDir, 'pending-microsoft-login.json'));
+
+  static Future<void> save(String clientId, PendingDeviceCode code) async {
+    try {
+      await writeFileSafely(_file, utf8.encode(jsonEncode({...code.toJson(), 'clientId': clientId.trim()})));
+    } catch (_) {
+      // 保存不了只是不能在启动器被杀后接着登录，不影响这次登录
+    }
+  }
+
+  static Future<void> clear() async {
+    try {
+      final f = _file;
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
+  }
+
+  /// 上次退出前还没完成、也还没过期的登录；Client ID 已经换了的不算
+  static Future<PendingDeviceCode?> load(String clientId) async {
+    try {
+      final f = _file;
+      if (!await f.exists()) return null;
+      final j = jsonDecode(await f.readAsString());
+      final code = j is Map<String, dynamic> && j['clientId'] == clientId.trim() ? PendingDeviceCode.fromJson(j) : null;
+      // 留一分钟余量：快过期的代码接着等也来不及
+      if (code == null || code.expiresAt - DateTime.now().millisecondsSinceEpoch < 60000) {
+        await clear();
+        return null;
+      }
+      return code;
+    } catch (_) {
+      return null;
+    }
   }
 }
 

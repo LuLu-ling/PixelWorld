@@ -3,17 +3,15 @@ import 'package:flutter/material.dart';
 import '../app_scope.dart';
 import '../core/accounts.dart';
 import '../core/microsoft.dart';
-import '../shell.dart' show MainPage, ShellNav;
-import 'settings_group.dart';
-import 'side_nav.dart' show ContentPanel;
+import '../shell.dart' show ShellNav;
 import 'device_login_dialog.dart';
 import 'yggdrasil_login_dialog.dart';
 import '../l10n/l10n.dart';
 
-/// 打开账户管理：在主界面里切到侧栏的「账户」页；不在主界面里时打开单独的全屏页面
+/// 打开账户管理：在主界面里切到「设置 - 账户」；不在主界面里时（例如首次设置）打开单独的全屏页面
 Future<void> showAccountsDialog(BuildContext context) async {
   final nav = ShellNav.maybeOf(context);
-  if (nav != null) return nav.goMain(MainPage.accounts);
+  if (nav != null) return nav.openSettings('accounts');
   await Navigator.of(context).push<void>(
     MaterialPageRoute(
       builder: (context) => Scaffold(
@@ -24,25 +22,7 @@ Future<void> showAccountsDialog(BuildContext context) async {
   );
 }
 
-/// 侧栏的「账户」页
-class AccountsPage extends StatelessWidget {
-  const AccountsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) => ContentPanel(
-    child: ListView(
-      padding: const EdgeInsets.fromLTRB(6, 2, 16, 16),
-      children: [
-        SettingsGroup(
-          title: context.l10n.oobeAccount,
-          children: const [Padding(padding: EdgeInsets.fromLTRB(20, 16, 20, 20), child: AccountsPanel())],
-        ),
-      ],
-    ),
-  );
-}
-
-/// 账户管理：切换、添加离线 / 微软 / 外置登录账户、移除
+/// 账户管理：切换、添加离线 / 微软 / 外置登录账户、移除。放在设置页的「账户」小节里
 class AccountsPanel extends StatefulWidget {
   const AccountsPanel({super.key});
 

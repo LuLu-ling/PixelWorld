@@ -2167,12 +2167,13 @@
   "aiSearchEngineSerper": "Serper / Google（需要 Key）",
   "downloadLoadFailedRetry": "连不上 · 重试",
   "@downloadLoadFailedRetry": {"description": "加载器版本列表获取失败（连不上服务器），点一下重试；手机上要短"},
-  "precheckOwnershipRequired": "先登录一次购买了 Minecraft 的微软账户，才能使用离线账户和外置登录。",
+  "precheckOwnershipRequired": "为了正版验证，需要先登录一次购买了 Minecraft 的微软账户，才能使用离线账户和外置登录。",
   "launchDialogsVerifyOwnershipFirst": "需要先验证正版",
   "launchDialogsOwnershipRequiredBody": "Minecraft 是付费游戏。按照 Mojang 的规定，需要先登录一次购买了 Minecraft 的微软账户，才能用离线账户或外置登录开始游戏。\n\n验证一次之后，离线账户和外置登录就可以一直使用了。",
   "launchDialogsBuyGame": "去购买",
   "launchDialogsSignInMicrosoft": "登录微软账户",
   "oobeAccountHintVerified": "玩正版用微软账户，也可以用离线账户或外置登录。",
-  "oobeAccountHintUnverified": "先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。",
-  "oobeAvailableAfterVerification": "验证正版后可用"
+  "oobeAccountHintUnverified": "为了正版验证，请先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。",
+  "oobeAvailableAfterVerification": "验证正版后可用",
+  "accountsOwnershipNotice": "说明：为了正版验证，离线账户和外置登录需要先登录一次拥有 Minecraft 的微软账户，确认你购买了游戏后才能添加和使用。"
 }

@@ -6264,7 +6264,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get precheckOwnershipRequired =>
-      'Sign in once with a Microsoft account that owns Minecraft to use offline and external accounts.';
+      'To verify game ownership, sign in once with a Microsoft account that owns Minecraft before using offline and external accounts.';
 
   @override
   String get launchDialogsVerifyOwnershipFirst => 'Verify game ownership first';
@@ -6285,10 +6285,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get oobeAccountHintUnverified =>
-      'Sign in first with a Microsoft account that owns Minecraft; after that, offline and external accounts work too.';
+      'To verify game ownership, sign in first with a Microsoft account that owns Minecraft; after that, offline and external accounts work too.';
 
   @override
   String get oobeAvailableAfterVerification => 'Available after verifying ownership';
+
+  @override
+  String get accountsOwnershipNotice =>
+      'Note: to verify game ownership, offline and external accounts can only be added and used after you sign in once with a Microsoft account that owns Minecraft.';
 }
 
 /// The translations for English, as used in the United Kingdom (`en_GB`).
@@ -6469,4 +6473,8 @@ class AppLocalizationsEnGb extends AppLocalizationsEn {
 
   @override
   String get aiReplyLanguage => 'English (UK spelling)';
+
+  @override
+  String get accountsOwnershipNotice =>
+      'Note: to verify game ownership, offline and external accounts can only be added and used after you sign in once with a Microsoft account that owns Minecraft.';
 }

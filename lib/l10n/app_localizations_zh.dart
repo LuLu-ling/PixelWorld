@@ -6060,7 +6060,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadLoadFailedRetry => '连不上 · 重试';
 
   @override
-  String get precheckOwnershipRequired => '先登录一次购买了 Minecraft 的微软账户，才能使用离线账户和外置登录。';
+  String get precheckOwnershipRequired => '为了正版验证，需要先登录一次购买了 Minecraft 的微软账户，才能使用离线账户和外置登录。';
 
   @override
   String get launchDialogsVerifyOwnershipFirst => '需要先验证正版';
@@ -6079,10 +6079,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get oobeAccountHintVerified => '玩正版用微软账户，也可以用离线账户或外置登录。';
 
   @override
-  String get oobeAccountHintUnverified => '先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。';
+  String get oobeAccountHintUnverified => '为了正版验证，请先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。';
 
   @override
   String get oobeAvailableAfterVerification => '验证正版后可用';
+
+  @override
+  String get accountsOwnershipNotice => '说明：为了正版验证，离线账户和外置登录需要先登录一次拥有 Minecraft 的微软账户，确认你购买了游戏后才能添加和使用。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -12141,7 +12144,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get downloadLoadFailedRetry => '連不上 · 重試';
 
   @override
-  String get precheckOwnershipRequired => '先登入一次購買了 Minecraft 的微軟帳戶，才能使用離線帳戶和外置登入。';
+  String get precheckOwnershipRequired => '為了正版驗證，需要先登入一次購買了 Minecraft 的微軟帳戶，才能使用離線帳戶和外置登入。';
 
   @override
   String get launchDialogsVerifyOwnershipFirst => '需要先驗證正版';
@@ -12160,8 +12163,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get oobeAccountHintVerified => '玩正版用微軟帳戶，也可以用離線帳戶或外置登入。';
 
   @override
-  String get oobeAccountHintUnverified => '先登入購買了 Minecraft 的微軟帳戶，之後也能用離線帳戶和外置登入。';
+  String get oobeAccountHintUnverified => '為了正版驗證，請先登入購買了 Minecraft 的微軟帳戶，之後也能用離線帳戶和外置登入。';
 
   @override
   String get oobeAvailableAfterVerification => '驗證正版後可用';
+
+  @override
+  String get accountsOwnershipNotice => '說明：為了正版驗證，離線帳戶和外置登入需要先登入一次擁有 Minecraft 的微軟帳戶，確認你購買了遊戲後才能新增和使用。';
 }

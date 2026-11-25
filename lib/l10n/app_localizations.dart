@@ -10296,7 +10296,7 @@ abstract class AppLocalizations {
   /// No description provided for @precheckOwnershipRequired.
   ///
   /// In zh, this message translates to:
-  /// **'先登录一次购买了 Minecraft 的微软账户，才能使用离线账户和外置登录。'**
+  /// **'为了正版验证，需要先登录一次购买了 Minecraft 的微软账户，才能使用离线账户和外置登录。'**
   String get precheckOwnershipRequired;
 
   /// No description provided for @launchDialogsVerifyOwnershipFirst.
@@ -10332,7 +10332,7 @@ abstract class AppLocalizations {
   /// No description provided for @oobeAccountHintUnverified.
   ///
   /// In zh, this message translates to:
-  /// **'先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。'**
+  /// **'为了正版验证，请先登录购买了 Minecraft 的微软账户，之后也能用离线账户和外置登录。'**
   String get oobeAccountHintUnverified;
 
   /// No description provided for @oobeAvailableAfterVerification.
@@ -10340,6 +10340,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'验证正版后可用'**
   String get oobeAvailableAfterVerification;
+
+  /// No description provided for @accountsOwnershipNotice.
+  ///
+  /// In zh, this message translates to:
+  /// **'说明：为了正版验证，离线账户和外置登录需要先登录一次拥有 Minecraft 的微软账户，确认你购买了游戏后才能添加和使用。'**
+  String get accountsOwnershipNotice;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

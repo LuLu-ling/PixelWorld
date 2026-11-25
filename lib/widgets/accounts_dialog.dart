@@ -143,6 +143,11 @@ class _AccountsDialogState extends State<_AccountsDialog> {
                 label: Text(context.l10n.oobeExternalSign),
               ),
             ),
+            const SizedBox(height: 12),
+            Text(
+              context.l10n.accountsOwnershipNotice,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
           ],
         ),
       ),

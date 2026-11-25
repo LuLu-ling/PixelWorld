@@ -1698,12 +1698,13 @@
   "aiSearchEngineBrave": "Brave Search（需要 Key）",
   "aiSearchEngineSerper": "Serper / Google（需要 Key）",
   "downloadLoadFailedRetry": "連不上 · 重試",
-  "precheckOwnershipRequired": "先登入一次購買了 Minecraft 的微軟帳戶，才能使用離線帳戶和外置登入。",
+  "precheckOwnershipRequired": "為了正版驗證，需要先登入一次購買了 Minecraft 的微軟帳戶，才能使用離線帳戶和外置登入。",
   "launchDialogsVerifyOwnershipFirst": "需要先驗證正版",
   "launchDialogsOwnershipRequiredBody": "Minecraft 是付費遊戲。按照 Mojang 的規定，需要先登入一次購買了 Minecraft 的微軟帳戶，才能用離線帳戶或外置登入開始遊戲。\n\n驗證一次之後，離線帳戶和外置登入就可以一直使用了。",
   "launchDialogsBuyGame": "去購買",
   "launchDialogsSignInMicrosoft": "登入微軟帳戶",
   "oobeAccountHintVerified": "玩正版用微軟帳戶，也可以用離線帳戶或外置登入。",
-  "oobeAccountHintUnverified": "先登入購買了 Minecraft 的微軟帳戶，之後也能用離線帳戶和外置登入。",
-  "oobeAvailableAfterVerification": "驗證正版後可用"
+  "oobeAccountHintUnverified": "為了正版驗證，請先登入購買了 Minecraft 的微軟帳戶，之後也能用離線帳戶和外置登入。",
+  "oobeAvailableAfterVerification": "驗證正版後可用",
+  "accountsOwnershipNotice": "說明：為了正版驗證，離線帳戶和外置登入需要先登入一次擁有 Minecraft 的微軟帳戶，確認你購買了遊戲後才能新增和使用。"
 }

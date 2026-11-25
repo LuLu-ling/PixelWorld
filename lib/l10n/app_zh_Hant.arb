@@ -1711,5 +1711,8 @@
   "touchTipBody": "TouchController 是第三方模組，為 Java 版帶來基岩版風格的觸控操作，按鍵佈局可以自己調整。它還在早期開發階段，可能會遇到問題。\n\n裝進「{instance}」後，下次啟動時啟動器會把遊戲內的觸控交給它，並隱藏內建的虛擬按鍵；想換回來，在模組裡停用它就行。",
   "touchTipInstall": "安裝",
   "touchTipNever": "不再推薦",
-  "touchTipInstalled": "已為 {instance} 安裝 TouchController，下次啟動生效"
+  "touchTipInstalled": "已為 {instance} 安裝 TouchController，下次啟動生效",
+  "touchTipBodyLaunch": "TouchController 是第三方模組，為 Java 版帶來基岩版風格的觸控操作，按鍵佈局可以自己調整。它還在早期開發階段，可能會遇到問題。\n\n裝進「{instance}」後，這次啟動就由它接管遊戲內的觸控，並隱藏內建的虛擬按鍵；想換回來，在模組裡停用它就行。",
+  "touchTipLaunchAnyway": "直接啟動",
+  "touchTipInstallAndLaunch": "安裝並啟動"
 }

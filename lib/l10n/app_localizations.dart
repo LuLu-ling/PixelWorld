@@ -10376,6 +10376,24 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'已为 {instance} 安装 TouchController，下次启动生效'**
   String touchTipInstalled(Object instance);
+
+  /// No description provided for @touchTipBodyLaunch.
+  ///
+  /// In zh, this message translates to:
+  /// **'TouchController 是第三方模组，给 Java 版带来基岩版风格的触屏操作，按键布局可以自己调整。它还在早期开发阶段，可能会遇到问题。\n\n装进「{instance}」后，这次启动就由它接管游戏内的触摸，并隐藏自带的虚拟按键；想换回来，在模组里禁用它就行。'**
+  String touchTipBodyLaunch(Object instance);
+
+  /// No description provided for @touchTipLaunchAnyway.
+  ///
+  /// In zh, this message translates to:
+  /// **'直接启动'**
+  String get touchTipLaunchAnyway;
+
+  /// No description provided for @touchTipInstallAndLaunch.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装并启动'**
+  String get touchTipInstallAndLaunch;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

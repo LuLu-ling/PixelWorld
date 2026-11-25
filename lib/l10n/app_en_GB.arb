@@ -55,5 +55,6 @@
   "oauthAuthorizationDenied": "Authorisation denied",
   "authSignCanceled": "Sign-in cancelled",
   "aiReplyLanguage": "English (UK spelling)",
-  "accountsOwnershipNotice": "Note: to verify game ownership, offline and external accounts can only be added and used after you sign in once with a Microsoft account that owns Minecraft."
+  "accountsOwnershipNotice": "Note: to verify game ownership, offline and external accounts can only be added and used after you sign in once with a Microsoft account that owns Minecraft.",
+  "touchTipBodyLaunch": "TouchController is a third-party mod that brings Bedrock-style touch controls to Java Edition, with a layout you can customise. It is still early in development, so expect some rough edges.\n\nOnce it is in \"{instance}\", it takes over in-game touch from this launch and the launcher hides its own on-screen buttons. To switch back, disable it in the mod list."
 }

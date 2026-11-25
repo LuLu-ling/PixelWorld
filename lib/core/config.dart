@@ -131,6 +131,7 @@ class LauncherConfig extends ChangeNotifier {
     // 安卓：推荐 TouchController 模组（选了「不再推荐」后为 false），以及已经推荐过的实例
     'touchControllerTip': true,
     'touchControllerTipped': <String>[],
+    'touchControllerLaunchTipped': <String>[],
     // 启动器更新：通道为空时跟随这个构建自己的通道（见 AppInfo.channel）；启动时自动检查
     'updateChannel': '',
     'updateAutoCheck': true,
@@ -214,6 +215,11 @@ class LauncherConfig extends ChangeNotifier {
   bool get touchControllerTip => _data['touchControllerTip'] as bool? ?? true;
   List<String> get touchControllerTipped => [
     for (final x in (_data['touchControllerTipped'] as List? ?? const [])) '$x',
+  ];
+
+  /// 启动前已经推荐过 TouchController 的实例（与游戏退出后的推荐分开记）
+  List<String> get touchControllerLaunchTipped => [
+    for (final x in (_data['touchControllerLaunchTipped'] as List? ?? const [])) '$x',
   ];
   List<GameFolder> get gameFolders =>
       (_data['gameFolders'] as List).whereType<Map<String, dynamic>>().map(GameFolder.fromJson).toList();

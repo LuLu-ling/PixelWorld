@@ -54,6 +54,9 @@ abstract interface class LaunchPrompts implements AuthPrompts {
 
   /// 所选 Java 可能与版本不兼容时询问是否仍然启动
   Future<bool> confirmJava(String message);
+
+  /// 安卓：启动前推荐 TouchController；选择安装时装好再返回，这次启动就用上
+  Future<void> suggestTouchController(String instanceId);
 }
 
 /// 全局状态：设置、账户、版本列表、游戏进程与日志
@@ -166,6 +169,9 @@ class AppState extends ChangeNotifier {
   Stream<CrashReport> get crashes => _crashes.stream;
 
   final _touchControllerTips = StreamController<String>.broadcast();
+
+  /// 启动前的推荐对话框（及选择安装后的下载）进行中，此时再点启动不响应
+  bool _suggestingTouchController = false;
 
   /// 安卓：在没装 TouchController 的模组实例里玩了一会儿、正常退出后，推荐装它（值为实例 id）
   Stream<String> get touchControllerTips => _touchControllerTips.stream;
@@ -481,6 +487,15 @@ class AppState extends ChangeNotifier {
       await prompts.askOwnership();
       return false;
     }
+    if (_suggestingTouchController) return false;
+    if (await touchControllerTipDue(id, beforeLaunch: true)) {
+      _suggestingTouchController = true;
+      try {
+        await prompts.suggestTouchController(id);
+      } finally {
+        _suggestingTouchController = false;
+      }
+    }
     final count = config.launchCount + 1;
     if (shouldAskSponsor(count)) unawaited(prompts.askSponsor(count));
 
@@ -774,20 +789,25 @@ class AppState extends ChangeNotifier {
       _launcherLog(tr.appStateCouldntCollectCrashInformation(e));
     } finally {
       _afterExited(config.afterLaunch, crashed: crashed);
-      if (!crashed) _maybeTipTouchController(run);
+      if (!crashed) unawaited(_maybeTipTouchController(run));
     }
   }
 
-  /// 推荐 TouchController 的时机：安卓上用自带虚拟按键玩了至少 3 分钟、正常退出，
-  /// 实例是它支持的加载器（Fabric、Forge、NeoForge）且还没装；每个实例只推荐一次
-  void _maybeTipTouchController(GameRun run) {
-    if (!Platform.isAndroid || !config.touchControllerTip) return;
-    if (config.touchControllerTipped.contains(run.versionId)) return;
+  /// 推荐 TouchController 的共同条件：安卓上、没选过「不再推荐」、这个时机（启动前或退出后）还没推荐过，
+  /// 实例是它支持的加载器（Fabric、Forge、NeoForge）且还没装
+  Future<bool> touchControllerTipDue(String id, {required bool beforeLaunch}) async {
+    if (!Platform.isAndroid || !config.touchControllerTip) return false;
+    final tipped = beforeLaunch ? config.touchControllerLaunchTipped : config.touchControllerTipped;
+    if (tipped.contains(id)) return false;
+    final inst = instance(id);
+    if (inst == null || !const {Loader.fabric, Loader.forge, Loader.neoforge}.contains(inst.loader)) return false;
+    return !hasTouchController(await gameDirOf(inst));
+  }
+
+  /// 退出后的推荐：用自带虚拟按键玩了至少 3 分钟、正常退出
+  Future<void> _maybeTipTouchController(GameRun run) async {
     if (DateTime.now().difference(run.startedAt) < const Duration(minutes: 3)) return;
-    final inst = instance(run.versionId);
-    if (inst == null || !const {Loader.fabric, Loader.forge, Loader.neoforge}.contains(inst.loader)) return;
-    if (hasTouchController(run.gameDir)) return;
-    _touchControllerTips.add(run.versionId);
+    if (await touchControllerTipDue(run.versionId, beforeLaunch: false)) _touchControllerTips.add(run.versionId);
   }
 
   // ---------- 启动器可见性，与 PCL-CE 的 LauncherVisibility 一致 ----------

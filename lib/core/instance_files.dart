@@ -52,6 +52,8 @@ List<InstanceFile> listInstanceFiles(String gameDir, InstanceFolder folder) {
     final isDir = e is Directory;
     if (folder == InstanceFolder.saves && !isDir) continue;
     if (folder == InstanceFolder.screenshots && !_image.hasMatch(e.path)) continue;
+    final base = p.basename(e.path).toLowerCase();
+    if (base == '.ds_store' || base == '.ds_store.disabled') continue;
     try {
       final s = e.statSync();
       out.add(InstanceFile(path: e.path, size: s.size, modified: s.modified, isDir: isDir));

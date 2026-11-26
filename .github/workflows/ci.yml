@@ -1,0 +1,103 @@
+# 拉取请求的自动检查：静态分析、格式、翻译文件、自动化测试，再把各平台编译一遍。
+# 安卓 APK 和 Windows 版上传为构建产物（保留 7 天），合并前可以下载来试；
+# 这些构建按 nightly 通道打包，没有正式签名（APK 用调试签名，不能覆盖安装正式版）。
+# 推送到 main 后的检查与发布见 release.yml
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 同一个 PR 推了新提交时取消还在跑的旧检查
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 与 release.yml 保持一致
+  FLUTTER_VERSION: 3.47.9
+  PCLPW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+  PCLPW_CHANNEL: nightly
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      # window_manager 依赖的 cnativeapi 在测试时会编译本地代码，需要 GTK 3、X11、Xi 的开发包
+      - name: Dependencies
+        timeout-minutes: 20
+        run: bash .github/apt-install.sh libgtk-3-dev libx11-dev libxi-dev pkg-config
+      - run: flutter pub get
+      - name: Format
+        run: dart format -l 120 --output=none --set-exit-if-changed lib test tool
+      # 改了 .arb 后要运行 flutter gen-l10n，把生成的文件一起提交
+      - name: Localizations
+        run: |
+          flutter gen-l10n
+          git diff --exit-code -- lib/l10n || { echo "::error::lib/l10n 里生成的文件没有更新，请运行 flutter gen-l10n 后提交"; exit 1; }
+      - run: flutter analyze
+      - run: flutter test
+
+  build:
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: android, os: ubuntu-latest }
+          - { name: windows, os: windows-latest }
+          - { name: macos, os: macos-latest }
+          - { name: linux, os: ubuntu-24.04 }
+    name: build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        if: ${{ matrix.name == 'android' }}
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Dependencies
+        if: ${{ matrix.name == 'linux' }}
+        timeout-minutes: 20
+        run: bash .github/apt-install.sh clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libx11-dev libxi-dev
+      - run: flutter pub get
+      - name: Build
+        shell: bash
+        run: |
+          defines=(--dart-define=PCLPW_COMMIT="$PCLPW_COMMIT" --dart-define=PCLPW_CHANNEL="$PCLPW_CHANNEL")
+          case "${{ matrix.name }}" in
+            android) flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons "${defines[@]}" ;;
+            windows) flutter build windows --release "${defines[@]}" ;;
+            macos) flutter build macos --release "${defines[@]}" ;;
+            linux) flutter build linux --release "${defines[@]}" ;;
+          esac
+      - uses: actions/upload-artifact@v4
+        if: ${{ matrix.name == 'android' }}
+        with:
+          name: pr-android-arm64
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: ${{ matrix.name == 'windows' }}
+        with:
+          name: pr-windows-x64
+          path: build/windows/x64/runner/Release/
+          retention-days: 7

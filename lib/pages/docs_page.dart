@@ -33,7 +33,7 @@ class _DocsPageState extends State<DocsPage> {
     if (href == null || href.isEmpty || href.startsWith('#')) return;
     if (href.startsWith('http://') || href.startsWith('https://')) return _open(href);
     // 指向官网首页等站外页面
-    if (href.startsWith('../')) return _open('https://pixelworld.zhuzhi.site/${href.substring(3)}');
+    if (href.startsWith('../')) return _open('https://pixelworld.paperzhu.com/${href.substring(3)}');
     final path = href.split('#').first;
     final name = path.split('/').last;
     if (name.endsWith('.html')) {

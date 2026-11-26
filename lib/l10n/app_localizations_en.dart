@@ -2116,7 +2116,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get docsFromPixelworldZhuzhiSite => 'From pixelworld.zhuzhi.site · shows the last cached copy when offline';
+  String get docsFromPixelworldZhuzhiSite => 'From pixelworld.paperzhu.com · shows the last cached copy when offline';
 
   @override
   String get docsOpenBrowser => 'Open in browser';

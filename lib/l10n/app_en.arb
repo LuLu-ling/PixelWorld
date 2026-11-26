@@ -608,7 +608,7 @@
   "diagnoseCharactersTrimmedPrivateInformation": "{count} characters, trimmed and with private information removed",
   "diagnoseModList": "Mod list",
   "diagnoseOtherEnabledMods": "{count, plural, =1{1 enabled mod} other{{count} enabled mods}}",
-  "docsFromPixelworldZhuzhiSite": "From pixelworld.zhuzhi.site · shows the last cached copy when offline",
+  "docsFromPixelworldZhuzhiSite": "From pixelworld.paperzhu.com · shows the last cached copy when offline",
   "docsOpenBrowser": "Open in browser",
   "instanceInstanceNoLongerExists": "This instance no longer exists",
   "instanceWorlds": "Worlds",

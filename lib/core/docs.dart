@@ -10,7 +10,7 @@ import '../app_info.dart';
 import 'paths.dart';
 import 'i18n/strings.dart';
 
-/// 文档页面；id 对应 `https://pixelworld.zhuzhi.site/docs/<id>.html`
+/// 文档页面；id 对应 `https://pixelworld.paperzhu.com/docs/<id>.html`
 List<({String id, String title})> get docPages => [
   (id: 'index', title: tr.docsOverview),
   (id: 'install', title: tr.docsDownloadInstall),
@@ -23,7 +23,7 @@ List<({String id, String title})> get docPages => [
   (id: 'api', title: tr.docsLauncherAPI),
 ];
 
-const docSite = 'https://pixelworld.zhuzhi.site/docs';
+const docSite = 'https://pixelworld.paperzhu.com/docs';
 
 /// 官网不可用时从 raw.githubusercontent 读取 site 分支的内容；GitHub 直连失败时再试镜像
 const _rawDocs = 'https://raw.githubusercontent.com/zhuzhi-09/PixelWorld/site/docs/docs';

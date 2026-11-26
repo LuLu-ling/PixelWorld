@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:cryptography/cryptography.dart';
 
 import '../app_info.dart';
 import 'updater.dart';
@@ -10,11 +13,19 @@ final _client = HttpClient()
   ..connectionTimeout = const Duration(seconds: 8);
 
 /// 依次从各个接口地址获取 [file]（如 update.json），返回第一个格式有效（format 为 1）的内容；
-/// 全部失败时返回 null
-Future<Map<String, dynamic>?> fetchSiteJson(String file, {List<String>? bases}) async {
+/// 全部失败时返回 null。
+///
+/// 给了 [signedBy]（Ed25519 公钥）时，还要读取同目录的 `<file>.sig`（Base64 编码的签名），
+/// 只接受签名有效的内容；签名缺失或不对的地址当作不可用，换下一个
+Future<Map<String, dynamic>?> fetchSiteJson(String file, {List<String>? bases, List<int>? signedBy}) async {
   for (final base in bases ?? AppInfo.siteApiBases) {
     try {
-      final data = await _get('$base/$file').timeout(const Duration(seconds: 15));
+      final bytes = await _get('$base/$file').timeout(const Duration(seconds: 15));
+      if (signedBy != null) {
+        final sig = await _get('$base/$file.sig').timeout(const Duration(seconds: 15));
+        if (!await verifySiteSignature(bytes, utf8.decode(sig), signedBy)) continue;
+      }
+      final data = jsonDecode(utf8.decode(bytes));
       if (data is Map<String, dynamic> && data['format'] == 1) return data;
     } catch (_) {
       // 换下一个地址
@@ -23,15 +34,33 @@ Future<Map<String, dynamic>?> fetchSiteJson(String file, {List<String>? bases}) 
   return null;
 }
 
-Future<Object?> _get(String url) async {
+/// 用 Ed25519 公钥 [publicKey] 核对 [data] 的签名（[signature] 为 Base64 文本）
+Future<bool> verifySiteSignature(List<int> data, String signature, List<int> publicKey) async {
+  try {
+    final sig = base64.decode(signature.trim());
+    if (sig.length != 64 || publicKey.length != 32) return false;
+    return await Ed25519().verify(
+      data,
+      signature: Signature(sig, publicKey: SimplePublicKey(publicKey, type: KeyPairType.ed25519)),
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+Future<List<int>> _get(String url) async {
   final req = await _client.getUrl(Uri.parse(url));
-  req.headers.set(HttpHeaders.acceptHeader, 'application/json');
   final res = await req.close();
   if (res.statusCode != 200) {
     await res.drain<void>();
     throw HttpException('HTTP ${res.statusCode}');
   }
-  return jsonDecode(await res.transform(utf8.decoder).join());
+  final out = BytesBuilder(copy: false);
+  await for (final chunk in res) {
+    out.add(chunk);
+    if (out.length > 4 << 20) throw const HttpException('response too large');
+  }
+  return out.takeBytes();
 }
 
 /// 解析 update.json，返回各通道的最新发布（没有发布的通道不在结果中）；格式不支持时返回 null
@@ -53,9 +82,15 @@ Map<String, Release>? parseUpdateChannels(Map<String, dynamic> json) {
   return result;
 }
 
-/// 从自有接口获取各通道的最新发布；接口不可用或内容无效时返回 null
-Future<Map<String, Release>?> fetchUpdateChannels() async {
-  final json = await fetchSiteJson('update.json');
+/// 从自有接口获取各通道的最新发布；接口不可用、内容无效或签名不对时返回 null（改用 GitHub API）。
+/// 更新信息里有安装包的下载地址和 SHA-256，必须有发布工作流的签名（公钥见 AppInfo.updateSigningKey），
+/// 这样官网或镜像被他人控制时也无法让启动器安装伪造的更新
+Future<Map<String, Release>?> fetchUpdateChannels({List<String>? bases, List<int>? publicKey}) async {
+  final json = await fetchSiteJson(
+    'update.json',
+    bases: bases,
+    signedBy: publicKey ?? base64.decode(AppInfo.updateSigningKey),
+  );
   return json == null ? null : parseUpdateChannels(json);
 }
 

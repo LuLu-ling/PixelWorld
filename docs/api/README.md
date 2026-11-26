@@ -11,6 +11,10 @@
 
 由发布工作流（`.github/workflows/release.yml` 的 Update API 步骤，脚本 `tool/update_api.py`）在每次发布后自动生成，**不要手动修改**。
 
+同时生成 `update.json.sig`：用 Ed25519 私钥（仓库 Actions 密钥 `UPDATE_SIGNING_KEY`）对 `update.json` 的原始字节签名，Base64 编码。启动器内置对应的公钥（`lib/app_info.dart` 的 `updateSigningKey`），签名缺失或不对的地址会被跳过；全部不可用时改用 GitHub API。手动改了 `update.json` 签名就会失效。
+
+更换密钥：生成新的密钥对，更新 `UPDATE_SIGNING_KEY` 和 `updateSigningKey` 后发布新版本。旧版本拿着旧公钥验证不了新签名，会改用 GitHub API 检查更新，不会收不到更新。
+
 ## notices.json
 
 公告，**手动维护**：编辑后提交到 `site` 分支即可，启动器每次打开时读取，显示在首页「Minecraft 版本动态」上方。

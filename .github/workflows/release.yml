@@ -355,19 +355,38 @@ jobs:
               --title "Pixel World Nightly ($sha)" --notes "$notes" dist/*
           fi
       # 更新启动器的更新接口：官网（site 分支）的 docs/api/v1/update.json。
-      # 公告 notices.json 在 site 分支上手动维护，这里不改动
+      # 公告 notices.json 在 site 分支上手动维护，这里不改动。
+      # update.json 用 Ed25519 私钥（Actions 密钥 UPDATE_SIGNING_KEY，PEM 格式）签名，签名写到 update.json.sig；
+      # 启动器只接受签名有效的更新信息（公钥见 lib/app_info.dart 的 updateSigningKey），否则改用 GitHub API
       - name: Update API
         env:
           GH_TOKEN: ${{ github.token }}
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
         run: |
+          set -euo pipefail
           gh api "repos/$GITHUB_REPOSITORY/releases?per_page=30" > "$RUNNER_TEMP/releases.json"
           python3 tool/update_api.py "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/update.json"
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+            echo "::error::没有配置 UPDATE_SIGNING_KEY，无法给更新信息签名"
+            exit 1
+          fi
+          key="$RUNNER_TEMP/update-signing.pem"
+          (umask 077; printf '%s\n' "$UPDATE_SIGNING_KEY" > "$key")
+          openssl pkeyutl -sign -inkey "$key" -rawin -in "$RUNNER_TEMP/update.json" | base64 -w0 > "$RUNNER_TEMP/update.json.sig"
+          # 用启动器内置的公钥核对一遍，密钥配错时在这里就失败，而不是让启动器读不到更新信息
+          want=$(sed -n "s/.*updateSigningKey = '\([^']*\)'.*/\1/p" lib/app_info.dart)
+          have=$(openssl pkey -in "$key" -pubout -outform DER | tail -c 32 | base64 -w0)
+          rm -f "$key"
+          if [ "$want" != "$have" ]; then
+            echo "::error::UPDATE_SIGNING_KEY 与 lib/app_info.dart 里的 updateSigningKey 不是一对"
+            exit 1
+          fi
           git fetch --depth=1 origin site
           git worktree add "$RUNNER_TEMP/site" FETCH_HEAD
           cd "$RUNNER_TEMP/site"
           mkdir -p docs/api/v1
-          cp "$RUNNER_TEMP/update.json" docs/api/v1/update.json
-          git add docs/api/v1/update.json
+          cp "$RUNNER_TEMP/update.json" "$RUNNER_TEMP/update.json.sig" docs/api/v1/
+          git add docs/api/v1/update.json docs/api/v1/update.json.sig
           if git diff --cached --quiet; then exit 0; fi
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -m "更新接口：${GITHUB_REF_NAME} ${GITHUB_SHA::7}"

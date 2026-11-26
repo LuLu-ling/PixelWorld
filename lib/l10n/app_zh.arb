@@ -690,7 +690,7 @@
   "diagnoseModList": "模组列表",
   "diagnoseOtherEnabledMods": "{count} 个已启用的模组",
   "@diagnoseOtherEnabledMods": {"placeholders": {"count": {"type": "num"}}},
-  "docsFromPixelworldZhuzhiSite": "来自 pixelworld.zhuzhi.site · 断网时显示最近一次缓存",
+  "docsFromPixelworldZhuzhiSite": "来自 pixelworld.paperzhu.com · 断网时显示最近一次缓存",
   "docsOpenBrowser": "在浏览器打开",
   "instanceInstanceNoLongerExists": "这个实例已不存在",
   "instanceWorlds": "存档",

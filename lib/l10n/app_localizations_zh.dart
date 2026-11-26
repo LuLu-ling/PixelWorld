@@ -2006,7 +2006,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get docsFromPixelworldZhuzhiSite => '来自 pixelworld.zhuzhi.site · 断网时显示最近一次缓存';
+  String get docsFromPixelworldZhuzhiSite => '来自 pixelworld.paperzhu.com · 断网时显示最近一次缓存';
 
   @override
   String get docsOpenBrowser => '在浏览器打开';
@@ -8123,7 +8123,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get docsFromPixelworldZhuzhiSite => '來自 pixelworld.zhuzhi.site · 斷網時顯示最近一次快取';
+  String get docsFromPixelworldZhuzhiSite => '來自 pixelworld.paperzhu.com · 斷網時顯示最近一次快取';
 
   @override
   String get docsOpenBrowser => '在瀏覽器開啟';

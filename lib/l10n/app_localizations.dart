@@ -3748,7 +3748,7 @@ abstract class AppLocalizations {
   /// No description provided for @docsFromPixelworldZhuzhiSite.
   ///
   /// In zh, this message translates to:
-  /// **'来自 pixelworld.zhuzhi.site · 断网时显示最近一次缓存'**
+  /// **'来自 pixelworld.paperzhu.com · 断网时显示最近一次缓存'**
   String get docsFromPixelworldZhuzhiSite;
 
   /// No description provided for @docsOpenBrowser.

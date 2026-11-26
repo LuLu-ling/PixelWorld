@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        提交前请先看看[使用文档](https://pixelworld.zhuzhi.site/docs/)和[已有 Issues](https://github.com/zhuzhi-09/PixelWorld/issues?q=is%3Aissue+)，并确认用的是最新版本。
+        提交前请先看看[使用文档](https://pixelworld.paperzhu.com/docs/)和[已有 Issues](https://github.com/zhuzhi-09/PixelWorld/issues?q=is%3Aissue+)，并确认用的是最新版本。
         请尽量把问题写清楚；缺少日志或复现步骤时，可能无法定位，Issue 会被直接关闭。
 
   - type: checkboxes

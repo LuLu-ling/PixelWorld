@@ -6,10 +6,10 @@
 > - **Mods and resources** from Modrinth, with automatic dependency installation.
 > - **Fast downloads** from the official servers or the BMCLAPI mirror, with automatic fallback and SHA-1 verification.
 > - **Accounts**: Microsoft account sign-in through Microsoft's official OAuth device code flow (see [Authentication](#authentication)). Offline and third-party (Yggdrasil / authlib-injector) accounts are available only after game ownership has been verified with a Microsoft account.
-> - **No data collection**: no telemetry, no crash-report uploads, no author-run account server. See the [privacy policy](https://pixelworld.zhuzhi.site/docs/privacy.html).
+> - **No data collection**: no telemetry, no crash-report uploads, no author-run account server. See the [privacy policy](https://pixelworld.paperzhu.com/docs/privacy.html).
 > - **Android**: built-in game runtime with selectable renderers and touch controls.
 >
-> Downloads: [Releases](https://github.com/zhuzhi-09/PixelWorld/releases) · Website: [pixelworld.zhuzhi.site](https://pixelworld.zhuzhi.site)
+> Downloads: [Releases](https://github.com/zhuzhi-09/PixelWorld/releases) · Website: [pixelworld.paperzhu.com](https://pixelworld.paperzhu.com)
 >
 > ### Authentication
 >

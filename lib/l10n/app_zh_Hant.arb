@@ -608,7 +608,7 @@
   "diagnoseCharactersTrimmedPrivateInformation": "{count} 個字元，已截取並去除隱私資訊",
   "diagnoseModList": "模組列表",
   "diagnoseOtherEnabledMods": "{count} 個已啟用的模組",
-  "docsFromPixelworldZhuzhiSite": "來自 pixelworld.zhuzhi.site · 斷網時顯示最近一次快取",
+  "docsFromPixelworldZhuzhiSite": "來自 pixelworld.paperzhu.com · 斷網時顯示最近一次快取",
   "docsOpenBrowser": "在瀏覽器開啟",
   "instanceInstanceNoLongerExists": "這個實例已不存在",
   "instanceWorlds": "存檔",

@@ -27,6 +27,10 @@ abstract final class AppInfo {
     'https://raw.githubusercontent.com/zhuzhi-09/PixelWorld/site/docs/api/v1',
   ];
 
+  /// update.json 签名的 Ed25519 公钥（Base64，32 字节）。私钥只在仓库的 Actions 密钥 UPDATE_SIGNING_KEY 里，
+  /// 发布工作流用它签名（见 release.yml 的 Update API 步骤）。换密钥时旧版本会改用 GitHub API 检查更新
+  static const updateSigningKey = 'U0I7l4ViNu90Cc1bAwcOSGyI0Vl7CpZ+YC+dqNvrAP0=';
+
   static const repoUrl = 'https://github.com/zhuzhi-09/PixelWorld';
 
   static const authorName = 'Paper.Zhu';
